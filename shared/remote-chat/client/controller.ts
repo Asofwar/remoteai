@@ -39,6 +39,7 @@ export class ChatController {
   private synchronization = 0;
   private skillGeneration = 0;
   private active = false;
+  private transportConnected = false;
   private syncTimer?: ReturnType<typeof setTimeout>;
   private readonly images = new ImageCache(<T>(body: Parameters<ConstructorParameters<typeof ImageCache>[0]>[0]) =>
     this.connection.request<T>('request', body));
@@ -78,6 +79,9 @@ export class ChatController {
   }
 
   private changeMode(mode: ConnectionMode) {
+    // A path outage keeps the logical session, pending requests and loaded history intact.
+    if (mode !== 'offline' && this.transportConnected) { this.update({ mode }); return; }
+    this.transportConnected = mode === 'direct' || mode === 'relay';
     this.historyReader.reset();
     this.queueConnection.reset();
     if (mode === 'offline') {

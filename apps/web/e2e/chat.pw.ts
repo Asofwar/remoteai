@@ -6,7 +6,15 @@ import { attachmentJourney } from './chat-attachments';
 import { composerLayout } from './chat-composer';
 import { projectPickerJourney } from './chat-project-picker';
 
-test.beforeEach(async ({ page, request }) => {
+test.beforeEach(async ({ page, request }, info) => {
+  // Login can open chat immediately; install the network fault before any peer is created.
+  if (info.title.endsWith('over relay') || info.title.startsWith('falls back after direct discovery')) {
+    await page.addInitScript(() => {
+      window.RTCPeerConnection = class {
+        constructor() { throw new Error('Direct transport disabled for the relay regression'); }
+      } as unknown as typeof RTCPeerConnection;
+    });
+  }
   await request.post(`${fixtureUrl}/test/reset`);
   await expect.poll(async () => (await state(request)).operations.length).toBe(0);
   await page.goto('./');

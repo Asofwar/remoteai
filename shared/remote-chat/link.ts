@@ -1,26 +1,15 @@
 import { SessionCipher } from './cipher';
 import { Assembler, chunks } from './framing';
 import {
-  DIRECT_TIMEOUT_MS, RELAY_START_GRACE_MS, MAX_BUFFER_BYTES, type Channel, type ConnectionMode, type IceServer,
-  type Peer, type PeerFactory, type RpcMessage, type Signal,
+  DIRECT_TIMEOUT_MS, RELAY_START_GRACE_MS, MAX_BUFFER_BYTES, type Channel, type ConnectionMode,
+  type Peer, type RpcMessage, type Signal,
 } from './protocol';
 
-interface LinkOptions {
-  sessionId: string;
-  desktop: boolean;
-  secret: Uint8Array;
-  publicKey?: string;
-  iceServers: IceServer[];
-  createPeer: PeerFactory;
-  signal: (message: object) => void;
-  relayBuffered: () => number;
-  message: (message: RpcMessage) => void;
-  mode: (mode: ConnectionMode) => void;
-  error: (message: string) => void;
-}
+import type { LinkOptions } from './linkOptions';
+import { HotLink } from './hotLink';
 
 /** One logical encrypted connection across ICE direct transport and the admin fallback relay. */
-export class ChatLink {
+class LegacyChatLink {
   private peer?: Peer;
   private channel?: Channel;
   private cipher?: SessionCipher;
@@ -166,4 +155,24 @@ export class ChatLink {
     this.assembler.clear();
     this.changeMode('offline');
   }
+}
+
+/** Transport v2 is used only when the coordinator and both endpoints advertise support. */
+export class ChatLink {
+  private readonly implementation: LegacyChatLink | HotLink;
+  constructor(options: LinkOptions) {
+    this.implementation = options.transportVersion === 2 ? new HotLink(options) : new LegacyChatLink(options);
+  }
+  get resumable() { return this.implementation instanceof HotLink && this.implementation.resumable; }
+  offer() { return this.implementation.offer(); }
+  acceptSignal(signal: Signal) { return this.implementation.acceptSignal(signal); }
+  enableRelay() { this.implementation.enableRelay(); }
+  fallback() { this.implementation.fallback(); }
+  receive(payload: string) { this.implementation.receive(payload); }
+  send(message: RpcMessage) { return this.implementation.send(message); }
+  setRelayAvailable(available: boolean) {
+    if (this.implementation instanceof HotLink) this.implementation.setRelayAvailable(available);
+    else if (!available) this.implementation.close();
+  }
+  close() { this.implementation.close(); }
 }

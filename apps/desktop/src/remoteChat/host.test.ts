@@ -14,6 +14,7 @@ vi.mock('../../../../shared/remote-chat/link', () => ({ ChatLink: class {
     links.set(options.sessionId, { mode: options.mode, close: () => this.close() });
   }
   enableRelay() { this.options.mode('relay'); }
+  setRelayAvailable(available: boolean) { if (!available) this.close(); }
   close() {
     if (this.closed) return;
     this.closed = true;

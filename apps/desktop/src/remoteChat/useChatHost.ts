@@ -19,7 +19,7 @@ export function useChatHost() {
         const config = await invoke<ChatHostConfig | null>('remote_chat_config');
         if (stopped) return;
         if (!config) { host?.close(); host = undefined; return; }
-        if (host?.alive && JSON.stringify(host.config) === JSON.stringify(config)) return;
+        if (host?.updateConfig(config)) return;
         host?.close();
         host = new ChatHost(config, mobileConnection.setConnected);
       } catch {

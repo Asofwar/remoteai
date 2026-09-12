@@ -34,7 +34,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     });
     client.on('pong', () => { const state = this.connections.get(client); if (state) state.alive = true; });
     client.on('message', (raw: RawData, binary: boolean) => {
-      void this.receive(client, raw, binary).catch(() => client.close(4001, 'Chat connection rejected'));
+      void this.receive(client, raw, binary).catch(() => {
+        this.sessions.disconnect(client, true);
+        client.close(4001, 'Chat connection rejected');
+      });
     });
     client.once('close', () => this.handleDisconnect(client));
   }
@@ -56,7 +59,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     if (client.readyState !== WebSocket.OPEN || !this.connections.has(client)) return;
     state.identity = identity;
     clearTimeout(state.authTimer);
-    state.authTimer = setTimeout(() => client.close(4001, 'Session expired'), identity.expiresAt - Date.now());
+    state.authTimer = setTimeout(() => {
+      this.sessions.disconnect(client, true);
+      client.close(4001, 'Session expired');
+    }, identity.expiresAt - Date.now());
     this.sessions.join(client, identity, message, this.stun.iceServers());
   }
 
@@ -72,6 +78,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
   }
 
   private tick() {
+    this.sessions.prune();
     for (const [client, state] of this.connections) {
       if (!state.alive) { client.terminate(); continue; }
       state.alive = false;

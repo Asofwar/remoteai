@@ -1,5 +1,6 @@
 import { Fragment, memo, useMemo } from "react";
 import type { Item, Turn } from "./types";
+import type { SubmitMessageEdit } from "./messageEditContent";
 import { MessageItem } from "./MessageItem";
 import { TurnDuration } from "./TurnDuration";
 import { TurnPlan } from "./TurnPlan";
@@ -17,7 +18,7 @@ export { groupTurnItems } from "../../../../../shared/chat/turnGroups";
 export const TurnMessage = memo(function TurnMessage({ turn, running, active, followsInterruption = false,
   editableItemId, onEdit, editDisabled, threadId, visibleItems = turn.items }: {
   turn: Turn; running: boolean; active: boolean; followsInterruption?: boolean;
-  editableItemId?: string; onEdit?: (text: string) => Promise<boolean>; editDisabled?: boolean;
+  editableItemId?: string; onEdit?: SubmitMessageEdit; editDisabled?: boolean;
   threadId?: string;
   visibleItems?: Item[];
 }) {

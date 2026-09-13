@@ -61,8 +61,8 @@ export function Messages({ value, selected, active = true, footer, pendingReques
             threadId={selected ?? undefined}
             editableItemId={last?.turnId === turn.id ? last.item.id : undefined}
             editDisabled={editDisabled || Boolean(value?.activeTurn || pendingRequest || last?.item.localEcho)}
-            onEdit={onEdit && selected && last ? (text) => onEdit({ threadId: selected,
-              turnId: turn.id, itemId: last.item.id, text }) : undefined}
+            onEdit={onEdit && selected && last ? (content) => onEdit({ threadId: selected,
+              turnId: turn.id, itemId: last.item.id, ...content }) : undefined}
             followsInterruption={followsInterruption}
             running={value?.activeTurn === turn.id} active={active} />)}
           {value?.error && <p className={styles.turnError} role="status">{value.error}</p>}

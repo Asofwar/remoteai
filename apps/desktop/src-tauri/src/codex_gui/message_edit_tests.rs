@@ -42,6 +42,58 @@ fn edit_replaces_all_text_and_preserves_every_attachment() {
 }
 
 #[test]
+fn edit_removes_only_selected_images_and_preserves_other_references() {
+    let source = history();
+    let mut request = edit();
+    request.removed_image_indexes = vec![0];
+    let input = edited_input(&source, &request).unwrap();
+    assert_eq!(input.len(), 4);
+    assert_eq!(input[1]["type"], "image");
+    assert_eq!(input[2]["type"], "skill");
+    assert_eq!(input[3]["type"], "mention");
+    request.removed_image_indexes = vec![0, 1];
+    assert_eq!(edited_input(&source, &request).unwrap().len(), 3);
+    assert_eq!(
+        source["turns"][1]["items"][0]["content"]
+            .as_array()
+            .unwrap()
+            .len(),
+        6
+    );
+}
+
+#[test]
+fn removing_images_from_a_steering_message_keeps_earlier_images() {
+    let mut source = history();
+    source["turns"][1]["items"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({
+        "id": "steering", "type": "userMessage", "content": [
+            {"type": "text", "text": "补充"}, {"type": "localImage", "path": "D:/remove.png"}]}));
+    let mut request = edit();
+    request.item_id = "steering".into();
+    request.removed_image_indexes = vec![0];
+    let input = edited_input(&source, &request).unwrap();
+    assert_eq!(input.len(), 7);
+    assert_eq!(input[2]["path"], "D:/photo.png");
+    assert_eq!(input[3]["type"], "image");
+    assert_eq!(input.last().unwrap()["text"], request.text);
+}
+
+#[tokio::test]
+async fn invalid_image_removal_is_rejected_before_rewinding() {
+    let mut request = edit();
+    request.removed_image_indexes = vec![2];
+    let result = replace_message(&request, json!({"threadId": "thread"}), |method, _| {
+        assert!(matches!(method, "thread/resume" | "thread/read"));
+        std::future::ready(Ok(json!({"thread": history()})))
+    })
+    .await;
+    assert!(result.is_err());
+}
+
+#[test]
 fn edit_rejects_stale_targets_and_running_threads() {
     let mut request = edit();
     request.item_id = "old".into();

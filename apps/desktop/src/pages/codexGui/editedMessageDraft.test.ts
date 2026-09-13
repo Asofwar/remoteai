@@ -22,3 +22,18 @@ it("recovers the edited text, earlier steering inputs, and all attached referenc
         { kind: "plugin", name: "plugin", path: "plugin://example" },
       ] });
 });
+
+it("does not restore removed images or remove images from earlier steering inputs", () => {
+  const source = conversation({ id: "thread", cwd: "", preview: "", updatedAt: 0, turns: [
+    { id: "last", status: "interrupted", items: [
+      { id: "first", type: "userMessage", content: [{ type: "localImage", path: "D:/earlier.png" }] },
+      { id: "edit", type: "userMessage", content: [
+        { type: "localImage", path: "D:/remove.png" }, { type: "text", text: "old text" },
+        { type: "image", url: "https://example.com/keep.png" },
+      ] },
+    ] },
+  ] });
+  expect(editedMessageDraft(source, { threadId: "thread", turnId: "last", itemId: "edit",
+    text: "edited", removedImageIndexes: [0] }).images)
+    .toEqual(["D:/earlier.png", "https://example.com/keep.png"]);
+});

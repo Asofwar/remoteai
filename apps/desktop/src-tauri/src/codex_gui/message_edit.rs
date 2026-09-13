@@ -24,6 +24,8 @@ pub(crate) struct EditRequest {
     turn_id: String,
     item_id: String,
     text: String,
+    #[serde(default)]
+    removed_image_indexes: Vec<usize>,
     model: Option<String>,
     effort: Option<String>,
     access: AccessMode,
@@ -83,12 +85,7 @@ fn edited_input(thread: &Value, edit: &EditRequest) -> Result<Vec<Value>> {
             .ok_or(GuiError::InvalidRequest)?;
         if message["id"] == edit.item_id {
             input.push(json!({"type": "text", "text": edit.text, "text_elements": []}));
-            input.extend(
-                content
-                    .iter()
-                    .filter(|part| part["type"] != "text")
-                    .cloned(),
-            );
+            input.extend(retained_attachments(content, &edit.removed_image_indexes)?);
             break;
         }
         input.extend(content.iter().cloned());
@@ -172,6 +169,28 @@ where
         json!({"threadId": edit.thread_id, "includeTurns": true}),
     )
     .await
+}
+
+fn retained_attachments(content: &[Value], removed: &[usize]) -> Result<Vec<Value>> {
+    let is_image = |part: &&Value| part["type"] == "image" || part["type"] == "localImage";
+    let image_count = content.iter().filter(is_image).count();
+    let removed: std::collections::BTreeSet<_> = removed.iter().copied().collect();
+    if removed.iter().any(|index| *index >= image_count) {
+        return Err(GuiError::InvalidRequest);
+    }
+    let mut image_index = 0;
+    Ok(content
+        .iter()
+        .filter(|part| {
+            if !is_image(part) {
+                return part["type"] != "text";
+            }
+            let retain = !removed.contains(&image_index);
+            image_index += 1;
+            retain
+        })
+        .cloned()
+        .collect())
 }
 
 async fn replace_message<F, Fut>(

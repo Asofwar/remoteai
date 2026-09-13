@@ -1,5 +1,6 @@
 import { memo } from "react";
 import type { Item } from "./types";
+import type { SubmitMessageEdit } from "./messageEditContent";
 import { ActivityRow } from "./ActivityRow";
 import { RichText } from "./RichText";
 import { CopyButton } from "./CopyButton";
@@ -31,7 +32,7 @@ function toolText(item: Item) {
 
 export const MessageItem = memo(function MessageItem({ item, streaming, startedAt, onEdit, editDisabled }: {
   item: Item; streaming: boolean; startedAt?: number | null;
-  onEdit?: (text: string) => Promise<boolean>; editDisabled?: boolean;
+  onEdit?: SubmitMessageEdit; editDisabled?: boolean;
 }) {
   if (item.type === "userMessage") return <UserMessage item={item} startedAt={startedAt}
     onEdit={onEdit} editDisabled={editDisabled} />;

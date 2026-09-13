@@ -4,11 +4,124 @@
   font-size: 14px;
 }
 
-.editor {
-  width: min(560px, 65vw);
+.editingMessage.editingMessage {
+  --edit-background: #f3f3f3;
+  --edit-text: #1b1c1d;
+  --edit-cancel-background: #fff;
+  --edit-cancel-border: #e8e8e8;
+  --edit-send-background: #1b1c1d;
+  --edit-send-text: #fff;
+  width: 100%;
   max-width: 100%;
-  white-space: normal;
-  p { max-width: 400px; margin: 10px 0; font-size: 12px; color: var(--gui-muted); }
+
+  .bubble {
+    padding: 18px;
+    border-radius: 28px;
+    background: var(--edit-background);
+    color: var(--edit-text);
+  }
 }
 
-.editorActions { display: flex; justify-content: flex-end; gap: 8px; }
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 114px;
+  white-space: normal;
+
+  textarea.editorInput {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--edit-text);
+    font: inherit;
+    font-size: 16px;
+    line-height: 24px;
+    resize: none;
+  }
+}
+
+.editorActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: auto;
+
+  .cancelButton, .sendButton {
+    height: 40px;
+    padding-inline: 14px;
+    border-radius: 14px;
+    box-shadow: none;
+    font-size: 16px;
+    line-height: 24px;
+    &:focus-visible { outline: 2px solid var(--edit-text); outline-offset: 3px; }
+    &:disabled { opacity: 0.45; }
+  }
+
+  .cancelButton, .cancelButton:not(:disabled):hover, .cancelButton:not(:disabled):active {
+    border-color: var(--edit-cancel-border);
+    background: var(--edit-cancel-background);
+    color: var(--edit-text);
+  }
+
+  .sendButton, .sendButton:not(:disabled):hover, .sendButton:not(:disabled):active {
+    border-color: transparent;
+    background: var(--edit-send-background);
+    color: var(--edit-send-text);
+    font-weight: 600;
+  }
+
+  button:not(:disabled):hover { filter: brightness(0.94); }
+}
+
+.editorImages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.editorImage {
+  position: relative;
+  width: 96px;
+  flex: 0 0 auto;
+  max-width: 100%;
+  > button:first-child, > span { margin: 0; }
+  > button:first-child {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 96px;
+    img { width: 100%; height: 100%; object-fit: contain; }
+  }
+
+  .removeImage {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 2px solid var(--edit-background);
+    border-radius: 50%;
+    background: #1b1c1d;
+    color: #fff;
+    cursor: pointer;
+    &:focus-visible { outline: 2px solid var(--edit-text); outline-offset: 2px; }
+    &:disabled { opacity: 0.45; cursor: default; }
+  }
+}
+
+:global(:root[data-theme='dark']) .editingMessage {
+  --edit-background: #2b2b2b;
+  --edit-text: #f2f2f2;
+  --edit-cancel-background: #353535;
+  --edit-cancel-border: #484848;
+  --edit-send-background: #f2f2f2;
+  --edit-send-text: #1b1c1d;
+}

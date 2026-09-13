@@ -193,7 +193,8 @@ export type Request =
   | ({ operation: "projectFiles" } & import('../../../../../shared/remote-chat/projectFiles').ProjectFilesRequest)
   | { operation: "projectDirectories"; directory: string }
   | { operation: "editMessage"; threadId: string; turnId: string; itemId: string; text: string;
-      removedImageIndexes?: number[]; model?: string; effort?: string; access: AccessMode; cwd?: string }
+      removedImageIndexes?: number[]; images?: string[]; skills?: SkillReference[];
+      model?: string; effort?: string; access: AccessMode; cwd?: string }
   | { operation: "imagePreview"; threadId: string; source: string; variant?: "thumbnail" | "original"; maxBytes?: number }
   | { operation: "goalGet" | "goalClear"; threadId: string }
   | { operation: "goalSet"; threadId: string; objective?: string; status: "active" | "paused" }

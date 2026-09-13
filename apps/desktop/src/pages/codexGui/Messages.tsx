@@ -16,12 +16,14 @@ import type { ReplyQuote } from "./replyQuotes";
 import styles from "./styles.module.less";
 import { ImageThreadContext } from "./useImageSource";
 import { FileThreadContext } from "./fileApi";
+import { MessageEditContext } from "./messageEditContext";
 
-export function Messages({ value, selected, active = true, footer, pendingRequest, onQuote, onEdit, editDisabled }: {
+export function Messages({ value, selected, active = true, footer, pendingRequest, onQuote,
+  onEdit, editDisabled, editCwd }: {
   value?: Conversation; selected: string | null; active?: boolean; footer?: ReactNode;
   pendingRequest?: PendingRequest;
   onQuote?: (quote: ReplyQuote) => boolean;
-  onEdit?: EditMessage; editDisabled?: boolean;
+  onEdit?: EditMessage; editDisabled?: boolean; editCwd?: string;
 }) {
   const last = lastUserMessage(value);
   const { viewport, content, away, onScroll, jumpToLatest, pauseFollowing } = useFollowScroll(selected, active);
@@ -31,7 +33,8 @@ export function Messages({ value, selected, active = true, footer, pendingReques
   const sending = pendingRequest && pendingRequest.threadId === selected && !value?.activeTurn;
   const processing = value?.processing;
   const startedAtMs = processing?.startedAtMs ?? (turn?.startedAt == null ? undefined : turn.startedAt * SECOND_MS);
-  return <FileThreadContext.Provider value={selected}>
+  return <MessageEditContext.Provider value={{ cwd: editCwd ?? value?.thread.cwd ?? "", active }}>
+    <FileThreadContext.Provider value={selected}>
     <ImageThreadContext.Provider value={selected}><div className={styles.messageArea}>
     {quote.selection && <QuoteSelectionButton selection={quote.selection} onQuote={() => {
       const current = content.current ? selectedQuote(content.current) : null;
@@ -78,5 +81,5 @@ export function Messages({ value, selected, active = true, footer, pendingReques
         </div>
       </div>
     </div>
-  </div></ImageThreadContext.Provider></FileThreadContext.Provider>;
+  </div></ImageThreadContext.Provider></FileThreadContext.Provider></MessageEditContext.Provider>;
 }

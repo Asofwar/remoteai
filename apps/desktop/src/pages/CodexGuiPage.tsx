@@ -144,6 +144,7 @@ function Workspace({ active, accountPicker, providers, aggregateApis, windowCont
       <div className={paneStyles.conversation} hidden={view !== "conversation"}>
       {!installer.version ? <Installer installer={installer} /> :
         <Messages value={current} selected={state.selected} active={conversationActive}
+          editCwd={state.selected ? state.projectOverrides[state.selected] : undefined}
           onEdit={controller.messageEditor.submit} editDisabled={!canEditMessage(state)}
           onQuote={canQuote ? (quote) => composer.current?.addQuote(quote) ?? false : undefined}
           pendingRequest={state.pendingRequest} footer={<>

@@ -1,5 +1,102 @@
 use super::*;
 
+const PASTED_IMAGE: &str = "data:image/png;base64,iVBORw0KGgo=";
+
+#[tokio::test]
+async fn pasted_images_and_selected_skills_are_sent_with_retained_attachments() {
+    let directory = std::env::temp_dir().join(format!("edit-skill-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let path = directory.join("SKILL.md");
+    std::fs::write(&path, "# Test skill").unwrap();
+    let mut edit = edit();
+    edit.images = vec![PASTED_IMAGE.into()];
+    edit.skills = Some(vec![serde_json::from_value(
+        json!({ "name": "test", "path": path }),
+    )
+    .unwrap()]);
+    edit.removed_image_indexes = vec![0];
+    let (_, params) = send_request(&edit).into_rpc().unwrap();
+    let result = replace_message(&edit, params, |method, params| {
+        std::future::ready(Ok(match method {
+            "thread/resume" | "thread/read" => json!({"thread": history()}),
+            "thread/rollback" => json!({"thread": {"id": "thread", "turns": []}}),
+            "turn/start" => {
+                assert_eq!(
+                    params["input"],
+                    json!([
+                        {"type": "text", "text": edit.text, "text_elements": []},
+                        {"type": "image", "url": "https://example.com/image.png"},
+                        {"type": "mention", "name": "plugin", "path": "plugin://example"},
+                        {"type": "image", "url": PASTED_IMAGE},
+                        {"type": "skill", "name": "test", "path": path},
+                    ])
+                );
+                json!({"turn": {"id": "replacement"}})
+            }
+            _ => panic!("unexpected operation: {method}"),
+        }))
+    })
+    .await;
+    std::fs::remove_dir_all(&directory).unwrap();
+    assert!(result.is_ok());
+}
+
+#[test]
+fn edit_additions_use_normal_image_and_skill_validation() {
+    let mut edit = edit();
+    for image in [
+        "data:image/png;base64,bm90LWltYWdl",
+        "relative.png",
+        "https://example.com/new.png",
+    ] {
+        edit.images = vec![image.into()];
+        assert!(send_request(&edit).into_rpc().is_err());
+    }
+    edit.images.clear();
+    edit.skills = Some(vec![serde_json::from_value(
+        json!({ "name": "test", "path": "relative/SKILL.md" }),
+    )
+    .unwrap()]);
+    assert!(send_request(&edit).into_rpc().is_err());
+}
+
+#[tokio::test]
+async fn retained_and_pasted_images_share_a_limit_before_rewind() {
+    let mut edit = edit();
+    edit.images = vec![PASTED_IMAGE.into(); 7];
+    let (_, params) = send_request(&edit).into_rpc().unwrap();
+    assert!(replace_message(&edit, params, |method, _| {
+        assert!(matches!(method, "thread/resume" | "thread/read"));
+        std::future::ready(Ok(json!({"thread": history()})))
+    })
+    .await
+    .is_err());
+    edit.removed_image_indexes = vec![0];
+    assert!(edited_input(&history(), &edit).is_ok());
+}
+
+#[test]
+fn clearing_skills_only_changes_the_target_message() {
+    let mut source = history();
+    source["turns"][1]["items"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({
+        "id": "steering", "type": "userMessage", "content": [
+            {"type": "text", "text": "followup"},
+            {"type": "skill", "name": "remove", "path": "D:/remove/SKILL.md"}]}));
+    let mut edit = edit();
+    edit.item_id = "steering".into();
+    edit.skills = Some(vec![]);
+    let input = edited_input(&source, &edit).unwrap();
+    let skills: Vec<_> = input
+        .iter()
+        .filter(|part| part["type"] == "skill")
+        .collect();
+    assert_eq!(skills.len(), 1);
+    assert_eq!(skills[0]["name"], "skill");
+}
+
 fn edit() -> EditRequest {
     serde_json::from_value(
         json!({"threadId": "thread", "turnId": "last", "itemId": "question",

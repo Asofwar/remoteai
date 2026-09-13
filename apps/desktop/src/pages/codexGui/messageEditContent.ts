@@ -1,6 +1,12 @@
-import type { Content } from "./types";
+import type { Content, SkillReference } from "./types";
 
-export interface MessageEditContent { text: string; removedImageIndexes?: number[] }
+export interface MessageEditContent {
+  text: string;
+  removedImageIndexes?: number[];
+  images?: string[];
+  /** When present, replaces the edited message's skill references, including an empty selection. */
+  skills?: SkillReference[];
+}
 export type SubmitMessageEdit = (content: MessageEditContent) => Promise<boolean>;
 
 export function isMessageImage(part: Content): boolean {

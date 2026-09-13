@@ -30,7 +30,9 @@
   min-height: 114px;
   white-space: normal;
 
-  textarea.editorInput {
+  .editorInput {
+    min-height: 49px;
+    max-height: 343px;
     padding: 0;
     border: 0;
     border-radius: 0;
@@ -41,6 +43,8 @@
     resize: none;
   }
 }
+
+.editorError { margin: 0; max-width: 400px; color: #b74b2b; font-size: 12px; white-space: normal; }
 
 .editorActions {
   display: flex;

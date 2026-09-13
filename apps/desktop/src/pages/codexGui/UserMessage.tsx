@@ -34,6 +34,8 @@ export function UserMessage({ item, startedAt, onEdit, editDisabled = false }: {
           {part.path?.startsWith("plugin://") ? "插件" : "附件"}：{part.name || part.path}
         </span>)}
       {editing && onEdit ? <UserMessageEditor text={text} images={parts.filter(isMessageImage)}
+        skills={parts.flatMap((part) => part.type === "skill" && part.path
+          ? [{ name: part.name ?? "", path: part.path }] : [])}
         disabled={editDisabled} onSubmit={onEdit}
         onCancel={() => setEditing(false)} /> : <div>{text}</div>}
     </div>

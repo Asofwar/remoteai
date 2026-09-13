@@ -108,7 +108,7 @@ async fn editing_resumes_rolls_back_and_sends_on_the_original_thread() {
     let result = replace_message(&edit(), json!({"threadId": "thread"}), |method, params| {
         calls.push((method, params));
         std::future::ready(Ok(match method {
-            "thread/resume" => json!({"thread": history()}),
+            "thread/resume" | "thread/read" => json!({"thread": history()}),
             "thread/rollback" => {
                 json!({"thread": {"id": "thread", "turns": [history()["turns"][0]]}})
             }
@@ -120,11 +120,17 @@ async fn editing_resumes_rolls_back_and_sends_on_the_original_thread() {
     .unwrap();
     assert_eq!(
         calls.iter().map(|call| call.0).collect::<Vec<_>>(),
-        ["thread/resume", "thread/rollback", "turn/start"]
+        [
+            "thread/resume",
+            "thread/read",
+            "thread/rollback",
+            "turn/start"
+        ]
     );
     assert!(calls.iter().all(|call| call.1["threadId"] == "thread"));
-    assert_eq!(calls[1].1["numTurns"], 1);
-    assert_eq!(calls[2].1["input"][0]["text"], edit().text);
+    assert_eq!(calls[1].1["includeTurns"], true);
+    assert_eq!(calls[2].1["numTurns"], 1);
+    assert_eq!(calls[3].1["input"][0]["text"], edit().text);
     assert_eq!(result["thread"]["id"], "thread");
     assert_eq!(result["turn"]["id"], "replacement");
 }
@@ -133,7 +139,7 @@ async fn editing_resumes_rolls_back_and_sends_on_the_original_thread() {
 async fn failed_resend_returns_rolled_back_history_without_archiving_the_thread() {
     let result = replace_message(&edit(), json!({"threadId": "thread"}), |method, _| {
         std::future::ready(match method {
-            "thread/resume" => Ok(json!({"thread": history()})),
+            "thread/resume" | "thread/read" => Ok(json!({"thread": history()})),
             "thread/rollback" => Ok(json!({"thread": {"id": "thread", "turns": []}})),
             "turn/start" => Err(GuiError::Timeout),
             _ => panic!("unexpected operation: {method}"),
@@ -153,7 +159,7 @@ async fn paginated_edit_uses_revert_and_keeps_the_retained_history() {
     source["historyMode"] = json!("paginated");
     let result = replace_message(&edit(), json!({"threadId": "thread"}), |method, params| {
         std::future::ready(Ok(match method {
-            "thread/resume" => json!({"thread": source}),
+            "thread/resume" | "thread/read" => json!({"thread": source}),
             "thread/revert" => {
                 assert_eq!(
                     params,
@@ -192,4 +198,64 @@ fn edit_requests_validate_text_and_identifiers() {
         assert!(validate(&request).is_err());
     }
     assert!(validate(&edit()).is_ok());
+}
+
+#[tokio::test]
+async fn interrupted_edit_uses_persisted_ids_and_attachments_after_resume() {
+    let mut source = history();
+    source["historyMode"] = json!("paginated");
+    source["turns"][1]["status"] = json!("interrupted");
+    let mut resumed = source.clone();
+    resumed["turns"][1]["items"][0]["id"] = json!("item-1");
+    resumed["turns"][1]["items"][0]["content"] = json!([]);
+    let result = replace_message(&edit(), json!({"threadId": "thread"}), |method, params| {
+        std::future::ready(Ok(match method {
+            "thread/resume" => json!({"thread": resumed}),
+            "thread/read" => {
+                assert_eq!(params, json!({"threadId": "thread", "includeTurns": true}));
+                json!({"thread": source})
+            }
+            "thread/revert" => {
+                assert_eq!(params["beforeTurnId"], "last");
+                json!({"thread": {"id": "thread", "turns": []}})
+            }
+            "turn/start" => {
+                assert_eq!(
+                    params["input"],
+                    json!(edited_input(&source, &edit()).unwrap())
+                );
+                json!({"turn": {"id": "replacement"}})
+            }
+            _ => panic!("unexpected operation: {method}"),
+        }))
+    })
+    .await
+    .unwrap();
+    assert_eq!(result["turn"]["id"], "replacement");
+    assert_eq!(result["thread"]["turns"], json!([source["turns"][0]]));
+}
+
+#[tokio::test]
+async fn edit_does_not_rewind_when_fresh_history_is_stale_active_or_unavailable() {
+    let mut stale = history();
+    stale["turns"][1]["items"][0]["id"] = json!("newer-message");
+    let mut active = history();
+    active["status"]["type"] = json!("active");
+    for fresh in [Some(stale), Some(active), None] {
+        let mut calls = Vec::new();
+        let result = replace_message(&edit(), json!({"threadId": "thread"}), |method, _| {
+            calls.push(method);
+            std::future::ready(match method {
+                "thread/resume" => Ok(json!({"thread": history()})),
+                "thread/read" => fresh
+                    .as_ref()
+                    .map(|thread| json!({"thread": thread}))
+                    .ok_or(GuiError::Timeout),
+                _ => panic!("must not mutate history: {method}"),
+            })
+        })
+        .await;
+        assert!(result.is_err());
+        assert_eq!(calls, ["thread/resume", "thread/read"]);
+    }
 }

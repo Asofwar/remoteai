@@ -149,10 +149,10 @@ pub(super) async fn submit(client: &Client, edit: EditRequest) -> Result<GuiResp
     Ok(GuiResponse { data })
 }
 
-async fn replace_message<F, Fut>(
+async fn load_edit_history<F, Fut>(
     edit: &EditRequest,
-    mut params: Value,
-    mut request: F,
+    params: &Value,
+    request: &mut F,
 ) -> Result<Value>
 where
     F: FnMut(&'static str, Value) -> Fut,
@@ -164,7 +164,26 @@ where
     if let Some(cwd) = params.get("cwd") {
         resume["cwd"] = cwd.clone();
     }
-    let source = request("thread/resume", resume).await?;
+    request("thread/resume", resume).await?;
+    // Interrupted turns can get transient item IDs in resume responses. Read the
+    // persisted history used by the UI so stale-target checks compare stable IDs.
+    request(
+        "thread/read",
+        json!({"threadId": edit.thread_id, "includeTurns": true}),
+    )
+    .await
+}
+
+async fn replace_message<F, Fut>(
+    edit: &EditRequest,
+    mut params: Value,
+    mut request: F,
+) -> Result<Value>
+where
+    F: FnMut(&'static str, Value) -> Fut,
+    Fut: std::future::Future<Output = Result<Value>>,
+{
+    let source = load_edit_history(edit, &params, &mut request).await?;
     // Attachments come from the server's stored message, never arbitrary frontend content.
     params["input"] = json!(edited_input(&source["thread"], edit)?);
     let (method, rewind) = rewind_request(&source["thread"], edit)?;

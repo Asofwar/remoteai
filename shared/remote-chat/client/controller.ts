@@ -337,7 +337,8 @@ export class ChatController {
   }
 
   async loadOlder() {
-    if (!this.state.historyHasMore || !this.state.ready) return;
+    // A manual pull retries even after the PC previously reported the beginning of history.
+    if (!this.state.selected || !this.state.ready) return;
     if (this.refreshThreadId === this.state.selected?.id) {
       if (!this.state.historyLoadingMore) {
         this.olderQueued = true;

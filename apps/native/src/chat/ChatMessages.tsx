@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Keyboard, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Keyboard, Pressable, RefreshControl, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useChatScroll } from './useChatScroll';
+import { useHistoryRefresh } from './useHistoryRefresh';
 import { ChatMessage } from './ChatMessage';
 import { ChatToolDetails } from './ChatToolDetails';
 import { ChatWorkDrawer } from './ChatWorkDrawer';
@@ -39,10 +40,11 @@ function TimelineEntry({ entry, open }: { entry: TurnEntry; open: (selection: Se
 
 export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder }: ChatMessagesProps) {
   const entries = useMemo(() => conversationEntries(thread?.turns ?? []), [thread?.turns]);
-  const { list, more, preservePosition, initializing, onItemLayout, onFooterLayout, ...scrollHandlers }
+  const { list, more, preservePosition, historyBottomSpace, initializing, onItemLayout, onFooterLayout, ...scrollHandlers }
     = useChatScroll<TurnEntry>({ hasMore, loading, loadingMore, loadOlder,
       latestItemId: entries.at(-1)?.id, bottomPadding: styles.messages.padding });
-  const showInitialLoading = initializing || (loading && !entries.length);
+  const refresh = useHistoryRefresh(more, loadingMore);
+  const showInitialLoading = initializing || (loading && !loadingMore && !entries.length);
   const [selection, setSelection] = useState<Selection | null>(null);
   const open = useCallback((value: Selection) => { Keyboard.dismiss(); setSelection(value); }, []);
   // Resolve against live history so open process, plan, output and diff drawers keep receiving updates.
@@ -64,22 +66,27 @@ export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder 
     keyboardShouldPersistTaps="handled" initialNumToRender={10}
     // Keep message views attached while the keyboard changes the native clipping bounds.
     removeClippedSubviews={false}
-    maintainVisibleContentPosition={preservePosition ? { minIndexForVisible: 1 } : undefined}
+    alwaysBounceVertical
+    refreshControl={<RefreshControl {...refresh} colors={[palette.green]} tintColor={palette.green}
+      progressBackgroundColor={palette.background} />}
+    // FlatList accounts for the header itself; anchor the first message even in a one-message conversation.
+    maintainVisibleContentPosition={preservePosition ? { minIndexForVisible: 0 } : undefined}
     {...scrollHandlers} scrollEventThrottle={100}
-    ListHeaderComponent={hasMore ? <View style={[styles.historyStatus, styles.messageHeader]}>
-      {loadingMore ? <>
+    ListHeaderComponent={<View style={hasMore && [styles.historyStatus, styles.messageHeader]}>
+      {hasMore && (loadingMore ? <>
         <ActivityIndicator size="small" accessibilityLabel="正在加载聊天记录" />
         <Text style={styles.subtitle}>正在加载聊天记录…</Text>
       </> : <Pressable accessibilityRole="button" onPress={more}>
         <Text style={styles.subtitle}>加载更早的消息</Text>
-      </Pressable>}
-    </View> : null}
-    ListEmptyComponent={loading ? null : <View style={styles.empty}>
+      </Pressable>)}
+    </View>}
+    ListEmptyComponent={showInitialLoading ? null : <View style={styles.empty}>
       <Ionicons name="terminal-outline" size={28} color={palette.green} />
       <Text style={styles.title}>想一起完成什么？</Text>
       <Text style={[styles.subtitle, styles.centerText]}>直接提问，或选择一个项目开始任务。</Text>
     </View>}
-    ListFooterComponent={<View style={styles.messageFooter} onLayout={onFooterLayout} />} />
+    ListFooterComponent={<View style={[styles.messageFooter, { paddingBottom: historyBottomSpace }]}
+      onLayout={onFooterLayout} />} />
     {showInitialLoading && <View style={styles.messageLoadingOverlay}>
       <ActivityIndicator size="small" accessibilityLabel="正在加载聊天记录" />
       <Text style={[styles.subtitle, styles.messageLoadingText]}>正在加载聊天记录…</Text>

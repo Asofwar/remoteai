@@ -7,6 +7,18 @@ export function seedDemoHistory(thread: Thread) {
   })) }];
 }
 
+export function seedDemoCompactHistory(thread: Thread) {
+  thread.turns = [{ id: 'compact-history', status: 'completed', items: [
+    ...Array.from({ length: 25 }, (_, index) => ({
+      id: `compact-${index}`, type: 'userMessage', text: `更早的消息 ${index + 1}`,
+    })),
+    ...Array.from({ length: 9 }, (_, index) => ({
+      id: `compact-tool-${index}`, type: 'commandExecution', command: 'echo test', status: 'completed',
+    })),
+    { id: 'compact-answer', type: 'agentMessage', text: '处理完成，可以继续查看更早的消息。' },
+  ] }];
+}
+
 export function seedDemoOpeningHistory(thread: Thread) {
   const paragraph = '这段较长的回复用于验证打开聊天时的阅读位置，内容应完整显示，不能只留下底部按钮。';
   thread.turns = [{ id: 'opening-history', status: 'completed',

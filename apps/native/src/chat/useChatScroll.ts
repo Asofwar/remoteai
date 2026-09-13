@@ -18,6 +18,7 @@ export function useChatScroll<Entry extends { id: string } = Item>(
   const list = useRef<FlatList<Entry>>(null);
   const following = useRef(true);
   const scrolling = useRef(false);
+  const loadingOlder = useRef(false);
   const position = useRef(0);
   const nativePosition = useRef(0);
   const contentHeight = useRef(0);
@@ -35,6 +36,7 @@ export function useChatScroll<Entry extends { id: string } = Item>(
   const presented = useRef(false);
   const [initialPositionReady, setInitialPositionReady] = useState(false);
   const [preservePosition, setPreservePosition] = useState(false);
+  const [historyBottomSpace, setHistoryBottomSpace] = useState(0);
   const presentLatest = useCallback(() => {
     if (presented.current || presentFrame.current !== undefined) return;
     // Reveal after native cells and the bottom position agree, never at an estimated virtualization spacer.
@@ -83,28 +85,36 @@ export function useChatScroll<Entry extends { id: string } = Item>(
     if (presentFrame.current !== undefined) cancelAnimationFrame(presentFrame.current);
   }, []);
   const updateFollowing = ({ nativeEvent }: ScrollEvent) => {
+    if (loadingOlder.current || loadingMore) return;
     following.current = nativeEvent.contentSize.height - nativeEvent.layoutMeasurement.height
       - nativeEvent.contentOffset.y < SCROLL_EDGE_DISTANCE;
     setPreservePosition(!following.current);
   };
-  const more = () => {
-    if (!hasMore || loadingMore || !loadOlder) return;
-    following.current = false;
-    setPreservePosition(true);
-    void loadOlder();
+  const more = async () => {
+    if (loadingOlder.current || loadingMore || !loadOlder) return;
+    loadingOlder.current = true;
+    if (latest.current) {
+      following.current = false;
+      setPreservePosition(true);
+      // Native scroll offsets are clamped to the content height; retain a short conversation's empty tail.
+      setHistoryBottomSpace((space) => Math.max(space, viewportHeight.current - contentHeight.current + space));
+    }
+    try { await loadOlder(); }
+    finally { loadingOlder.current = false; }
   };
   const finishScroll = (event: ScrollEvent) => {
     updateFollowing(event);
     scrolling.current = false;
     // Android can deliver the final scroll position after the drag event has ended.
-    if (event.nativeEvent.contentOffset.y < SCROLL_EDGE_DISTANCE) more();
+    const top = event.nativeEvent.contentOffset.y;
+    if (hasMore && top > 0 && top < SCROLL_EDGE_DISTANCE) void more();
   };
   const onScroll = (event: ScrollEvent) => {
     const top = event.nativeEvent.contentOffset.y;
     // Image loads and keyboard resizing also emit scroll events; only a drag changes follow intent.
     if (scrolling.current) {
       updateFollowing(event);
-      if (top < position.current && top < SCROLL_EDGE_DISTANCE) more();
+      if (hasMore && top > 0 && top < position.current && top < SCROLL_EDGE_DISTANCE) void more();
     }
     position.current = top;
     nativePosition.current = top;
@@ -123,7 +133,7 @@ export function useChatScroll<Entry extends { id: string } = Item>(
     presentLatest();
   };
   const beginScroll = () => { scrolling.current = true; };
-  return { list, more, preservePosition, initializing: Boolean(latestItemId) && !initialPositionReady,
+  return { list, more, preservePosition, historyBottomSpace, initializing: Boolean(latestItemId) && !initialPositionReady,
     onItemLayout, onFooterLayout, onLayout, onContentSizeChange, onScroll,
     onViewableItemsChanged, viewabilityConfig: VIEWABILITY_CONFIG,
     onScrollBeginDrag: beginScroll, onScrollEndDrag: finishScroll,

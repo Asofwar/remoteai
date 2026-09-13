@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Keyboard, Pressable, RefreshControl, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useChatScroll } from './useChatScroll';
@@ -8,18 +8,26 @@ import { ChatToolDetails } from './ChatToolDetails';
 import { ChatWorkDrawer } from './ChatWorkDrawer';
 import { ChatTurnDuration, ChatTurnSummary, type TurnPanel } from './ChatTurnSummary';
 import { ChatTurnDetails } from './ChatTurnDetails';
-import { conversationEntries, findWorkEntry, type TurnEntry, type WorkEntry } from './turnPresentation';
+import { findWorkEntry, type TurnEntry, type WorkEntry } from './turnPresentation';
+import { useConversationEntries } from './useConversationEntries';
 import type { ChatMessagesProps } from '../../../../shared/remote-chat/client/messageProps';
 import { palette, styles } from './styles';
 
 type Selection = { type: 'work'; id: string } | { type: 'item'; id: string; workId?: string }
   | { type: 'turn'; id: string; panel: TurnPanel };
 
-function MessageSeparator() {
-  return <View style={styles.messageSeparator} />;
+const PROCESS_SEPARATOR_STYLE = { height: 14 };
+
+function MessageSeparator({ leadingItem }: { leadingItem?: TurnEntry }) {
+  const process = leadingItem?.kind === 'process' || (leadingItem?.kind === 'work' && leadingItem.inline);
+  return <View style={process ? PROCESS_SEPARATOR_STYLE : styles.messageSeparator} />;
 }
 
 function WorkSummary({ entry, onOpen }: { entry: WorkEntry; onOpen: () => void }) {
+  if (entry.inline) return <View style={[styles.row, { paddingVertical: 5 }]}>
+    <Text style={styles.subtitle}>{entry.turn.status === 'inProgress' ? '正在处理' : '处理过程'}</Text>
+    <Text style={styles.subtitle}>{entry.items.length} 项活动</Text>
+  </View>;
   const label = entry.turn.status === 'inProgress' ? '正在处理' : '查看处理过程';
   return <Pressable accessibilityRole="button" accessibilityLabel={`${label}，${entry.items.length} 项活动`}
     style={[styles.row, { paddingVertical: 5 }]} onPress={onOpen}>
@@ -34,17 +42,20 @@ function TimelineEntry({ entry, open }: { entry: TurnEntry; open: (selection: Se
   if (entry.kind === 'summary') return <ChatTurnSummary turn={entry.turn}
     onOpen={(id, panel) => open({ type: 'turn', id, panel })} />;
   if (entry.kind === 'work') return <WorkSummary entry={entry} onOpen={() => open({ type: 'work', id: entry.id })} />;
-  return <ChatMessage item={entry.item} onOpen={(id) => open({ type: 'item', id })}
+  return <ChatMessage item={entry.item} process={entry.kind === 'process'}
+    onOpen={(id) => open({ type: 'item', id })}
     running={entry.turn.status === 'inProgress' && entry.item.status !== 'completed'} />;
 }
 
 export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder }: ChatMessagesProps) {
-  const entries = useMemo(() => conversationEntries(thread?.turns ?? []), [thread?.turns]);
+  const entries = useConversationEntries(thread?.turns ?? []);
   const { list, more, preservePosition, historyBottomSpace, initializing, onItemLayout, onFooterLayout, ...scrollHandlers }
     = useChatScroll<TurnEntry>({ hasMore, loading, loadingMore, loadOlder,
       latestItemId: entries.at(-1)?.id, bottomPadding: styles.messages.padding });
   const refresh = useHistoryRefresh(more, loadingMore);
-  const showInitialLoading = initializing || (loading && !loadingMore && !entries.length);
+  // Live work is readable as soon as it arrives, even while the keyboard delays the initial scroll anchor.
+  const hasInlineWork = entries.some((entry) => entry.kind === 'work' && entry.inline);
+  const showInitialLoading = (!hasInlineWork && initializing) || (loading && !loadingMore && !entries.length);
   const [selection, setSelection] = useState<Selection | null>(null);
   const open = useCallback((value: Selection) => { Keyboard.dismiss(); setSelection(value); }, []);
   // Resolve against live history so open process, plan, output and diff drawers keep receiving updates.

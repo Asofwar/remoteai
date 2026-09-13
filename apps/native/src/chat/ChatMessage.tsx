@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ChatMarkdown } from './Markdown';
 import { ChatImage } from './ChatImage';
+import { ChatActivityLabel } from './ChatActivityLabel';
 import { questionMessageText } from '../../../../shared/remote-chat/client/asyncQuestions';
 import { CopyTextButton } from './CopyTextButton';
 import { messageContent, messageLabel } from '../../../../shared/chat/messageDetails';
@@ -71,14 +72,15 @@ function activitySummary(item: Item): { preview: string; icon: IconName } {
   return { icon, preview: [label, content, STATUS_LABELS[item.status ?? '']].filter(Boolean).join(' · ') };
 }
 
-export function ChatActivityRow({ item, onOpen }: { item: Item; onOpen: (id: string) => void }) {
+export function ChatActivityRow({ item, onOpen, running = false }: {
+  item: Item; onOpen: (id: string) => void; running?: boolean;
+}) {
   const summary = activitySummary(item);
   if (item.type === 'reasoning' && !summary.preview.trim()) return null;
   const preview = summary.preview.slice(0, PREVIEW_LENGTH).replace(/\s+/g, ' ').trim();
   return <Pressable accessibilityRole="button" accessibilityLabel={preview}
     style={messageStyles.activity} onPress={() => onOpen(item.id)}>
-    <Ionicons name={summary.icon} size={15} color={palette.muted} />
-    <Text numberOfLines={2} style={[styles.subtitle, styles.fill]}>{preview}</Text>
+    <ChatActivityLabel icon={summary.icon} text={preview} active={running && item.status === 'inProgress'} />
     <Ionicons name="chevron-forward" size={15} color={palette.muted} />
   </Pressable>;
 }
@@ -95,7 +97,7 @@ export const ChatMessage = memo(function ChatMessage({ item, onOpen, running = f
       {images.map((source, index) => <ChatImage key={index} source={source} />)}
     </Pressable>
   </View>;
-  if (item.type !== 'agentMessage') return <ChatActivityRow item={item} onOpen={onOpen} />;
+  if (item.type !== 'agentMessage') return <ChatActivityRow item={item} onOpen={onOpen} running={running} />;
   return <View style={styles.assistantMessage}>
     <ChatMarkdown text={text} tone={process ? 'process' : 'default'} />
     {!process && !running && !!text.trim() && <View style={messageStyles.actions}>

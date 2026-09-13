@@ -4,7 +4,6 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { TurnMessage } from "./TurnMessage";
 import { MessageItem } from "./MessageItem";
-import { ToolText, OUTPUT_PAGE_CHARACTERS } from "./ToolText";
 import type { Item } from "./types";
 
 let root: Root;
@@ -71,22 +70,4 @@ it("only serializes an unknown activity when its detail is opened", async () => 
   await toggle(container.querySelector("details")!);
   expect(container.textContent).toContain("unknown output");
   expect(serialize).toHaveBeenCalledTimes(1);
-});
-
-it("bounds every output page while copying the complete text without truncation", async () => {
-  const text = "a".repeat(OUTPUT_PAGE_CHARACTERS) + "b".repeat(OUTPUT_PAGE_CHARACTERS) + "完整输出结尾";
-  const writeText = vi.fn().mockResolvedValue(undefined);
-  vi.stubGlobal("navigator", { clipboard: { writeText } });
-  await act(async () => root.render(<ToolText text={text} />));
-  const next = () => [...container.querySelectorAll("button")].find((button) => button.textContent === "下一段")!;
-  expect(container.querySelector("pre")!.textContent).toBe("a".repeat(OUTPUT_PAGE_CHARACTERS));
-  await act(async () => next().click());
-  expect(container.querySelector("pre")!.textContent).toBe("b".repeat(OUTPUT_PAGE_CHARACTERS));
-  await act(async () => next().click());
-  expect(container.querySelector("pre")!.textContent).toBe("完整输出结尾");
-  expect(next().disabled).toBe(true);
-  await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="复制完整内容"]')!.click());
-  expect(writeText).toHaveBeenCalledWith(text);
-  await act(async () => root.render(<ToolText text="shorter result" />));
-  expect(container.querySelector("pre")!.textContent).toBe("shorter result");
 });

@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { completedTurnFiles, conversationEntries, findWorkEntry, groupTurnItems } from './turnPresentation';
 import type { Item, Turn } from './types';
 import { CONTINUE_MESSAGE } from '../../../../shared/remote-chat/composerAction';
+import { retainInlineTurns } from './useConversationEntries';
 
 it('keeps user steering and final replies in order while grouping process messages', () => {
   const items: Item[] = [
@@ -20,7 +21,7 @@ it('keeps user steering and final replies in order while grouping process messag
   expect(groupTurnItems([{ id: 'legacy', type: 'agentMessage' }])[0].type).toBe('message');
 });
 
-it('keeps a live process drawer address stable as output arrives and a final answer follows', () => {
+it('shows live commentary and tools inline with stable addresses as output and the final answer arrive', () => {
   const turn: Turn = { id: 'turn', status: 'inProgress', items: [
     { id: 'progress', type: 'agentMessage', phase: 'commentary', text: 'Working' },
   ] };
@@ -29,7 +30,61 @@ it('keeps a live process drawer address stable as output arrives and a final ans
     { id: 'shell', type: 'commandExecution' }, { id: 'answer', type: 'agentMessage', phase: 'final_answer' },
   ] }]);
   expect(updated[0].id).toBe(entry.id);
-  expect(updated.map((value) => value.kind)).toEqual(['work', 'message']);
+  expect(updated.map((value) => value.kind)).toEqual(['work', 'process', 'process', 'message']);
+  expect(updated[1].id).toBe(conversationEntries([turn])[1].id);
+  expect(updated[0]).toMatchObject({ inline: true });
+  expect(updated[1]).toMatchObject({ item: { id: 'progress', text: 'Working' } });
+  const streamed = conversationEntries([{ ...turn, items: [turn.items[0], {
+    id: 'shell', type: 'commandExecution', status: 'inProgress', aggregatedOutput: 'STEP-2',
+  }] }]);
+  expect(streamed[2]).toMatchObject({ id: updated[2].id, item: { aggregatedOutput: 'STEP-2' } });
+});
+
+it('keeps all 65 activities as individual list cells, in order around user steering', () => {
+  const activities: Item[] = Array.from({ length: 65 }, (_, index) => ({
+    id: `tool-${index}`, type: 'commandExecution', status: 'completed',
+  }));
+  const entries = conversationEntries([{ id: 'turn', status: 'inProgress', items: [
+    ...activities.slice(0, 30), { id: 'steer', type: 'userMessage' }, ...activities.slice(30),
+  ] }]);
+  expect(entries.flatMap((entry) => entry.kind === 'process' ? [entry.item.id] : []))
+    .toEqual(activities.map((item) => item.id));
+  expect(entries.slice(30, 34).map((entry) => entry.id)).toEqual([
+    'turn:message:tool-29', 'turn:message:steer', 'turn:work:tool-30', 'turn:message:tool-30',
+  ]);
+  expect(new Set(entries.map((entry) => entry.id)).size).toBe(entries.length);
+});
+
+it.each(['completed', 'failed', 'interrupted'])('retains visible work when the live turn becomes %s', (status) => {
+  const turn: Turn = { id: 'turn', status: 'inProgress', items: [{ id: 'tool', type: 'commandExecution' }] };
+  const retained = retainInlineTurns([turn], new Set());
+  const finished: Turn = { ...turn, status };
+  expect(retainInlineTurns([finished], retained)).toBe(retained);
+  expect(conversationEntries([finished], retained).filter((entry) => entry.kind === 'process'))
+    .toMatchObject([{ id: 'turn:message:tool' }]);
+  // Reopening completed history has no retained state and starts with a drawer, as on desktop.
+  expect(conversationEntries([finished]).filter((entry) => entry.kind === 'process')).toEqual([]);
+  expect(conversationEntries([finished])[0]).toMatchObject({ kind: 'work', inline: false });
+});
+
+it('does not expand older completed turns when the next turn starts', () => {
+  const turns: Turn[] = [
+    { id: 'old', status: 'completed', items: [{ id: 'old-tool', type: 'commandExecution' }] },
+    { id: 'live', status: 'inProgress', items: [{ id: 'live-tool', type: 'commandExecution' }] },
+  ];
+  const retained = retainInlineTurns(turns, new Set());
+  expect([...retained]).toEqual(['live']);
+  expect(retainInlineTurns(turns, retained)).toBe(retained);
+  expect(conversationEntries(turns, retained).filter((entry) => entry.kind === 'work')
+    .map((entry) => entry.inline)).toEqual([false, true]);
+});
+
+it('preserves live activity IDs when earlier items in the same group load', () => {
+  const turn: Turn = { id: 'turn', status: 'inProgress', items: [{ id: 'tail', type: 'commandExecution' }] };
+  const before = conversationEntries([turn]);
+  const after = conversationEntries([{ ...turn, items: [{ id: 'earlier', type: 'reasoning' }, ...turn.items] }]);
+  expect(after.at(-1)?.id).toBe(before.at(-1)?.id);
+  expect(findWorkEntry(after, before[0].id)?.items.map((item) => item.id)).toEqual(['earlier', 'tail']);
 });
 
 it('retains every turn plan, failure, interruption and changes instead of only the latest turn', () => {

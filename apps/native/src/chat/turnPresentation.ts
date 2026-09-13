@@ -5,8 +5,8 @@ import { turnElapsedMs } from '../../../desktop/src/pages/codexGui/turnTiming';
 import { groupTurnItems } from '../../../../shared/chat/turnGroups';
 export { groupTurnItems } from '../../../../shared/chat/turnGroups';
 
-export type MessageEntry = { id: string; kind: 'message'; turn: Turn; item: Item };
-export type WorkEntry = { id: string; kind: 'work'; turn: Turn; items: Item[] };
+export type MessageEntry = { id: string; kind: 'message' | 'process'; turn: Turn; item: Item };
+export type WorkEntry = { id: string; kind: 'work'; turn: Turn; items: Item[]; inline: boolean };
 export type TurnEntry = MessageEntry | WorkEntry | { id: string; kind: 'summary'; turn: Turn }
   | { id: string; kind: 'duration'; turn: Turn };
 
@@ -25,12 +25,20 @@ function hasSummary(turn: Turn) {
 }
 
 /** Stable group IDs keep open drawers and measured list cells attached during streamed updates. */
-export function conversationEntries(turns: Turn[]): TurnEntry[] {
+export function conversationEntries(turns: Turn[], inlineTurns: ReadonlySet<string> = new Set()): TurnEntry[] {
   return turns.flatMap((turn, index) => {
     const items = turns[index - 1]?.status === 'interrupted' ? visibleContinuationItems(turn.items) : turn.items;
-    const entries: TurnEntry[] = groupTurnItems(items).map((group) => group.type === 'work'
-      ? { id: `${turn.id}:work:${group.items[0].id}`, kind: 'work', turn, items: group.items }
-      : { id: `${turn.id}:message:${group.items[0].id}`, kind: 'message', turn, item: group.items[0] });
+    const inline = turn.status === 'inProgress' || inlineTurns.has(turn.id);
+    const entries = groupTurnItems(items).flatMap((group): TurnEntry[] => {
+      if (group.type === 'message') return [{ id: `${turn.id}:message:${group.items[0].id}`,
+        kind: 'message', turn, item: group.items[0] }];
+      const work: WorkEntry = { id: `${turn.id}:work:${group.items[0].id}`,
+        kind: 'work', turn, items: group.items, inline };
+      if (!inline) return [work];
+      return [work, ...group.items.map((item): MessageEntry => ({
+        id: `${turn.id}:message:${item.id}`, kind: 'process', turn, item,
+      }))];
+    });
     if (turn.status !== 'inProgress' && turnElapsedMs(turn, 0) != null) {
       const response = entries.findIndex((entry) => entry.kind !== 'message' || entry.item.type !== 'userMessage');
       entries.splice(response < 0 ? entries.length : response, 0,

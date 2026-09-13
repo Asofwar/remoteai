@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { BackHandler, Keyboard, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import type { AuthSession, RemoteDevice } from '../types';
 import { ChatApproval } from './ChatApprovals';
+import { ChatAsyncQuestions } from './ChatAsyncQuestions';
 import { ChatComposer } from './ChatComposer';
 import { ChatOverlay } from './ChatOverlay';
 import { ChatQueue } from './ChatQueue';
@@ -145,6 +146,10 @@ function ConnectedChat({ session, device, devices, active, chooseDevice, notific
         {state.approvals.filter((event) => event.params.threadId === state.selected?.id).map((event) =>
           <ChatApproval key={String(event.id)} event={event} respond={(reply) => controller.respond(reply)} />)}
       </ScrollView>}
+    <ChatAsyncQuestions thread={state.selected} error={state.error}
+      disabled={!ready || state.sending || state.settingsBusy || state.selectedArchived || state.queueBusy
+        || state.compacting === state.selected?.id}
+      answer={controller.answerAsyncQuestion} />
     <ChatQueue {...queueProps(state, controller)} />
     <ChatComposer threadId={state.selected?.id ?? null} models={state.models} selection={state.settings}
       loadCatalog={controller.loadComposerCatalog} loadFiles={controller.loadProjectFiles}

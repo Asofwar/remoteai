@@ -4,6 +4,7 @@ import type { FileReference } from '../../../../shared/chat/fileReference';
 import type { TextPreview } from '../../../../shared/remote-chat/textPreview';
 import { BottomSheet } from '../components/BottomSheet';
 import { ChatCodeBlock } from './ChatCodeBlock';
+import { fileLanguage } from './ChatCodeHighlight';
 import { styles } from './styles';
 
 export const ChatFileContext = createContext<((file: FileReference) => void) | null>(null);
@@ -37,7 +38,8 @@ function FilePreview({ file, threadId, ready, load, close }: Omit<Props, 'childr
       {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
       {result && <>
         <Text style={styles.subtitle}>当前文件内容{file.line ? ` · 引用第 ${file.line} 行` : ''}</Text>
-        <ChatCodeBlock text={result.text} label="完整文本" lineNumbers />
+        <ChatCodeBlock text={result.text} label="完整文本" language={fileLanguage(file.path)}
+          lineNumbers copyLabel="复制文件内容" />
       </>}
     </ScrollView>
   </BottomSheet>;

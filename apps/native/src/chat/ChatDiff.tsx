@@ -1,61 +1,54 @@
-import { useContext, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { DiffFile, DiffLine } from '../../../../shared/chat/diff';
-import { CopyTextButton } from './CopyTextButton';
-import { ChatFileContext } from './ChatFilePreview';
+import { Feather } from '@expo/vector-icons';
+import type { DiffFile } from '../../../../shared/chat/diff';
+import { BottomSheet } from '../components/BottomSheet';
+import { ChatDiffContent } from './ChatDiffContent';
 import { palette, styles } from './styles';
 
-const PAGE_LINES = 100;
-const kinds: Record<string, string> = { add: '新增', delete: '删除', update: '修改' };
+const KINDS: Record<string, string> = { add: '新增', delete: '删除', update: '修改' };
 
-function DiffRow({ line }: { line: DiffLine }) {
-  const marker = line.kind === 'add' ? '+' : line.kind === 'remove' ? '−' : ' ';
-  return <View style={[diffStyles.line, diffStyles[line.kind]]}>
-    <Text style={[styles.code, diffStyles.number]}>{line.oldLine ?? ''}</Text>
-    <Text style={[styles.code, diffStyles.number]}>{line.newLine ?? ''}</Text>
-    <Text selectable style={[styles.code, { flexShrink: 1 }]}>{marker} {line.text}</Text>
-  </View>;
-}
-
-function DiffFileView({ file }: { file: DiffFile }) {
-  const [expanded, setExpanded] = useState(false);
-  const [limit, setLimit] = useState(PAGE_LINES);
-  const [wrap, setWrap] = useState(true);
-  const openFile = useContext(ChatFileContext);
-  const rows = <View>{file.lines.slice(0, limit).map((line, index) => <DiffRow key={index} line={line} />)}</View>;
-  return <View style={diffStyles.file}>
-    <Pressable accessibilityRole="button" accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)}>
-      <Text style={styles.title}>{expanded ? '▾' : '▸'} {file.path}</Text>
-      {file.previousPath && <Text selectable style={styles.subtitle}>原路径：{file.previousPath}</Text>}
-      <Text style={styles.subtitle}>{file.previousPath ? '重命名' : kinds[file.kind] ?? '修改'} ·
-        新增 {file.added} 行 · 删除 {file.removed} 行</Text>
-    </Pressable>
-    {expanded && <>
-      <View style={diffStyles.toolbar}>
-        <CopyTextButton text={file.raw} label="复制 diff" />
-        <Pressable accessibilityRole="button" style={styles.compactButton} onPress={() => setWrap(!wrap)}>
-          <Text style={styles.buttonText}>{wrap ? '横向滚动' : '自动换行'}</Text></Pressable>
-        {openFile && file.kind !== 'delete' && <Pressable accessibilityRole="button" style={styles.compactButton}
-          onPress={() => openFile({ path: file.path })}><Text style={styles.buttonText}>查看文件</Text></Pressable>}
-      </View>
-      {wrap ? rows : <ScrollView horizontal nestedScrollEnabled>{rows}</ScrollView>}
-      {!file.lines.length && <Text style={styles.subtitle}>文件内容为空</Text>}
-      {file.lines.length > limit && <Pressable accessibilityRole="button" style={styles.button}
-        onPress={() => setLimit(limit + PAGE_LINES)}><Text style={styles.buttonText}>显示更多修改</Text></Pressable>}
-    </>}
+export function DiffCounts({ added, removed }: { added: number; removed: number }) {
+  return <View style={diffStyles.counts} accessibilityLabel={`新增 ${added} 行，删除 ${removed} 行`}>
+    <Text style={diffStyles.added}>+{added}</Text><Text style={diffStyles.removed}>−{removed}</Text>
   </View>;
 }
 
 export function ChatDiff({ files }: { files: DiffFile[] }) {
-  return <View style={{ gap: 16 }}>{files.map((file, index) =>
-    <DiffFileView key={`${file.path}:${index}`} file={file} />)}</View>;
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // Resolve from incoming props so an open drawer follows live edits.
+  const selected = files.find((file, index) => `${file.path}:${index}` === selectedKey);
+  const added = files.reduce((sum, file) => sum + file.added, 0);
+  const removed = files.reduce((sum, file) => sum + file.removed, 0);
+  return <View style={diffStyles.document}>
+    <View style={diffStyles.summary}>
+      <Text style={styles.subtitle}>{new Set(files.map((file) => file.path)).size} 个文件</Text>
+      <DiffCounts added={added} removed={removed} />
+    </View>
+    {files.map((file, index) => <Pressable key={`${file.path}:${index}`} accessibilityRole="button"
+      accessibilityLabel={`查看 ${file.path} 的修改`} style={diffStyles.file}
+      onPress={() => setSelectedKey(`${file.path}:${index}`)}>
+      <Feather name="file-text" size={15} color={palette.muted} />
+      <Text style={[styles.messageText, styles.fill]} numberOfLines={2}>{file.path.split(/[\\/]/).pop()}</Text>
+      <Text style={styles.subtitle}>{file.previousPath ? '重命名' : KINDS[file.kind] ?? '修改'}</Text>
+      <DiffCounts added={file.added} removed={file.removed} />
+      <Feather name="chevron-right" size={15} color={palette.muted} />
+    </Pressable>)}
+    {selected && <BottomSheet visible tall title="文件差异" subtitle={selected.path}
+      onClose={() => setSelectedKey(null)} onBack={() => setSelectedKey(null)} dragFromHeaderOnly>
+      <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
+        <ChatDiffContent key={selectedKey} file={selected} />
+      </ScrollView>
+    </BottomSheet>}
+  </View>;
 }
 
 const diffStyles = StyleSheet.create({
-  file: { gap: 10, borderWidth: 1, borderColor: palette.border, borderRadius: 10, padding: 10 },
-  toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  line: { flexDirection: 'row', paddingVertical: 2, minHeight: 23 },
-  number: { width: 38, color: palette.muted, textAlign: 'right', marginRight: 6 },
-  add: { backgroundColor: '#dff4e5' }, remove: { backgroundColor: '#ffe5e5' },
-  hunk: { backgroundColor: '#e7effa' }, meta: { backgroundColor: '#eef1ef' }, context: {},
+  document: { gap: 8 },
+  summary: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  file: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1,
+    borderColor: palette.border, borderRadius: 8, padding: 10, minHeight: 44 },
+  counts: { flexDirection: 'row', gap: 6, flexShrink: 0 },
+  added: { color: '#2e9863', fontSize: 12, lineHeight: 20 },
+  removed: { color: '#c15a5a', fontSize: 12, lineHeight: 20 },
 });

@@ -1,115 +1,97 @@
-import { useContext, useMemo } from 'react';
-import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
-import MarkdownIt from 'markdown-it';
-import { palette, styles } from './styles';
-import { ChatImage } from './ChatImage';
+import { memo, useMemo, useState, type ReactNode } from 'react';
+import { Pressable, ScrollView, Text, View, type TextStyle } from 'react-native';
+import { parseDiff } from '../../../../shared/chat/diff';
 import { ChatCodeBlock } from './ChatCodeBlock';
 import { ChatDiff } from './ChatDiff';
-import { ChatFileContext } from './ChatFilePreview';
-import { parseFileReference } from '../../../../shared/chat/fileReference';
-import { parseDiff } from '../../../../shared/chat/diff';
+import { ChatCodeReview } from './ChatCodeReview';
+import { MarkdownParagraph, type MarkdownContext } from './MarkdownInline';
+import type { MarkdownNode } from './markdownTree';
+import { markdownContent } from './markdownContent';
+import { markdownStyles } from './Markdown.styles';
+import { styles } from './styles';
 
-const parser = new MarkdownIt({ html: false, linkify: false, typographer: false, maxNesting: 20 });
-const validateLink = parser.validateLink.bind(parser);
-parser.validateLink = (url) => validateLink(url) || Boolean(parseFileReference(url));
-type Token = ReturnType<typeof parser.parse>[number];
-interface Node { token: Token; children: Node[] }
-const PREVIEW_LENGTH = 20_000;
+const PAGE_BLOCKS = 60;
+const PARAGRAPH_TYPES = new Set(['paragraph_open', 'heading_open', 'inline']);
+const LIST_TYPES = new Set(['bullet_list_open', 'ordered_list_open']);
 
-function tree(tokens: Token[]): Node[] {
-  const root: Node[] = [];
-  const stack = [root];
-  for (const token of tokens) {
-    if (token.nesting === -1) { if (stack.length > 1) stack.pop(); continue; }
-    const node: Node = { token, children: token.children ? tree(token.children) : [] };
-    stack[stack.length - 1].push(node);
-    if (token.nesting === 1) stack.push(node.children);
-  }
-  return root;
+/** Paginate native views, not source text: cutting Markdown midway corrupts tables and code fences. */
+function MarkdownPage<Node>({ nodes, render }: {
+  nodes: Node[]; render: (node: Node, index: number) => ReactNode;
+}) {
+  const [limit, setLimit] = useState(PAGE_BLOCKS);
+  return <>{nodes.slice(0, limit).map(render)}
+    {nodes.length > limit && <Pressable accessibilityRole="button" style={styles.button}
+      onPress={() => setLimit((value) => value + PAGE_BLOCKS)}>
+      <Text style={styles.buttonText}>显示更多内容</Text>
+    </Pressable>}
+  </>;
 }
 
-function openLink(url: string) {
-  if (/^https?:\/\//i.test(url)) void Linking.openURL(url).catch(() => undefined);
+function List({ node, context }: { node: MarkdownNode; context: MarkdownContext }) {
+  const ordered = node.token.type === 'ordered_list_open';
+  const start = Number(node.token.attrGet('start') ?? 1);
+  return <View style={markdownStyles.list}>
+    <MarkdownPage nodes={node.children} render={(child, index) => <View key={index} style={markdownStyles.listRow}>
+      {child.task === undefined
+        ? <Text style={[styles.messageText, markdownStyles.marker, context.muted && markdownStyles.muted,
+          context.tone === 'process' && markdownStyles.process]}>
+          {ordered ? `${start + index}.` : '•'}
+        </Text>
+        : <View accessibilityRole="checkbox" accessibilityState={{ checked: child.task, disabled: true }}
+          accessibilityLabel={child.task ? '已完成' : '未完成'}
+          style={[markdownStyles.checkbox, child.task && markdownStyles.checked]}>
+          {child.task && <Text style={markdownStyles.checkmark}>✓</Text>}
+        </View>}
+      <View style={styles.fill}><Block node={child} context={context} /></View>
+    </View>} />
+  </View>;
 }
 
-function Inline({ nodes }: { nodes: Node[] }) {
-  const openFile = useContext(ChatFileContext);
-  return <>{nodes.map(({ token, children }, index) => {
-    if (token.type === 'softbreak' || token.type === 'hardbreak') return '\n';
-    const style = token.type === 'strong_open' ? { fontWeight: '700' as const }
-      : token.type === 'em_open' ? { fontStyle: 'italic' as const }
-        : token.type === 'code_inline' ? styles.code : undefined;
-    if (token.type === 'link_open') return <Text key={index} style={{ color: palette.green }}
-      onPress={() => {
-        const url = String(token.attrGet('href') ?? '');
-        const file = parseFileReference(url);
-        if (file && openFile) openFile(file);
-        else openLink(url);
-      }}><Inline nodes={children} /></Text>;
-    return <Text key={index} style={style}>{children.length ? <Inline nodes={children} /> : token.content}</Text>;
-  })}</>;
+function Code({ node }: { node: MarkdownNode }) {
+  const language = node.token.info.trim().split(/\s/)[0].toLowerCase();
+  const files = useMemo(() => ['diff', 'patch'].includes(language) ? parseDiff(node.token.content) : [],
+    [language, node.token.content]);
+  if (files.length) return <ChatDiff files={files} />;
+  return <ChatCodeBlock text={node.token.content} label={language || '代码'} language={language} />;
 }
 
-function hasImage(node: Node): boolean {
-  return node.token.type === 'image' || node.children.some(hasImage);
-}
-
-function Paragraph({ nodes, heading }: { nodes: Node[]; heading: boolean }) {
-  const parts: Node[][] = [];
-  for (const node of nodes) {
-    if (hasImage(node)) parts.push([node], []);
-    else (parts[parts.length - 1] ?? (parts[0] = [])).push(node);
-  }
-  return <View>{parts.map((part, index) => {
-    if (!part.length) return null;
-    const first = part[0];
-    if (first.token.type === 'image') return <ChatImage key={index}
-      source={String(first.token.attrGet('src') ?? '')} description={first.token.content || '图片'} />;
-    if (hasImage(first)) return <Paragraph key={index} nodes={first.children} heading={heading} />;
-    return <Text key={index} selectable style={[styles.messageText, { marginVertical: 6 },
-      heading && { fontWeight: '700', fontSize: 19 }]}><Inline nodes={part} /></Text>;
+function TableRow({ node, context }: { node: MarkdownNode; context: MarkdownContext }) {
+  return <View style={markdownStyles.tableRow}>{node.children.map((child, index) => {
+    const alignment = String(child.token.attrGet('style') ?? '').match(/text-align:(left|center|right)/)?.[1];
+    return <View key={index} style={markdownStyles.cell}><Block node={child} context={{ ...context,
+      compact: true, header: child.token.type === 'th_open',
+      textAlign: alignment as TextStyle['textAlign'] }} /></View>;
   })}</View>;
 }
 
-function Block({ node }: { node: Node }) {
+function Block({ node, context = {} }: { node: MarkdownNode; context?: MarkdownContext }) {
   const { token, children } = node;
-  if (token.type === 'fence' || token.type === 'code_block') {
-    const language = token.info.trim().split(/\s/)[0].toLowerCase();
-    if (language === 'diff' || language === 'patch') return <ChatDiff files={parseDiff(token.content)} />;
-    return <ChatCodeBlock text={token.content} label={language || '代码'} />;
-  }
-  if (token.type === 'paragraph_open' || token.type === 'heading_open' || token.type === 'inline') {
+  if (token.type === 'fence' || token.type === 'code_block') return <Code node={node} />;
+  if (PARAGRAPH_TYPES.has(token.type)) {
     const inline = token.type === 'inline' ? children : children.flatMap((child) => child.children);
-    return <Paragraph nodes={inline} heading={token.type === 'heading_open'} />;
+    return <MarkdownParagraph nodes={inline} heading={token.type === 'heading_open' ? token.tag : undefined}
+      context={{ ...context, compact: context.compact || token.hidden }} />;
   }
-  if (token.type === 'bullet_list_open' || token.type === 'ordered_list_open') return <View>
-    {children.map((child, index) => <View key={index} style={[styles.row, { alignItems: 'flex-start' }]}>
-      <Text style={[styles.messageText, { paddingTop: 6 }]}>{token.type === 'ordered_list_open'
-        ? `${Number(token.attrGet('start') ?? 1) + index}.` : '•'}</Text>
-      <View style={styles.fill}><Block node={child} /></View>
-    </View>)}
-  </View>;
-  if (token.type === 'table_open') return <ScrollView horizontal><View>
-    {children.map((child, index) => <Block key={index} node={child} />)}
-  </View></ScrollView>;
-  if (token.type === 'tr_open') return <View style={{ flexDirection: 'row' }}>
-    {children.map((child, index) => <View key={index} style={{ width: 160, padding: 8,
-      borderWidth: 0.5, borderColor: palette.border }}><Block node={child} /></View>)}
-  </View>;
-  if (token.type === 'hr') return <View style={{ height: 1, backgroundColor: palette.border, marginVertical: 10 }} />;
-  return <View style={token.type === 'blockquote_open' ? styles.tool : undefined}>
-    {children.map((child, index) => <Block key={index} node={child} />)}
+  if (LIST_TYPES.has(token.type)) return <List node={node} context={context} />;
+  if (token.type === 'table_open') return <ScrollView horizontal nestedScrollEnabled style={markdownStyles.table}>
+    <View><MarkdownPage nodes={children}
+      render={(child, index) => <Block key={index} node={child} context={context} />} />
+    </View>
+  </ScrollView>;
+  if (token.type === 'tr_open') return <TableRow node={node} context={context} />;
+  if (token.type === 'hr') return <View style={markdownStyles.rule} />;
+  const quote = token.type === 'blockquote_open';
+  return <View style={quote ? markdownStyles.quote : undefined}>
+    <MarkdownPage nodes={children} render={(child, index) => <Block key={index} node={child}
+      context={quote ? { ...context, muted: true } : context} />} />
   </View>;
 }
 
-export function ChatMarkdown({ text }: { text: string }) {
-  const nodes = useMemo(() => tree(parser.parse(text.slice(0, PREVIEW_LENGTH), {})), [text]);
-  return <View>{nodes.map((node, index) => <Block key={index} node={node} />)}
-    {text.length > PREVIEW_LENGTH && <RemainingText text={text.slice(PREVIEW_LENGTH)} />}
-  </View>;
-}
-
-function RemainingText({ text }: { text: string }) {
-  // Large outputs stay readable and copyable without constructing tens of thousands of formatted native views.
-  return <Pressable accessibilityRole="text"><Text selectable style={styles.messageText}>{text}</Text></Pressable>;
-}
+export const ChatMarkdown = memo(function ChatMarkdown({ text, tone = 'default' }: {
+  text: string; tone?: 'default' | 'process';
+}) {
+  const content = useMemo(() => markdownContent(text), [text]);
+  return <View><MarkdownPage nodes={content} render={(entry, index) => entry.type === 'review'
+    ? <ChatCodeReview key={index} comment={entry.comment} />
+    : <Block key={index} node={entry.node} context={{ tone }} />} /></View>;
+});

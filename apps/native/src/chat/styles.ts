@@ -1,7 +1,8 @@
 import { StyleSheet } from 'react-native';
 
-export const palette = { ink: '#13231c', muted: '#6f8177', green: '#14806f', border: '#dce8df',
-  background: '#f7faf7', pale: '#e6f8f1', danger: '#c74e47' };
+// Match the light Codex GUI conversation palette on the connected computer.
+export const palette = { ink: '#17211b', muted: '#718078', green: '#0b8065', border: '#dfe5df',
+  background: '#fbfcfa', pale: '#e7f5f4', danger: '#c74e47' };
 
 export const styles = StyleSheet.create({
   fill: { flex: 1 },
@@ -43,9 +44,9 @@ export const styles = StyleSheet.create({
   // Leave room for Android's fallback font instead of relying on the exact measured text width.
   messageLoadingText: { width: '100%', maxWidth: 400, paddingHorizontal: 16, textAlign: 'center' },
   historyStatus: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 36 },
-  userMessage: { alignSelf: 'flex-end', maxWidth: '92%', borderRadius: 18,
-    backgroundColor: '#e6f1eb', paddingHorizontal: 15, paddingVertical: 10 },
-  messageText: { color: palette.ink, fontSize: 15, lineHeight: 24 },
+  userMessage: { alignSelf: 'flex-end', maxWidth: '90%', borderRadius: 16, borderBottomRightRadius: 4,
+    backgroundColor: palette.pale, paddingHorizontal: 19, paddingVertical: 15 },
+  messageText: { color: palette.ink, fontSize: 14, lineHeight: 25 },
   assistantMessage: { gap: 8 },
   speaker: { color: palette.green, fontSize: 12, lineHeight: 18, fontWeight: '700' },
   tool: { borderLeftWidth: 2, borderLeftColor: '#b7cbc0', paddingLeft: 12, paddingVertical: 8 },

@@ -1,0 +1,21 @@
+# Backport upstream PR #3832, released in react-native-gesture-handler 2.30.0.
+# https://github.com/software-mansion/react-native-gesture-handler/pull/3832
+# Expo 53 uses 2.24.0; Metro resolves this package's react-native source entry.
+diff --git a/src/components/ReanimatedDrawerLayout.tsx b/src/components/ReanimatedDrawerLayout.tsx
+--- a/src/components/ReanimatedDrawerLayout.tsx
++++ b/src/components/ReanimatedDrawerLayout.tsx
+@@ -500,6 +500,7 @@
+     const overlayDismissGesture = useMemo(
+       () =>
+         Gesture.Tap()
++          .enabled(drawerOpened)
+           .maxDistance(25)
+           .onEnd(() => {
+             if (
+@@ -509,5 +510,5 @@
+               closeDrawer();
+             }
+           }),
+-      [closeDrawer, isDrawerOpen, drawerLockMode]
++      [closeDrawer, isDrawerOpen, drawerLockMode, drawerOpened]
+     );

@@ -10,21 +10,8 @@ import styles from "./styles.module.less";
 import { GeneratedImages } from "./GeneratedImages";
 import { DeferredDetails } from "./DeferredDetails";
 import { RequestErrorNotice } from "./RequestErrorNotice";
-
-interface Group { type: "work" | "message"; items: Item[] }
-
-/** Only process messages collapse; user steering and final answers stay in chronological order. */
-export function groupTurnItems(items: Item[]): Group[] {
-  const lastAnswer = items.reduce((last, item, index) => item.type === "agentMessage" ? index : last, -1);
-  return items.reduce<Group[]>((groups, item, index) => {
-    const answer = item.type === "agentMessage"
-      && (item.phase === "final_answer" || (!item.phase && index === lastAnswer));
-    const type = item.type === "userMessage" || answer ? "message" : "work";
-    if (type === "work" && groups.at(-1)?.type === "work") groups[groups.length - 1].items.push(item);
-    else groups.push({ type, items: [item] });
-    return groups;
-  }, []);
-}
+import { groupTurnItems } from "../../../../../shared/chat/turnGroups";
+export { groupTurnItems } from "../../../../../shared/chat/turnGroups";
 
 export const TurnMessage = memo(function TurnMessage({ turn, running, active, followsInterruption = false,
   editableItemId, onEdit, editDisabled, threadId, visibleItems = turn.items }: {

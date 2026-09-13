@@ -12,8 +12,10 @@ type ScrollEvent = NativeSyntheticEvent<NativeScrollEvent>;
 type Options = Pick<ChatMessagesProps, 'hasMore' | 'loading' | 'loadingMore' | 'loadOlder'>
   & { latestItemId?: string; bottomPadding: number };
 
-export function useChatScroll({ hasMore, loading, loadingMore, loadOlder, latestItemId, bottomPadding }: Options) {
-  const list = useRef<FlatList<Item>>(null);
+export function useChatScroll<Entry extends { id: string } = Item>(
+  { hasMore, loading, loadingMore, loadOlder, latestItemId, bottomPadding }: Options,
+) {
+  const list = useRef<FlatList<Entry>>(null);
   const following = useRef(true);
   const scrolling = useRef(false);
   const position = useRef(0);
@@ -56,7 +58,7 @@ export function useChatScroll({ hasMore, loading, loadingMore, loadOlder, latest
     measuredItems.current.add(id);
     presentLatest();
   }, [presentLatest]);
-  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken<Item>[] }) => {
+  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken<Entry>[] }) => {
     visibleItems.current = new Set(viewableItems.filter((token) => token.isViewable).map((token) => token.item.id));
     presentLatest();
   }, [presentLatest]);

@@ -5,6 +5,8 @@ const LABELS: Record<string, string> = {
   userMessage: '消息内容', agentMessage: '回复内容', commandExecution: '执行命令', fileChange: '文件修改',
   reasoning: '思考过程', webSearch: '搜索网页', mcpToolCall: '使用工具', dynamicToolCall: '使用工具',
   functionCallOutput: '工具输出', collabAgentToolCall: '协作任务', collabToolCall: '协作任务', plan: '执行计划',
+  imageView: '查看图片', imageGeneration: '生成图片', sleep: '等待', contextCompaction: '整理对话',
+  enteredReviewMode: '开始代码审查', exitedReviewMode: '代码审查结果', hookPrompt: '任务补充',
 };
 export const messageLabel = (item: Item) => LABELS[item.type] ?? '任务活动';
 

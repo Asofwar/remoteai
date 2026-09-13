@@ -18,6 +18,7 @@ import { resolveModelSelection } from '../../../apps/desktop/src/pages/codexGui/
 import { SIDEBAR_EVENT, type SidebarSnapshot } from '../sidebar';
 import { emptyQueue, QUEUE_EVENT, type QueueAction, type QueueSnapshot } from '../queue';
 import { QueueConnection } from './queueConnection';
+import { AsyncAnswers } from './asyncAnswers';
 import { createGuiAccountsClient } from './guiAccounts';
 import { initialChatState, type ApprovalReply, type ChatProject, type ChatState, type GuiEvent,
   type ListResponse, type Request, type SendInput, type SkillsResponse, type Thread } from './types';
@@ -30,6 +31,9 @@ export class ChatController {
   private readonly eventListeners = new Set<(event: GuiEvent) => void>();
   private readonly connection: Pick<ChatConnection, 'request' | 'start' | 'stop'>;
   private readonly queueConnection = new QueueConnection((body) => this.connection.request('request', body));
+  private readonly asyncAnswers = new AsyncAnswers({ snapshot: () => this.state,
+    request: (body) => this.connection.request('request', body), update: (patch) => this.update(patch),
+    applyQueue: (queue) => this.applyQueue(queue), refresh: () => this.refreshSelected() });
   readonly guiAccounts = createGuiAccountsClient({
     request: (body) => this.connection.request('request', body), subscribe: (listener) => this.subscribeEvents(listener),
   });
@@ -433,6 +437,8 @@ export class ChatController {
     } catch (error) { this.failure(error); return false; }
     finally { this.update({ sending: false }); }
   }
+
+  answerAsyncQuestion = (item: import('./types').Item, answers: string[]) => this.asyncAnswers.submit(item, answers);
 
   private ensureCurrent(generation: number) {
     if (generation !== this.synchronization || !this.state.ready) throw new Error('连接已中断，请连接后再发送。');

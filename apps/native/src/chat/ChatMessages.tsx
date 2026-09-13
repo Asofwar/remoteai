@@ -1,80 +1,64 @@
-import { memo, useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Keyboard, Pressable, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useChatScroll } from './useChatScroll';
-import { ChatMarkdown } from './Markdown';
-import { ChatImage } from './ChatImage';
+import { ChatMessage } from './ChatMessage';
 import { ChatToolDetails } from './ChatToolDetails';
-import { messageContent, messageLabel as toolLabel, turnFiles } from '../../../../shared/chat/messageDetails';
-import { ChatDiff } from './ChatDiff';
-import { BottomSheet } from '../components/BottomSheet';
-import { ScrollView } from 'react-native';
-import { CopyTextButton } from './CopyTextButton';
-import { itemImageSources } from '../../../../shared/chat/imageSources';
-import type { Item } from './types';
+import { ChatWorkDrawer } from './ChatWorkDrawer';
+import { ChatTurnDuration, ChatTurnSummary, type TurnPanel } from './ChatTurnSummary';
+import { ChatTurnDetails } from './ChatTurnDetails';
+import { conversationEntries, findWorkEntry, type TurnEntry, type WorkEntry } from './turnPresentation';
 import type { ChatMessagesProps } from '../../../../shared/remote-chat/client/messageProps';
-import { styles } from './styles';
+import { palette, styles } from './styles';
+
+type Selection = { type: 'work'; id: string } | { type: 'item'; id: string; workId?: string }
+  | { type: 'turn'; id: string; panel: TurnPanel };
 
 function MessageSeparator() {
   return <View style={styles.messageSeparator} />;
 }
 
-function ToolMessage({ item, onOpen }: { item: Item; onOpen: (id: string) => void }) {
-  return <View style={styles.tool}>
-    <Pressable accessibilityRole="button" accessibilityLabel={`查看${toolLabel(item)}详情`}
-      onPress={() => onOpen(item.id)}>
-      <Text style={styles.subtitle}>▸ {toolLabel(item)}
-        {item.status === 'inProgress' ? ' · 进行中' : ''}</Text>
-      {item.command && <Text numberOfLines={1} style={styles.code}>{item.command}</Text>}
-    </Pressable>
-  </View>;
+function WorkSummary({ entry, onOpen }: { entry: WorkEntry; onOpen: () => void }) {
+  const label = entry.turn.status === 'inProgress' ? '正在处理' : '查看处理过程';
+  return <Pressable accessibilityRole="button" accessibilityLabel={`${label}，${entry.items.length} 项活动`}
+    style={[styles.row, { paddingVertical: 5 }]} onPress={onOpen}>
+    <Text style={styles.subtitle}>{label}</Text>
+    <Text style={[styles.subtitle, styles.fill]}>{entry.items.length} 项活动</Text>
+    <Ionicons name="chevron-forward" size={15} color={palette.muted} />
+  </Pressable>;
 }
 
-const ChatMessage = memo(function ChatMessage({ item, onOpen }: { item: Item; onOpen: (id: string) => void }) {
-  const images = itemImageSources(item);
-  if (item.type === 'userMessage') return <View style={[styles.userMessage, images.length > 0 && { width: '92%' }]}>
-    <Text selectable style={styles.messageText}>{messageContent(item)}</Text>
-    {images.map((source, index) => <ChatImage key={index} source={source} />)}
-    <Pressable accessibilityRole="button" onPress={() => onOpen(item.id)}>
-      <Text style={styles.buttonText}>查看全文</Text></Pressable>
-  </View>;
-  if (images.length) return <View>
-    {images.map((source, index) => <ChatImage key={index} source={source} />)}
-    <ToolMessage item={item} onOpen={onOpen} />
-  </View>;
-  if (item.type !== 'agentMessage') return <ToolMessage item={item} onOpen={onOpen} />;
-  return <View style={styles.assistantMessage}>
-    <Text style={styles.speaker}>Codex</Text>
-    <ChatMarkdown text={messageContent(item)} />
-    <View style={styles.row}>
-      <Pressable accessibilityRole="button" style={styles.compactButton} onPress={() => onOpen(item.id)}>
-        <Text style={styles.buttonText}>查看全文</Text></Pressable>
-      <CopyTextButton text={messageContent(item)} label="复制回复" />
-    </View>
-  </View>;
-});
+function TimelineEntry({ entry, open }: { entry: TurnEntry; open: (selection: Selection) => void }) {
+  if (entry.kind === 'duration') return <ChatTurnDuration turn={entry.turn} />;
+  if (entry.kind === 'summary') return <ChatTurnSummary turn={entry.turn}
+    onOpen={(id, panel) => open({ type: 'turn', id, panel })} />;
+  if (entry.kind === 'work') return <WorkSummary entry={entry} onOpen={() => open({ type: 'work', id: entry.id })} />;
+  return <ChatMessage item={entry.item} onOpen={(id) => open({ type: 'item', id })}
+    running={entry.turn.status === 'inProgress' && entry.item.status !== 'completed'} />;
+}
 
 export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder }: ChatMessagesProps) {
-  const items = thread?.turns?.flatMap((turn) => turn.items) ?? [];
+  const entries = useMemo(() => conversationEntries(thread?.turns ?? []), [thread?.turns]);
   const { list, more, preservePosition, initializing, onItemLayout, onFooterLayout, ...scrollHandlers }
-    = useChatScroll({
-    hasMore, loading, loadingMore, loadOlder, latestItemId: items.at(-1)?.id, bottomPadding: styles.messages.padding,
-  });
-  const showInitialLoading = initializing || (loading && !items.length);
-  const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
-  const [changesOpen, setChangesOpen] = useState(false);
-  const openTool = useCallback((id: string) => { Keyboard.dismiss(); setSelectedToolId(id); }, []);
-  // Resolve from the live messages so output keeps updating while the drawer is open.
-  const selectedTool = items.find((item) => item.id === selectedToolId);
-  const lastTurn = thread?.turns?.at(-1);
-  const changedTurn = thread?.turns?.slice().reverse().find((turn) => turn.diff?.trim()
-    || turn.items.some((item) => item.changes?.length));
-  return <><View style={styles.fill}><FlatList ref={list} data={items} keyExtractor={(item) => item.id}
+    = useChatScroll<TurnEntry>({ hasMore, loading, loadingMore, loadOlder,
+      latestItemId: entries.at(-1)?.id, bottomPadding: styles.messages.padding });
+  const showInitialLoading = initializing || (loading && !entries.length);
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const open = useCallback((value: Selection) => { Keyboard.dismiss(); setSelection(value); }, []);
+  // Resolve against live history so open process, plan, output and diff drawers keep receiving updates.
+  const selectedEntry = selection?.type === 'work' ? findWorkEntry(entries, selection.id) : undefined;
+  const selectedTool = selection?.type === 'item'
+    ? thread?.turns?.flatMap((turn) => turn.items).find((item) => item.id === selection.id) : undefined;
+  const selectedTurn = selection?.type === 'turn' ? thread?.turns?.find((turn) => turn.id === selection.id) : undefined;
+  const workId = selection?.type === 'item' ? selection.workId : undefined;
+  const close = () => setSelection(null);
+  return <><View style={styles.fill}><FlatList ref={list} data={entries} keyExtractor={(entry) => entry.id}
     style={showInitialLoading && styles.messageListLoading}
     pointerEvents={showInitialLoading ? 'none' : 'auto'} accessibilityElementsHidden={showInitialLoading}
     importantForAccessibility={showInitialLoading ? 'no-hide-descendants' : 'auto'}
-    contentContainerStyle={items.length ? styles.messages : styles.empty}
-    renderItem={({ item }) => <View collapsable={false} onLayout={() => onItemLayout(item.id)}>
-      <ChatMessage item={item} onOpen={openTool} />
+    contentContainerStyle={entries.length ? styles.messages : styles.empty}
+    renderItem={({ item: entry }) => <View collapsable={false} onLayout={() => onItemLayout(entry.id)}>
+      <TimelineEntry entry={entry} open={open} />
     </View>}
     ItemSeparatorComponent={MessageSeparator}
     keyboardShouldPersistTaps="handled" initialNumToRender={10}
@@ -82,8 +66,7 @@ export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder 
     removeClippedSubviews={false}
     maintainVisibleContentPosition={preservePosition ? { minIndexForVisible: 1 } : undefined}
     {...scrollHandlers} scrollEventThrottle={100}
-    ListHeaderComponent={hasMore ? <View
-      style={[styles.historyStatus, styles.messageHeader]}>
+    ListHeaderComponent={hasMore ? <View style={[styles.historyStatus, styles.messageHeader]}>
       {loadingMore ? <>
         <ActivityIndicator size="small" accessibilityLabel="正在加载聊天记录" />
         <Text style={styles.subtitle}>正在加载聊天记录…</Text>
@@ -92,28 +75,21 @@ export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder 
       </Pressable>}
     </View> : null}
     ListEmptyComponent={loading ? null : <View style={styles.empty}>
-      <Text style={styles.emptyGlyph}>✳</Text>
+      <Ionicons name="terminal-outline" size={28} color={palette.green} />
       <Text style={styles.title}>想一起完成什么？</Text>
-      <Text style={[styles.subtitle, styles.centerText]}>消息会发送到你的电脑，随时可以接着聊。</Text>
+      <Text style={[styles.subtitle, styles.centerText]}>直接提问，或选择一个项目开始任务。</Text>
     </View>}
-    ListFooterComponent={<View style={styles.messageFooter} onLayout={onFooterLayout}>
-      {changedTurn && <Pressable accessibilityRole="button" style={styles.button}
-        onPress={() => { Keyboard.dismiss(); setChangesOpen(true); }}>
-        <Text style={styles.buttonText}>查看最近一轮文件修改</Text></Pressable>}
-      {lastTurn?.error && <Text style={styles.error}>{lastTurn.error.message}</Text>}
-    </View>} />
+    ListFooterComponent={<View style={styles.messageFooter} onLayout={onFooterLayout} />} />
     {showInitialLoading && <View style={styles.messageLoadingOverlay}>
       <ActivityIndicator size="small" accessibilityLabel="正在加载聊天记录" />
       <Text style={[styles.subtitle, styles.messageLoadingText]}>正在加载聊天记录…</Text>
     </View>}
     </View>
-    {selectedTool && <ChatToolDetails key={selectedTool.id} item={selectedTool}
-      onClose={() => setSelectedToolId(null)} />}
-    {changesOpen && changedTurn && <BottomSheet visible tall title="文件修改"
-      onClose={() => setChangesOpen(false)} dragFromHeaderOnly>
-      <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
-        <ChatDiff files={turnFiles(changedTurn)} />
-      </ScrollView>
-    </BottomSheet>}
+    {selectedEntry?.kind === 'work' && <ChatWorkDrawer entry={selectedEntry} onClose={close}
+      onOpen={(id) => open({ type: 'item', id, workId: selectedEntry.id })} />}
+    {selectedTool && <ChatToolDetails key={selectedTool.id} item={selectedTool} onClose={close}
+      onBack={workId ? () => open({ type: 'work', id: workId }) : undefined} />}
+    {selectedTurn && selection?.type === 'turn' && <ChatTurnDetails turn={selectedTurn}
+      panel={selection.panel} onClose={close} />}
   </>;
 }

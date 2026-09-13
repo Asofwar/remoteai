@@ -1,0 +1,88 @@
+import { Linking, Pressable, Text, View } from 'react-native';
+import { messageContent, messageSections } from '../../../../shared/chat/messageDetails';
+import { changedFiles } from '../../../../shared/chat/diff';
+import {
+  collaborationStates, collaborationStatus, collaborationSummary, isCollaborationActivity,
+} from '../../../desktop/src/pages/codexGui/collaborationActivity';
+import { formatTurnDuration } from '../../../desktop/src/pages/codexGui/turnTiming';
+import { ChatCodeBlock } from './ChatCodeBlock';
+import { ChatMarkdown } from './Markdown';
+import { ChatDiff } from './ChatDiff';
+import { ChatToolResult } from './ChatToolResult';
+import { ChatImage } from './ChatImage';
+import { generatedImageSource, itemImageSources } from '../../../../shared/chat/imageSources';
+import { ChatCommandDetails } from './ChatCommandDetails';
+import { CopyTextButton } from './CopyTextButton';
+import { toolText } from './toolText';
+import { styles, palette } from './styles';
+import type { Item } from './types';
+
+function WebLink({ url, title }: { url?: string; title?: string }) {
+  if (!url || !/^https?:\/\//i.test(url)) return <Text style={styles.messageText}>{title || url}</Text>;
+  return <Pressable accessibilityRole="link" onPress={() => {
+    void Linking.openURL(url).catch(() => undefined);
+  }}><Text selectable style={[styles.messageText, { color: palette.green, textDecorationLine: 'underline' }]}>
+    {title || url}</Text></Pressable>;
+}
+
+function SearchDetails({ item }: { item: Item }) {
+  return <View style={{ gap: 12 }}>
+    {(item.action?.queries ?? [item.action?.query || item.query]).filter(Boolean).map((query, index) =>
+      <Text key={index} selectable style={styles.messageText}>{query}</Text>)}
+    {item.action?.url && <WebLink url={item.action.url} />}
+    {item.action?.pattern && <Text style={styles.messageText}>查找：{item.action.pattern}</Text>}
+    {item.results?.map((result, index) => <View key={index}
+      style={{ borderTopWidth: 1, borderColor: palette.border, paddingTop: 8, gap: 4 }}>
+      <WebLink url={result.url} title={result.title} />
+      {result.snippet && <Text selectable style={styles.subtitle}>{result.snippet}</Text>}
+    </View>)}
+  </View>;
+}
+
+function CollaborationDetails({ item }: { item: Item }) {
+  return <View style={{ gap: 12 }}>
+    <Text style={styles.messageText}>{collaborationSummary(item)}</Text>
+    {item.prompt && <ChatMarkdown text={item.prompt} />}
+    {item.text && item.text !== item.prompt && <ChatMarkdown text={item.text} />}
+    {collaborationStates(item).map((state, index) => <View key={index}>
+      <Text style={styles.subtitle}>协作任务 {index + 1} · {collaborationStatus(state.status)}</Text>
+      {state.message && <ChatMarkdown text={state.message} />}
+    </View>)}
+  </View>;
+}
+
+function UserMessageDetails({ item }: { item: Item }) {
+  const text = messageContent(item);
+  return <View style={{ gap: 12 }}>
+    {!!text && <Text selectable style={styles.messageText}>{text}</Text>}
+    {itemImageSources(item).map((source, index) => <ChatImage key={index} source={source} />)}
+    {!!text && <CopyTextButton text={text} label="复制消息" />}
+  </View>;
+}
+
+export function ChatToolContent({ item }: { item: Item }) {
+  const text = toolText(item);
+  if (item.type === 'userMessage') return <UserMessageDetails item={item} />;
+  if (['agentMessage', 'reasoning', 'plan', 'enteredReviewMode', 'exitedReviewMode'].includes(item.type)) {
+    return <ChatMarkdown text={text} />;
+  }
+  if (item.type === 'commandExecution') return <ChatCommandDetails item={item} />;
+  if (item.type === 'fileChange') return <ChatDiff files={changedFiles(item.changes ?? [])} />;
+  if (['mcpToolCall', 'dynamicToolCall', 'functionCallOutput'].includes(item.type)) {
+    return <ChatToolResult item={item} />;
+  }
+  if (item.type === 'webSearch') return <SearchDetails item={item} />;
+  if (item.type === 'imageView' || item.type === 'imageGeneration') return <View style={{ gap: 12 }}>
+    {item.type === 'imageView' && <ChatImage source={generatedImageSource(item)} description="查看的图片" />}
+    {(item.path || item.savedPath) && <Text selectable style={styles.subtitle}>{item.path || item.savedPath}</Text>}
+    {item.failure?.message && <Text style={styles.error}>{item.failure.message}</Text>}
+    {item.revisedPrompt && <ChatMarkdown text={item.revisedPrompt} />}
+  </View>;
+  if (isCollaborationActivity(item)) return <CollaborationDetails item={item} />;
+  if (item.type === 'contextCompaction') return <Text style={styles.messageText}>
+    较早的对话已整理为摘要，可以继续处理当前任务。</Text>;
+  if (item.type === 'sleep') return <Text style={styles.messageText}>
+    等待时长：{formatTurnDuration(item.durationMs ?? 0)}</Text>;
+  return <>{messageSections(item).map((section, index) =>
+    <ChatCodeBlock key={index} text={section.text} label={section.title} copyLabel={`复制${section.title}`} />)}</>;
+}

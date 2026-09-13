@@ -1,0 +1,121 @@
+import { useContext, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { pairDiffLines, type DiffFile, type DiffLine, type DiffPair } from '../../../../shared/chat/diff';
+import { CopyTextButton } from './CopyTextButton';
+import { ChatFileContext } from './ChatFilePreview';
+import { HighlightedCode, fileLanguage } from './ChatCodeHighlight';
+import { palette, styles } from './styles';
+
+const PAGE_LINES = 200;
+const NUMBER_COLUMN_WIDTH = 34;
+const MIN_SCROLL_COLUMN_WIDTH = 320;
+const CELL_BORDER_WIDTH = 1;
+const REDUNDANT_HEADER = /^(diff --git |index |--- |\+\+\+ |new file mode |deleted file mode )/;
+
+function UnifiedRow({ line, language, wrap }: { line: DiffLine; language: string; wrap: boolean }) {
+  const marker = line.kind === 'add' ? '+' : line.kind === 'remove' ? '−' : ' ';
+  const heading = line.kind === 'hunk' || line.kind === 'meta';
+  return <View style={[diffStyles.line, diffStyles[line.kind]]}>
+    <Text style={[styles.code, diffStyles.number]}>{line.oldLine ?? ''}</Text>
+    <Text style={[styles.code, diffStyles.number]}>{line.newLine ?? ''}</Text>
+    <Text style={[styles.code, diffStyles.sign]}>{marker}</Text>
+    <Text selectable style={[styles.code, wrap ? diffStyles.wrappedText : diffStyles.unwrappedText]}>
+      <HighlightedCode text={line.text || ' '} language={heading ? '' : language} /></Text>
+  </View>;
+}
+
+function SplitCell({ line, side, language, column, wrap }: {
+  line?: DiffLine; side: 'left' | 'right'; language: string; column: StyleProp<ViewStyle>; wrap: boolean;
+}) {
+  return <View style={[diffStyles.cell, column, line && diffStyles[line.kind]]}>
+    <Text style={[styles.code, diffStyles.number]}>{side === 'left' ? line?.oldLine : line?.newLine}</Text>
+    <Text selectable style={[styles.code, wrap ? diffStyles.wrappedText : diffStyles.unwrappedText]}>
+      <HighlightedCode text={line?.text || ' '} language={language} /></Text>
+  </View>;
+}
+
+/** Measure with the native font in an unconstrained scroller; character counts miss CJK, tabs and font scaling. */
+function MeasureCode({ text, onMeasure }: { text: string; onMeasure: (width: number) => void }) {
+  return <ScrollView horizontal scrollEnabled={false} style={diffStyles.measure} pointerEvents="none"
+    accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
+    onContentSizeChange={(width) => onMeasure(Math.ceil(width))}>
+    <Text style={styles.code}>{text}</Text>
+  </ScrollView>;
+}
+
+function SplitRows({ pairs, language, wrap }: { pairs: DiffPair[]; language: string; wrap: boolean }) {
+  const [widths, setWidths] = useState({ left: 0, right: 0 });
+  const text = useMemo(() => ({ left: pairs.map((pair) => pair.left?.text || ' ').join('\n'),
+    right: pairs.map((pair) => pair.right?.text || ' ').join('\n') }), [pairs]);
+  const left = Math.max(MIN_SCROLL_COLUMN_WIDTH, widths.left + NUMBER_COLUMN_WIDTH + CELL_BORDER_WIDTH);
+  const right = Math.max(MIN_SCROLL_COLUMN_WIDTH, widths.right + NUMBER_COLUMN_WIDTH + CELL_BORDER_WIDTH);
+  const columns = wrap ? [diffStyles.wrappedCell, diffStyles.wrappedCell] : [{ width: left }, { width: right }];
+  return <View style={wrap ? undefined : { width: left + right }}>
+    {!wrap && <>
+      <MeasureCode text={text.left} onMeasure={(width) => setWidths((current) =>
+        width > current.left ? { ...current, left: width } : current)} />
+      <MeasureCode text={text.right} onMeasure={(width) => setWidths((current) =>
+        width > current.right ? { ...current, right: width } : current)} />
+    </>}
+    <View style={diffStyles.line}>
+      <Text style={[diffStyles.columnLabel, columns[0]]}>修改前</Text>
+      <Text style={[diffStyles.columnLabel, columns[1]]}>修改后</Text>
+    </View>
+    {pairs.map((pair, index) => pair.heading
+      ? <Text selectable key={index} style={[styles.code, diffStyles.hunk]}>{pair.heading.text}</Text>
+      : <View key={index} style={diffStyles.line}>
+        <SplitCell line={pair.left} side="left" language={language} column={columns[0]} wrap={wrap} />
+        <SplitCell line={pair.right} side="right" language={language} column={columns[1]} wrap={wrap} />
+      </View>)}
+  </View>;
+}
+
+export function ChatDiffContent({ file }: { file: DiffFile }) {
+  const [limit, setLimit] = useState(PAGE_LINES);
+  const [wrap, setWrap] = useState(false);
+  const [split, setSplit] = useState(false);
+  const openFile = useContext(ChatFileContext);
+  const lines = useMemo(() => file.lines.filter((line) => line.kind !== 'meta'
+    || !REDUNDANT_HEADER.test(line.text)), [file.lines]);
+  const pairs = useMemo(() => split ? pairDiffLines(lines) : [], [lines, split]);
+  const language = fileLanguage(file.path);
+  const total = split ? pairs.length : lines.length;
+  const rows = split ? <SplitRows pairs={pairs.slice(0, limit)} language={language} wrap={wrap} />
+    : <View>{lines.slice(0, limit).map((line, index) =>
+      <UnifiedRow key={index} line={line} language={language} wrap={wrap} />)}</View>;
+  return <View style={{ gap: 10 }}>
+    {file.previousPath && <Text selectable style={styles.subtitle}>{file.previousPath} → {file.path}</Text>}
+    <View style={diffStyles.toolbar}>
+      <CopyTextButton text={file.raw} label="复制 diff" />
+      <Pressable accessibilityRole="button" style={diffStyles.action} onPress={() => setWrap(!wrap)}>
+        <Text style={diffStyles.actionText}>{wrap ? '横向滚动' : '自动换行'}</Text></Pressable>
+      <Pressable accessibilityRole="button" style={diffStyles.action} onPress={() => setSplit(!split)}>
+        <Text style={diffStyles.actionText}>{split ? '统一' : '并排'}</Text></Pressable>
+      {openFile && file.kind !== 'delete' && <Pressable accessibilityRole="button" style={diffStyles.action}
+        onPress={() => openFile({ path: file.path })}><Text style={diffStyles.actionText}>查看文件</Text></Pressable>}
+    </View>
+    {wrap ? rows : <ScrollView horizontal nestedScrollEnabled>{rows}</ScrollView>}
+    {!total && <Text style={styles.subtitle}>{file.kind === 'add' ? '新增空文件' : '此文件没有可显示的文本差异。'}</Text>}
+    {total > limit && <Pressable accessibilityRole="button" style={styles.button}
+      onPress={() => setLimit(limit + PAGE_LINES)}>
+      <Text style={styles.buttonText}>继续显示（还有 {total - limit} 行）</Text></Pressable>}
+  </View>;
+}
+
+const diffStyles = StyleSheet.create({
+  toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  action: { minHeight: 36, paddingHorizontal: 6, justifyContent: 'center' },
+  actionText: { color: palette.muted, fontSize: 12, lineHeight: 20 },
+  line: { flexDirection: 'row', minHeight: 23 },
+  number: { width: NUMBER_COLUMN_WIDTH, flexShrink: 0, color: palette.muted, textAlign: 'right', paddingRight: 6,
+    borderRightWidth: 1, borderColor: palette.border },
+  sign: { width: 20, flexShrink: 0, textAlign: 'center' },
+  cell: { flexDirection: 'row', borderRightWidth: CELL_BORDER_WIDTH, borderColor: palette.border },
+  wrappedCell: { flex: 1, minWidth: 0 },
+  wrappedText: { flex: 1, minWidth: 0 },
+  unwrappedText: { flexShrink: 0 },
+  measure: { position: 'absolute', left: 0, top: 0, width: 1, height: 1, opacity: 0 },
+  columnLabel: { padding: 8, color: palette.muted, backgroundColor: '#f4f6f5' },
+  add: { backgroundColor: '#e0f2e7' }, remove: { backgroundColor: '#fbe5e5' },
+  hunk: { backgroundColor: '#f4f6f5', paddingVertical: 2 }, meta: { backgroundColor: '#f4f6f5' }, context: {},
+});

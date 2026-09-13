@@ -117,21 +117,39 @@ it("ignores zoom, horizontal wheels, and scrolling inside nested output or away 
   expect(count()).toBe(20);
 });
 
-it("keeps streamed items and an expanded partial activity group while older components mount", async () => {
+it("keeps streamed items and an expanded complete activity group while older messages mount", async () => {
   const value = conversation();
   value.turns[0].items.forEach((entry) => { entry.phase = "commentary"; });
+  value.turns.unshift({ id: "earlier", status: "completed", items: Array.from({ length: 35 }, (_, index) => (
+    { ...item(index), id: `earlier-${index}` })) });
   await render(value);
   const details = container.querySelector("details")!;
   await act(async () => { details.open = true; details.dispatchEvent(new Event("toggle")); });
   await act(async () => button().click());
-  const next = { ...value, turns: [{ ...value.turns[0], items: [...value.turns[0].items, item(35)] }] };
+  const next = { ...value, turns: [value.turns[0], { ...value.turns[1], items: [...value.turns[1].items, item(35)] }] };
   await render(next);
-  expect(count()).toBe(11);
+  expect(count()).toBe(45);
   await frame(); await frame();
-  expect(count()).toBe(21);
+  expect(count()).toBe(55);
   expect(container.querySelector("details")).toBe(details);
   expect(details.open).toBe(true);
   expect(container.textContent).toContain("Message 35");
+});
+
+it("shows the question and full activity count without mounting thousands of collapsed rich messages", async () => {
+  const value = conversation();
+  value.turns[0].items = [{ id: "question", type: "userMessage", content: [{ type: "text", text: "检查项目" }] },
+    ...Array.from({ length: 2_000 }, (_, index): Item => ({ ...item(index), phase: "commentary" })),
+    { ...item(2_000), id: "answer" }];
+  await render(value);
+  expect(container.querySelector("summary")?.textContent).toContain("2000 项活动");
+  expect(container.querySelector("details")?.open).toBe(false);
+  expect(count()).toBe(2);
+  expect(container.querySelector('[data-message-id="question"]')).not.toBeNull();
+  expect(container.querySelector('[data-message-id="answer"]')).not.toBeNull();
+  expect(rendered.texts.has("Message 0")).toBe(false);
+  expect(rendered.texts.has("Message 1999")).toBe(false);
+  expect(button()).toBeUndefined();
 });
 
 it("uses the full turn to distinguish a hidden continuation instruction from later user messages", async () => {

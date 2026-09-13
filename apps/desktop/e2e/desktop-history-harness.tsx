@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { App, ConfigProvider } from "antd";
 import { Messages } from "../src/pages/codexGui/Messages";
-import type { Conversation, Item } from "../src/pages/codexGui/types";
+import type { Conversation, Item, Turn } from "../src/pages/codexGui/types";
 import styles from "../src/pages/codexGui/styles.module.less";
 
 const MESSAGE_COUNT = 2_000;
 const ITEMS_PER_TURN = 20;
+const ACTIVITY_COUNT = 120;
+const PROCESSED_TURN_COUNT = 6;
 const TICK_MS = 50;
 const message = (index: number): Item => index % 2 === 0
   ? { id: `message-${index}`, type: "userMessage", content: [{ type: "text", text: `请检查第 ${index} 项。` }] }
@@ -24,7 +26,26 @@ const compact: Conversation = { ...large, turns: [{ id: "compact", status: "comp
     phase: "commentary", text: `正在检查第 ${index} 项。` })),
   { id: "final", type: "agentMessage", phase: "final_answer", text: "最新回复已完成。" },
 ] }] };
-const cached = new URLSearchParams(location.search).has("compact") ? compact : large;
+const activityHistory: Conversation = { ...large, turns: [
+  ...Array.from({ length: PROCESSED_TURN_COUNT }, (_, turn): Turn => ({
+    id: `history-${turn}`, status: "completed", items: [
+      { id: `question-${turn}`, type: "userMessage",
+        content: [{ type: "text", text: `请检查历史任务 ${turn}。` }] },
+      ...Array.from({ length: ACTIVITY_COUNT }, (_, index): Item => ({
+        id: `history-activity-${turn}-${index}`, type: "agentMessage", phase: "commentary",
+        text: `历史任务 ${turn} 的处理记录 ${index}。`,
+      })),
+      { id: `answer-${turn}`, type: "agentMessage", phase: "final_answer", text: `历史任务 ${turn} 已完成。` },
+    ],
+  })),
+  { id: "latest", status: "completed", items: [
+    { id: "latest-question", type: "userMessage", content: [{ type: "text", text: "检查都完成了吗？" }] },
+    { id: "latest-answer", type: "agentMessage", phase: "final_answer", text: "所有检查已完成。" },
+  ] },
+] };
+const params = new URLSearchParams(location.search);
+const fixtures: Record<string, Conversation> = { compact, "activity-history": activityHistory };
+const cached = fixtures[[...params.keys()][0]] ?? large;
 const other: Conversation = { ...cached, thread: { ...cached.thread, id: "other" }, turns: [] };
 
 function Harness() {

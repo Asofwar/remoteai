@@ -1,15 +1,18 @@
 import { expect, it } from "vitest";
 import { messageWindow } from "./messageWindow";
 import type { Turn } from "./types";
+import { CONTINUE_MESSAGE } from "./continuation";
 
 function history(): Turn[] {
   return Array.from({ length: 7 }, (_, turn) => ({ id: `turn-${turn}`, status: "completed",
-    items: Array.from({ length: 5 }, (_, item) => ({ id: `item-${turn * 5 + item}`, type: "agentMessage" })),
+    items: Array.from({ length: 5 }, (_, item) => ({ id: `item-${turn * 5 + item}`,
+      type: "agentMessage", phase: "final_answer" })),
   }));
 }
-const ids = (range: ReturnType<typeof messageWindow>) => range.entries.flatMap((entry) => entry.items.map((item) => item.id));
+const ids = (range: ReturnType<typeof messageWindow>) => range.entries
+  .flatMap((entry) => entry.items.map((item) => item.id));
 
-it("limits the initial window to ten items, then includes ten older items at a time", () => {
+it("limits the initial window to ten message groups, then includes ten older groups at a time", () => {
   const turns = history();
   let range = messageWindow(turns);
   expect(ids(range)).toHaveLength(10);
@@ -36,7 +39,7 @@ it("limits a single large turn without discarding its full data or prior interru
 it("keeps the earliest loaded item when streaming appends new content and resets a removed cursor", () => {
   const turns = history();
   const first = messageWindow(turns);
-  turns[6].items.push({ id: "new", type: "agentMessage" });
+  turns[6].items.push({ id: "new", type: "agentMessage", phase: "final_answer" });
   expect(ids(messageWindow(turns, { start: first.start }))).toHaveLength(11);
   expect(ids(messageWindow(turns, { start: first.start, older: true }))).toHaveLength(21);
   turns[5].items = [];
@@ -58,4 +61,60 @@ it("does not offer another page when only empty turns precede the first message"
   const first = messageWindow(turns);
   expect(first.hasMore).toBe(false);
   expect(messageWindow(turns, { start: first.start }).hasMore).toBe(false);
+});
+
+it("includes a whole large process group alongside its question and answer on entry", () => {
+  const turn: Turn = { id: "long", status: "completed", items: [
+    { id: "question", type: "userMessage" },
+    ...Array.from({ length: 2_000 }, (_, index) => ({ id: `tool-${index}`, type: "commandExecution" })),
+    { id: "answer", type: "agentMessage" },
+  ] };
+  const range = messageWindow([turn]);
+  expect(range.entries[0].items).toEqual(turn.items);
+  expect(range.hasMore).toBe(false);
+  expect(range.start?.itemId).toBe("question");
+});
+
+it("reaches earlier messages in one page across many complete process groups", () => {
+  const turns: Turn[] = Array.from({ length: 7 }, (_, index) => ({ id: `turn-${index}`, status: "completed", items: [
+    { id: `question-${index}`, type: "userMessage" },
+    ...Array.from({ length: 100 }, (_, activity) => ({ id: `tool-${index}-${activity}`, type: "commandExecution" })),
+    { id: `answer-${index}`, type: "agentMessage" },
+  ] }));
+  const first = messageWindow(turns);
+  expect(first.start?.itemId).toBe("answer-3");
+  const older = messageWindow(turns, { start: first.start, older: true });
+  expect(older.start?.itemId).toBe("tool-0-0");
+  expect(older.entries[0].items).toHaveLength(101);
+  expect(ids(older)).toContain("question-1");
+  expect(older.hasMore).toBe(true);
+  const last = messageWindow(turns, { start: older.start, older: true });
+  expect(last.start?.itemId).toBe("question-0");
+  expect(last.hasMore).toBe(false);
+});
+
+it("realigns the cursor when a newly appended unphased answer extends an earlier process group", () => {
+  const turn: Turn = { id: "turn", status: "inProgress", items: [
+    { id: "question", type: "userMessage" },
+    { id: "tool", type: "commandExecution" },
+    { id: "previous-answer", type: "agentMessage" },
+    ...Array.from({ length: 9 }, (_, index) => ({ id: `later-tool-${index}`, type: "commandExecution" })),
+  ] };
+  const start = { turnId: turn.id, itemId: "previous-answer" };
+  expect(messageWindow([turn], { start }).start).toEqual(start);
+  turn.items.push({ id: "latest-answer", type: "agentMessage" });
+  const next = messageWindow([turn], { start });
+  expect(next.start?.itemId).toBe("tool");
+  expect(next.entries[0].items).toHaveLength(12);
+  expect(messageWindow([turn], { start: next.start, older: true }).start?.itemId).toBe("question");
+});
+
+it("does not count hidden continuation instructions as earlier messages", () => {
+  const turns: Turn[] = [{ id: "stopped", status: "interrupted", items: [] },
+    { id: "continue", status: "interrupted", items: [{ id: "instruction", type: "userMessage",
+      content: [{ type: "text", text: CONTINUE_MESSAGE }] }] },
+    { id: "reply", status: "completed", items: [{ id: "answer", type: "agentMessage" }] }];
+  const range = messageWindow(turns);
+  expect(range.start?.itemId).toBe("answer");
+  expect(range.hasMore).toBe(false);
 });

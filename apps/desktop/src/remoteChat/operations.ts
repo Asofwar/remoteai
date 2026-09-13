@@ -15,6 +15,8 @@ import { readGuiAccounts, selectGuiAccount } from './guiAccounts';
 import { acknowledgedMessages } from './acknowledgedMessages';
 import { chatHandshake, validateChatHandshake } from '../../../../shared/remote-chat/handshake';
 import { guiConnectionError } from '../../../../shared/remote-chat/connectionErrors';
+import { invoke } from '../api/backend';
+import type { UsageSummary } from '../../../../shared/remote-chat/usage';
 
 const OPERATIONS = new Set([
   'projectDirectories',
@@ -26,6 +28,7 @@ interface Cached {
   fingerprint: string; result: Promise<RpcResponse>; expires: number; completed: boolean; readOnly: boolean;
 }
 const READ_OPERATIONS = new Set([
+  'usageSummary',
   'projectDirectories',
   'textPreview',
   'guiAccountsRead', 'syncHistory', 'imageChunk', 'imagePreview', 'models', 'list', 'read', 'goalGet', 'skills', 'projectFiles', 'queueRead',
@@ -73,6 +76,9 @@ export class ChatOperations {
   private async run(request: RpcRequest): Promise<unknown> {
     if (request.method === 'connect') return this.connect(request.body);
     const body = object(request.body);
+    if (request.method === 'request' && body.operation === 'usageSummary') {
+      return invoke<UsageSummary>('codex_gui_usage_summary');
+    }
     if (request.method === 'request' && body.operation === 'guiAccountsRead') return readGuiAccounts();
     if (request.method === 'request' && body.operation === 'guiAccountSelect') return selectGuiAccount(body.selection);
     if (request.method === 'request' && QUEUE_OPERATIONS.has(String(body.operation))) {

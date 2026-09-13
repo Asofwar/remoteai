@@ -4,6 +4,7 @@ import { useComposerKeyboard } from './useComposerKeyboard';
 import { composerAction, COMPOSER_ACTION_LABELS, CONTINUE_MESSAGE }
   from '../../../../shared/remote-chat/composerAction';
 import { ChatSettings } from './ChatSettings';
+import type { ReadUsage } from '../../../../shared/remote-chat/usage';
 import { ChatAttachmentPreviews, ChatAttachmentSheet } from './ChatAttachments';
 import { pickChatImages } from './pickChatImages';
 import type { Model, SendInput } from './types';
@@ -11,6 +12,7 @@ import { composerLabel, type ComposerSettings } from '../../../../shared/remote-
 import { useChatDraft } from '../../../../shared/remote-chat/client/useChatDraft';
 
 interface Props {
+  readUsage: ReadUsage;
   models: Model[];
   selection: ComposerSettings;
   settingsBusy: boolean;
@@ -26,6 +28,7 @@ interface Props {
   interrupt: () => Promise<void>;
 }
 export function ChatComposer({ models, selection, settingsBusy, settingsError, updateSettings,
+  readUsage,
   threadId, active, ready, sending, running, interrupted = false, send, interrupt }: Props) {
   const [settings, setSettings] = useState(false);
   const [attachments, setAttachments] = useState(false);
@@ -104,6 +107,7 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
     </form>
     {attachments && <ChatAttachmentSheet busy={busy} pick={openAlbum} onClose={() => setAttachments(false)} />}
     {settings && <ChatSettings models={models} selection={selection}
+      readUsage={readUsage}
       saving={settingsBusy} error={settingsError} ready={ready}
       updateSettings={updateSettings} onClose={() => setSettings(false)} />}
   </>;

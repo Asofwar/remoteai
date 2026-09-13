@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { AdaptiveSheet } from '../components/AdaptiveSheet';
+import { ChatUsage } from './ChatUsage';
+import type { ReadUsage } from '../../../../shared/remote-chat/usage';
 import type { Model } from './types';
 import type { ComposerSettings } from '../../../../shared/remote-chat/composer';
 import { SETTINGS_FIELDS, settingOptions, settingValue, settingsNotice, visibleSettingsFields,
   type SettingField } from '../../../../shared/remote-chat/settingsMenu';
 
 interface Props {
+  readUsage: ReadUsage;
   models: Model[];
   selection: ComposerSettings;
   saving: boolean;
@@ -15,7 +18,7 @@ interface Props {
   onClose: () => void;
 }
 
-export function ChatSettings({ models, selection, saving, ready, error, updateSettings, onClose }: Props) {
+export function ChatSettings({ models, selection, saving, ready, error, updateSettings, onClose, readUsage }: Props) {
   const [field, setField] = useState<SettingField | null>(null);
   const notice = settingsNotice({ saving, ready, error });
   const choose = async (value: string) => {
@@ -35,6 +38,7 @@ export function ChatSettings({ models, selection, saving, ready, error, updateSe
       {!!error && <button type="button" className="chat-button" onClick={() => { void updateSettings(selection); }}>
         重新保存</button>}
       <button type="button" className="chat-button chat-primary" tabIndex={field ? -1 : 0} onClick={onClose}>完成</button>
+      <ChatUsage read={readUsage} active={!field} ready={ready} />
     </div>
     {field && <AdaptiveSheet open title={SETTINGS_FIELDS.find((entry) => entry.field === field)!.title} width={400}
       onBack={() => setField(null)} onClose={() => setField(null)}>

@@ -7,8 +7,12 @@ import type { ComposerSettings } from '../../../../shared/remote-chat/composer';
 import { SETTINGS_FIELDS, settingOptions, settingValue, settingsNotice, visibleSettingsFields,
   type SettingField } from '../../../../shared/remote-chat/settingsMenu';
 import { palette, styles } from './styles';
+import { ChatUsage } from './ChatUsage';
+import type { ReadUsage } from '../../../../shared/remote-chat/usage';
 
 interface Props {
+  readUsage: ReadUsage;
+  usageActive: boolean;
   models: Model[];
   selection: ComposerSettings;
   saving: boolean;
@@ -18,7 +22,8 @@ interface Props {
   onClose: () => void;
 }
 
-export function ChatSettings({ models, selection, saving, ready, error, updateSettings, onClose }: Props) {
+export function ChatSettings({ models, selection, saving, ready, error, updateSettings, onClose,
+  readUsage, usageActive }: Props) {
   const [field, setField] = useState<SettingField | null>(null);
   const notice = settingsNotice({ saving, ready, error });
   const choose = async (value: string) => {
@@ -26,8 +31,8 @@ export function ChatSettings({ models, selection, saving, ready, error, updateSe
     if (value !== selection[field] || error) await updateSettings({ [field]: value });
     setField((current) => current === field ? null : current);
   };
-  return <BottomSheet visible title="聊天设置" onClose={onClose}>
-    <View style={[styles.settings, menuStyles.content]}
+  return <BottomSheet visible fullWidthContent title="聊天设置" onClose={onClose}>
+    <SheetScrollView contentContainerStyle={[styles.settings, menuStyles.content]}
       accessibilityElementsHidden={field !== null} importantForAccessibility={field ? 'no-hide-descendants' : 'auto'}>
       {visibleSettingsFields(selection).map((entry) => <Pressable key={entry.field} accessibilityRole="button"
         accessibilityLabel={`设置${entry.label}`} onPress={() => setField(entry.field)} style={menuStyles.entry}>
@@ -39,7 +44,8 @@ export function ChatSettings({ models, selection, saving, ready, error, updateSe
         style={error ? styles.error : styles.subtitle}>{notice}</Text>}
       {!!error && <Pressable accessibilityRole="button" style={styles.button}
         onPress={() => { void updateSettings(selection); }}><Text style={styles.buttonText}>重新保存</Text></Pressable>}
-    </View>
+      <ChatUsage read={readUsage} active={usageActive && !field} ready={ready} />
+    </SheetScrollView>
     {field && <BottomSheet fullWidthContent
       visible title={SETTINGS_FIELDS.find((entry) => entry.field === field)!.title}
       onBack={() => setField(null)} onClose={() => setField(null)}>

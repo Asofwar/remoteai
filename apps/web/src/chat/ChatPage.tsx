@@ -70,6 +70,7 @@ function ConnectedChat({ session, device, devices, active, chooseDevice }: Props
     </div>}
     <ChatQueue {...queueProps(state, controller)} />
     <ChatComposer threadId={state.selected?.id ?? null} models={state.models} selection={state.settings}
+      readUsage={controller.readUsage}
       settingsBusy={state.settingsBusy} settingsError={state.settingsError}
       updateSettings={(settings) => controller.setSettings(settings)}
       active={active} ready={ready} sending={state.sending} running={running}

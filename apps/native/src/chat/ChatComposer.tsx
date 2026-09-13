@@ -65,6 +65,7 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
   const menu = useComposerMenu({ draft, scope: `${threadId ?? ''}:${cwd}`, active,
     refresh: catalog.refresh, compact });
   const hasDraft = draft.hasContent || photos.photos.length > 0 || attachments.items.length > 0;
+  const compactField = !draft.text.length && !hasDraft && !photos.busy && !photos.error;
   useEffect(() => { if (!active) { setSettings(false); setAdding(false); setProjectFiles(null); } }, [active]);
   useEffect(() => { setSettings(false); setAdding(false); setProjectFiles(null); setAttachmentError(''); }, [threadId]);
   useEffect(() => { setProjectFiles(null); }, [cwd]);
@@ -117,29 +118,31 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
       close={() => { setAdding(false); menu.close(); }}>
       {menuContent()}
     </ComposerPopover>}
-    <View ref={anchor} collapsable={false} style={styles.composerField}
+    <View ref={anchor} collapsable={false} style={[styles.composerField, compactField && styles.composerFieldCompact]}
       onLayout={({ nativeEvent }) => setAnchorHeight(nativeEvent.layout.height)}>
       <ChatPhotoPicker photos={photos} disabled={sending} active={active} />
       <ComposerReferences items={attachments.items} disabled={attachmentBusy} remove={attachments.remove} />
       <TextInput ref={menu.input} accessibilityLabel="聊天消息"
-        style={styles.input}
+        style={[styles.input, compactField && styles.inputCompact]}
         multiline value={draft.text} maxLength={100_000} selection={menu.selection}
+        placeholderTextColor="#999999" underlineColorAndroid="transparent"
         onSelectionChange={(event) => menu.setSelection(event.nativeEvent.selection)}
-        onChangeText={draft.setText} placeholder={ready ? '发消息，输入 @ 选择插件…' : '连接后即可发送消息'} />
-      <View pointerEvents="box-none" style={styles.composerActions}>
+        onChangeText={draft.setText} placeholder={ready ? '发消息…' : '连接后发消息'} />
+      <View pointerEvents="box-none" style={[styles.composerActions, compactField && styles.composerActionsCompact]}>
         <Pressable accessibilityRole="button" accessibilityLabel="添加内容" style={styles.composerAdd}
           accessibilityState={{ expanded: adding }} onPress={() => { menu.close(); setAdding((current) => !current); }}>
           <Text style={styles.composerAddText}>+</Text>
         </Pressable>
         <View style={styles.composerTrailing}>
-          <Pressable accessibilityRole="button" style={styles.composerModel}
+          <Pressable accessibilityRole="button" style={[styles.composerModel, compactField && styles.composerModelCompact]}
             accessibilityLabel={`${composerLabel(models, selection)}${selection.speed === 'fast' ? '，快速模式' : ''}，聊天设置`}
             onPress={() => setSettings(true)}>
+            {compactField ? <Feather name="sliders" size={19} color={styles.composerModelText.color} /> : <>
             <Text numberOfLines={1} ellipsizeMode="head" style={styles.composerModelText}>
               {modelLabelTail(composerLabel(models, selection))}</Text>
             {selection.speed === 'fast' && <Feather name="zap" size={14}
               color={styles.composerModelText.color} accessibilityLabel="快速模式" />}
-            <Feather name="chevron-down" size={12} color={styles.composerModelText.color} />
+            <Feather name="chevron-down" size={12} color={styles.composerModelText.color} /></>}
           </Pressable>
           <ComposerActionButton action={action} disabled={actionDisabled} busy={pausing || sending}
             onPress={() => { void submit(); }} />

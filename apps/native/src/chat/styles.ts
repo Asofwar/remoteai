@@ -1,13 +1,14 @@
 import { StyleSheet } from 'react-native';
 
-// Match the light Codex GUI conversation palette on the connected computer.
+// Neutral surfaces keep the conversation and floating composer visually continuous.
 export const palette = { ink: '#17211b', muted: '#718078', green: '#0b8065', border: '#dfe5df',
-  background: '#fbfcfa', pale: '#e7f5f4', danger: '#c74e47' };
+  background: '#fafafa', pale: '#e7f5f4', danger: '#c74e47' };
 
 export const styles = StyleSheet.create({
   fill: { flex: 1 },
   hidden: { display: 'none' },
-  page: { flex: 1, backgroundColor: palette.background },
+  page: { flex: 1, backgroundColor: palette.background,
+    experimental_backgroundImage: 'linear-gradient(180deg, #fafafa 0%, #ffffff 25%, #ffffff 65%, #f3f3f3 100%)' },
   padded: { padding: 20, gap: 14 },
   heading: { color: palette.ink, fontSize: 27, lineHeight: 36, fontWeight: '800' },
   title: { color: palette.ink, fontSize: 16, lineHeight: 24, fontWeight: '700' },
@@ -22,7 +23,7 @@ export const styles = StyleSheet.create({
   primaryText: { color: '#fff' },
   disabled: { opacity: 0.4 },
   header: { paddingHorizontal: 16, paddingVertical: 12, gap: 12, flexDirection: 'row',
-    alignItems: 'center', borderBottomWidth: 1, borderBottomColor: palette.border, backgroundColor: '#fff' },
+    alignItems: 'center' },
   headerTitle: { color: palette.ink, fontSize: 16, lineHeight: 24, fontWeight: '700' },
   // Explicit leading leaves room for Android's Chinese fallback font, including single-line labels.
   headerMeta: { color: palette.muted, fontSize: 11, lineHeight: 18, marginTop: 4 },
@@ -52,19 +53,23 @@ export const styles = StyleSheet.create({
   tool: { borderLeftWidth: 2, borderLeftColor: '#b7cbc0', paddingLeft: 12, paddingVertical: 8 },
   code: { fontFamily: 'monospace', color: palette.ink, fontSize: 12, lineHeight: 19 },
   status: { fontSize: 12, lineHeight: 18, color: palette.muted, marginVertical: 6 },
-  composer: { padding: 12, gap: 10, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: palette.border },
-  composerField: { padding: 8, gap: 4, borderWidth: 1, borderColor: palette.border,
-    backgroundColor: palette.background, borderRadius: 22 },
+  composer: { padding: 12, gap: 10 },
+  composerField: { padding: 8, gap: 4, backgroundColor: '#fff', borderRadius: 26 },
+  composerFieldCompact: { padding: 6, borderRadius: 28 },
   composerActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  composerActionsCompact: { position: 'absolute', left: 6, right: 6, top: 8 },
   composerTrailing: { flexDirection: 'row', gap: 8, alignItems: 'center', flexShrink: 1 },
   composerModel: { paddingHorizontal: 8, paddingVertical: 6, minHeight: 40, minWidth: 0,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, flexShrink: 1 },
+  composerModelCompact: { width: 40, paddingHorizontal: 0 },
   composerModelText: { fontSize: 13, lineHeight: 20, paddingVertical: 2, color: palette.ink,
     includeFontPadding: true, textAlignVertical: 'center', flexShrink: 1 },
   composerAdd: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },
   composerAddText: { color: palette.ink, fontSize: 28, lineHeight: 32 },
   input: { minHeight: 40, maxHeight: 150, fontSize: 16, lineHeight: 23, color: palette.ink,
     paddingHorizontal: 8, paddingVertical: 8, textAlignVertical: 'top' },
+  inputCompact: { height: 44, minHeight: 44, maxHeight: 44, marginLeft: 40, marginRight: 88,
+    textAlignVertical: 'center' },
   compactButton: { minHeight: 36, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10,
     backgroundColor: palette.pale, justifyContent: 'center' },
   settings: { gap: 12, maxWidth: 400, width: '100%', alignSelf: 'center' },

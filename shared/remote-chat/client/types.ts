@@ -24,6 +24,8 @@ export interface ChatProject { cwd: string; label: string }
 export interface ChatState {
   mode: ConnectionMode;
   ready: boolean;
+  connecting: boolean;
+  retryAt: number | null;
   threads: Thread[];
   selected: Thread | null;
   draftProject: ChatProject | null;
@@ -49,7 +51,8 @@ export interface ChatState {
 }
 
 export function initialChatState(): ChatState {
-  return { mode: 'offline', ready: false, threads: [], selected: null, draftProject: null, selectedArchived: false,
+  return { mode: 'offline', ready: false, connecting: false, retryAt: null,
+    threads: [], selected: null, draftProject: null, selectedArchived: false,
     models: [], approvals: [], cursor: null, queue: emptyQueue(), queueBusy: false,
     settings: { ...DEFAULT_COMPOSER }, settingsBusy: false, settingsError: '', sidebar: emptySidebar(),
     search: '', archived: false, loading: false, historyLoading: false, historyLoadingMore: false,

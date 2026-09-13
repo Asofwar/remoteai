@@ -41,6 +41,7 @@ export class ChatController {
   private readGeneration = 0;
   private refreshThreadId: string | null = null;
   private synchronization = 0;
+  private synchronizing?: number;
   private skillGeneration = 0;
   private active = false;
   private transportConnected = false;
@@ -65,6 +66,8 @@ export class ChatController {
     this.connection = createConnection({
       mode: (mode) => this.changeMode(mode), error: (error) => this.update({ error }),
       ready: () => { void this.synchronize(); },
+      // Resuming the coordinator socket must not replace a pending GUI initialization deadline.
+      retryAt: (retryAt) => { if (!this.transportConnected) this.update({ retryAt }); },
       event: (event) => this.receive(event as GuiEvent),
     });
   }
@@ -102,8 +105,8 @@ export class ChatController {
     clearTimeout(this.syncTimer);
     clearTimeout(this.historyTimer);
     this.historyTimer = undefined;
-    this.update({ mode, ready: false, loading: false, historyLoading: false, historyLoadingMore: false,
-      compacting: undefined });
+    this.update({ mode, ready: false, connecting: mode !== 'offline', retryAt: null,
+      loading: false, historyLoading: false, historyLoadingMore: false, compacting: undefined });
   }
 
   private receive(event: GuiEvent) {
@@ -130,7 +133,8 @@ export class ChatController {
     }
     if (event?.method === 'connection/closed' || event?.method === 'codex/disconnected') {
       this.skillGeneration += 1;
-      this.update({ ready: false, error: CONNECTION_ERRORS.guiDisconnected });
+      this.synchronization += 1;
+      this.update({ ready: false, connecting: false, error: CONNECTION_ERRORS.guiDisconnected });
       this.scheduleSynchronization();
     }
   }
@@ -138,6 +142,7 @@ export class ChatController {
   private scheduleSynchronization() {
     clearTimeout(this.syncTimer);
     if (!this.active || !['direct', 'relay'].includes(this.state.mode)) return;
+    this.update({ retryAt: Date.now() + SYNCHRONIZATION_RETRY_MS });
     this.syncTimer = setTimeout(() => { void this.synchronize(); }, SYNCHRONIZATION_RETRY_MS);
   }
 
@@ -151,6 +156,16 @@ export class ChatController {
   }
 
   start() { this.active = true; this.connection.start(); }
+
+  connectNow = () => {
+    if (this.state.ready || this.state.connecting) return;
+    this.active = true;
+    if (this.transportConnected) { void this.synchronize(); return; }
+    this.connection.stop();
+    this.update({ connecting: true, retryAt: null, error: '' });
+    this.connection.start();
+  };
+
   stop() {
     this.active = false;
     this.skillGeneration += 1;
@@ -164,13 +179,17 @@ export class ChatController {
     this.listGeneration += 1;
     this.readGeneration += 1;
     this.refreshThreadId = null;
-    this.update({ ready: false, historyLoading: false, historyLoadingMore: false, compacting: undefined });
+    this.update({ ready: false, connecting: false, retryAt: null,
+      historyLoading: false, historyLoadingMore: false, compacting: undefined });
     this.connection.stop();
   }
 
   private async synchronize() {
+    if (!this.active || this.synchronizing === this.synchronization) return;
     clearTimeout(this.syncTimer);
     const generation = ++this.synchronization;
+    this.synchronizing = generation;
+    this.update({ connecting: true, retryAt: null });
     try {
       const response = await this.connection.request<unknown>('connect', chatHandshake);
       if (!this.active || generation !== this.synchronization) return;
@@ -178,14 +197,14 @@ export class ChatController {
       this.update({ approvals, error: '' });
       await Promise.all([this.list(), this.loadModels(generation), this.refreshSelected(), this.loadQueue(generation)]);
       if (this.active && generation === this.synchronization) {
-        this.update({ ready: true });
+        this.update({ ready: true, connecting: false, retryAt: null });
         void this.flushSettings();
       }
     } catch (error) {
       if (!this.active || generation !== this.synchronization) return;
-      this.update({ error: guiConnectionError(error) });
+      this.update({ connecting: false, error: guiConnectionError(error) });
       this.scheduleSynchronization();
-    }
+    } finally { if (this.synchronizing === generation) this.synchronizing = undefined; }
   }
 
   private async loadModels(generation: number) {

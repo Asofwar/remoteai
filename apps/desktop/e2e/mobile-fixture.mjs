@@ -15,6 +15,7 @@ const profile = { id: 'test-owner', email: 'mobile-test@example.test', role: 'us
 const devices = [{ deviceId: 'computer', name: '我的工作电脑', platform: 'Windows', online: true,
   localProxyRunning: false, capabilities: [], lastSeenAt: new Date().toISOString() }];
 let page;
+let blockMobileConnections = false;
 const previewImage = await readFile(new URL('../src-tauri/icons/32x32.png', import.meta.url));
 const httpServer = http.createServer((request, response) => {
   if (request.url === '/test/preview.png') {
@@ -87,6 +88,7 @@ const httpServer = http.createServer((request, response) => {
     return;
   }
   if (request.url === '/test/reset' && request.method === 'POST') {
+    blockMobileConnections = false;
     for (const client of mobileClients) client.terminate();
     relayFrames = 0;
     void page.evaluate(() => localStorage.clear()).then(() => page.reload()).then(() => response.end('{}'))
@@ -101,6 +103,18 @@ const httpServer = http.createServer((request, response) => {
   if (request.url === '/test/disconnect' && request.method === 'POST') {
     for (const client of mobileClients) client.close(4000, 'Emulator reconnect test');
     response.end('{}');
+    return;
+  }
+  if (request.url === '/test/connection-block' && request.method === 'POST') {
+    void (async () => {
+      let body = '';
+      for await (const chunk of request) body += chunk.toString();
+      blockMobileConnections = JSON.parse(body).blocked === true;
+      if (blockMobileConnections) {
+        for (const client of mobileClients) client.close(4000, 'Emulator reconnect test');
+      }
+      response.end('{}');
+    })().catch(() => response.writeHead(400).end('{}'));
     return;
   }
   const routes = {
@@ -133,6 +147,7 @@ wss.on('connection', (socket, request) => {
       if (frame.role === 'mobile') {
         mobileClients.add(socket);
         mobileConnections += 1;
+        if (blockMobileConnections) { socket.close(4004, 'Emulator unavailable test'); return; }
       }
       session.join(socket, { role: frame.role, deviceId: 'computer', ownerId: profile.id,
         expiresAt: Date.now() + 3600_000 }, frame, []);

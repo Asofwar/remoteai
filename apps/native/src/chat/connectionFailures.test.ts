@@ -57,3 +57,44 @@ it('does not overwrite a disconnected PC reason with a late initialization failu
   controller.stop();
   expect(vi.getTimerCount()).toBe(0);
 });
+
+it('retries GUI initialization immediately once, cancelling the pending automatic retry', async () => {
+  vi.useFakeTimers();
+  const { controller, request, events } = harness(new Error('Codex 暂时无法启动'));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(controller.snapshot()).toMatchObject({ connecting: false, retryAt: Date.now() + 3000 });
+  events.retryAt?.(Date.now() + 1500);
+  expect(controller.snapshot().retryAt).toBe(Date.now() + 3000);
+  let finish!: (value: unknown) => void;
+  request.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+  controller.connectNow();
+  controller.connectNow();
+  events.ready();
+  expect(controller.snapshot()).toMatchObject({ ready: false, connecting: true, retryAt: null });
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(request.mock.calls.filter(([method]) => method === 'connect')).toHaveLength(2);
+  finish({ ...chatHandshake, approvals: [] });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(controller.snapshot()).toMatchObject({ ready: true, connecting: false, retryAt: null });
+  controller.stop();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it('starts a disconnected transport once and hides the retry action during connection', () => {
+  let events!: ConnectionEvents;
+  const start = vi.fn(() => events.mode('connecting'));
+  const stop = vi.fn(() => events.mode('offline'));
+  const controller = new ChatController((callbacks) => {
+    events = callbacks;
+    return { start, stop, request: async <T>() => [] as T };
+  });
+  controller.start();
+  events.mode('offline');
+  events.retryAt?.(Date.now() + 30_000);
+  controller.connectNow();
+  controller.connectNow();
+  expect(start).toHaveBeenCalledTimes(2);
+  expect(stop).toHaveBeenCalledOnce();
+  expect(controller.snapshot()).toMatchObject({ connecting: true, retryAt: null });
+  controller.stop();
+});

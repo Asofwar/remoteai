@@ -18,12 +18,13 @@ function harness(authorize = vi.fn(async () => session)) {
   const mode = vi.fn();
   const ready = vi.fn();
   const error = vi.fn();
-  const connection = new ChatConnection({ deviceId: 'pc', authorize, mode, ready, error, event: vi.fn(),
+  const retryAt = vi.fn();
+  const connection = new ChatConnection({ deviceId: 'pc', authorize, mode, ready, error, retryAt, event: vi.fn(),
     randomBytes: (length) => new Uint8Array(length).fill(1),
     createPeer: () => ({ offer: async () => undefined, accept: async () => undefined, close() {} }),
   });
   connection.start();
-  return { connection, authorize, mode, ready, error };
+  return { connection, authorize, mode, ready, error, retryAt };
 }
 
 beforeEach(() => { vi.useFakeTimers(); Socket.instances = []; vi.stubGlobal('WebSocket', Socket); });
@@ -42,6 +43,31 @@ it('retries an unresponsive handshake without waiting for the socket close event
   expect(Socket.instances[1].close).not.toHaveBeenCalled();
   connection.stop();
   expect(vi.getTimerCount()).toBe(0);
+});
+
+it('publishes the actual retry deadline and cancels it when immediately restarted', async () => {
+  const { connection, authorize, retryAt } = harness();
+  await vi.advanceTimersByTimeAsync(30_000);
+  expect(retryAt).toHaveBeenLastCalledWith(Date.now() + 1500);
+  await vi.advanceTimersByTimeAsync(500);
+  connection.stop();
+  expect(retryAt).toHaveBeenLastCalledWith(null);
+  connection.start();
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(authorize).toHaveBeenCalledTimes(2);
+  expect(retryAt).toHaveBeenLastCalledWith(null);
+  connection.stop();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it('clears the countdown when the scheduled retry begins', async () => {
+  const { connection, authorize, retryAt } = harness();
+  await vi.advanceTimersByTimeAsync(30_000);
+  expect(retryAt).toHaveBeenLastCalledWith(Date.now() + 1500);
+  await vi.advanceTimersByTimeAsync(1500);
+  expect(authorize).toHaveBeenCalledTimes(2);
+  expect(retryAt).toHaveBeenLastCalledWith(null);
+  connection.stop();
 });
 
 it('ignores an authorization result arriving after that attempt timed out', async () => {

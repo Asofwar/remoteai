@@ -125,7 +125,7 @@ function ConnectedChat({ session, device, devices, active, chooseDevice, notific
       <View style={styles.fill}>
         <Text numberOfLines={1} style={styles.headerTitle}>
           {state.selected ? threadPresentation(state.selected, state.sidebar).title : '新聊天'}</Text>
-        <ChatConnectionInfo state={state} controller={controller} device={device} active={active} />
+        <ChatConnectionInfo state={state} controller={controller} device={device} active={active && foreground} />
       </View>
       {state.selected && state.selectedArchived && <Pressable accessibilityRole="button"
         style={styles.compactButton} disabled={!ready || running}

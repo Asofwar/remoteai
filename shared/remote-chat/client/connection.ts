@@ -11,6 +11,7 @@ export interface ConnectionEvents {
   ready: () => void;
   event: (event: unknown) => void;
   error: (message: string) => void;
+  retryAt?: (timestamp: number | null) => void;
 }
 
 interface ConnectionOptions extends ConnectionEvents {
@@ -47,6 +48,7 @@ export class ChatConnection {
   }
 
   private async connect() {
+    this.options.retryAt?.(null);
     const generation = ++this.generation;
     this.socketAuthenticated = false;
     if (!this.link) this.options.mode('connecting');
@@ -218,8 +220,10 @@ export class ChatConnection {
 
   private schedule() {
     clearTimeout(this.timer);
+    this.options.retryAt?.(null);
     if (!this.active) return;
     const delay = Math.min(30_000, 1500 * 2 ** Math.min(this.attempt++, 5));
+    this.options.retryAt?.(Date.now() + delay);
     this.timer = setTimeout(() => { void this.connect(); }, delay);
   }
 

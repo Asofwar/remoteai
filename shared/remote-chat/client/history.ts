@@ -38,6 +38,10 @@ export function mergeHistory(snapshot: Thread, live: Thread, before: Thread): Th
     turns.set(turn.id, existing ? mergeTurn(existing, turn, original.get(turn.id)) : turn);
   }
   const previous = new Map(live.turns?.map((turn) => [turn.id, turn]));
-  return { ...snapshot, turns: [...turns.values()].map((turn) => turn.status === 'inProgress'
+  // Notifications received during a history read take precedence, including decreases after compaction.
+  const tokenUsage = live.tokenUsage !== before.tokenUsage
+    ? live.tokenUsage : snapshot.tokenUsage ?? live.tokenUsage;
+  return { ...snapshot, ...(tokenUsage ? { tokenUsage } : {}),
+    turns: [...turns.values()].map((turn) => turn.status === 'inProgress'
     ? restoreTurnTiming(turn, previous.get(turn.id)) : turn) };
 }

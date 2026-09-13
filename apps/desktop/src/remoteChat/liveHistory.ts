@@ -17,12 +17,17 @@ export class LiveHistory {
     if (!id || event.id != null) return;
     if (['thread/started', 'thread/resumed', 'thread/archived', 'thread/unarchived', 'thread/deleted',
       'thread/compacted'].includes(event.method)) {
+      const tokenUsage = this.threads.get(id)?.tokenUsage;
       this.threads.delete(id);
+      if (tokenUsage && event.method !== 'thread/deleted') {
+        this.threads.set(id, { id, preview: '', cwd: '', updatedAt: 0, turns: [], tokenUsage });
+      }
       return;
     }
-    if (!event.params.turnId && !event.params.turn?.id) return;
-    const previous = event.method === 'turn/started' ? undefined : this.threads.get(id);
-    const thread = previous ?? { id, preview: '', cwd: '', updatedAt: 0, turns: [] };
+    if (!event.params.turnId && !event.params.turn?.id && !event.params.tokenUsage) return;
+    const previous = this.threads.get(id);
+    const thread = previous && event.method !== 'turn/started'
+      ? previous : { id, preview: '', cwd: '', updatedAt: 0, turns: [], tokenUsage: previous?.tokenUsage };
     this.threads.delete(id);
     this.threads.set(id, updateThread(thread, event));
     if (this.threads.size > MAX_LIVE_THREADS) this.threads.delete(this.threads.keys().next().value!);
@@ -30,6 +35,6 @@ export class LiveHistory {
 
   merge(snapshot: Thread) {
     const live = this.threads.get(snapshot.id);
-    return live ? mergeHistory(snapshot, live, { ...snapshot, turns: [] }) : snapshot;
+    return live ? mergeHistory(snapshot, live, { ...snapshot, turns: [], tokenUsage: undefined }) : snapshot;
   }
 }

@@ -17,6 +17,9 @@ function mergeItems(previous: Item[], incoming: Item[]) {
 
 export function updateThread(thread: Thread, event: GuiEvent): Thread {
   const { params, method } = event;
+  if (method === 'thread/tokenUsage/updated' && params.tokenUsage) {
+    return { ...thread, tokenUsage: params.tokenUsage };
+  }
   const id = params.turnId ?? params.turn?.id;
   if (!id) return thread;
   const turns = [...(thread.turns ?? [])];

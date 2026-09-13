@@ -1,6 +1,6 @@
 export type {
   AccessMode, ApprovalReply, GuiEvent, Item, ListResponse, Model, Request,
-  Skill, SkillReference, SkillsResponse, Thread, Turn,
+  Skill, SkillReference, SkillsResponse, Thread, ThreadTokenUsage, Turn,
 } from '../../../apps/desktop/src/pages/codexGui/types';
 import type { GuiEvent, Model, SkillReference, Thread } from '../../../apps/desktop/src/pages/codexGui/types';
 import type { AttachmentReference } from '../../../apps/desktop/src/pages/codexGui/attachmentTypes';

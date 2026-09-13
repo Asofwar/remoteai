@@ -85,6 +85,7 @@ export interface Turn {
   planExplanation?: string | null;
 }
 export interface Thread {
+  tokenUsage?: ThreadTokenUsage;
   id: string;
   name?: string | null;
   preview: string;

@@ -2,12 +2,17 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useChatUsage } from '../../../../shared/remote-chat/client/useChatUsage';
 import { formatCost, formatTokens, usageTrailing, type ReadUsage } from '../../../../shared/remote-chat/usage';
 import { palette } from './styles';
+import { contextUsageLabel } from '../../../../shared/remote-chat/contextUsage';
+import type { ThreadTokenUsage } from './types';
 
-export function ChatUsage({ read, active, ready }: { read: ReadUsage; active: boolean; ready: boolean }) {
+export function ChatUsage({ read, active, ready, tokenUsage }: {
+  read: ReadUsage; active: boolean; ready: boolean; tokenUsage?: ThreadTokenUsage;
+}) {
   const { usage, error } = useChatUsage(read, active && ready);
   const trailing = usageTrailing(usage);
   const notice = ready ? error || '正在读取今日用量…' : '连接后查看今日用量';
   return <View style={styles.container}>
+    <Text style={styles.row}>{contextUsageLabel(tokenUsage)}</Text>
     {usage ? <Text style={styles.row} accessibilityLabel={[
       `今日 Token 用量：${usage.totalTokens.toLocaleString('en-US')}`,
       `今日预估费用：${formatCost(usage.estimatedCostUsd)}`, trailing?.description,
@@ -21,7 +26,7 @@ export function ChatUsage({ read, active, ready }: { read: ReadUsage; active: bo
 }
 
 const styles = StyleSheet.create({
-  container: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.border, paddingTop: 14 },
+  container: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.border, paddingTop: 14, gap: 4 },
   row: { color: palette.muted, fontSize: 12, lineHeight: 20, flexShrink: 1 },
   tokens: { color: palette.green, fontWeight: '600' },
   cost: { color: '#b45d00', fontWeight: '600' },

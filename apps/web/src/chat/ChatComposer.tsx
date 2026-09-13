@@ -7,11 +7,12 @@ import { ChatSettings } from './ChatSettings';
 import type { ReadUsage } from '../../../../shared/remote-chat/usage';
 import { ChatAttachmentPreviews, ChatAttachmentSheet } from './ChatAttachments';
 import { pickChatImages } from './pickChatImages';
-import type { Model, SendInput } from './types';
+import type { Model, SendInput, ThreadTokenUsage } from './types';
 import { composerLabel, type ComposerSettings } from '../../../../shared/remote-chat/composer';
 import { useChatDraft } from '../../../../shared/remote-chat/client/useChatDraft';
 
 interface Props {
+  tokenUsage?: ThreadTokenUsage;
   readUsage: ReadUsage;
   models: Model[];
   selection: ComposerSettings;
@@ -28,7 +29,7 @@ interface Props {
   interrupt: () => Promise<void>;
 }
 export function ChatComposer({ models, selection, settingsBusy, settingsError, updateSettings,
-  readUsage,
+  readUsage, tokenUsage,
   threadId, active, ready, sending, running, interrupted = false, send, interrupt }: Props) {
   const [settings, setSettings] = useState(false);
   const [attachments, setAttachments] = useState(false);
@@ -107,7 +108,7 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
     </form>
     {attachments && <ChatAttachmentSheet busy={busy} pick={openAlbum} onClose={() => setAttachments(false)} />}
     {settings && <ChatSettings models={models} selection={selection}
-      readUsage={readUsage}
+      readUsage={readUsage} tokenUsage={tokenUsage}
       saving={settingsBusy} error={settingsError} ready={ready}
       updateSettings={updateSettings} onClose={() => setSettings(false)} />}
   </>;

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BottomSheet } from '../components/BottomSheet';
 import { SheetScrollView, SHEET_READABLE_WIDTH } from '../components/SheetScrollView';
-import type { Model } from './types';
+import type { Model, ThreadTokenUsage } from './types';
 import type { ComposerSettings } from '../../../../shared/remote-chat/composer';
 import { SETTINGS_FIELDS, settingOptions, settingValue, settingsNotice, visibleSettingsFields,
   type SettingField } from '../../../../shared/remote-chat/settingsMenu';
@@ -11,6 +11,7 @@ import { ChatUsage } from './ChatUsage';
 import type { ReadUsage } from '../../../../shared/remote-chat/usage';
 
 interface Props {
+  tokenUsage?: ThreadTokenUsage;
   readUsage: ReadUsage;
   usageActive: boolean;
   models: Model[];
@@ -23,7 +24,7 @@ interface Props {
 }
 
 export function ChatSettings({ models, selection, saving, ready, error, updateSettings, onClose,
-  readUsage, usageActive }: Props) {
+  readUsage, usageActive, tokenUsage }: Props) {
   const [field, setField] = useState<SettingField | null>(null);
   const notice = settingsNotice({ saving, ready, error });
   const choose = async (value: string) => {
@@ -44,7 +45,7 @@ export function ChatSettings({ models, selection, saving, ready, error, updateSe
         style={error ? styles.error : styles.subtitle}>{notice}</Text>}
       {!!error && <Pressable accessibilityRole="button" style={styles.button}
         onPress={() => { void updateSettings(selection); }}><Text style={styles.buttonText}>重新保存</Text></Pressable>}
-      <ChatUsage read={readUsage} active={usageActive && !field} ready={ready} />
+      <ChatUsage read={readUsage} active={usageActive && !field} ready={ready} tokenUsage={tokenUsage} />
     </SheetScrollView>
     {field && <BottomSheet fullWidthContent
       visible title={SETTINGS_FIELDS.find((entry) => entry.field === field)!.title}

@@ -24,11 +24,12 @@ import { ChatCommandMenu } from './ChatCommandMenu';
 import { useComposerMenu } from './useComposerMenu';
 import type { SkillCatalogState } from './skillCatalog';
 import { useChatDraft } from '../../../../shared/remote-chat/client/useChatDraft';
-import type { Model, SendInput } from './types';
+import type { Model, SendInput, ThreadTokenUsage } from './types';
 import { styles } from './styles';
 import { composerLabel, type ComposerSettings } from '../../../../shared/remote-chat/composer';
 
 interface Props {
+  tokenUsage?: ThreadTokenUsage;
   readUsage: ReadUsage;
   usageActive: boolean;
   models: Model[];
@@ -54,7 +55,7 @@ interface Props {
 }
 
 export function ChatComposer({ models, selection, settingsBusy, settingsError, updateSettings,
-  readUsage, usageActive,
+  readUsage, usageActive, tokenUsage,
   threadId, active, ready, sending, running, interrupted = false, send, interrupt,
   catalog, cwd, compactReason, compacting, compact, loadCatalog, loadFiles }: Props) {
   const [settings, setSettings] = useState(false);
@@ -178,7 +179,7 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
         attachments.addFile({ kind: 'file', name: file.name, path: file.path }); setProjectFiles(null);
       }} />}
     {settings && <ChatSettings models={models} selection={selection}
-      readUsage={readUsage} usageActive={active && usageActive}
+      readUsage={readUsage} usageActive={active && usageActive} tokenUsage={tokenUsage}
       saving={settingsBusy} error={settingsError} ready={ready}
       updateSettings={updateSettings} onClose={() => setSettings(false)} />}
   </View>;

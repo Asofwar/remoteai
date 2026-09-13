@@ -155,7 +155,7 @@ function ConnectedChat({ session, device, devices, active, chooseDevice, notific
       answer={controller.answerAsyncQuestion} />
     <ChatQueue {...queueProps(state, controller)} />
     <ChatComposer threadId={state.selected?.id ?? null} models={state.models} selection={state.settings}
-      readUsage={controller.readUsage} usageActive={foreground}
+      readUsage={controller.readUsage} usageActive={foreground} tokenUsage={state.selected?.tokenUsage}
       loadCatalog={controller.loadComposerCatalog} loadFiles={controller.loadProjectFiles}
       catalog={catalog} cwd={state.selected?.cwd ?? state.draftProject?.cwd ?? ''}
       compactReason={compactUnavailableReason(state)} compacting={!!state.compacting

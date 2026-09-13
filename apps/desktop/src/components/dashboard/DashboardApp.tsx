@@ -1268,17 +1268,20 @@ export function DashboardApp() {
             scrollDurationSeconds={announcement?.scrollDurationSeconds ?? 22}
             style={announcementStyle} text={announcementText}
             trackKey={`${language}:${announcementText}`} />}
-          {(page === "accounts" || page === "providers") && <AccountToolbox t={t}>
+          {!sidebarNavigationEnabled && (
+            <DashboardNavigation onPageChange={setPage} page={page} t={t} />
+          )}
+          {(!sidebarNavigationEnabled || page === "accounts" || page === "providers") && <AccountToolbox t={t}
+            navigation={sidebarNavigationEnabled ? undefined : { page, onPageChange: setPage }}>
+            {(page === "accounts" || page === "providers") && <>
             <AccountDisplayTabs displayMode={accountDisplayMode.displayMode}
               onChange={accountDisplayMode.setDisplayMode} t={t} />
             {usageSpeedPill}
             {titlebarProxyRunning && <CloudRecycleBin t={t} disabled={!cloud.state.authenticated}
               triggerClassName="refresh-all announcement-recycle-bin-button" />}
             <CodexConfigRepairButton disabled={providerManager.proxyBusy} notify={notify} t={t} />
+            </>}
           </AccountToolbox>}
-          {!sidebarNavigationEnabled && (
-            <DashboardNavigation onPageChange={setPage} page={page} t={t} />
-          )}
         </header>
 
         <main className={page === "accounts" ? "accounts-main"

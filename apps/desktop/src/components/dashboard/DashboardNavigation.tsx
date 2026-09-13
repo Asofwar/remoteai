@@ -34,7 +34,7 @@ interface DashboardNavigationProps {
   page: DashboardPage;
   sidebarTools?: ReactNode;
   t: Translate;
-  variant?: "top" | "sidebar";
+  variant?: "top" | "sidebar" | "toolbox";
 }
 
 const NAVIGATION_ITEMS = [
@@ -42,12 +42,19 @@ const NAVIGATION_ITEMS = [
   { page: "sessions", icon: FolderOpen, labelKey: "nav.sessions" },
   { page: "providers", icon: Server, labelKey: "nav.providers" },
   { page: "codexGui", icon: SquareTerminal, labelKey: "nav.codexGui" },
+] as const;
+
+const TOOLBOX_NAVIGATION_ITEMS = [
   { page: "systemPrompts", icon: MessageSquareText, labelKey: "nav.systemPrompts" },
   { page: "claudeCode", icon: Bot, labelKey: "nav.claudeCode" },
   { page: "tokens", icon: BarChart3, labelKey: "nav.tokenUsage" },
   { page: "dreamSkin", icon: Palette, labelKey: "nav.dreamSkin" },
   { page: "skills", icon: PackageOpen, labelKey: "nav.skills" },
 ] as const;
+
+export function isToolboxPage(page: DashboardPage) {
+  return TOOLBOX_NAVIGATION_ITEMS.some((item) => item.page === page);
+}
 
 export function DashboardNavigation({
   collapsed = false,
@@ -57,7 +64,7 @@ export function DashboardNavigation({
   t,
   variant = "top",
 }: DashboardNavigationProps) {
-  const navigationButton = (item: typeof NAVIGATION_ITEMS[number] | {
+  const navigationButton = (item: typeof NAVIGATION_ITEMS[number] | typeof TOOLBOX_NAVIGATION_ITEMS[number] | {
     page: "settings" | "codexConfig";
     icon: typeof Settings;
     labelKey: "nav.settings" | "nav.codexConfig";
@@ -65,7 +72,8 @@ export function DashboardNavigation({
     const Icon = item.icon;
     const label = t(item.labelKey);
     return (
-      <button key={item.page} className={page === item.page ? "selected" : ""}
+      <button key={item.page} type="button" className={page === item.page ? "selected" : ""}
+        aria-current={page === item.page ? "page" : undefined}
         aria-label={collapsed ? label : undefined} title={collapsed ? label : undefined}
         onClick={() => onPageChange(item.page)}>
         <Icon size={19} /><span>{label}</span>
@@ -73,10 +81,11 @@ export function DashboardNavigation({
     );
   };
   return (
-    <nav className={variant === "sidebar" ? "sidebar-tabs" : "top-tabs"}
+    <nav className={`${variant}-tabs`}
       aria-label={t("nav.aria")}
       data-tauri-drag-region={variant === "sidebar" ? true : undefined}>
-      {NAVIGATION_ITEMS.map(navigationButton)}
+      {variant !== "toolbox" && NAVIGATION_ITEMS.map(navigationButton)}
+      {variant !== "top" && TOOLBOX_NAVIGATION_ITEMS.map(navigationButton)}
       {variant === "sidebar" && (
         <div className="sidebar-nav-tools" data-tauri-drag-region>
           {sidebarTools}

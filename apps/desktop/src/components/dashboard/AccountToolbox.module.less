@@ -10,6 +10,13 @@
 
 .expanded { transform: rotate(180deg); }
 
+.topNavigation { margin-left: auto; }
+
+.selected {
+  color: var(--ink);
+  background: var(--green-highlight);
+}
+
 .actions {
   display: flex;
   flex-direction: column;
@@ -17,7 +24,33 @@
   gap: 8px;
   width: max-content;
   max-width: min(384px, calc(100vw - 160px));
-  white-space: nowrap;
+  white-space: normal;
+
+  :global(.toolbox-tabs) {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+
+    button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 32px;
+      padding: 6px 10px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--ink);
+      font-size: 12px;
+      text-align: left;
+      cursor: pointer;
+
+      svg { flex-shrink: 0; }
+      &:hover { background: var(--green-soft); }
+      &:global(.selected) { background: var(--green-highlight); }
+    }
+  }
 
   :global(.refresh-all) {
     height: var(--announcement-height);

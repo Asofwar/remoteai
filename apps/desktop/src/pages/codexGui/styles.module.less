@@ -144,7 +144,7 @@
   color: var(--gui-muted); font-size: 12px;
   > button { color: inherit; } }
 @media (hover: none) { .userMessageActions { opacity: 1; pointer-events: auto; } }
-.agentMessage { min-width: 0; line-height: 1.8; font-size: 14px; > button { color: var(--gui-muted); } }
+.agentMessage { min-width: 0; line-height: 1.8; font-size: 14px; }
 [data-quote-source] { user-select: text; }
 [data-quote-exclude] { user-select: none; }
 .markdown { overflow-wrap: anywhere; p { margin: 10px 0; } ul, ol { padding-left: 24px; }
@@ -155,6 +155,10 @@
   th, td { border: 1px solid var(--gui-border); padding: 6px 12px; }
   blockquote { border-left: 3px solid var(--gui-border); padding-left: 16px; margin-left: 0; color: var(--gui-muted); }
   a { color: var(--green-dark); text-decoration: underline; } }
+.markdown:has(> .messageCopy) { margin-block: 10px;
+  > p:has(+ .messageCopy) { display: inline; } }
+.messageCopy { display: inline-block; margin-left: 6px; vertical-align: middle;
+  line-height: 1; > button { color: var(--gui-muted); } }
 .imageLabel { display: block; font-size: 12px; color: var(--gui-muted); }
 .working { display: flex; align-items: center; gap: 10px; padding: 8px 0; color: var(--gui-muted); font-size: 12px; }
 .muted { color: var(--gui-muted); font-size: 12px; }

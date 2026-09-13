@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { updateAccountDetails } from '../api/client';
 import { generateTotp, normalizeTotpSecret, parseOtpAuthUri } from '../totp/totp';
 import { TotpQrScanner } from '../totp/TotpQrScanner';
 import type { AccountSummary, AuthSession } from '../types';
 import { BottomSheet } from './BottomSheet';
+import { SheetScrollView } from './SheetScrollView';
 import { Toast } from './AppToast';
 
 const TOTP_PERIOD_SECONDS = 30;
@@ -180,7 +181,7 @@ export function AccountPrivateDetailsSheet({ account, session, syncing, onClose,
   };
 
   return <>
-    <BottomSheet visible={Boolean(account) && !scannerOpen} tall title="账号资料" subtitle={account?.email}
+    <BottomSheet fullWidthContent visible={Boolean(account) && !scannerOpen} tall title="账号资料" subtitle={account?.email}
       onClose={onClose} dismissible={!saving} actions={[
         { label: '取消', onPress: onClose, disabled: saving },
         {
@@ -194,7 +195,7 @@ export function AccountPrivateDetailsSheet({ account, session, syncing, onClose,
       {syncing ? <View style={styles.syncingBox}>
         <ActivityIndicator color="#14806f" />
         <Text style={styles.syncingText}>正在同步最新账号资料…</Text>
-      </View> : <ScrollView style={styles.scroll} contentContainerStyle={styles.content}
+      </View> : <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled">
         <Text style={styles.label}>预设可用截止日期</Text>
         <TextInput value={expiresAt} onChangeText={setExpiresAt} editable={metadataEditable}
@@ -240,7 +241,7 @@ export function AccountPrivateDetailsSheet({ account, session, syncing, onClose,
           textAlignVertical="top" placeholder="添加账号备注" placeholderTextColor="#98a69f"
           style={[styles.input, styles.noteInput]} />
         {!metadataEditable ? <Text style={styles.readOnlyHint}>该字段由管理员维护</Text> : null}
-      </ScrollView>}
+      </SheetScrollView>}
     </BottomSheet>
     <TotpQrScanner visible={Boolean(account) && scannerOpen} onClose={() => setScannerOpen(false)}
       onScan={(value) => {

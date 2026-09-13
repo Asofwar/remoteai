@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomSheet } from '../components/BottomSheet';
+import { SheetScrollView, SHEET_READABLE_WIDTH } from '../components/SheetScrollView';
 import { pendingQuestions } from '../../../../shared/remote-chat/client/asyncQuestions';
 import type { Item, Thread } from './types';
 import { palette, styles } from './styles';
@@ -57,17 +58,17 @@ function QuestionCard({ item, disabled, error, answer }: Omit<Props, 'thread'> &
       <Text style={styles.buttonText}>回答</Text>
       <Ionicons name="chevron-forward" size={15} color={palette.muted} />
     </Pressable>
-    <BottomSheet visible={open} tall title="需要你的补充" onClose={() => setOpen(false)}
+    <BottomSheet fullWidthContent visible={open} tall title="需要你的补充" onClose={() => setOpen(false)}
       dismissible={!busy} dragFromHeaderOnly actions={[{ label: '提交回答', tone: 'primary', loading: busy,
         disabled: disabled || answers.some((value) => !value.trim()), onPress: submit }]}>
-      <ScrollView style={questionStyles.scroll} contentContainerStyle={questionStyles.content}
+      <SheetScrollView style={questionStyles.scroll} contentContainerStyle={questionStyles.content}
         keyboardShouldPersistTaps="handled">
         {questions.map((question, index) => <QuestionField key={index} question={question}
           value={answers[index] ?? ''} disabled={disabled || busy} submit={() => { void submit(); }}
           update={(value) => setAnswers((previous) => previous.map((entry, position) =>
             position === index ? value : entry))} />)}
         {!!(error || failure) && <Text accessibilityRole="alert" style={styles.error}>{error || failure}</Text>}
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>
   </>;
 }
@@ -87,7 +88,7 @@ const questionStyles = StyleSheet.create({
   entry: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12,
     borderWidth: 1, borderColor: palette.border, borderRadius: 12, backgroundColor: '#fff' },
   scroll: { flexShrink: 1 },
-  content: { gap: 20, paddingBottom: 20, maxWidth: 400, width: '100%', alignSelf: 'center' },
+  content: { gap: 20, paddingBottom: 20, maxWidth: SHEET_READABLE_WIDTH, width: '100%', alignSelf: 'center' },
   question: { gap: 12 },
   option: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   input: { minHeight: 42, maxHeight: 120, textAlignVertical: 'top' },

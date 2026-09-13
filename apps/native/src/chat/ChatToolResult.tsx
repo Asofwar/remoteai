@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { BottomSheet } from '../components/BottomSheet';
+import { SheetScrollView } from '../components/SheetScrollView';
 import { ChatCodeBlock } from './ChatCodeBlock';
 import { ChatToolText } from './ChatToolText';
 import { ChatImage } from './ChatImage';
@@ -43,10 +44,10 @@ function Payload({ title, value }: { title: string; value: unknown }) {
     <Pressable accessibilityRole="button" accessibilityLabel={`查看${title}`} onPress={() => setOpen(true)}>
       <Text style={styles.subtitle}>{title} ›</Text>
     </Pressable>
-    <BottomSheet visible={open} tall title={title} onClose={() => setOpen(false)} dragFromHeaderOnly>
-      <ScrollView style={{ flexShrink: 1 }}>
+    <BottomSheet fullWidthContent visible={open} tall title={title} onClose={() => setOpen(false)} dragFromHeaderOnly>
+      <SheetScrollView style={{ flexShrink: 1 }}>
         <ChatCodeBlock text={serialized(value)} label={title} copyLabel={`复制${title}`} />
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>
   </>;
 }

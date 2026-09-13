@@ -12,7 +12,8 @@ function CommandText({ text, command = false }: { text: string; command?: boolea
   const pages = Math.max(1, Math.ceil(text.length / OUTPUT_PAGE_CHARACTERS));
   const page = Math.min(requestedPage, pages - 1);
   return <View>
-    <ScrollView nestedScrollEnabled style={command ? commandStyles.command : commandStyles.output}>
+    <ScrollView nestedScrollEnabled style={command ? commandStyles.command : commandStyles.output}
+      contentContainerStyle={command ? commandStyles.commandContent : commandStyles.outputContent}>
       <Text selectable style={styles.code}>
         {text.slice(page * OUTPUT_PAGE_CHARACTERS, (page + 1) * OUTPUT_PAGE_CHARACTERS)}</Text>
     </ScrollView>
@@ -47,8 +48,10 @@ export function ChatCommandDetails({ item }: { item: Item }) {
 
 const commandStyles = StyleSheet.create({
   toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12 },
-  command: { backgroundColor: '#f4f6f5', borderRadius: 5, paddingVertical: 8, paddingHorizontal: 10, maxHeight: 340 },
-  output: { paddingVertical: 8, maxHeight: 340 },
+  command: { backgroundColor: '#f4f6f5', borderRadius: 5, maxHeight: 340 },
+  commandContent: { paddingVertical: 8, paddingHorizontal: 10 },
+  output: { maxHeight: 340 },
+  outputContent: { paddingVertical: 8 },
   paging: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, maxWidth: 400 },
   failed: { color: palette.danger },
 });

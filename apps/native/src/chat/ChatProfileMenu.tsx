@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BottomSheet } from '../components/BottomSheet';
+import { SheetScrollView, SheetInset, SHEET_READABLE_WIDTH } from '../components/SheetScrollView';
 import type { GuiAccountChoice, GuiAccountsClient } from '../../../../shared/remote-chat/guiAccounts';
 import { useGuiAccounts } from '../../../../shared/remote-chat/client/useGuiAccounts';
 import { palette, styles } from './styles';
@@ -39,11 +40,11 @@ export function ChatProfileMenu({ client, deviceName, ready, active, email, choo
       onPress={() => setPanel('profile')}>
       <Text style={pickerStyles.initials}>{initials}</Text>
     </Pressable>
-    <BottomSheet visible={panel !== null && active} title={panel === 'accounts' ? '切换账户' : '账户与电脑'}
+    <BottomSheet fullWidthContent visible={panel !== null && active} title={panel === 'accounts' ? '切换账户' : '账户与电脑'}
       subtitle={panel === 'accounts' ? '与电脑共用当前聊天账户' : undefined}
       onClose={() => setPanel(null)} dismissible={!accounts.saving} dragFromHeaderOnly
       onBack={panel === 'accounts' && !accounts.saving ? () => setPanel('profile') : undefined}>
-      {panel === 'profile' ? <View style={pickerStyles.panel}>
+      {panel === 'profile' ? <SheetInset style={[pickerStyles.panel, pickerStyles.readable]}>
         <Text style={pickerStyles.email}>{email}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="切换电脑" style={pickerStyles.option}
           onPress={() => { setPanel(null); chooseDevice(); }}>
@@ -59,21 +60,24 @@ export function ChatProfileMenu({ client, deviceName, ready, active, email, choo
             <Text numberOfLines={1} style={styles.subtitle}>{name}</Text></View>
           <Feather name="chevron-right" size={18} color={palette.muted} />
         </Pressable>
-      </View> : <View style={pickerStyles.panel}>
-        <TextInput accessibilityLabel="搜索账户" placeholder="搜索名称或备注" value={query} onChangeText={setQuery}
-          autoCapitalize="none" autoCorrect={false} style={styles.search} />
-        {!ready && <Text style={styles.subtitle}>连接电脑后即可切换账户。</Text>}
-        {accounts.loading && <ActivityIndicator color={palette.green} accessibilityLabel="正在同步账户" />}
-        {ready && accounts.snapshot && !accounts.snapshot.running &&
-          <Text style={styles.subtitle}>请先在电脑上开启本地代理，再切换账户。</Text>}
-        {!!accounts.error && <View style={styles.row}>
-          <Text accessibilityRole="alert" style={[styles.error, styles.fill]}>{accounts.error}</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="重试读取账户"
-            disabled={!ready || accounts.loading || Boolean(accounts.saving)} onPress={accounts.refresh}>
-            <Text style={styles.buttonText}>重试</Text>
-          </Pressable>
-        </View>}
-        <ScrollView style={pickerStyles.list} keyboardShouldPersistTaps="handled">
+      </SheetInset> : <View style={pickerStyles.panel}>
+        <SheetInset style={[pickerStyles.fields, pickerStyles.readable]}>
+          <TextInput accessibilityLabel="搜索账户" placeholder="搜索名称或备注" value={query} onChangeText={setQuery}
+            autoCapitalize="none" autoCorrect={false} style={styles.search} />
+          {!ready && <Text style={styles.subtitle}>连接电脑后即可切换账户。</Text>}
+          {accounts.loading && <ActivityIndicator color={palette.green} accessibilityLabel="正在同步账户" />}
+          {ready && accounts.snapshot && !accounts.snapshot.running &&
+            <Text style={styles.subtitle}>请先在电脑上开启本地代理，再切换账户。</Text>}
+          {!!accounts.error && <View style={styles.row}>
+            <Text accessibilityRole="alert" style={[styles.error, styles.fill]}>{accounts.error}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="重试读取账户"
+              disabled={!ready || accounts.loading || Boolean(accounts.saving)} onPress={accounts.refresh}>
+              <Text style={styles.buttonText}>重试</Text>
+            </Pressable>
+          </View>}
+        </SheetInset>
+        <SheetScrollView style={pickerStyles.list} contentContainerStyle={pickerStyles.readable}
+          keyboardShouldPersistTaps="handled">
           {choices.map((choice) => {
             const selected = choice === current;
             return <Pressable key={`${choice.kind}:${choice.id}`} accessibilityRole="button"
@@ -94,7 +98,7 @@ export function ChatProfileMenu({ client, deviceName, ready, active, email, choo
           })}
           {!choices.length && accounts.snapshot && !accounts.loading && <Text style={pickerStyles.empty}>
             {accounts.snapshot.choices.length ? '没有找到匹配的账户。' : '暂无可选账户，请先在电脑上添加账户。'}</Text>}
-        </ScrollView>
+        </SheetScrollView>
       </View>}
     </BottomSheet>
   </>;
@@ -105,7 +109,9 @@ const pickerStyles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', borderWidth: 5, borderColor: palette.background },
   initials: { color: '#fff', fontSize: 15, fontWeight: '500' },
   email: { color: palette.muted, fontSize: 14, lineHeight: 21 },
-  panel: { width: '100%', maxWidth: 400, alignSelf: 'center', gap: 12, paddingBottom: 16 },
+  panel: { flexShrink: 1, gap: 12, paddingBottom: 16 },
+  fields: { gap: 12 },
+  readable: { width: '100%', maxWidth: SHEET_READABLE_WIDTH, alignSelf: 'center' },
   list: { maxHeight: 360 },
   option: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 64, padding: 12, borderRadius: 12 },
   selected: { backgroundColor: palette.pale },

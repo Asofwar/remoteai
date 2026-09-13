@@ -1,27 +1,31 @@
 import Feather from '@expo/vector-icons/Feather';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { BottomSheet } from '../components/BottomSheet';
+import { SheetFlatList, SheetInset, SHEET_READABLE_WIDTH } from '../components/SheetScrollView';
 import { directoryProject, type ProjectPickerProps } from '../../../../shared/remote-chat/projectDirectories';
 import { useProjectDirectories } from '../../../../shared/remote-chat/client/useProjectDirectories';
 
 export function ChatProjectPicker(props: ProjectPickerProps) {
   const { result, loading, error, browse, retry } = useProjectDirectories(props);
-  return <BottomSheet visible title="选择项目" onClose={props.close} dragFromHeaderOnly
+  return <BottomSheet fullWidthContent visible title="选择项目" onClose={props.close} dragFromHeaderOnly
     actions={[{ label: '选择此文件夹', tone: 'primary', disabled: loading || !result?.directory,
       onPress: () => { if (result?.directory) props.choose(directoryProject(result.directory)); } }]}>
     <View style={pickerStyles.root}>
-      <Text numberOfLines={2} style={pickerStyles.message}>{result?.directory || '此电脑'}</Text>
-      <View style={pickerStyles.navigation}>
-        <Pressable accessibilityRole="button" disabled={loading} onPress={() => browse('')}>
-          <Text style={pickerStyles.link}>此电脑</Text></Pressable>
-        {result?.parent != null && <Pressable accessibilityRole="button" disabled={loading}
-          onPress={() => browse(result.parent ?? '')}><Text style={pickerStyles.link}>返回上一级</Text></Pressable>}
-      </View>
-      {loading && <ActivityIndicator accessibilityLabel="正在读取文件夹" style={pickerStyles.message} />}
-      {!!error && <View><Text accessibilityRole="alert" style={pickerStyles.message}>{error}</Text>
-        <Pressable accessibilityRole="button" onPress={retry}><Text style={pickerStyles.link}>重试</Text></Pressable>
-      </View>}
-      <FlatList data={result?.entries ?? []} keyExtractor={(entry) => entry.path} style={pickerStyles.list}
+      <SheetInset style={pickerStyles.readable}>
+        <Text numberOfLines={2} style={pickerStyles.message}>{result?.directory || '此电脑'}</Text>
+        <View style={pickerStyles.navigation}>
+          <Pressable accessibilityRole="button" disabled={loading} onPress={() => browse('')}>
+            <Text style={pickerStyles.link}>此电脑</Text></Pressable>
+          {result?.parent != null && <Pressable accessibilityRole="button" disabled={loading}
+            onPress={() => browse(result.parent ?? '')}><Text style={pickerStyles.link}>返回上一级</Text></Pressable>}
+        </View>
+        {loading && <ActivityIndicator accessibilityLabel="正在读取文件夹" style={pickerStyles.message} />}
+        {!!error && <View><Text accessibilityRole="alert" style={pickerStyles.message}>{error}</Text>
+          <Pressable accessibilityRole="button" onPress={retry}><Text style={pickerStyles.link}>重试</Text></Pressable>
+        </View>}
+      </SheetInset>
+      <SheetFlatList data={result?.entries ?? []} keyExtractor={(entry) => entry.path} style={pickerStyles.list}
+        contentContainerStyle={pickerStyles.readable}
         keyboardShouldPersistTaps="handled" nestedScrollEnabled
         renderItem={({ item }) => <Pressable accessibilityRole="button" accessibilityLabel={item.name}
           disabled={loading} onPress={() => browse(item.path)} style={pickerStyles.row}>
@@ -37,7 +41,8 @@ export function ChatProjectPicker(props: ProjectPickerProps) {
 }
 
 const pickerStyles = StyleSheet.create({
-  root: { width: '100%', maxWidth: 400, alignSelf: 'center' },
+  root: { flexShrink: 1 },
+  readable: { width: '100%', maxWidth: SHEET_READABLE_WIDTH, alignSelf: 'center' },
   list: { maxHeight: 340, flexGrow: 0 },
   navigation: { flexDirection: 'row', gap: 16 },
   row: { flexDirection: 'row', gap: 12, alignItems: 'center', padding: 12, minHeight: 48 },

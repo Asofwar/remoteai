@@ -1,8 +1,9 @@
 import { createContext, useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, ScrollView, Text } from 'react-native';
+import { ActivityIndicator, Text } from 'react-native';
 import type { FileReference } from '../../../../shared/chat/fileReference';
 import type { TextPreview } from '../../../../shared/remote-chat/textPreview';
 import { BottomSheet } from '../components/BottomSheet';
+import { SheetScrollView } from '../components/SheetScrollView';
 import { ChatCodeBlock } from './ChatCodeBlock';
 import { fileLanguage } from './ChatCodeHighlight';
 import { styles } from './styles';
@@ -30,9 +31,9 @@ function FilePreview({ file, threadId, ready, load, close }: Omit<Props, 'childr
     });
     return () => { cancelled = true; };
   }, [threadId, ready, load, file.path, attempt]);
-  return <BottomSheet visible tall title="文件内容" subtitle={file.path} onClose={close} dragFromHeaderOnly
+  return <BottomSheet fullWidthContent visible tall title="文件内容" subtitle={file.path} onClose={close} dragFromHeaderOnly
     actions={error ? [{ label: '重试', onPress: () => setAttempt(attempt + 1), disabled: !ready }] : []}>
-    <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
+    <SheetScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
       {!ready && !result && <Text style={styles.subtitle}>请连接电脑后查看文件。</Text>}
       {ready && !result && !error && <ActivityIndicator accessibilityLabel="正在读取文件" />}
       {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
@@ -41,7 +42,7 @@ function FilePreview({ file, threadId, ready, load, close }: Omit<Props, 'childr
         <ChatCodeBlock text={result.text} label="完整文本" language={fileLanguage(file.path)}
           lineNumbers copyLabel="复制文件内容" />
       </>}
-    </ScrollView>
+    </SheetScrollView>
   </BottomSheet>;
 }
 

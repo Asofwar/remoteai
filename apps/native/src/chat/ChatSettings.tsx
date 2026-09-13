@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BottomSheet } from '../components/BottomSheet';
+import { SheetScrollView, SHEET_READABLE_WIDTH } from '../components/SheetScrollView';
 import type { Model } from './types';
 import type { ComposerSettings } from '../../../../shared/remote-chat/composer';
 import { SETTINGS_FIELDS, settingOptions, settingValue, settingsNotice, visibleSettingsFields,
@@ -39,9 +40,10 @@ export function ChatSettings({ models, selection, saving, ready, error, updateSe
       {!!error && <Pressable accessibilityRole="button" style={styles.button}
         onPress={() => { void updateSettings(selection); }}><Text style={styles.buttonText}>重新保存</Text></Pressable>}
     </View>
-    {field && <BottomSheet visible title={SETTINGS_FIELDS.find((entry) => entry.field === field)!.title}
+    {field && <BottomSheet fullWidthContent
+      visible title={SETTINGS_FIELDS.find((entry) => entry.field === field)!.title}
       onBack={() => setField(null)} onClose={() => setField(null)}>
-      <ScrollView key={field} contentContainerStyle={[styles.settings, menuStyles.content]}>
+      <SheetScrollView key={field} contentContainerStyle={[styles.settings, menuStyles.content, menuStyles.options]}>
         {settingOptions(field, models, selection).map((option) => <Pressable key={option.value}
           accessibilityRole="radio" accessibilityLabel={option.label}
           accessibilityState={{ checked: selection[field] === option.value }}
@@ -53,13 +55,14 @@ export function ChatSettings({ models, selection, saving, ready, error, updateSe
           </View>
           {option.description && <Text style={styles.subtitle}>{option.description}</Text>}
         </Pressable>)}
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>}
   </BottomSheet>;
 }
 
 const menuStyles = StyleSheet.create({
   content: { paddingBottom: 18 },
+  options: { maxWidth: SHEET_READABLE_WIDTH },
   entry: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, padding: 14,
     borderWidth: 1, borderColor: palette.border, borderRadius: 12 },
   value: { flex: 1, textAlign: 'right', color: palette.green, fontSize: 13, lineHeight: 20 },

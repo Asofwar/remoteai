@@ -1,6 +1,7 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomSheet } from '../components/BottomSheet';
+import { SheetScrollView } from '../components/SheetScrollView';
 import { ChatMarkdown } from './Markdown';
 import { ChatDiff } from './ChatDiff';
 import { CopyTextButton } from './CopyTextButton';
@@ -39,12 +40,12 @@ function ErrorDetails({ turn }: { turn: Turn }) {
 }
 
 export function ChatTurnDetails({ turn, panel, onClose }: Props) {
-  return <BottomSheet visible tall title={PANEL_TITLES[panel]} onClose={onClose} dragFromHeaderOnly>
-    <ScrollView style={detailStyles.scroll} contentContainerStyle={detailStyles.content}>
+  return <BottomSheet fullWidthContent visible tall title={PANEL_TITLES[panel]} onClose={onClose} dragFromHeaderOnly>
+    <SheetScrollView style={detailStyles.scroll} contentContainerStyle={detailStyles.content}>
       {panel === 'plan' && <PlanDetails turn={turn} />}
       {panel === 'changes' && <ChatDiff files={completedTurnFiles(turn)} />}
       {panel === 'error' && <ErrorDetails turn={turn} />}
-    </ScrollView>
+    </SheetScrollView>
   </BottomSheet>;
 }
 

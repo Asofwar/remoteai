@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import type { DiffFile } from '../../../../shared/chat/diff';
 import { BottomSheet } from '../components/BottomSheet';
+import { SheetScrollView } from '../components/SheetScrollView';
 import { ChatDiffContent } from './ChatDiffContent';
 import { palette, styles } from './styles';
 
@@ -34,11 +35,11 @@ export function ChatDiff({ files }: { files: DiffFile[] }) {
       <DiffCounts added={file.added} removed={file.removed} />
       <Feather name="chevron-right" size={15} color={palette.muted} />
     </Pressable>)}
-    {selected && <BottomSheet visible tall title="文件差异" subtitle={selected.path}
+    {selected && <BottomSheet fullWidthContent visible tall title="文件差异" subtitle={selected.path}
       onClose={() => setSelectedKey(null)} onBack={() => setSelectedKey(null)} dragFromHeaderOnly>
-      <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
+      <SheetScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
         <ChatDiffContent key={selectedKey} file={selected} />
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>}
   </View>;
 }

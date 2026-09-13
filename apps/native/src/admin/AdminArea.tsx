@@ -16,6 +16,7 @@ import { DailyActivePlatforms, DashboardGrowth } from './DashboardStats';
 import { adminRequest } from '../api/client';
 import { Toast } from '../components/AppToast';
 import { BottomSheet } from '../components/BottomSheet';
+import { SheetScrollView, SheetInset } from '../components/SheetScrollView';
 import type {
   AdminDashboardOverview,
   AdminFeedback,
@@ -606,7 +607,7 @@ function OfficialAccountsPage({ session, profile, onBack }: AdminAreaProps & { o
       <Pager value={data} onChange={(page) => void load(page)} />
     </ScrollView>
 
-    <BottomSheet
+    <BottomSheet fullWidthContent
       visible={Boolean(editing)}
       title={editing === 'new' ? '新增官方账号' : '编辑官方账号'}
       subtitle={editing === 'new' ? '导入凭据并补充账号信息' : editing ? editing.email : undefined}
@@ -618,14 +619,14 @@ function OfficialAccountsPage({ session, profile, onBack }: AdminAreaProps & { o
         { label: '保存账号', tone: 'primary', onPress: save, loading: saving },
       ]}
     >
-      <ScrollView style={styles.sheetScroll} keyboardShouldPersistTaps="handled">
+      <SheetScrollView style={styles.sheetScroll} keyboardShouldPersistTaps="handled">
         <Field label="auth.json" value={authJson} onChangeText={setAuthJson} placeholder={editing === 'new' ? '{"tokens":{"access_token":"..."}}' : '留空表示不修改凭据'} multiline hint="请粘贴完整的账号认证 JSON" />
         <Field label="备注" value={note} onChangeText={setNote} placeholder="给账号添加便于识别的说明" />
         <Field label="到期日期" value={expiresAt} onChangeText={setExpiresAt} placeholder="YYYY-MM-DD" />
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>
 
-    <BottomSheet
+    <BottomSheet fullWidthContent
       visible={Boolean(binding)}
       title="绑定用户"
       subtitle={binding?.email}
@@ -637,7 +638,7 @@ function OfficialAccountsPage({ session, profile, onBack }: AdminAreaProps & { o
         { label: `保存 ${boundIds.length} 项`, tone: 'primary', onPress: saveBindings, loading: saving, disabled: bindingLoading },
       ]}
     >
-      <ScrollView style={styles.bindingList}>
+      <SheetScrollView style={styles.bindingList}>
         {bindingLoading ? <View style={styles.sheetLoading}><ActivityIndicator color={COLORS.primary} /><Text style={styles.stateDescription}>正在读取用户…</Text></View> : null}
         {!bindingLoading && !bindingUsers.length ? <Text style={styles.inlineEmpty}>暂无可绑定用户</Text> : null}
         {bindingUsers.map((user) => {
@@ -651,7 +652,7 @@ function OfficialAccountsPage({ session, profile, onBack }: AdminAreaProps & { o
             <View style={styles.checkCopy}><Text style={styles.checkLabel}>{user.email}</Text><Text style={styles.checkMeta}>{user.role}</Text></View>
           </Pressable>;
         })}
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>
 
     <BottomSheet
@@ -849,7 +850,7 @@ function InvitationsPage({ session, profile, onBack }: AdminAreaProps & { onBack
       <Pager value={data} onChange={(page) => void load(page)} />
     </ScrollView>
 
-    <BottomSheet
+    <BottomSheet fullWidthContent
       visible={creating}
       title="创建邀请"
       subtitle="创建后注册链接会自动复制到剪贴板"
@@ -861,16 +862,16 @@ function InvitationsPage({ session, profile, onBack }: AdminAreaProps & { onBack
         { label: '创建并复制', tone: 'primary', onPress: create, loading: creatingBusy },
       ]}
     >
-      <ScrollView style={styles.sheetScroll} keyboardShouldPersistTaps="handled">
+      <SheetScrollView style={styles.sheetScroll} keyboardShouldPersistTaps="handled">
         <Field label="指定邮箱（可选）" value={email} onChangeText={setEmail} keyboardType="email-address" placeholder="留空允许任意邮箱" />
         <Field label="角色代码" value={role} onChangeText={setRole} placeholder="user" />
         <Field label="最大使用次数" value={maxUses} onChangeText={setMaxUses} keyboardType="numeric" />
         <SwitchRow label="永不过期" description="开启后注册链接不会自动失效" value={neverExpires} onValueChange={setNeverExpires} />
         {!neverExpires ? <Field label="有效小时数" value={hours} onChangeText={setHours} keyboardType="numeric" /> : null}
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>
 
-    <BottomSheet
+    <BottomSheet fullWidthContent
       visible={Boolean(usersInvite) && !giftUser}
       title="已注册用户"
       subtitle={usersInvite?.email || '任意邮箱邀请'}
@@ -878,7 +879,7 @@ function InvitationsPage({ session, profile, onBack }: AdminAreaProps & { onBack
       tall
       actions={[{ label: '完成', tone: 'primary', onPress: () => setUsersInvite(null) }]}
     >
-      <ScrollView style={styles.sheetScroll}>
+      <SheetScrollView style={styles.sheetScroll}>
         {registeredLoading ? <View style={styles.sheetLoading}><ActivityIndicator color={COLORS.primary} /><Text style={styles.stateDescription}>正在读取注册记录…</Text></View> : null}
         {!registeredLoading && !registeredUsers.length ? <Text style={styles.inlineEmpty}>暂无注册用户</Text> : null}
         {registeredUsers.map((user) => <View key={user.id} style={styles.personRow}>
@@ -889,10 +890,10 @@ function InvitationsPage({ session, profile, onBack }: AdminAreaProps & { onBack
             {canGiftAccounts && user.userId ? <AdminButton label="赠送" tone="primary" compact onPress={() => openGift(user)} /> : null}
           </View>
         </View>)}
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>
 
-    <BottomSheet
+    <BottomSheet fullWidthContent
       visible={Boolean(giftUser)}
       title="赠送官方账号"
       subtitle={giftUser?.email}
@@ -904,8 +905,8 @@ function InvitationsPage({ session, profile, onBack }: AdminAreaProps & { onBack
         { label: `赠送 ${giftSelectedIds.length} 个`, tone: 'primary', onPress: confirmGift, loading: giftSaving, disabled: giftLoading || !giftSelectedIds.length },
       ]}
     >
-      <Text style={styles.giftHint}>可选择一个或多个账号，已绑定用户较少的账号优先显示。</Text>
-      <ScrollView style={styles.bindingList}>
+      <SheetInset><Text style={styles.giftHint}>可选择一个或多个账号，已绑定用户较少的账号优先显示。</Text></SheetInset>
+      <SheetScrollView style={styles.bindingList}>
         {giftLoading ? <View style={styles.sheetLoading}><ActivityIndicator color={COLORS.primary} /><Text style={styles.stateDescription}>正在读取官方账号池…</Text></View> : null}
         {!giftLoading && !giftAccounts.items.length ? <Text style={styles.inlineEmpty}>官方账号池暂无可赠送账号</Text> : null}
         {giftAccounts.items.map((account) => {
@@ -923,7 +924,7 @@ function InvitationsPage({ session, profile, onBack }: AdminAreaProps & { onBack
           </Pressable>;
         })}
         <Pager value={giftAccounts} onChange={(page) => void loadGiftAccounts(page)} />
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>
 
     <BottomSheet
@@ -1037,7 +1038,7 @@ function FeedbackPage({ session, profile, onBack }: AdminAreaProps & { onBack: (
       <Pager value={data} onChange={(page) => void load(page)} />
     </ScrollView>
 
-    <BottomSheet
+    <BottomSheet fullWidthContent
       visible={Boolean(selected)}
       title="反馈详情"
       subtitle={selected ? `${selected.email || '匿名用户'} · ${selected.platform} · v${selected.version}` : undefined}
@@ -1045,7 +1046,7 @@ function FeedbackPage({ session, profile, onBack }: AdminAreaProps & { onBack: (
       tall
       actions={[{ label: '完成', tone: 'primary', onPress: () => setSelected(null) }]}
     >
-      <ScrollView style={styles.sheetScroll}>
+      <SheetScrollView style={styles.sheetScroll}>
         <View style={styles.detailContentBox}><Text selectable style={styles.detailContent}>{selected?.content}</Text></View>
         {selected?.attachments.length ? <Text style={styles.sheetSectionLabel}>附件</Text> : null}
         {selected?.attachments.map((file) => <View key={file.id} style={styles.fileRow}>
@@ -1053,10 +1054,10 @@ function FeedbackPage({ session, profile, onBack }: AdminAreaProps & { onBack: (
           <View style={styles.fileCopy}><Text style={styles.fileName} numberOfLines={1}>{file.fileName}</Text><Text style={styles.fileMeta}>{file.mimeType}</Text></View>
           <Text style={styles.fileSize}>{(file.size / 1024 / 1024).toFixed(2)} MB</Text>
         </View>)}
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>
 
-    <BottomSheet
+    <BottomSheet fullWidthContent
       visible={Boolean(replying)}
       title="邮件回复"
       subtitle={replying?.email ?? undefined}
@@ -1074,7 +1075,7 @@ function FeedbackPage({ session, profile, onBack }: AdminAreaProps & { onBack: (
         },
       ]}
     >
-      <ScrollView style={styles.sheetScroll} keyboardShouldPersistTaps="handled">
+      <SheetScrollView style={styles.sheetScroll} keyboardShouldPersistTaps="handled">
         <Text style={styles.fieldLabel}>发件服务</Text>
         {mailServicesLoading ? <View style={styles.mailServiceLoading}>
           <ActivityIndicator color={COLORS.primary} size="small" />
@@ -1112,7 +1113,7 @@ function FeedbackPage({ session, profile, onBack }: AdminAreaProps & { onBack: (
         </View> : <Text style={styles.mailServiceEmpty}>暂无可用的发件服务，请刷新后重试</Text>}
         <Field label="邮件主题" value={subject} onChangeText={setSubject} />
         <Field label="回复内容" value={content} onChangeText={setContent} multiline placeholder="输入对用户问题的回复…" />
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>
   </PageShell>;
 }
@@ -1214,7 +1215,7 @@ function UsersPage({ session, profile, onBack }: AdminAreaProps & { onBack: () =
       <Pager value={data} onChange={(page) => void load(page)} />
     </ScrollView>
 
-    <BottomSheet
+    <BottomSheet fullWidthContent
       visible={Boolean(editing)}
       title={editing === 'new' ? '新增用户' : '编辑用户'}
       subtitle={editing === 'new' ? '创建一个新的云端用户' : editing ? editing.email : undefined}
@@ -1226,7 +1227,7 @@ function UsersPage({ session, profile, onBack }: AdminAreaProps & { onBack: () =
         { label: '保存用户', tone: 'primary', onPress: save, loading: saving },
       ]}
     >
-      <ScrollView style={styles.sheetScroll} keyboardShouldPersistTaps="handled">
+      <SheetScrollView style={styles.sheetScroll} keyboardShouldPersistTaps="handled">
         <Field label="邮箱" value={email} onChangeText={setEmail} keyboardType="email-address" placeholder="name@example.com" />
         <Field label={editing === 'new' ? '初始密码' : '重置密码（可选）'} value={password} onChangeText={setPassword} secureTextEntry placeholder={editing === 'new' ? '至少 8 位' : '留空表示不修改'} />
         <Text style={styles.fieldLabel}>角色</Text>
@@ -1240,7 +1241,7 @@ function UsersPage({ session, profile, onBack }: AdminAreaProps & { onBack: () =
           </Pressable>)}
         </View>
         <SwitchRow label="禁用用户" description="禁用后该用户将无法登录" value={disabled} onValueChange={setDisabled} />
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>
 
     <BottomSheet

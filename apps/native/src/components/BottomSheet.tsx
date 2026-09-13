@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { SHEET_HORIZONTAL_PADDING } from './SheetScrollView';
 
 const AnimatedSafeAreaView = Animated.createAnimatedComponent(SafeAreaView);
 const DRAG_DISMISS_DISTANCE = 80;
@@ -36,6 +37,7 @@ interface BottomSheetProps {
   dismissible?: boolean;
   tall?: boolean;
   dragFromHeaderOnly?: boolean;
+  fullWidthContent?: boolean;
 }
 
 export function BottomSheet({
@@ -49,6 +51,7 @@ export function BottomSheet({
   dismissible = true,
   tall = false,
   dragFromHeaderOnly = false,
+  fullWidthContent = false,
 }: BottomSheetProps) {
   const translateY = useRef(new Animated.Value(0)).current;
 
@@ -117,7 +120,7 @@ export function BottomSheet({
         ]}
         {...(!dragFromHeaderOnly ? dragResponder.panHandlers : {})}
       >
-        <View {...(dragFromHeaderOnly ? dragResponder.panHandlers : {})}>
+        <View style={styles.inset} {...(dragFromHeaderOnly ? dragResponder.panHandlers : {})}>
           <View style={styles.handle} />
           <View style={styles.header}>
             {onBack && <Pressable accessibilityRole="button" accessibilityLabel="返回上一层"
@@ -139,8 +142,8 @@ export function BottomSheet({
             </Pressable> : null}
           </View>
         </View>
-        {children ? <View style={styles.content}>{children}</View> : null}
-        {actions.length ? <View style={styles.actions}>
+        {children ? <View style={[styles.content, !fullWidthContent && styles.inset]}>{children}</View> : null}
+        {actions.length ? <View style={[styles.actions, styles.inset]}>
           {actions.map((action) => {
             const tone = action.tone ?? 'neutral';
             return <Pressable
@@ -180,7 +183,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingTop: 9,
-    paddingHorizontal: 20,
     shadowColor: '#06140f',
     shadowOpacity: 0.24,
     shadowRadius: 24,
@@ -188,6 +190,7 @@ const styles = StyleSheet.create({
     elevation: 24,
   },
   sheetTall: { maxHeight: '92%' },
+  inset: { paddingHorizontal: SHEET_HORIZONTAL_PADDING },
   handle: { width: 44, height: 5, borderRadius: 3, alignSelf: 'center', backgroundColor: '#d5dfd9', marginBottom: 17 },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
   heading: { flex: 1, minWidth: 0 },

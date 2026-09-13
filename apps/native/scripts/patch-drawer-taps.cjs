@@ -11,7 +11,7 @@ function patchDrawerSource(source, patch) {
   const newline = source.includes('\r\n') ? '\r\n' : '\n';
   let output = source.replace(/\r\n/g, '\n');
   const hunks = patch.replace(/\r\n/g, '\n').split(/^@@.*@@.*$/m).slice(1);
-  if (hunks.length !== 2) throw new Error('The drawer tap backport must contain exactly two hunks.');
+  if (hunks.length !== 3) throw new Error('The drawer gesture patch must contain exactly three hunks.');
   for (const hunk of hunks) {
     const lines = hunk.split('\n').filter((line) => /^[ +\-]/.test(line));
     const before = lines.filter((line) => !line.startsWith('+')).map((line) => line.slice(1)).join('\n');
@@ -25,7 +25,7 @@ function patchDrawerSource(source, patch) {
   return output.replace(/\n/g, newline);
 }
 
-/** Backport https://github.com/software-mansion/react-native-gesture-handler/pull/3832. */
+/** Backport the overlay guard and preserve native text long-presses at the drawer edge. */
 function applyDrawerTapPatch() {
   const manifestPath = require.resolve(`${PACKAGE_NAME}/package.json`, { paths: [nativeDirectory] });
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));

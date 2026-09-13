@@ -1,14 +1,13 @@
 import { StyleSheet } from 'react-native';
 
-// Neutral surfaces keep the conversation and floating composer visually continuous.
+// A consistent gray canvas keeps the white composer distinct, including above the keyboard.
 export const palette = { ink: '#17211b', muted: '#718078', green: '#0b8065', border: '#dfe5df',
-  background: '#fafafa', pale: '#e7f5f4', danger: '#c74e47' };
+  background: '#f4f4f4', pale: '#e7f5f4', danger: '#c74e47' };
 
 export const styles = StyleSheet.create({
   fill: { flex: 1 },
   hidden: { display: 'none' },
-  page: { flex: 1, backgroundColor: palette.background,
-    experimental_backgroundImage: 'linear-gradient(180deg, #fafafa 0%, #ffffff 25%, #ffffff 65%, #f3f3f3 100%)' },
+  page: { flex: 1, backgroundColor: palette.background },
   padded: { padding: 20, gap: 14 },
   heading: { color: palette.ink, fontSize: 27, lineHeight: 36, fontWeight: '800' },
   title: { color: palette.ink, fontSize: 16, lineHeight: 24, fontWeight: '700' },

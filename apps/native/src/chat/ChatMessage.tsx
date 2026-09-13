@@ -4,8 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { ChatMarkdown } from './Markdown';
 import { ChatImage } from './ChatImage';
 import { ChatActivityLabel } from './ChatActivityLabel';
+import { QuoteSourceContext } from './ChatQuotes';
+import { UserMessageText } from './UserMessageText';
 import { questionMessageText } from '../../../../shared/remote-chat/client/asyncQuestions';
-import { CopyTextButton } from './CopyTextButton';
 import { messageContent, messageLabel } from '../../../../shared/chat/messageDetails';
 import { itemImageSources } from '../../../../shared/chat/imageSources';
 import {
@@ -85,31 +86,37 @@ export function ChatActivityRow({ item, onOpen, running = false }: {
   </Pressable>;
 }
 
-interface MessageProps { item: Item; onOpen: (id: string) => void; running?: boolean; process?: boolean }
+interface MessageProps {
+  item: Item; onOpen: (id: string) => void; running?: boolean; process?: boolean; onQuote?: () => void;
+}
 
-export const ChatMessage = memo(function ChatMessage({ item, onOpen, running = false, process = false }: MessageProps) {
+export const ChatMessage = memo(function ChatMessage(props: MessageProps) {
+  return <QuoteSourceContext.Provider value={{ messageId: props.item.id, onQuote: props.onQuote,
+    role: props.item.type === 'userMessage' ? 'user' : 'assistant' }}>
+    <MessageBody {...props} />
+  </QuoteSourceContext.Provider>;
+});
+
+function MessageBody({ item, onOpen, running = false, process = false }: MessageProps) {
   const images = itemImageSources(item);
   const text = questionMessageText(item);
   if (item.type === 'userMessage') return <View style={messageStyles.user}>
-    <Pressable onLongPress={() => onOpen(item.id)} accessibilityHint="长按查看全文"
+    <View
       style={[styles.userMessage, messageStyles.bubble, images.length > 0 && messageStyles.imageBubble]}>
-      {!!text && <Text selectable style={styles.messageText}>{text}</Text>}
+      {!!text && <UserMessageText text={text} />}
       {images.map((source, index) => <ChatImage key={index} source={source} />)}
-    </Pressable>
+    </View>
   </View>;
   if (item.type !== 'agentMessage') return <ChatActivityRow item={item} onOpen={onOpen} running={running} />;
   return <View style={styles.assistantMessage}>
-    <ChatMarkdown text={text} tone={process ? 'process' : 'default'} />
-    {!process && !running && !!text.trim() && <View style={messageStyles.actions}>
-      <CopyTextButton text={text} label="复制回复" />
-    </View>}
+    <ChatMarkdown text={text} tone={process ? 'process' : 'default'}
+      copy={!process && !running && text.trim() ? { text, label: '复制回复' } : undefined} />
   </View>;
-});
+}
 
 const messageStyles = StyleSheet.create({
   activity: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 5 },
   user: { alignItems: 'flex-end' },
   bubble: { borderRadius: 16, borderBottomRightRadius: 4, paddingHorizontal: 19, paddingVertical: 15 },
   imageBubble: { width: '92%' },
-  actions: { flexDirection: 'row', alignItems: 'center' },
 });

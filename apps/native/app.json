@@ -74,6 +74,7 @@
       ],
       "expo-notifications",
       "./plugins/withChatBackground.cjs",
+      "./plugins/withChatTextSelection.cjs",
       "./plugins/withChatTransport.cjs",
       "./plugins/withSharedBundleInputs.cjs",
       [

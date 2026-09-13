@@ -8,6 +8,9 @@ import { ComposerAddMenu, type ComposerAddAction } from './ComposerAddMenu';
 import { ComposerPopover } from './ComposerPopover';
 import { ComposerPluginMenu } from './ComposerPluginMenu';
 import { ComposerReferences } from './ComposerReferences';
+import { ComposerQuotes } from './ComposerQuotes';
+import { useChatQuotes } from './ChatQuotes';
+import { replyWithQuotes } from './replyQuotes';
 import { ComposerProjectFiles } from './ComposerProjectFiles';
 import { useComposerAttachments } from './useComposerAttachments';
 import type { RemoteComposerCatalog } from '../../../../shared/remote-chat/composerCatalog';
@@ -60,11 +63,22 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
   const attachments = useComposerAttachments({ threadId, sending });
   const readCatalog = useCallback(() => loadCatalog(cwd), [loadCatalog, cwd]);
   const photos = useChatPhotos({ threadId, sending });
+  const quoteDraft = useChatQuotes();
   const disabled = !ready || settingsBusy || compacting;
   const draft = useChatDraft({ threadId, sending, disabled: disabled || photos.busy || attachments.busy, selection, send });
   const menu = useComposerMenu({ draft, scope: `${threadId ?? ''}:${cwd}`, active,
     refresh: catalog.refresh, compact });
-  const hasDraft = draft.hasContent || photos.photos.length > 0 || attachments.items.length > 0;
+  const quoteCount = quoteDraft?.quotes.length ?? 0;
+  const previousQuoteCount = useRef(0);
+  useEffect(() => {
+    const added = quoteCount > previousQuoteCount.current;
+    previousQuoteCount.current = quoteCount;
+    if (!added || !active) return;
+    const frame = requestAnimationFrame(() => menu.input.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [quoteCount, active, menu.input]);
+  const hasDraft = draft.hasContent || photos.photos.length > 0 || attachments.items.length > 0
+    || Boolean(quoteDraft?.quotes.length);
   const compactField = !draft.text.length && !hasDraft && !photos.busy && !photos.error;
   useEffect(() => { if (!active) { setSettings(false); setAdding(false); setProjectFiles(null); } }, [active]);
   useEffect(() => { setSettings(false); setAdding(false); setProjectFiles(null); setAttachmentError(''); }, [threadId]);
@@ -82,13 +96,18 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
     }
     const submittedPhotos = photos.photos;
     const submittedAttachments = attachments.items;
+    const submittedQuotes = quoteDraft?.quotes ?? [];
     const size = submittedPhotos.reduce((total, photo) => total + photo.dataUrl.length, 0)
       + submittedAttachments.reduce((total, item) => total + (item.data?.length ?? 0), 0);
     if (size > MAX_CHAT_ATTACHMENT_DATA) { setAttachmentError('附件总大小过大，请减少照片或文件后再试。'); return; }
     setAttachmentError('');
-    const sent = await draft.submit({ text: action === 'continue' ? CONTINUE_MESSAGE : draft.text,
+    const text = replyWithQuotes(action === 'continue' ? CONTINUE_MESSAGE : draft.text, submittedQuotes);
+    const sent = await draft.submit({ text,
       images: submittedPhotos.map((photo) => photo.dataUrl), attachments: submittedAttachments });
-    if (sent) { photos.clearSubmitted(submittedPhotos); attachments.clearSubmitted(submittedAttachments); }
+    if (sent) {
+      photos.clearSubmitted(submittedPhotos); attachments.clearSubmitted(submittedAttachments);
+      quoteDraft?.clearSubmitted(submittedQuotes);
+    }
   };
   const chooseAdd = (choice: ComposerAddAction) => {
     setAdding(false); setAttachmentError('');
@@ -122,6 +141,7 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
       onLayout={({ nativeEvent }) => setAnchorHeight(nativeEvent.layout.height)}>
       <ChatPhotoPicker photos={photos} disabled={sending} active={active} />
       <ComposerReferences items={attachments.items} disabled={attachmentBusy} remove={attachments.remove} />
+      <ComposerQuotes disabled={sending} active={active} />
       <TextInput ref={menu.input} accessibilityLabel="聊天消息"
         style={[styles.input, compactField && styles.inputCompact]}
         multiline value={draft.text} maxLength={100_000} selection={menu.selection}

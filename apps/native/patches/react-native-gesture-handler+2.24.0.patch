@@ -1,6 +1,8 @@
 # Backport upstream PR #3832, released in react-native-gesture-handler 2.30.0.
 # https://github.com/software-mansion/react-native-gesture-handler/pull/3832
 # Expo 53 uses 2.24.0; Metro resolves this package's react-native source entry.
+# Also keep a nonzero pan distance: Android ORs distance with the directional activation threshold,
+# so zero steals stationary edge long-presses from native text selection.
 diff --git a/src/components/ReanimatedDrawerLayout.tsx b/src/components/ReanimatedDrawerLayout.tsx
 --- a/src/components/ReanimatedDrawerLayout.tsx
 +++ b/src/components/ReanimatedDrawerLayout.tsx
@@ -19,3 +21,10 @@ diff --git a/src/components/ReanimatedDrawerLayout.tsx b/src/components/Reanimat
 -      [closeDrawer, isDrawerOpen, drawerLockMode]
 +      [closeDrawer, isDrawerOpen, drawerLockMode, drawerOpened]
      );
+@@ -527,5 +528,5 @@
+         .activeCursor(activeCursor)
+         .mouseButton(mouseButton)
+         .hitSlop(drawerOpened ? fillHitSlop : edgeHitSlop)
+-        .minDistance(drawerOpened ? 100 : 0)
++        .minDistance(100)
+         .activeOffsetX(gestureOrientation * minSwipeDistance)

@@ -1,7 +1,8 @@
 import { useContext, useMemo, useState } from 'react';
+import { SelectableChatText } from './SelectableChatText';
 import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { pairDiffLines, type DiffFile, type DiffLine, type DiffPair } from '../../../../shared/chat/diff';
-import { CopyTextButton } from './CopyTextButton';
+import { INLINE_COPY_WIDTH, type CopyAction } from './CopyTextButton';
 import { ChatFileContext } from './ChatFilePreview';
 import { HighlightedCode, fileLanguage } from './ChatCodeHighlight';
 import { palette, styles } from './styles';
@@ -12,25 +13,28 @@ const MIN_SCROLL_COLUMN_WIDTH = 320;
 const CELL_BORDER_WIDTH = 1;
 const REDUNDANT_HEADER = /^(diff --git |index |--- |\+\+\+ |new file mode |deleted file mode )/;
 
-function UnifiedRow({ line, language, wrap }: { line: DiffLine; language: string; wrap: boolean }) {
+function UnifiedRow({ line, language, wrap, copy }: {
+  line: DiffLine; language: string; wrap: boolean; copy?: CopyAction;
+}) {
   const marker = line.kind === 'add' ? '+' : line.kind === 'remove' ? '−' : ' ';
   const heading = line.kind === 'hunk' || line.kind === 'meta';
   return <View style={[diffStyles.line, diffStyles[line.kind]]}>
     <Text style={[styles.code, diffStyles.number]}>{line.oldLine ?? ''}</Text>
     <Text style={[styles.code, diffStyles.number]}>{line.newLine ?? ''}</Text>
     <Text style={[styles.code, diffStyles.sign]}>{marker}</Text>
-    <Text selectable style={[styles.code, wrap ? diffStyles.wrappedText : diffStyles.unwrappedText]}>
-      <HighlightedCode text={line.text || ' '} language={heading ? '' : language} /></Text>
+    <SelectableChatText copy={copy} style={[styles.code, wrap ? diffStyles.wrappedText : diffStyles.unwrappedText]}>
+      <HighlightedCode text={line.text || ' '} language={heading ? '' : language} /></SelectableChatText>
   </View>;
 }
 
-function SplitCell({ line, side, language, column, wrap }: {
+function SplitCell({ line, side, language, column, wrap, copy }: {
   line?: DiffLine; side: 'left' | 'right'; language: string; column: StyleProp<ViewStyle>; wrap: boolean;
+  copy?: CopyAction;
 }) {
   return <View style={[diffStyles.cell, column, line && diffStyles[line.kind]]}>
     <Text style={[styles.code, diffStyles.number]}>{side === 'left' ? line?.oldLine : line?.newLine}</Text>
-    <Text selectable style={[styles.code, wrap ? diffStyles.wrappedText : diffStyles.unwrappedText]}>
-      <HighlightedCode text={line?.text || ' '} language={language} /></Text>
+    <SelectableChatText copy={copy} style={[styles.code, wrap ? diffStyles.wrappedText : diffStyles.unwrappedText]}>
+      <HighlightedCode text={line?.text || ' '} language={language} /></SelectableChatText>
   </View>;
 }
 
@@ -43,12 +47,16 @@ function MeasureCode({ text, onMeasure }: { text: string; onMeasure: (width: num
   </ScrollView>;
 }
 
-function SplitRows({ pairs, language, wrap }: { pairs: DiffPair[]; language: string; wrap: boolean }) {
+function SplitRows({ pairs, language, wrap, copy }: {
+  pairs: DiffPair[]; language: string; wrap: boolean; copy: CopyAction;
+}) {
   const [widths, setWidths] = useState({ left: 0, right: 0 });
   const text = useMemo(() => ({ left: pairs.map((pair) => pair.left?.text || ' ').join('\n'),
     right: pairs.map((pair) => pair.right?.text || ' ').join('\n') }), [pairs]);
-  const left = Math.max(MIN_SCROLL_COLUMN_WIDTH, widths.left + NUMBER_COLUMN_WIDTH + CELL_BORDER_WIDTH);
-  const right = Math.max(MIN_SCROLL_COLUMN_WIDTH, widths.right + NUMBER_COLUMN_WIDTH + CELL_BORDER_WIDTH);
+  const left = Math.max(MIN_SCROLL_COLUMN_WIDTH,
+    widths.left + NUMBER_COLUMN_WIDTH + CELL_BORDER_WIDTH + INLINE_COPY_WIDTH);
+  const right = Math.max(MIN_SCROLL_COLUMN_WIDTH,
+    widths.right + NUMBER_COLUMN_WIDTH + CELL_BORDER_WIDTH + INLINE_COPY_WIDTH);
   const columns = wrap ? [diffStyles.wrappedCell, diffStyles.wrappedCell] : [{ width: left }, { width: right }];
   return <View style={wrap ? undefined : { width: left + right }}>
     {!wrap && <>
@@ -62,10 +70,14 @@ function SplitRows({ pairs, language, wrap }: { pairs: DiffPair[]; language: str
       <Text style={[diffStyles.columnLabel, columns[1]]}>修改后</Text>
     </View>
     {pairs.map((pair, index) => pair.heading
-      ? <Text selectable key={index} style={[styles.code, diffStyles.hunk]}>{pair.heading.text}</Text>
+      ? <SelectableChatText key={index} style={[styles.code, diffStyles.hunk]}
+        copy={index === pairs.length - 1 ? copy : undefined}>
+        {pair.heading.text}</SelectableChatText>
       : <View key={index} style={diffStyles.line}>
-        <SplitCell line={pair.left} side="left" language={language} column={columns[0]} wrap={wrap} />
-        <SplitCell line={pair.right} side="right" language={language} column={columns[1]} wrap={wrap} />
+        <SplitCell line={pair.left} side="left" language={language} column={columns[0]} wrap={wrap}
+          copy={index === pairs.length - 1 && !pair.right ? copy : undefined} />
+        <SplitCell line={pair.right} side="right" language={language} column={columns[1]} wrap={wrap}
+          copy={index === pairs.length - 1 && pair.right ? copy : undefined} />
       </View>)}
   </View>;
 }
@@ -80,13 +92,15 @@ export function ChatDiffContent({ file }: { file: DiffFile }) {
   const pairs = useMemo(() => split ? pairDiffLines(lines) : [], [lines, split]);
   const language = fileLanguage(file.path);
   const total = split ? pairs.length : lines.length;
-  const rows = split ? <SplitRows pairs={pairs.slice(0, limit)} language={language} wrap={wrap} />
+  const copy = { text: file.raw, label: '复制 diff' };
+  const rows = split ? <SplitRows pairs={pairs.slice(0, limit)} language={language} wrap={wrap} copy={copy} />
     : <View>{lines.slice(0, limit).map((line, index) =>
-      <UnifiedRow key={index} line={line} language={language} wrap={wrap} />)}</View>;
+      <UnifiedRow key={index} line={line} language={language} wrap={wrap}
+        copy={index === Math.min(lines.length, limit) - 1 ? copy : undefined} />)}</View>;
   return <View style={{ gap: 10 }}>
-    {file.previousPath && <Text selectable style={styles.subtitle}>{file.previousPath} → {file.path}</Text>}
+    {file.previousPath && <SelectableChatText style={styles.subtitle}>
+      {file.previousPath} → {file.path}</SelectableChatText>}
     <View style={diffStyles.toolbar}>
-      <CopyTextButton text={file.raw} label="复制 diff" />
       <Pressable accessibilityRole="button" style={diffStyles.action} onPress={() => setWrap(!wrap)}>
         <Text style={diffStyles.actionText}>{wrap ? '横向滚动' : '自动换行'}</Text></Pressable>
       <Pressable accessibilityRole="button" style={diffStyles.action} onPress={() => setSplit(!split)}>
@@ -95,7 +109,8 @@ export function ChatDiffContent({ file }: { file: DiffFile }) {
         onPress={() => openFile({ path: file.path })}><Text style={diffStyles.actionText}>查看文件</Text></Pressable>}
     </View>
     {wrap ? rows : <ScrollView horizontal nestedScrollEnabled>{rows}</ScrollView>}
-    {!total && <Text style={styles.subtitle}>{file.kind === 'add' ? '新增空文件' : '此文件没有可显示的文本差异。'}</Text>}
+    {!total && <SelectableChatText style={styles.subtitle} copy={copy}>
+      {file.kind === 'add' ? '新增空文件' : '此文件没有可显示的文本差异。'}</SelectableChatText>}
     {total > limit && <Pressable accessibilityRole="button" style={styles.button}
       onPress={() => setLimit(limit + PAGE_LINES)}>
       <Text style={styles.buttonText}>继续显示（还有 {total - limit} 行）</Text></Pressable>}

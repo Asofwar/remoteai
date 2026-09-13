@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text } from 'react-native';
+import { AccessibilityInfo, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { BottomSheet } from '../components/BottomSheet';
 import { copyText, saveTextFile } from './copyText';
 import { palette, styles } from './styles';
+import { Toast } from '../components/AppToast';
+
+export interface CopyAction { text: string; label: string }
+export const INLINE_COPY_WIDTH = 30;
+const INLINE_BASELINE_OFFSET = 4;
 
 interface ExportRequest { text: string; reason: 'too-large' | 'failed' }
 
@@ -21,6 +26,9 @@ function useTextCopy(text: string) {
   const notice = (value: string) => {
     if (!mounted.current) return;
     setStatus(value);
+    AccessibilityInfo.announceForAccessibility(value);
+    if (value === '复制失败，请重试') Toast.fail(value);
+    else if (value !== '已复制') Toast.success(value);
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setStatus(''), 2000);
   };
@@ -52,19 +60,23 @@ function useTextCopy(text: string) {
 
 export function CopyTextButton({ text, label = '复制' }: { text: string; label?: string }) {
   const copy = useTextCopy(text);
-  return <><Pressable accessibilityRole="button" accessibilityLabel={label} style={copyStyles.button}
-    disabled={copy.saving} onPress={() => void copy.copy()}>{copy.status
-      ? <Text style={[styles.subtitle, { maxWidth: 400 }]}>{copy.status}</Text>
-      : <Feather name="copy" size={15} color={palette.muted} />}</Pressable>
+  return <View style={copyStyles.inline}><Pressable accessibilityRole="button" accessibilityLabel={label}
+    style={copyStyles.button} hitSlop={8}
+    disabled={copy.saving} onPress={() => void copy.copy()}>
+    <Feather name={copy.status === '已复制' ? 'check' : 'copy'} size={15} color={palette.muted} /></Pressable>
     {copy.request && <BottomSheet visible title="保存完整内容" onClose={copy.close} dismissible={!copy.saving}
       actions={[{ label: '保存完整内容', onPress: copy.save, loading: copy.saving, disabled: copy.saving }]}>
       <Text style={[styles.messageText, { maxWidth: 400 }]}>{copy.request.reason === 'too-large'
         ? '内容较长，可将完整内容保存为文本文件。' : '复制未成功，可将完整内容保存为文本文件。'}</Text>
       {!!copy.error && <Text accessibilityRole="alert" style={styles.error}>{copy.error}</Text>}
     </BottomSheet>}
-  </>;
+  </View>;
 }
 
 const copyStyles = StyleSheet.create({
-  button: { minWidth: 36, minHeight: 36, padding: 8, alignItems: 'center', justifyContent: 'center' },
+  // Explicit dimensions let Android lay out this view as one inline attachment in a TextView.
+  inline: { width: INLINE_COPY_WIDTH, height: 20 },
+  // The inline view ends at the text baseline; the icon's visible bottom also needs the font's descent.
+  button: { flex: 1, alignItems: 'center', justifyContent: 'center',
+    transform: [{ translateY: INLINE_BASELINE_OFFSET }] },
 });

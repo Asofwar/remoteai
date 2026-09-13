@@ -22,11 +22,17 @@ const source = `    const overlayDismissGesture = useMemo(
           }),
       [closeDrawer, isDrawerOpen, drawerLockMode]
     );
+        .activeCursor(activeCursor)
+        .mouseButton(mouseButton)
+        .hitSlop(drawerOpened ? fillHitSlop : edgeHitSlop)
+        .minDistance(drawerOpened ? 100 : 0)
+        .activeOffsetX(gestureOrientation * minSwipeDistance)
 `;
 
-it('backports only the upstream gesture guard and its memo dependency, then remains idempotent', () => {
+it('patches the overlay guard and stationary edge pan, then remains idempotent', () => {
   const expected = source.replace('Gesture.Tap()', 'Gesture.Tap()\n          .enabled(drawerOpened)')
-    .replace('[closeDrawer, isDrawerOpen, drawerLockMode]', '[closeDrawer, isDrawerOpen, drawerLockMode, drawerOpened]');
+    .replace('[closeDrawer, isDrawerOpen, drawerLockMode]', '[closeDrawer, isDrawerOpen, drawerLockMode, drawerOpened]')
+    .replace('.minDistance(drawerOpened ? 100 : 0)', '.minDistance(100)');
   const result = patchDrawerSource(source, patch);
   expect(result).toBe(expected);
   expect(patchDrawerSource(result, patch)).toBe(result);

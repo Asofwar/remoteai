@@ -19,14 +19,16 @@ export async function prepareHierarchy({ adb, output }) {
     .map((name) => path.join(platform, name));
   const source = fileURLToPath(new URL('./android/HierarchyDump.java', import.meta.url));
   const gestures = fileURLToPath(new URL('./android/ImageGestureTest.java', import.meta.url));
+  const quotes = fileURLToPath(new URL('./android/QuoteMenuTest.java', import.meta.url));
   await exec(executable('javac'), ['--release', '8', '-encoding', 'UTF-8',
-    '-cp', libraries.join(path.delimiter), '-d', build, source, gestures]);
+    '-cp', libraries.join(path.delimiter), '-d', build, source, gestures, quotes]);
   const compiler = path.join(sdk, 'build-tools', '35.0.0', 'lib', 'd8.jar');
   const outputJar = path.join(build, 'hierarchy.jar');
   const args = ['-cp', compiler, 'com.android.tools.r8.D8'];
   for (const library of libraries) args.push('--lib', library);
   args.push('--output', outputJar, path.join(build, 'dev/codexswitch/testing/HierarchyDump.class'),
-    path.join(build, 'dev/codexswitch/testing/ImageGestureTest.class'));
+    path.join(build, 'dev/codexswitch/testing/ImageGestureTest.class'),
+    path.join(build, 'dev/codexswitch/testing/QuoteMenuTest.class'));
   await exec(executable('java'), args);
   await adb('push', outputJar, '/data/local/tmp/chat-hierarchy.jar');
 }

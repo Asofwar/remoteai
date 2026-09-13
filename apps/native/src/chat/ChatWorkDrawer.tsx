@@ -13,7 +13,7 @@ export function ChatWorkDrawer({ entry, onOpen, onClose }: {
     <SheetFlatList data={entry.items} keyExtractor={(item) => item.id} style={workStyles.list}
       contentContainerStyle={workStyles.content} keyboardShouldPersistTaps="handled"
       ItemSeparatorComponent={() => <View style={workStyles.separator} />}
-      renderItem={({ item }) => <ChatMessage item={item} onOpen={onOpen} process
+      renderItem={({ item }) => <ChatMessage item={item} onOpen={onOpen} process onQuote={onClose}
         running={running && item.status !== 'completed'} />} />
   </BottomSheet>;
 }

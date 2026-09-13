@@ -4,7 +4,7 @@ import { BottomSheet } from '../components/BottomSheet';
 import { SheetScrollView } from '../components/SheetScrollView';
 import { ChatMarkdown } from './Markdown';
 import { ChatDiff } from './ChatDiff';
-import { CopyTextButton } from './CopyTextButton';
+import { SelectableChatText } from './SelectableChatText';
 import { completedTurnFiles } from './turnPresentation';
 import { turnErrorNotice, type TurnPanel } from './ChatTurnSummary';
 import { requestErrorDetails } from '../../../desktop/src/pages/codexGui/requestError';
@@ -34,8 +34,7 @@ function ErrorDetails({ turn }: { turn: Turn }) {
   const error = turn.error ?? turn.retryError;
   const text = error ? requestErrorDetails(error) : turnErrorNotice(turn);
   return <View style={detailStyles.error}>
-    <Text selectable style={styles.messageText}>{text}</Text>
-    <CopyTextButton text={text} label="复制报错详情" />
+    <SelectableChatText style={styles.messageText} copy={{ text, label: '复制报错详情' }}>{text}</SelectableChatText>
   </View>;
 }
 

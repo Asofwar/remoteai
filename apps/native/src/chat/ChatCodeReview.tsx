@@ -5,8 +5,10 @@ import type { ReviewComment } from '../../../desktop/src/pages/codexGui/messageD
 import { ChatFileContext } from './ChatFilePreview';
 import { reviewLocation } from './markdownContent';
 import { palette, styles } from './styles';
+import { SelectableChatText } from './SelectableChatText';
+import type { CopyAction } from './CopyTextButton';
 
-export function ChatCodeReview({ comment }: { comment: ReviewComment }) {
+export function ChatCodeReview({ comment, copy }: { comment: ReviewComment; copy?: CopyAction }) {
   const openFile = useContext(ChatFileContext);
   const { label, reference } = reviewLocation(comment);
   const open = reference && openFile ? () => openFile(reference) : undefined;
@@ -16,8 +18,10 @@ export function ChatCodeReview({ comment }: { comment: ReviewComment }) {
       <Text selectable style={[reviewStyles.text, reviewStyles.titleText, styles.fill]}>{comment.title}</Text>
     </View>
     <Text selectable style={[reviewStyles.text, reviewStyles.body]}>{comment.body}</Text>
-    <Text selectable={!open} accessibilityRole={open ? 'link' : undefined} onPress={open}
-      style={[reviewStyles.text, open && reviewStyles.link]}>{label}</Text>
+    <SelectableChatText style={reviewStyles.text} copy={copy}>
+      <Text accessibilityRole={open ? 'link' : undefined} onPress={open}
+        style={open && reviewStyles.link}>{label}</Text>
+    </SelectableChatText>
   </View>;
 }
 

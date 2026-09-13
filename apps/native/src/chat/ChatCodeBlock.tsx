@@ -1,30 +1,33 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { CopyTextButton } from './CopyTextButton';
+import type { CopyAction } from './CopyTextButton';
 import { palette, styles } from './styles';
 import { HighlightedCode } from './ChatCodeHighlight';
+import { SelectableChatText } from './SelectableChatText';
 
 const PAGE_CHARS = 12_000;
-interface Props { text: string; label?: string; language?: string; lineNumbers?: boolean; copyLabel?: string }
+interface Props {
+  text: string; label?: string; language?: string; lineNumbers?: boolean; copyLabel?: string; replyCopy?: CopyAction;
+}
 
 /** Limit native text layout work while keeping the entire output available to read and copy. */
 export function ChatCodeBlock({ text, label = '代码', language = '', lineNumbers = false,
-  copyLabel = '复制代码' }: Props) {
+  copyLabel = '复制代码', replyCopy }: Props) {
   const [limit, setLimit] = useState(PAGE_CHARS);
   const [wrap, setWrap] = useState(false);
   const visible = text.slice(0, limit);
   const displayed = lineNumbers
     ? visible.split('\n').map((line, index) => `${index + 1}  ${line}`).join('\n') : visible;
-  const content = <Text selectable style={[styles.code, codeStyles.content]}>
-    <HighlightedCode text={displayed || '（空文件）'} language={language} />
-  </Text>;
+  const actions = [{ text, label: copyLabel }, ...replyCopy ? [replyCopy] : []];
+  const content = <SelectableChatText style={[styles.code, codeStyles.content]} copy={actions}>
+    <HighlightedCode text={displayed.trimEnd() || '（空文件）'} language={language} />
+  </SelectableChatText>;
   return <View style={codeStyles.block}>
     <View style={codeStyles.toolbar}>
       <Text style={[codeStyles.label, styles.fill]}>{label}</Text>
       <Pressable accessibilityRole="button" accessibilityLabel="自动换行" accessibilityState={{ selected: wrap }}
         onPress={() => setWrap(!wrap)} style={codeStyles.action}>
         <Text style={[codeStyles.label, wrap && codeStyles.selected]}>自动换行</Text></Pressable>
-      <CopyTextButton text={text} label={copyLabel} />
     </View>
     <ScrollView nestedScrollEnabled style={codeStyles.viewport}>
       {wrap ? content : <ScrollView horizontal nestedScrollEnabled>{content}</ScrollView>}

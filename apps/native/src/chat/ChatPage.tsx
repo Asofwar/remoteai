@@ -8,6 +8,7 @@ import { ChatOverlay } from './ChatOverlay';
 import { ChatQueue } from './ChatQueue';
 import { queueProps } from '../../../../shared/remote-chat/client/queueProps';
 import { ChatMessages } from './ChatMessages';
+import { ChatQuotesProvider } from './ChatQuotes';
 import { ChatProcessing } from './ChatProcessing';
 import { ChatImageContext } from './ChatImage';
 import { ChatImagePreviewProvider } from './ChatImagePreview';
@@ -105,7 +106,9 @@ function ConnectedChat({ session, device, devices, active, chooseDevice, notific
     });
     return () => subscription.remove();
   }, [active, drawer, pickingDevice, state.selected?.id, state.sending, controller]);
-  return <ChatDrawer ref={drawerRef} enabled={active && !pickingDevice}
+  return <ChatQuotesProvider active={active} scope={state.selected?.id ?? null}
+    enabled={active && !state.selectedArchived}>
+  <ChatDrawer ref={drawerRef} enabled={active && !pickingDevice}
     onOpen={() => setDrawer(true)} onMoving={() => setDrawer(true)} onClose={closed}
     navigation={<ChatThreads state={state} controller={controller} newChat={newChat}
       openSearch={() => setSearching(true)}
@@ -166,5 +169,5 @@ function ConnectedChat({ session, device, devices, active, chooseDevice, notific
     {searching && active && <ChatSearch state={state} controller={controller} onClose={() => setSearching(false)}
       select={(thread) => { setSearching(false); closeDrawer(() => { void controller.select(thread); }); }} />}
     </ChatOverlay>
-  </KeyboardAvoidingView></ChatDrawer>;
+  </KeyboardAvoidingView></ChatDrawer></ChatQuotesProvider>;
 }

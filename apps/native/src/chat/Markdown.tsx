@@ -9,10 +9,16 @@ import type { MarkdownNode } from './markdownTree';
 import { markdownContent } from './markdownContent';
 import { markdownStyles } from './Markdown.styles';
 import { styles } from './styles';
+import { SelectableChatText } from './SelectableChatText';
+import type { CopyAction } from './CopyTextButton';
 
 const PAGE_BLOCKS = 60;
 const PARAGRAPH_TYPES = new Set(['paragraph_open', 'heading_open', 'inline']);
 const LIST_TYPES = new Set(['bullet_list_open', 'ordered_list_open']);
+
+function childContext(context: MarkdownContext, index: number, length: number): MarkdownContext {
+  return { ...context, copy: index === length - 1 ? context.copy : undefined };
+}
 
 /** Paginate native views, not source text: cutting Markdown midway corrupts tables and code fences. */
 function MarkdownPage<Node>({ nodes, render }: {
@@ -42,23 +48,24 @@ function List({ node, context }: { node: MarkdownNode; context: MarkdownContext 
           style={[markdownStyles.checkbox, child.task && markdownStyles.checked]}>
           {child.task && <Text style={markdownStyles.checkmark}>✓</Text>}
         </View>}
-      <View style={styles.fill}><Block node={child} context={context} /></View>
+      <View style={styles.fill}><Block node={child} context={childContext(context, index, node.children.length)} /></View>
     </View>} />
   </View>;
 }
 
-function Code({ node }: { node: MarkdownNode }) {
+function Code({ node, copy }: { node: MarkdownNode; copy?: CopyAction }) {
   const language = node.token.info.trim().split(/\s/)[0].toLowerCase();
   const files = useMemo(() => ['diff', 'patch'].includes(language) ? parseDiff(node.token.content) : [],
     [language, node.token.content]);
-  if (files.length) return <ChatDiff files={files} />;
-  return <ChatCodeBlock text={node.token.content} label={language || '代码'} language={language} />;
+  if (files.length) return <ChatDiff files={files} copy={copy} />;
+  return <ChatCodeBlock text={node.token.content} label={language || '代码'} language={language} replyCopy={copy} />;
 }
 
 function TableRow({ node, context }: { node: MarkdownNode; context: MarkdownContext }) {
   return <View style={markdownStyles.tableRow}>{node.children.map((child, index) => {
     const alignment = String(child.token.attrGet('style') ?? '').match(/text-align:(left|center|right)/)?.[1];
-    return <View key={index} style={markdownStyles.cell}><Block node={child} context={{ ...context,
+    return <View key={index} style={markdownStyles.cell}><Block node={child} context={{
+      ...childContext(context, index, node.children.length),
       compact: true, header: child.token.type === 'th_open',
       textAlign: alignment as TextStyle['textAlign'] }} /></View>;
   })}</View>;
@@ -66,7 +73,7 @@ function TableRow({ node, context }: { node: MarkdownNode; context: MarkdownCont
 
 function Block({ node, context = {} }: { node: MarkdownNode; context?: MarkdownContext }) {
   const { token, children } = node;
-  if (token.type === 'fence' || token.type === 'code_block') return <Code node={node} />;
+  if (token.type === 'fence' || token.type === 'code_block') return <Code node={node} copy={context.copy} />;
   if (PARAGRAPH_TYPES.has(token.type)) {
     const inline = token.type === 'inline' ? children : children.flatMap((child) => child.children);
     return <MarkdownParagraph nodes={inline} heading={token.type === 'heading_open' ? token.tag : undefined}
@@ -75,23 +82,25 @@ function Block({ node, context = {} }: { node: MarkdownNode; context?: MarkdownC
   if (LIST_TYPES.has(token.type)) return <List node={node} context={context} />;
   if (token.type === 'table_open') return <ScrollView horizontal nestedScrollEnabled style={markdownStyles.table}>
     <View><MarkdownPage nodes={children}
-      render={(child, index) => <Block key={index} node={child} context={context} />} />
+      render={(child, index) => <Block key={index} node={child}
+        context={childContext(context, index, children.length)} />} />
     </View>
   </ScrollView>;
   if (token.type === 'tr_open') return <TableRow node={node} context={context} />;
-  if (token.type === 'hr') return <View style={markdownStyles.rule} />;
+  if (token.type === 'hr') return <><View style={markdownStyles.rule} />
+    {context.copy && <SelectableChatText copy={context.copy} />}</>;
   const quote = token.type === 'blockquote_open';
   return <View style={quote ? markdownStyles.quote : undefined}>
     <MarkdownPage nodes={children} render={(child, index) => <Block key={index} node={child}
-      context={quote ? { ...context, muted: true } : context} />} />
+      context={childContext({ ...context, muted: quote || context.muted }, index, children.length)} />} />
   </View>;
 }
 
-export const ChatMarkdown = memo(function ChatMarkdown({ text, tone = 'default' }: {
-  text: string; tone?: 'default' | 'process';
+export const ChatMarkdown = memo(function ChatMarkdown({ text, tone = 'default', copy }: {
+  text: string; tone?: 'default' | 'process'; copy?: CopyAction;
 }) {
   const content = useMemo(() => markdownContent(text), [text]);
   return <View><MarkdownPage nodes={content} render={(entry, index) => entry.type === 'review'
-    ? <ChatCodeReview key={index} comment={entry.comment} />
-    : <Block key={index} node={entry.node} context={{ tone }} />} /></View>;
+    ? <ChatCodeReview key={index} comment={entry.comment} copy={index === content.length - 1 ? copy : undefined} />
+    : <Block key={index} node={entry.node} context={childContext({ tone, copy }, index, content.length)} />} /></View>;
 });

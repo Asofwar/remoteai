@@ -6,10 +6,13 @@ import { ChatImage } from './ChatImage';
 import { hasMarkdownImage, type MarkdownNode } from './markdownTree';
 import { headingStyles, markdownStyles } from './Markdown.styles';
 import { styles } from './styles';
+import { SelectableChatText } from './SelectableChatText';
+import type { CopyAction } from './CopyTextButton';
 
 export interface MarkdownContext {
   muted?: boolean; compact?: boolean; header?: boolean; textAlign?: TextStyle['textAlign'];
   tone?: 'default' | 'process';
+  copy?: CopyAction;
 }
 const INLINE_STYLES = { strong_open: markdownStyles.bold, em_open: markdownStyles.italic,
   s_open: markdownStyles.strike, code_inline: [styles.code, markdownStyles.inlineCode] };
@@ -48,19 +51,22 @@ function paragraphParts(nodes: MarkdownNode[]): MarkdownNode[][] {
 export function MarkdownParagraph({ nodes, heading, context = {} }: {
   nodes: MarkdownNode[]; heading?: string; context?: MarkdownContext;
 }) {
-  return <View>{paragraphParts(nodes).map((part, index) => {
+  const parts = paragraphParts(nodes).filter((part) => part.length);
+  return <View>{parts.map((part, index) => {
     if (!part.length) return null;
     const first = part[0];
-    if (first.token.type === 'image') return <ChatImage key={index}
-      source={String(first.token.attrGet('src') ?? '')} description={first.token.content || '图片'} />;
+    const copy = index === parts.length - 1 ? context.copy : undefined;
+    if (first.token.type === 'image') return <View key={index}><ChatImage
+      source={String(first.token.attrGet('src') ?? '')} description={first.token.content || '图片'} />
+      {copy && <SelectableChatText copy={copy} />}</View>;
     if (hasMarkdownImage(first)) return <MarkdownParagraph key={index}
-      nodes={first.children} heading={heading} context={context} />;
-    return <Text key={index} selectable accessibilityRole={heading ? 'header' : undefined}
+      nodes={first.children} heading={heading} context={{ ...context, copy }} />;
+    return <SelectableChatText key={index} copy={copy} accessibilityRole={heading ? 'header' : undefined}
       style={[styles.messageText, markdownStyles.paragraph, context.compact && markdownStyles.compact,
         context.tone === 'process' && markdownStyles.process,
         context.muted && markdownStyles.muted, (heading || context.header) && markdownStyles.bold,
         heading ? headingStyles[heading] : undefined, { textAlign: context.textAlign }]}>
       <Inline nodes={part} muted={context.muted || context.tone === 'process'} />
-    </Text>;
+    </SelectableChatText>;
   })}</View>;
 }

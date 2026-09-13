@@ -6,6 +6,8 @@ import { BottomSheet } from '../components/BottomSheet';
 import { SheetScrollView } from '../components/SheetScrollView';
 import { ChatDiffContent } from './ChatDiffContent';
 import { palette, styles } from './styles';
+import { SelectableChatText } from './SelectableChatText';
+import type { CopyAction } from './CopyTextButton';
 
 const KINDS: Record<string, string> = { add: '新增', delete: '删除', update: '修改' };
 
@@ -15,7 +17,7 @@ export function DiffCounts({ added, removed }: { added: number; removed: number 
   </View>;
 }
 
-export function ChatDiff({ files }: { files: DiffFile[] }) {
+export function ChatDiff({ files, copy }: { files: DiffFile[]; copy?: CopyAction }) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   // Resolve from incoming props so an open drawer follows live edits.
   const selected = files.find((file, index) => `${file.path}:${index}` === selectedKey);
@@ -30,7 +32,8 @@ export function ChatDiff({ files }: { files: DiffFile[] }) {
       accessibilityLabel={`查看 ${file.path} 的修改`} style={diffStyles.file}
       onPress={() => setSelectedKey(`${file.path}:${index}`)}>
       <Feather name="file-text" size={15} color={palette.muted} />
-      <Text style={[styles.messageText, styles.fill]} numberOfLines={2}>{file.path.split(/[\\/]/).pop()}</Text>
+      <SelectableChatText style={[styles.messageText, styles.fill]}
+        copy={index === files.length - 1 ? copy : undefined}>{file.path.split(/[\\/]/).pop()}</SelectableChatText>
       <Text style={styles.subtitle}>{file.previousPath ? '重命名' : KINDS[file.kind] ?? '修改'}</Text>
       <DiffCounts added={file.added} removed={file.removed} />
       <Feather name="chevron-right" size={15} color={palette.muted} />

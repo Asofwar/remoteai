@@ -1352,7 +1352,7 @@ function SettingsPage({ session, profile, globalRefreshMinutes, onGlobalRefreshM
   </KeyboardAvoidingView>;
 }
 
-type AppPage = 'accounts' | 'devices' | 'chat' | 'totp' | 'admin' | 'settings' | 'about';
+type AppPage = 'accounts' | 'devices' | 'chat' | 'totp' | 'admin' | 'settings' | 'about' | 'token-summary';
 const DEFAULT_APP_PAGE: AppPage = 'chat';
 
 function BottomNavigation({ activePage, onChange }: {
@@ -2277,10 +2277,12 @@ function AppContent() {
   </View>;
   return <SafeAreaView style={[styles.app, activePage === 'chat' && styles.chatCanvas]}>
     <StatusBar style="dark" />
-    <ChatPage session={session} devices={devices} active={activePage === 'chat'}
+    <ChatPage session={session} devices={devices} active={activePage === 'chat' || activePage === 'token-summary'}
+      tokenSummary={activePage === 'token-summary'} openTokenSummary={() => setActivePage('token-summary')}
+      closeTokenSummary={() => setActivePage('chat')}
       notification={chatNotification.target} notificationError={chatNotification.error}
       notificationHandled={chatNotification.handled} />
-    {activePage === 'chat' ? null : activePage === 'accounts'
+    {activePage === 'chat' || activePage === 'token-summary' ? null : activePage === 'accounts'
       ? <Dashboard session={session} accounts={accounts} devices={devices} loading={loading}
         syncingServer={syncingServer} refreshingUsage={refreshingUsage} consumingQuota={consumingQuota}
         refreshingAccountId={refreshingAccountId} switchingAccountId={switchingAccountId}
@@ -2310,7 +2312,7 @@ function AppContent() {
                 onOpenAdmin={() => setActivePage('admin')}
                 onLogout={handleLogout}
                 totpManager={totpManager} />}
-    <BottomNavigation activePage={activePage} onChange={setActivePage} />
+    {activePage !== 'token-summary' && <BottomNavigation activePage={activePage} onChange={setActivePage} />}
   </SafeAreaView>;
 }
 

@@ -15,6 +15,7 @@ import { ChatImagePreviewProvider } from './ChatImagePreview';
 import { ChatFileProvider } from './ChatFilePreview';
 import { ChatThreads } from './ChatThreads';
 import { ChatProfileMenu } from './ChatProfileMenu';
+import { TokenSummaryPage } from '../tokenSummary/TokenSummaryPage';
 import { ChatSearch } from './ChatSearch';
 import { ChatDrawer, type ChatDrawerMethods } from './ChatDrawer';
 import { ChatDevices } from './ChatDevices';
@@ -33,6 +34,7 @@ interface Props {
   session: AuthSession; devices: RemoteDevice[]; active: boolean;
   notification: ChatNotificationTarget | null; notificationError: string;
   notificationHandled: (id: string) => void;
+  tokenSummary: boolean; openTokenSummary: () => void; closeTokenSummary: () => void;
 }
 
 export function ChatPage(props: Props) {
@@ -54,15 +56,17 @@ export function ChatPage(props: Props) {
     {!!backgroundError && <Text accessibilityRole="alert" style={styles.error}>{backgroundError}</Text>}
     {!!notificationError && <Pressable accessibilityRole="button" accessibilityLabel="打开通知设置"
       onPress={() => { void Linking.openSettings(); }}><Text style={styles.error}>{notificationError}</Text></Pressable>}
-    <ConnectedChat key={`${session.baseUrl}:${session.email}:${device?.deviceId ?? ''}`} session={session}
+    <ConnectedChat key={`${session.baseUrl}:${session.email}:${device?.deviceId ?? ''}`} {...props} session={session}
       device={device} devices={devices} active={active} chooseDevice={chooseDevice}
       notification={notification} notificationError={notificationError} notificationHandled={notificationHandled} />
   </View>;
 }
 
-function ConnectedChat({ session, device, devices, active, chooseDevice, notification, notificationHandled }: Props & {
+function ConnectedChat({ session, device, devices, active: pageActive, chooseDevice, notification, notificationHandled,
+  tokenSummary, openTokenSummary, closeTokenSummary }: Props & {
   device?: RemoteDevice; chooseDevice: (id: string) => void;
 }) {
+  const active = pageActive && !tokenSummary;
   const { state, controller, foreground, catalog } = useChat(session, device?.deviceId ?? '', Boolean(device));
   useChatCompletionNotifications(controller, session, device?.deviceId ?? '');
   useOpenChatNotification({ controller, target: notification?.deviceId === device?.deviceId ? notification : null,
@@ -106,7 +110,11 @@ function ConnectedChat({ session, device, devices, active, chooseDevice, notific
     });
     return () => subscription.remove();
   }, [active, drawer, pickingDevice, state.selected?.id, state.sending, controller]);
-  return <ChatQuotesProvider active={active} scope={state.selected?.id ?? null}
+  return <>
+  {tokenSummary && pageActive && <TokenSummaryPage read={controller.readTokenSummary} ready={ready}
+    foreground={foreground} deviceName={device?.name} onBack={closeTokenSummary} />}
+  <View style={[styles.fill, tokenSummary && styles.hidden]}>
+  <ChatQuotesProvider active={active} scope={state.selected?.id ?? null}
     enabled={active && !state.selectedArchived}>
   <ChatDrawer ref={drawerRef} enabled={active && !pickingDevice}
     onOpen={() => setDrawer(true)} onMoving={() => setDrawer(true)} onClose={closed}
@@ -114,6 +122,7 @@ function ConnectedChat({ session, device, devices, active, chooseDevice, notific
       openSearch={() => setSearching(true)}
       profileMenu={<ChatProfileMenu client={controller.guiAccounts} deviceName={device?.name} email={session.email}
         chooseDevice={() => closeDrawer(() => setPickingDevice(true))}
+        openTokenSummary={() => closeDrawer(openTokenSummary)}
         ready={ready} active={active && foreground && drawer && !searching} />}
       select={(thread) => closeDrawer(() => { void controller.select(thread); })} />}>
     <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -170,5 +179,5 @@ function ConnectedChat({ session, device, devices, active, chooseDevice, notific
     {searching && active && <ChatSearch state={state} controller={controller} onClose={() => setSearching(false)}
       select={(thread) => { setSearching(false); closeDrawer(() => { void controller.select(thread); }); }} />}
     </ChatOverlay>
-  </KeyboardAvoidingView></ChatDrawer></ChatQuotesProvider>;
+  </KeyboardAvoidingView></ChatDrawer></ChatQuotesProvider></View></>;
 }

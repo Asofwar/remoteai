@@ -19,6 +19,7 @@ const errors: string[] = [];
 let executions = 0;
 let settingsDelay = 0;
 let historyDelay = 0;
+let tokenSummaryDelay = 0;
 let legacyHistory = false;
 let heartbeats = 0;
 setInterval(() => { heartbeats += 1; }, 20);
@@ -68,10 +69,12 @@ async function receive({ data }: MessageEvent<string>) {
         const isSettings = (message.body as { operation?: string } | undefined)?.operation === 'composerSet';
         const isHistory = (message.body as { operation?: string } | undefined)?.operation === 'syncHistory';
         const isSkills = (message.body as { operation?: string } | undefined)?.operation === 'skills';
+        const isTokenSummary = (message.body as { operation?: string } | undefined)?.operation === 'tokenSummary';
         const send = () => { void target.send(response).catch((error: unknown) => errors.push(String(error))); };
         if (isSettings && settingsDelay) setTimeout(send, settingsDelay);
         else if (isHistory && historyDelay) setTimeout(send, historyDelay);
         else if (isSkills && demoSkillsDelay()) setTimeout(send, demoSkillsDelay());
+        else if (isTokenSummary && tokenSummaryDelay) setTimeout(send, tokenSummaryDelay);
         else send();
       },
     });
@@ -93,6 +96,7 @@ declare global {
       demoState: typeof demoState; setComposer: (input: unknown) => void; setSidebar: (action: string) => void;
       setSettingsDelay: (milliseconds: number) => void; setHistoryDelay: (milliseconds: number) => void;
       setSkills: typeof setDemoSkills;
+      setTokenSummaryDelay: (milliseconds: number) => void;
       setLegacyHistory: (enabled: boolean) => void };
   }
 }
@@ -101,6 +105,7 @@ window.chatTest = { modes, errors, events, request: (text) => rpc.request('reque
   executions: () => executions, beats: () => heartbeats, demoState,
   setComposer: (input) => { changeDemoComposer(input, link); },
   setSkills: setDemoSkills,
+  setTokenSummaryDelay: (milliseconds) => { tokenSummaryDelay = Math.max(0, Math.min(20000, milliseconds)); },
   setSettingsDelay: (milliseconds) => { settingsDelay = Math.max(0, Math.min(5000, milliseconds)); },
   setHistoryDelay: (milliseconds) => { historyDelay = Math.max(0, Math.min(5000, milliseconds)); },
   setLegacyHistory: (enabled) => { legacyHistory = enabled; },

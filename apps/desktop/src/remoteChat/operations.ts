@@ -18,6 +18,8 @@ import { chatHandshake, validateChatHandshake } from '../../../../shared/remote-
 import { guiConnectionError } from '../../../../shared/remote-chat/connectionErrors';
 import { invoke } from '../api/backend';
 import type { UsageSummary } from '../../../../shared/remote-chat/usage';
+import { TOKEN_SUMMARY_OPERATION } from '../../../../shared/remote-chat/tokenSummary';
+import { readTokenSummary } from './tokenSummary';
 
 const OPERATIONS = new Set([
   'projectDirectories',
@@ -29,6 +31,7 @@ interface Cached {
   fingerprint: string; result: Promise<RpcResponse>; expires: number; completed: boolean; readOnly: boolean;
 }
 const READ_OPERATIONS = new Set([
+  TOKEN_SUMMARY_OPERATION,
   'usageSummary',
   'projectDirectories',
   'textPreview',
@@ -77,6 +80,9 @@ export class ChatOperations {
   private async run(request: RpcRequest): Promise<unknown> {
     if (request.method === 'connect') return this.connect(request.body);
     const body = { ...object(request.body) };
+    if (request.method === 'request' && body.operation === TOKEN_SUMMARY_OPERATION) {
+      return readTokenSummary(body.weeks);
+    }
     if (request.method === 'request' && body.operation === 'usageSummary') {
       return invoke<UsageSummary>('codex_gui_usage_summary');
     }

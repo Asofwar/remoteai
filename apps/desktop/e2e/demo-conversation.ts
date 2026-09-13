@@ -17,6 +17,7 @@ import { demoPlugins, demoProjectFiles } from './demo-attachments';
 import { demoProjectDirectories } from './demo-project-directories';
 import { demoQueueRequest, demoQueueSnapshot, flushDemoQueue } from './demo-queue';
 import { demoGuiAccounts } from './demo-gui-accounts';
+import { demoTokenSummary } from './demo-token-summary';
 import { detailText, seedDemoDetails } from './demo-details';
 
 const images = new RemoteImages();
@@ -55,6 +56,7 @@ export function demoResponse(request: RpcRequest, link: ChatLink): unknown {
   if (request.method === 'connect') return [...approvals.values()].map(({ event }) => event);
   const input = (request.body ?? {}) as Record<string, unknown>;
   operations.push({ ...input, method: request.method });
+  if (input.operation === 'tokenSummary') return demoTokenSummary(input);
   if (request.method === 'respond') return respond(input);
   if (input.operation === 'models') return { data: demoComposer().models, nextCursor: null, composer: demoComposer() };
   if (input.operation === 'skills') return { ...demoSkills(), ...(input.includePlugins ? { plugins: demoPlugins } : {}) };

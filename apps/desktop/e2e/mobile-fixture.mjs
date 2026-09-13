@@ -63,13 +63,17 @@ const httpServer = http.createServer((request, response) => {
     })().catch(() => response.writeHead(400).end('{}'));
     return;
   }
-  if (['/test/settings-delay', '/test/history-delay'].includes(request.url) && request.method === 'POST') {
+  if (['/test/settings-delay', '/test/history-delay', '/test/token-summary-delay'].includes(request.url)
+    && request.method === 'POST') {
     void (async () => {
       let body = '';
       for await (const chunk of request) body += chunk.toString();
-      await page.evaluate(({ milliseconds, history }) => history ? window.chatTest.setHistoryDelay(milliseconds)
-        : window.chatTest.setSettingsDelay(milliseconds), {
-        milliseconds: JSON.parse(body).milliseconds, history: request.url === '/test/history-delay',
+      await page.evaluate(({ milliseconds, route }) => {
+        if (route === '/test/token-summary-delay') window.chatTest.setTokenSummaryDelay(milliseconds);
+        else if (route === '/test/history-delay') window.chatTest.setHistoryDelay(milliseconds);
+        else window.chatTest.setSettingsDelay(milliseconds);
+      }, {
+        milliseconds: JSON.parse(body).milliseconds, route: request.url,
       });
       response.end('{}');
     })().catch(() => response.writeHead(400).end('{}'));

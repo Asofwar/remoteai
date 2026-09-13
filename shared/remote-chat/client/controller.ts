@@ -21,6 +21,7 @@ import { QueueConnection } from './queueConnection';
 import { AsyncAnswers } from './asyncAnswers';
 import { createGuiAccountsClient } from './guiAccounts';
 import type { UsageSummary } from '../usage';
+import { TOKEN_SUMMARY_OPERATION, type ReadTokenSummary } from '../tokenSummary';
 import { initialChatState, type ApprovalReply, type ChatProject, type ChatState, type GuiEvent,
   type ListResponse, type Request, type SendInput, type SkillsResponse, type Thread } from './types';
 
@@ -75,6 +76,8 @@ export class ChatController {
 
   snapshot = () => this.state;
   readUsage = () => this.connection.request<UsageSummary>('request', { operation: 'usageSummary' });
+  readTokenSummary: ReadTokenSummary = (weeks) =>
+    this.connection.request('request', { operation: TOKEN_SUMMARY_OPERATION, weeks });
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
   subscribeEvents = (listener: (event: GuiEvent) => void) => {
     this.eventListeners.add(listener);

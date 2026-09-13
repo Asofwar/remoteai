@@ -9,12 +9,12 @@ import { palette, styles } from './styles';
 
 interface Props {
   client: GuiAccountsClient; deviceName?: string; ready: boolean; active: boolean;
-  email: string; chooseDevice: () => void;
+  email: string; chooseDevice: () => void; openTokenSummary: () => void;
 }
 
 const ACCOUNT_REFRESH_INTERVAL_MS = 60_000;
 
-export function ChatProfileMenu({ client, deviceName, ready, active, email, chooseDevice }: Props) {
+export function ChatProfileMenu({ client, deviceName, ready, active, email, chooseDevice, openTokenSummary }: Props) {
   const [panel, setPanel] = useState<'profile' | 'accounts' | null>(null);
   const [query, setQuery] = useState('');
   const accounts = useGuiAccounts(client, active && ready, panel === 'accounts' ? ACCOUNT_REFRESH_INTERVAL_MS : 0);
@@ -58,6 +58,13 @@ export function ChatProfileMenu({ client, deviceName, ready, active, email, choo
           <Feather name="user" size={22} color={palette.ink} />
           <View style={pickerStyles.copy}><Text style={styles.title}>切换账户</Text>
             <Text numberOfLines={1} style={styles.subtitle}>{name}</Text></View>
+          <Feather name="chevron-right" size={18} color={palette.muted} />
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Token 汇总" style={pickerStyles.option}
+          onPress={() => { setPanel(null); openTokenSummary(); }}>
+          <Feather name="bar-chart-2" size={22} color={palette.ink} />
+          <View style={pickerStyles.copy}><Text style={styles.title}>Token 汇总</Text>
+            <Text style={styles.subtitle}>查看用量趋势与消耗排行</Text></View>
           <Feather name="chevron-right" size={18} color={palette.muted} />
         </Pressable>
       </SheetInset> : <View style={pickerStyles.panel}>

@@ -23,6 +23,7 @@ test("defers closed history and appends long tool output as the mouse scrolls", 
   await expect(page.locator("pre")).toHaveCount(0);
   const process = page.locator("summary[data-history-anchor]");
   await process.click();
+  await page.locator('[data-activity-group="capture"] > details > summary').click();
   await expect(page.locator('[data-message-id="capture"]')).toBeVisible();
   await expect(page.locator("img")).toHaveCount(0);
   await page.locator('[data-message-id="capture"] > details > summary').click();

@@ -11,8 +11,11 @@
 .icon, .toggle { flex-shrink: 0; }
 .preview { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .toggle { opacity: 0; transition: opacity .12s ease, transform .12s ease; }
-.row:hover .toggle, .row:focus-within .toggle, .row[open] .toggle { opacity: 1; }
-.row[open] .toggle { transform: rotate(180deg); }
+.row:hover > .summary > .toggle, .row:focus-within > .summary > .toggle,
+.row[open] > .summary > .toggle { opacity: 1; }
+.row[open] > .summary > .toggle { transform: rotate(180deg); }
+.activityList { display: flex; flex-direction: column; gap: 10px; margin: 7px 0 3px 24px;
+  padding: 4px 0 4px 12px; border-left: 2px solid var(--line); }
 .commandBody, .reasoningBody {
   margin: 7px 0 3px 24px; padding: 10px 14px; border-left: 2px solid var(--line);
   max-height: 600px; overflow: auto; white-space: normal; overflow-wrap: anywhere;
@@ -32,9 +35,11 @@
 .failure { color: #c24047; white-space: pre-wrap; overflow-wrap: anywhere; }
 .emptyBody { color: var(--gui-muted); }
 .outputActions { display: flex; align-items: center; max-width: 400px; color: var(--gui-muted); }
-.row[data-status='inProgress'] .icon { color: var(--green-dark); animation: breathe 1.5s ease-in-out infinite; }
-.row[data-status='inProgress'] .preview { .activeText(); }
-.row[data-status='failed'] .icon { color: #c24047; }
+.row[data-status='inProgress'] > .summary > .icon {
+  color: var(--green-dark); animation: breathe 1.5s ease-in-out infinite;
+}
+.row[data-status='inProgress'] > .summary > .preview { .activeText(); }
+.row[data-status='failed'] > .summary > .icon { color: #c24047; }
 @keyframes breathe { 50% { opacity: .4; } }
 @media (hover: none) { .toggle { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .toggle { transition: none; } .icon { animation: none !important; } }

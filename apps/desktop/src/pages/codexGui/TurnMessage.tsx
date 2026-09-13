@@ -10,6 +10,7 @@ import styles from "./styles.module.less";
 import { GeneratedImages } from "./GeneratedImages";
 import { DeferredDetails } from "./DeferredDetails";
 import { RequestErrorNotice } from "./RequestErrorNotice";
+import { WorkItems } from "./WorkItems";
 import { groupTurnItems } from "../../../../../shared/chat/turnGroups";
 export { groupTurnItems } from "../../../../../shared/chat/turnGroups";
 
@@ -37,9 +38,7 @@ export const TurnMessage = memo(function TurnMessage({ turn, running, active, fo
       {group.type === "work" ? <DeferredDetails className={styles.workGroup} defaultOpen={running}
         summary={<summary data-history-anchor>{running ? "正在处理" : "查看处理过程"}
           <span>{group.items.length} 项活动</span></summary>}>
-        {() => <div className={styles.workItems}>{group.items.map((item) => <div key={item.id} data-message-id={item.id}>
-          <MessageItem item={item} startedAt={turn.startedAt} streaming={running && item.status !== "completed"} />
-        </div>)}</div>}
+        {() => <WorkItems items={group.items} startedAt={turn.startedAt} running={running} />}
       </DeferredDetails> : <div className={styles.messageEntry} data-message-id={group.items[0].id}>
         <MessageItem item={group.items[0]} startedAt={turn.startedAt}
         onEdit={group.items[0].id === editableItemId ? onEdit : undefined} editDisabled={editDisabled}

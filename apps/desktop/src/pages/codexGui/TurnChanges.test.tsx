@@ -75,6 +75,8 @@ it("keeps pending, failed, and declined edits as activities without claiming app
   await render(["inProgress", "failed", "declined"].map((status) => ({ ...edit, id: status, status })));
   expect(cards()).toHaveLength(0);
   expect(container.textContent).toContain("进行中");
+  const group = container.querySelector<HTMLDetailsElement>("[data-activity-group] > details")!;
+  await act(async () => { group.open = true; group.dispatchEvent(new Event("toggle")); });
   expect(container.textContent).toContain("失败");
   expect(container.textContent).toContain("已拒绝");
 });

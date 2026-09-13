@@ -7,14 +7,18 @@ import { palette, styles } from './styles';
 interface Props {
   state: ChatState; newChat: (project?: ChatProject) => void; select: (thread: Thread) => void;
   refresh: () => void; loadMore: () => void;
+  bottomInset: number;
 }
 
-export function ChatThreadList({ state, newChat, select, refresh, loadMore }: Props) {
+const LIST_BOTTOM_SPACING = 16;
+
+export function ChatThreadList({ state, newChat, select, refresh, loadMore, bottomInset }: Props) {
   const { groups, toggle } = useThreadGroups(state);
   const ready = state.ready;
   return (
-    <SectionList sections={groups} keyExtractor={(thread) => thread.id}
-      contentContainerStyle={listStyles.content} stickySectionHeadersEnabled={false} keyboardShouldPersistTaps="handled"
+    <SectionList style={styles.fill} sections={groups} keyExtractor={(thread) => thread.id}
+      contentContainerStyle={[listStyles.content, { paddingBottom: bottomInset + LIST_BOTTOM_SPACING }]}
+      stickySectionHeadersEnabled={false} keyboardShouldPersistTaps="handled"
       refreshing={state.loading} onRefresh={refresh}
       renderSectionHeader={({ section }) => <View style={styles.row}>
         <Text accessibilityRole="header" numberOfLines={1} style={[listStyles.project, styles.fill]}>
@@ -50,7 +54,7 @@ export function ChatThreadList({ state, newChat, select, refresh, loadMore }: Pr
 }
 
 const listStyles = StyleSheet.create({
-  content: { paddingHorizontal: 14, paddingBottom: 16 },
+  content: { paddingHorizontal: 14 },
   project: { color: palette.muted, fontSize: 12, lineHeight: 18, fontWeight: '600',
     paddingHorizontal: 10, marginVertical: 12 },
   add: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },

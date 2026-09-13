@@ -1,6 +1,14 @@
 use super::*;
 use std::{fs, path::PathBuf};
 
+#[test]
+fn applies_configured_limit_to_utf8_bytes() {
+    let fixture = Fixture::new();
+    fs::write(fixture.root().join("small.txt"), "中文").unwrap();
+    assert!(read_text_limited(&fixture.root(), "small.txt", 6).is_ok());
+    assert!(read_text_limited(&fixture.root(), "small.txt", 5).is_err());
+}
+
 struct Fixture(PathBuf);
 impl Fixture {
     fn new() -> Self {

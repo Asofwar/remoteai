@@ -1,3 +1,4 @@
+import { getChatPolicy, MIB } from '../../../../shared/remote-chat/policy';
 import { guiApi } from '../pages/codexGui/api';
 import type { ApprovalReply, GuiEvent, ListResponse, Request, SkillsResponse, Thread } from '../pages/codexGui/types';
 import { object, type RpcRequest, type RpcResponse } from '../../../../shared/remote-chat/protocol';
@@ -75,7 +76,7 @@ export class ChatOperations {
 
   private async run(request: RpcRequest): Promise<unknown> {
     if (request.method === 'connect') return this.connect(request.body);
-    const body = object(request.body);
+    const body = { ...object(request.body) };
     if (request.method === 'request' && body.operation === 'usageSummary') {
       return invoke<UsageSummary>('codex_gui_usage_summary');
     }
@@ -110,6 +111,8 @@ export class ChatOperations {
     }
     // The existing typed Rust boundary validates directories, thread ids, inputs and approval replies.
     const sidebarVersion = guiSidebar.version();
+    if (body.operation === 'list') body.limit = getChatPolicy().threadPageSize;
+    if (body.operation === 'textPreview') body.maxBytes = getChatPolicy().filePreviewMaxMb * MIB;
     const result = await guiApi.request(body as unknown as Request);
     if (body.operation === 'skills') return composerCatalog(result as SkillsResponse, body);
     if (body.operation === 'list') {

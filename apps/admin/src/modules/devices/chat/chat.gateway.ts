@@ -1,11 +1,14 @@
+import { ChatSettingsService } from '../../chat-settings/chat-settings.service';
 import { OnModuleDestroy } from '@nestjs/common';
 import { OnGatewayConnection, OnGatewayDisconnect, WebSocketGateway } from '@nestjs/websockets';
 import type { RawData } from 'ws';
 import WebSocket from 'ws';
 import { ChatAuthService } from './chat-auth.service';
 import { ChatSessions } from './chat-sessions';
-import { CHAT_FRAME_LIMIT, record, type ChatIdentity } from './protocol';
+import { CHAT_FRAME_LIMIT, record, send, type ChatIdentity } from './protocol';
 import { ChatStunService } from './stun.service';
+
+const POLICY_REFRESH_MS = 5000;
 
 interface Connection {
   identity?: ChatIdentity;
@@ -23,7 +26,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
   private readonly sessions = new ChatSessions();
   private readonly heartbeat = setInterval(() => this.tick(), 25_000);
 
-  constructor(private readonly auth: ChatAuthService, private readonly stun: ChatStunService) {
+  private refreshingPolicy = false;
+  private readonly policyTimer = setInterval(() => { void this.refreshPolicy(); }, POLICY_REFRESH_MS);
+
+  constructor(private readonly auth: ChatAuthService, private readonly stun: ChatStunService,
+    private readonly settings: ChatSettingsService) {
+    this.policyTimer.unref();
     this.heartbeat.unref();
   }
 
@@ -56,6 +64,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     if (state.authenticating) throw new Error('Authentication pending');
     state.authenticating = true;
     const identity = await this.auth.authenticate(message);
+    const policy = await this.settings.read();
     if (client.readyState !== WebSocket.OPEN || !this.connections.has(client)) return;
     state.identity = identity;
     clearTimeout(state.authTimer);
@@ -63,7 +72,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
       this.sessions.disconnect(client, true);
       client.close(4001, 'Session expired');
     }, identity.expiresAt - Date.now());
+    send(client, { type: 'chat-policy', policy });
     this.sessions.join(client, identity, message, this.stun.iceServers());
+  }
+
+  private async refreshPolicy() {
+    if (this.refreshingPolicy || !this.connections.size) return;
+    this.refreshingPolicy = true;
+    try {
+      const policy = await this.settings.read();
+      for (const [client, state] of this.connections) {
+        if (state.identity && state.identity.expiresAt > Date.now()) send(client, { type: 'chat-policy', policy });
+      }
+    } catch { /* Keep the last confirmed policy during a temporary database outage. */ }
+    finally { this.refreshingPolicy = false; }
   }
 
   private checkRate(state: Connection, size: number) {
@@ -95,6 +117,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
 
   onModuleDestroy() {
     clearInterval(this.heartbeat);
+    clearInterval(this.policyTimer);
     for (const client of this.connections.keys()) {
       this.handleDisconnect(client);
       client.close(1001, 'Server shutting down');

@@ -20,7 +20,9 @@ pub(super) async fn preview(
     client: &Client,
     thread_id: String,
     path: String,
+    max_bytes: Option<u64>,
 ) -> Result<GuiResponse> {
+    let max_bytes = max_bytes.unwrap_or(MAX_TEXT_BYTES).clamp(1, MAX_TEXT_BYTES);
     validate_path(&path)?;
     let response = client
         .request("thread/read", thread_params(thread_id)?)
@@ -29,9 +31,11 @@ pub(super) async fn preview(
         .as_str()
         .ok_or(GuiError::TextPreview)?
         .to_owned();
-    let preview = tauri::async_runtime::spawn_blocking(move || read_text(Path::new(&root), &path))
-        .await
-        .map_err(|_| GuiError::TextPreview)??;
+    let preview = tauri::async_runtime::spawn_blocking(move || {
+        read_text_limited(Path::new(&root), &path, max_bytes)
+    })
+    .await
+    .map_err(|_| GuiError::TextPreview)??;
     Ok(GuiResponse {
         data: serde_json::to_value(preview).map_err(|_| GuiError::TextPreview)?,
     })
@@ -58,7 +62,12 @@ fn validate_path(path: &str) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
 fn read_text(root: &Path, source: &str) -> Result<TextPreview> {
+    read_text_limited(root, source, MAX_TEXT_BYTES)
+}
+
+fn read_text_limited(root: &Path, source: &str, max_bytes: u64) -> Result<TextPreview> {
     validate_path(source)?;
     if !root.is_absolute() {
         return Err(GuiError::TextPreview);
@@ -72,14 +81,14 @@ fn read_text(root: &Path, source: &str) -> Result<TextPreview> {
         return Err(GuiError::TextPreview);
     }
     let file = File::open(&path).map_err(|_| GuiError::TextPreview)?;
-    if file.metadata().map_err(|_| GuiError::TextPreview)?.len() > MAX_TEXT_BYTES {
+    if file.metadata().map_err(|_| GuiError::TextPreview)?.len() > max_bytes {
         return Err(GuiError::TextPreview);
     }
     let mut text = String::new();
-    file.take(MAX_TEXT_BYTES + 1)
+    file.take(max_bytes + 1)
         .read_to_string(&mut text)
         .map_err(|_| GuiError::TextPreview)?;
-    if text.len() as u64 > MAX_TEXT_BYTES || text.contains('\0') {
+    if text.len() as u64 > max_bytes || text.contains('\0') {
         return Err(GuiError::TextPreview);
     }
     Ok(TextPreview {

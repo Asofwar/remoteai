@@ -1,4 +1,6 @@
 import { EventEmitter } from 'events';
+import { DEFAULT_CHAT_POLICY } from '@/modules/chat-settings/chat-policy';
+import type { ChatSettingsService } from '@/modules/chat-settings/chat-settings.service';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type WebSocket from 'ws';
 import { ChatSessions } from '@/modules/devices/chat/chat-sessions';
@@ -82,6 +84,28 @@ describe('chat rendezvous and relay', () => {
 });
 
 describe('chat authentication lifecycle', () => {
+  it('refreshes connected clients without overlapping configuration reads and stops on teardown', async () => {
+    vi.useFakeTimers();
+    const auth = { authenticate: async () => identity('desktop') } as unknown as ChatAuthService;
+    const read = vi.fn().mockResolvedValue(DEFAULT_CHAT_POLICY);
+    const gateway = new ChatGateway(auth, new ChatStunService(), { read } as unknown as ChatSettingsService);
+    const socket = new Socket();
+    gateway.handleConnection(socket.ws());
+    socket.emit('message', Buffer.from('{"type":"authenticate"}'), false);
+    await vi.advanceTimersByTimeAsync(0);
+    let finish: (policy: typeof DEFAULT_CHAT_POLICY) => void = () => undefined;
+    read.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(read).toHaveBeenCalledTimes(2);
+    const updated = { ...DEFAULT_CHAT_POLICY, historyPageSize: 4 };
+    finish(updated);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(socket.sent.at(-1)).toEqual({ type: 'chat-policy', policy: updated });
+    gateway.onModuleDestroy();
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(read).toHaveBeenCalledTimes(2);
+  });
+
   it('requires an active user, an unexpired signed token and an owned device', async () => {
     const jwt = { verifyAsync: vi.fn().mockResolvedValue({ sub: 'owner', exp: Date.now() / 1000 + 1000 }) };
     const users = { findActiveById: vi.fn().mockResolvedValue({ id: 'owner' }) };
@@ -103,7 +127,8 @@ describe('chat authentication lifecycle', () => {
     vi.useFakeTimers();
     let finish: (identity: ChatIdentity) => void = () => undefined;
     const auth = { authenticate: vi.fn().mockImplementation(() => new Promise((resolve) => { finish = resolve; })) };
-    const gateway = new ChatGateway(auth as unknown as ChatAuthService, new ChatStunService());
+    const settings = { read: async () => ({ ...DEFAULT_CHAT_POLICY }) } as ChatSettingsService;
+    const gateway = new ChatGateway(auth as unknown as ChatAuthService, new ChatStunService(), settings);
     const socket = new Socket();
     gateway.handleConnection(socket.ws());
     socket.emit('message', Buffer.from('{"type":"authenticate"}'), false);
@@ -116,7 +141,9 @@ describe('chat authentication lifecycle', () => {
     gateway.handleConnection(active.ws());
     active.emit('message', Buffer.from('{"type":"authenticate"}'), false);
     await Promise.resolve();
+    await Promise.resolve();
     expect(active.sent).toContainEqual({ type: 'registered' });
+    expect(active.sent).toContainEqual({ type: 'chat-policy', policy: DEFAULT_CHAT_POLICY });
     await vi.advanceTimersByTimeAsync(2001);
     expect(active.close).toHaveBeenCalled();
     gateway.onModuleDestroy();

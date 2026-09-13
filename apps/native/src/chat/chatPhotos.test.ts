@@ -2,14 +2,26 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_CHAT_PHOTOS, MAX_PHOTO_DATA_CHARS, PhotoPermissionError,
   preparePhoto, selectPhotos, validatePhotos } from './chatPhotos';
 import type { ImagePickerAsset } from 'expo-image-picker';
+import { DEFAULT_CHAT_POLICY, setChatPolicy } from '../../../../shared/remote-chat/policy';
 
 const mocks = vi.hoisted(() => ({ library: vi.fn(), camera: vi.fn(), permission: vi.fn(), manipulate: vi.fn() }));
 vi.mock('expo-image-picker', () => ({ launchImageLibraryAsync: mocks.library,
   launchCameraAsync: mocks.camera, requestCameraPermissionsAsync: mocks.permission }));
 vi.mock('expo-image-manipulator', () => ({ manipulateAsync: mocks.manipulate, SaveFormat: { JPEG: 'jpeg' } }));
-beforeEach(() => vi.resetAllMocks());
+vi.mock('expo-file-system', () => ({ getInfoAsync: async () => ({ exists: true, size: 100 }) }));
+beforeEach(() => { vi.resetAllMocks(); setChatPolicy(DEFAULT_CHAT_POLICY); });
 
 describe('chat photos', () => {
+  it('uses updated source and resize limits before processing a selected photo', async () => {
+    setChatPolicy({ ...DEFAULT_CHAT_POLICY, imageSourceMaxMb: 1, imageMaxEdge: 512, imageTargetKb: 32 });
+    const asset = { uri: 'content://photos/selected', width: 2000, height: 1000, fileSize: 1024 * 1024 + 1 };
+    await expect(preparePhoto(asset)).rejects.toThrow('1 MB');
+    expect(mocks.manipulate).not.toHaveBeenCalled();
+    mocks.manipulate.mockResolvedValue({ uri: 'file:///cache/photo.jpg', base64: 'YQ==' });
+    await preparePhoto({ ...asset, fileSize: 100 });
+    expect(mocks.manipulate).toHaveBeenCalledWith(asset.uri, [{ resize: { width: 512 } }],
+      { format: 'jpeg', compress: 0.8, base64: true });
+  });
   it('uses the system photo picker without requesting broad access and preserves cancellation', async () => {
     mocks.library.mockResolvedValue({ canceled: true, assets: null });
     expect(await selectPhotos('library', 3)).toEqual({ canceled: true, assets: null });

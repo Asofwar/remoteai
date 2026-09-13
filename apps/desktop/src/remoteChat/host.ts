@@ -1,4 +1,5 @@
 import { guiApi } from '../pages/codexGui/api';
+import { CHAT_POLICY_MESSAGE, setChatPolicy } from '../../../../shared/remote-chat/policy';
 import { keyPair } from '../../../../shared/remote-chat/cipher';
 import { ChatLink } from '../../../../shared/remote-chat/link';
 import { RtcPeer } from '../../../../shared/remote-chat/rtcPeer';
@@ -157,6 +158,7 @@ export class ChatHost {
 
   private async receive(data: string) {
     const message = parseMessage(data);
+    if (message.type === CHAT_POLICY_MESSAGE) { setChatPolicy(message.policy); return; }
     if (message.type === 'registered') { clearTimeout(this.handshakeTimer); return; }
     const sessionId = message.sessionId;
     if (typeof sessionId !== 'string') return;

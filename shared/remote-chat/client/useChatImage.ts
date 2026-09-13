@@ -9,8 +9,9 @@ export interface ImagePreviewOptions {
 
 export function useChatImage(source: string | undefined, options: ImagePreviewOptions | null) {
   const network = source && /^https?:\/\//i.test(source) ? source : undefined;
-  const local = source ? (localImageSource(source) ?? (options?.load ? network : undefined)) : undefined;
-  const remote = source && (isInlineImage(source) || (network && !local)) ? source : undefined;
+  const local = source ? (localImageSource(source)
+    ?? (options?.load && (network || isInlineImage(source)) ? source : undefined)) : undefined;
+  const remote = source && !local && (isInlineImage(source) || network) ? source : undefined;
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{ key: string; url?: string; failed?: boolean }>();
   const [failedKey, setFailedKey] = useState<string>();

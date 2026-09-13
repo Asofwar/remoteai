@@ -1,3 +1,4 @@
+import { base64Bytes, checkDownloadSize } from '../../../../shared/remote-chat/policy';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
@@ -20,6 +21,7 @@ async function requestSavePermission() {
 async function prepareImage(source: string, directory: string) {
   const inline = /^data:(image\/(?:png|jpeg|webp|gif));base64,([a-z0-9+/=]+)$/i.exec(source);
   if (inline) {
+    checkDownloadSize(base64Bytes(source));
     const mime = inline[1].toLowerCase();
     const uri = `${directory}image.${EXTENSIONS[mime]}`;
     await FileSystem.writeAsStringAsync(uri, inline[2], { encoding: FileSystem.EncodingType.Base64 });
@@ -30,6 +32,9 @@ async function prepareImage(source: string, directory: string) {
   const header = Object.entries(download.headers).find(([name]) => name.toLowerCase() === 'content-type');
   const mime = header?.[1].split(';')[0].trim().toLowerCase() ?? '';
   if (download.status !== 200 || !EXTENSIONS[mime]) throw new Error('Invalid image response');
+  const info = await FileSystem.getInfoAsync(download.uri);
+  if (!info.exists || info.isDirectory) throw new Error('图片暂时无法保存，请重试。');
+  checkDownloadSize(info.size);
   const uri = `${directory}image.${EXTENSIONS[mime]}`;
   await FileSystem.moveAsync({ from: download.uri, to: uri });
   return { uri, mime };

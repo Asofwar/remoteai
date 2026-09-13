@@ -1,5 +1,16 @@
 use super::*;
 
+#[test]
+fn rejects_images_above_the_configured_limit_before_rendering() {
+    let source = "data:image/png;base64,YWI=".to_string();
+    let options = |limit| PreviewOptions {
+        variant: super::super::image_thumbnail::ImageVariant::Original,
+        max_bytes: Some(limit),
+    };
+    assert!(render_limited(source.clone(), options(1)).is_err());
+    assert_eq!(render_limited(source.clone(), options(2)).unwrap(), source);
+}
+
 struct Fixture(PathBuf);
 
 impl Fixture {

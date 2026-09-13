@@ -13,7 +13,7 @@ it('passes scoped text previews to the desktop and retains safe failure messages
   const operations = new ChatOperations();
   expect(await operations.execute({ kind: 'request', id: 'file:1', method: 'request', body }))
     .toMatchObject({ data });
-  expect(guiApi.request).toHaveBeenCalledWith(body);
+  expect(guiApi.request).toHaveBeenCalledWith({ ...body, maxBytes: 2 * 1024 * 1024 });
   expect(await operations.execute({ kind: 'request', id: 'file:2', method: 'request', body }))
     .toMatchObject({ error: '文件暂时无法读取。' });
 });

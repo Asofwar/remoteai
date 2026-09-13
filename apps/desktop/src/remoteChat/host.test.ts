@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ConnectionMode } from '../../../../shared/remote-chat/protocol';
 import { ChatHost } from './host';
 import { mobileConnection } from './mobileConnection';
+import { DEFAULT_CHAT_POLICY, getChatPolicy, setChatPolicy } from '../../../../shared/remote-chat/policy';
 
 const links = vi.hoisted(() => new Map<string, { mode: (mode: ConnectionMode) => void; close: () => void }>());
 vi.mock('../pages/codexGui/api', () => ({ guiApi: { subscribe: vi.fn(async () => vi.fn()) } }));
@@ -34,7 +35,18 @@ beforeEach(() => {
   host = new ChatHost({ websocketUrl: 'ws://localhost', accessToken: 'test', deviceId: 'pc' },
     mobileConnection.setConnected);
 });
-afterEach(() => { host.close(); vi.unstubAllGlobals(); });
+afterEach(() => { host.close(); setChatPolicy(DEFAULT_CHAT_POLICY); vi.unstubAllGlobals(); });
+
+it('accepts configuration from the coordinator before pairing and while a direct session is active', async () => {
+  const policy = { ...DEFAULT_CHAT_POLICY, threadPageSize: 6 };
+  socket.onmessage?.({ data: JSON.stringify({ type: 'chat-policy', policy }) });
+  expect(getChatPolicy().threadPageSize).toBe(6);
+  await receive('peer-open', 'phone');
+  links.get('phone')!.mode('direct');
+  socket.onmessage?.({ data: JSON.stringify({ type: 'chat-policy', policy: { ...policy, threadPageSize: 9 } }) });
+  expect(getChatPolicy().threadPageSize).toBe(9);
+  expect(mobileConnection.getSnapshot()).toBe(true);
+});
 
 async function receive(type: string, sessionId: string) {
   socket.onmessage?.({ data: JSON.stringify({ type, sessionId, publicKey: 'test', iceServers: [] }) });

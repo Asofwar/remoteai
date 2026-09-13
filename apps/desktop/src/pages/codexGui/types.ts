@@ -188,12 +188,12 @@ export type ApprovalReply = {
   answers?: Record<string, { answers: string[] }>;
 };
 export type Request =
-  | { operation: "textPreview"; threadId: string; path: string }
+  | { operation: "textPreview"; threadId: string; path: string; maxBytes?: number }
   | ({ operation: "projectFiles" } & import('../../../../../shared/remote-chat/projectFiles').ProjectFilesRequest)
   | { operation: "projectDirectories"; directory: string }
   | { operation: "editMessage"; threadId: string; turnId: string; itemId: string; text: string;
       model?: string; effort?: string; access: AccessMode; cwd?: string }
-  | { operation: "imagePreview"; threadId: string; source: string; variant?: "thumbnail" | "original" }
+  | { operation: "imagePreview"; threadId: string; source: string; variant?: "thumbnail" | "original"; maxBytes?: number }
   | { operation: "goalGet" | "goalClear"; threadId: string }
   | { operation: "goalSet"; threadId: string; objective?: string; status: "active" | "paused" }
   | { operation: "plugins"; cwd?: string }
@@ -203,7 +203,7 @@ export type Request =
       skills: SkillReference[]; attachments?: AttachmentReference[] }
   | { operation: "skills"; cwd?: string }
   | { operation: "models"; cursor?: string }
-  | { operation: "list"; cursor?: string; archived: boolean; search?: string }
+  | { operation: "list"; cursor?: string; archived: boolean; search?: string; limit?: number }
   | { operation: "start"; cwd?: string; model?: string; access: AccessMode }
   | { operation: "resume"; threadId: string; access: AccessMode; cwd?: string }
   | { operation: "send"; threadId: string; text: string; images: string[]; access: AccessMode;

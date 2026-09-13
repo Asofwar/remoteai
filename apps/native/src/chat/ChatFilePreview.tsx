@@ -27,7 +27,7 @@ function FilePreview({ file, threadId, ready, load, close }: Omit<Props, 'childr
     let cancelled = false;
     setError(''); setResult(undefined);
     void load(threadId, file.path).then((value) => { if (!cancelled) setResult(value); }, () => {
-      if (!cancelled) setError('文件暂时无法读取，请确认文件仍在当前项目中，且为不超过 2 MB 的文本文件。');
+      if (!cancelled) setError('文件暂时无法读取，请确认文件仍在当前项目中，且大小未超过查看上限。');
     });
     return () => { cancelled = true; };
   }, [threadId, ready, load, file.path, attempt]);

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { DownloadPolicyError } from '../../../../shared/remote-chat/policy';
 import { ImageSavePermissionError, saveImage } from './saveImage';
 
 export function useSaveImage(url: string | undefined) {
@@ -21,7 +22,7 @@ export function useSaveImage(url: string | undefined) {
       await saveImage(url);
       if (mounted.current) setMessage('已保存到相册');
     } catch (error) {
-      if (mounted.current) setMessage(error instanceof ImageSavePermissionError
+      if (mounted.current) setMessage(error instanceof ImageSavePermissionError || error instanceof DownloadPolicyError
         ? error.message : '保存失败，请重试');
     } finally {
       busy.current = false;

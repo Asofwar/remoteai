@@ -1,3 +1,4 @@
+import { getChatPolicy } from './policy';
 import type { Thread } from './client/types';
 import type { HistoryDelta } from './historySync';
 
@@ -35,8 +36,9 @@ export function sliceHistory(thread: Thread, window: HistoryWindow = {}): { thre
     if (index >= 0) anchor = count + index;
     count += turn.items.length;
   }
-  const start = anchor < 0 ? Math.max(0, count - HISTORY_PAGE_SIZE)
-    : Math.max(0, anchor - (window.older ? HISTORY_PAGE_SIZE : 0));
+  const pageSize = getChatPolicy().historyPageSize;
+  const start = anchor < 0 ? Math.max(0, count - pageSize)
+    : Math.max(0, anchor - (window.older ? pageSize : 0));
   let offset = 0;
   const selected = turns.flatMap((turn) => {
     const from = Math.max(0, start - offset);

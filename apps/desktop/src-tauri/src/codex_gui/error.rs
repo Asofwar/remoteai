@@ -1,6 +1,6 @@
 #[derive(Debug, thiserror::Error)]
 pub(super) enum GuiError {
-    #[error("文件暂时无法读取，请确认文件仍在当前项目中，且为不超过 2 MB 的文本文件。")]
+    #[error("文件暂时无法读取，请确认文件仍在当前项目中，且大小未超过查看上限。")]
     TextPreview,
     #[error("文件暂时无法添加，请确认单个文件不超过 2 MB 后重试。")]
     Attachment,

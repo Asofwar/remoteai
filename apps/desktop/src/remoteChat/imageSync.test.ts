@@ -16,7 +16,7 @@ it('replaces inline and generated originals with stable references scoped to the
   vi.mocked(guiApi.request).mockResolvedValue({ url: 'data:image/jpeg;base64,YQ==' });
   await images.request({ operation: 'imagePreview', threadId: 'task', source: prepared.result });
   expect(guiApi.request).toHaveBeenCalledWith({ operation: 'imagePreview', threadId: 'task',
-    source: original, variant: 'thumbnail' });
+    source: original, variant: 'thumbnail', maxBytes: 20 * 1024 * 1024 });
   vi.mocked(guiApi.request).mockResolvedValue({ thread: { id: 'other', turns: [] } });
   await expect(images.request({ operation: 'imagePreview', threadId: 'other', source: prepared.result })).rejects.toThrow();
 });

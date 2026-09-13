@@ -1,6 +1,7 @@
 import { createContext, useContext, useState } from 'react';
 import { useChatImage, type ImagePreviewOptions } from '../../../../shared/remote-chat/client/useChatImage';
 import { ImageViewer } from '../../../../shared/chat/ImageViewer';
+import { downloadChatImage } from './downloadImage';
 
 export const ChatImageContext = createContext<ImagePreviewOptions | null>(null);
 
@@ -17,6 +18,6 @@ export function ChatImage({ source, description = '图片' }: { source?: string;
         referrerPolicy="no-referrer" onError={image.fail} />
     </button>
     {preview && <ImageViewer key={image.key} thumbnail={image.url} description={description}
-      load={image.original} close={() => setPreview(false)} />}
+      load={image.original} download={downloadChatImage} close={() => setPreview(false)} />}
   </>;
 }

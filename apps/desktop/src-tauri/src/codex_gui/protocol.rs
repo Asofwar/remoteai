@@ -10,6 +10,7 @@ use super::prompt::{
 };
 
 const PAGE_SIZE: u32 = 50;
+const MAX_PAGE_SIZE: u32 = 100;
 
 #[derive(Debug, Deserialize)]
 #[serde(
@@ -21,6 +22,7 @@ pub(crate) enum GuiRequest {
     TextPreview {
         thread_id: String,
         path: String,
+        max_bytes: Option<u64>,
     },
     ProjectFiles(super::project_files::ProjectFilesRequest),
     ProjectDirectories {
@@ -32,6 +34,7 @@ pub(crate) enum GuiRequest {
         source: String,
         #[serde(default)]
         variant: super::image_thumbnail::ImageVariant,
+        max_bytes: Option<u64>,
     },
     Models {
         cursor: Option<String>,
@@ -54,6 +57,7 @@ pub(crate) enum GuiRequest {
         thread_id: String,
     },
     List {
+        limit: Option<u32>,
         cursor: Option<String>,
         archived: bool,
         search: Option<String>,
@@ -226,13 +230,15 @@ impl GuiRequest {
                 Ok(("model/list", json!({"limit": PAGE_SIZE, "cursor": cursor})))
             }
             Self::List {
+                limit,
                 cursor,
                 archived,
                 search,
             } => Ok((
                 "thread/list",
                 json!({
-                    "limit": PAGE_SIZE, "cursor": cursor, "archived": archived, "searchTerm": search,
+                    "limit": limit.unwrap_or(PAGE_SIZE).clamp(1, MAX_PAGE_SIZE),
+                    "cursor": cursor, "archived": archived, "searchTerm": search,
                     "sortKey": "updated_at", "modelProviders": []
                 }),
             )),

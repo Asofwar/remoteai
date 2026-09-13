@@ -1,0 +1,41 @@
+import { describe, expect, it, vi } from 'vitest';
+import type { Repository } from 'typeorm';
+import { REQUIRED_PERMISSIONS } from '@/common/decorators/permissions.decorator';
+import { Permission } from '@/common/rbac/permissions';
+import { DEFAULT_CHAT_POLICY, parseChatPolicy } from '@/modules/chat-settings/chat-policy';
+import { ChatSettingsController } from '@/modules/chat-settings/chat-settings.controller';
+import { ChatSettingsService } from '@/modules/chat-settings/chat-settings.service';
+import { ChatSettingsEntity } from '@/modules/chat-settings/chat-settings.entity';
+import type { AuthUser } from '@/common/decorators/user.decorator';
+
+describe('chat settings', () => {
+  it.each([null, {}, { threadPageSize: '20' }, { historyPageSize: 0 }, { imageTargetKb: 1 },
+    { fileDownloadMaxMb: Infinity }, { imageMaxEdge: 300.5 }])('rejects incomplete or invalid limits: %o', (value) => {
+    const input = value && Object.keys(value).length ? { ...DEFAULT_CHAT_POLICY, ...value } : value;
+    expect(() => parseChatPolicy(input)).toThrow();
+  });
+
+  it('defaults only when no configuration has been saved and commits changes with their audit record', async () => {
+    let saved: ChatSettingsEntity | null = null;
+    const save = vi.fn(async (entity, row) => { if (entity === ChatSettingsEntity) saved = row; });
+    const repository = { findOneBy: async () => saved,
+      manager: { transaction: async (work: (manager: { save: typeof save }) => Promise<void>) => work({ save }) } };
+    const service = new ChatSettingsService(repository as unknown as Repository<ChatSettingsEntity>);
+    expect(await service.read()).toEqual(DEFAULT_CHAT_POLICY);
+    const policy = { ...DEFAULT_CHAT_POLICY, threadPageSize: 7, imageTargetKb: 128 };
+    const actor = { id: 'owner', email: 'owner@example.test' } as AuthUser;
+    expect(await service.update(actor, policy)).toEqual(policy);
+    expect(await service.read()).toEqual(policy);
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(save.mock.calls[1][1]).toMatchObject({ actorId: actor.id, metadata: policy });
+    await expect(service.update(actor, { ...policy, imageSourceMaxMb: 500 })).rejects.toThrow();
+    expect(save).toHaveBeenCalledTimes(2);
+  });
+
+  it('requires distinct read and manage permissions', () => {
+    expect(Reflect.getMetadata(REQUIRED_PERMISSIONS, ChatSettingsController.prototype.read))
+      .toEqual([Permission.ChatSettingsRead]);
+    expect(Reflect.getMetadata(REQUIRED_PERMISSIONS, ChatSettingsController.prototype.update))
+      .toEqual([Permission.ChatSettingsManage]);
+  });
+});

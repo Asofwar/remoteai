@@ -1,3 +1,5 @@
+import { utf8ToBytes } from '@noble/hashes/utils';
+import { checkDownloadSize } from '../../../../shared/remote-chat/policy';
 import { Platform } from 'react-native';
 import { setStringAsync } from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system';
@@ -28,6 +30,7 @@ async function saveToSelectedFolder(text: string, filename: string): Promise<Tex
 
 /** Save the complete original UTF-8 text; caller-provided names and filesystem paths are never accepted. */
 export async function saveTextFile(text: string): Promise<TextSaveResult | null> {
+  checkDownloadSize(utf8ToBytes(text).length);
   if (Platform.OS !== 'android') throw new Error('Text file export is unavailable');
   const filename = `CodexSwitch-output-${randomUUID()}.txt`;
   if (Number(Platform.Version) < SCOPED_STORAGE_API) return saveToSelectedFolder(text, filename);

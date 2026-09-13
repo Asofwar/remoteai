@@ -1,3 +1,4 @@
+import { CHAT_POLICY_MESSAGE, setChatPolicy } from '../policy';
 import { keyPair } from '../cipher';
 import { ChatLink } from '../link';
 import { ChatRpc } from '../rpc';
@@ -129,6 +130,7 @@ export class ChatConnection {
 
   private async receive(data: string, keys: ReturnType<typeof keyPair>) {
     const message = parseMessage(data);
+    if (message.type === CHAT_POLICY_MESSAGE) { setChatPolicy(message.policy); return; }
     if (message.type === 'paired' && typeof message.sessionId === 'string') {
       this.socketAuthenticated = true;
       if (message.transportVersion === 2 && typeof message.resumeToken === 'string') {

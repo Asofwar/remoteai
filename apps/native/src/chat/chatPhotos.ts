@@ -1,11 +1,12 @@
+import { getInfoAsync } from 'expo-file-system';
+import { base64Bytes, getChatPolicy, MIB } from '../../../../shared/remote-chat/policy';
+import { compressChatImage, ImagePolicyError } from '../../../../shared/remote-chat/compressImage';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
 export const MAX_CHAT_PHOTOS = 8;
 // Keep room for the text and encryption envelope within the remote chat message limit.
 export const MAX_PHOTO_DATA_CHARS = 4 * 1024 * 1024;
-const MAX_PHOTO_EDGE = 2048;
-const PHOTO_QUALITY = 0.8;
 const PICKER_OPTIONS: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 1 };
 
 export interface ChatPhoto { id: string; uri: string; dataUrl: string }
@@ -29,13 +30,25 @@ export async function selectPhotos(source: PhotoSource, remaining: number) {
 }
 
 export async function preparePhoto(asset: ImagePicker.ImagePickerAsset): Promise<ChatPhoto> {
-  const resize = asset.width >= asset.height ? { width: MAX_PHOTO_EDGE } : { height: MAX_PHOTO_EDGE };
-  const actions = Math.max(asset.width, asset.height) > MAX_PHOTO_EDGE ? [{ resize }] : [];
-  // Read the granted local URI in native code and normalize HEIC/other formats for the PC.
-  const photo = await manipulateAsync(asset.uri, actions,
-    { format: SaveFormat.JPEG, compress: PHOTO_QUALITY, base64: true });
-  if (!photo.base64) throw new Error('照片读取失败，请重新选择。');
-  return { id: photo.uri, uri: photo.uri, dataUrl: `data:image/jpeg;base64,${photo.base64}` };
+  const policy = getChatPolicy();
+  let bytes = asset.fileSize;
+  if (bytes === undefined) {
+    const info = await getInfoAsync(asset.uri);
+    if (!info.exists || info.isDirectory) throw new ImagePolicyError('照片读取失败，请重新选择。');
+    bytes = info.size;
+  }
+  if (bytes > policy.imageSourceMaxMb * MIB) {
+    throw new ImagePolicyError(`单张图片不能超过 ${policy.imageSourceMaxMb} MB，请选择较小的图片。`);
+  }
+  return compressChatImage(async (edge, quality) => {
+    const resize = asset.width >= asset.height ? { width: edge } : { height: edge };
+    const actions = Math.max(asset.width, asset.height) > edge ? [{ resize }] : [];
+    const photo = await manipulateAsync(asset.uri, actions,
+      { format: SaveFormat.JPEG, compress: quality, base64: true });
+    if (!photo.base64) throw new ImagePolicyError('照片读取失败，请重新选择。');
+    const value = { id: photo.uri, uri: photo.uri, dataUrl: `data:image/jpeg;base64,${photo.base64}` };
+    return { value, bytes: base64Bytes(value.dataUrl) };
+  }, policy);
 }
 
 export function validatePhotos(photos: ChatPhoto[]) {

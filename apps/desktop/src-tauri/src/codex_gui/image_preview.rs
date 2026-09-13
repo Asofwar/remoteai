@@ -18,11 +18,33 @@ use super::{
 const MAX_IMAGE_BYTES: u64 = 20 * 1024 * 1024;
 const MAX_SOURCE_LENGTH: usize = 4096;
 
+pub(super) struct PreviewOptions {
+    pub variant: super::image_thumbnail::ImageVariant,
+    pub max_bytes: Option<u64>,
+}
+
+fn render_limited(source: String, options: PreviewOptions) -> Result<String> {
+    let limit = options
+        .max_bytes
+        .unwrap_or(MAX_IMAGE_BYTES)
+        .clamp(1, MAX_IMAGE_BYTES);
+    let encoded = source.split_once(',').ok_or(GuiError::ImagePreview)?.1;
+    let padding = encoded
+        .chars()
+        .rev()
+        .take_while(|character| *character == '=')
+        .count();
+    if (encoded.len() * 3 / 4).saturating_sub(padding) as u64 > limit {
+        return Err(GuiError::ImagePreview);
+    }
+    super::image_thumbnail::render(source, options.variant)
+}
+
 pub(super) async fn preview(
     client: &Client,
     thread_id: String,
     source: String,
-    variant: super::image_thumbnail::ImageVariant,
+    options: PreviewOptions,
 ) -> Result<GuiResponse> {
     uuid::Uuid::parse_str(&thread_id).map_err(|_| GuiError::InvalidRequest)?;
     let source = if source.starts_with("https://") || source.starts_with("http://") {
@@ -34,7 +56,7 @@ pub(super) async fn preview(
         // Inline bytes grant no filesystem access; use the same input validation as attachments.
         let data = tauri::async_runtime::spawn_blocking(move || {
             super::images::input(source.clone())?;
-            super::image_thumbnail::render(source, variant)
+            render_limited(source, options)
         })
         .await
         .map_err(|_| GuiError::ImagePreview)??;
@@ -54,7 +76,7 @@ pub(super) async fn preview(
     let data = tauri::async_runtime::spawn_blocking(move || {
         let references = image_references(&response["thread"]);
         let original = read_image(&source, &workspace, &generated, &references)?;
-        super::image_thumbnail::render(original, variant)
+        render_limited(original, options)
     })
     .await
     .map_err(|_| GuiError::ImagePreview)??;

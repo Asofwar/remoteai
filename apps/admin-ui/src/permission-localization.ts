@@ -4,6 +4,8 @@ import type { PermissionDefinition } from "./types";
 type PermissionMetadata = Pick<PermissionDefinition, "group" | "name" | "description">;
 
 const BUILT_IN_PERMISSION_ZH: Record<string, PermissionMetadata> = {
+  "admin.chat-settings.read": { group: "内容", name: "查看聊天设置", description: "查看手机和网页的聊天限制。" },
+  "admin.chat-settings.manage": { group: "内容", name: "管理聊天设置", description: "设置手机和网页的加载条数及图片、文件大小。" },
   "self.accounts.read": {
     group: "自助服务",
     name: "查看自己的账号",

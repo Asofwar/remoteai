@@ -8,6 +8,7 @@ export type MenuKey =
   | "roles"
   | "officialAccounts"
   | "announcement"
+  | "chatSettings"
   | "currency"
   | "codexHomePresets"
   | "emailTemplates"

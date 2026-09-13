@@ -1,3 +1,4 @@
+import { getChatPolicy, MIB } from '../../../../shared/remote-chat/policy';
 import { guiApi } from '../pages/codexGui/api';
 import type { Thread } from '../pages/codexGui/types';
 import { contentHash } from '../../../../shared/remote-chat/historySync';
@@ -62,14 +63,15 @@ export class RemoteImages {
   }
 
   private load(threadId: string, source: string, variant: 'thumbnail' | 'original') {
-    const key = JSON.stringify([threadId, source, variant]);
+    const maxBytes = getChatPolicy().imagePreviewMaxMb * MIB;
+    const key = JSON.stringify([threadId, source, variant, maxBytes]);
     const cached = this.images.get(key);
     if (cached) return Promise.resolve(cached);
     const existing = this.pending.get(key);
     if (existing) return existing;
     const request = this.resolve(threadId, source).then(async (resolved) => {
       const { url } = await guiApi.request<{ url: string }>({ operation: 'imagePreview', threadId,
-        source: resolved, variant });
+        source: resolved, variant, maxBytes });
       const limit = variant === 'thumbnail' ? 100_000 : MAX_ORIGINAL_CHARS;
       if (!isInlineImage(url) || url.length > limit) throw new Error('图片暂时无法加载，请重试。');
       this.images.set(key, url);

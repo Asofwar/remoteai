@@ -134,8 +134,13 @@ pub(crate) async fn codex_gui_request(
 /// Share request validation and typed failures with background GUI operations.
 async fn execute_request(state: &GuiState, request: GuiRequest) -> Result<GuiResponse> {
     let client = connected(state).await?;
-    if let GuiRequest::TextPreview { thread_id, path } = request {
-        return text_preview::preview(&client, thread_id, path).await;
+    if let GuiRequest::TextPreview {
+        thread_id,
+        path,
+        max_bytes,
+    } = request
+    {
+        return text_preview::preview(&client, thread_id, path, max_bytes).await;
     }
     if let GuiRequest::ProjectFiles(options) = request {
         return project_files::list(&client, options).await;
@@ -150,9 +155,16 @@ async fn execute_request(state: &GuiState, request: GuiRequest) -> Result<GuiRes
         thread_id,
         source,
         variant,
+        max_bytes,
     } = request
     {
-        return image_preview::preview(&client, thread_id, source, variant).await;
+        return image_preview::preview(
+            &client,
+            thread_id,
+            source,
+            image_preview::PreviewOptions { variant, max_bytes },
+        )
+        .await;
     }
     let projectless_root = client.projectless_root.clone();
     let response_root = projectless_root.clone();

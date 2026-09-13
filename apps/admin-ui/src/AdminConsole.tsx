@@ -20,6 +20,7 @@ import { LoginView } from "./components/LoginView";
 import { useAuthenticatedApi } from "./hooks/useAuthenticatedApi";
 import { ApprovalsPage } from "./pages/ApprovalsPage";
 import { AnnouncementPage } from "./pages/AnnouncementPage";
+import { ChatSettingsPage } from "./pages/ChatSettingsPage";
 import { CurrencyPage } from "./pages/CurrencyPage";
 import { CodexHomePresetsPage } from "./pages/CodexHomePresetsPage";
 import { AuditLogsPage } from "./pages/AuditLogsPage";
@@ -139,6 +140,7 @@ const emptyAnnouncementClickOverview: AnnouncementClickOverview = {
 };
 
 const menuPermissions: Record<MenuKey, Permission> = {
+  chatSettings: "admin.chat-settings.read",
   dashboard: "admin.dashboard.read",
   myAccounts: "self.accounts.read",
   users: "admin.users.read",
@@ -165,6 +167,7 @@ const menuOrder: MenuKey[] = [
   "officialAccounts",
   "announcement",
   "currency",
+  "chatSettings",
   "codexHomePresets",
   "emailTemplates",
   "skills",
@@ -1298,6 +1301,11 @@ export function AdminConsole({ dark, onThemeChange }: AdminConsoleProps) {
           onDeleteFaq={deleteFaq}
         />
       );
+    }
+
+    if (activeKey === "chatSettings") {
+      return <ChatSettingsPage api={api}
+        canManage={Boolean(profile?.permissions?.includes('admin.chat-settings.manage'))} />;
     }
 
     if (activeKey === "currency") {

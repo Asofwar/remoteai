@@ -4,7 +4,7 @@ import { ImageSavePermissionError, saveImage } from './saveImage';
 const mocks = vi.hoisted(() => ({
   platform: { OS: 'android', Version: 35 },
   disk: { makeDirectoryAsync: vi.fn(), writeAsStringAsync: vi.fn(), downloadAsync: vi.fn(),
-    moveAsync: vi.fn(), deleteAsync: vi.fn() },
+    moveAsync: vi.fn(), deleteAsync: vi.fn(), getInfoAsync: vi.fn() },
   permission: vi.fn(), album: vi.fn(), mediaStore: vi.fn(),
 }));
 vi.mock('react-native', () => ({ Platform: mocks.platform }));
@@ -25,6 +25,7 @@ beforeEach(() => {
   mocks.platform.Version = 35;
   mocks.permission.mockResolvedValue({ granted: true });
   mocks.disk.deleteAsync.mockResolvedValue(undefined);
+  mocks.disk.getInfoAsync.mockResolvedValue({ exists: true, size: 100 });
 });
 
 it('saves original inline bytes to Android Pictures without requesting access to existing photos', async () => {

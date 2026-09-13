@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ChatConnection } from '../../../../shared/remote-chat/client/connection';
 import { CONNECTION_ERRORS } from '../../../../shared/remote-chat/connectionErrors';
+import { DEFAULT_CHAT_POLICY, getChatPolicy, setChatPolicy } from '../../../../shared/remote-chat/policy';
 
 class Socket {
   static instances: Socket[] = [];
@@ -28,7 +29,17 @@ function harness(authorize = vi.fn(async () => session)) {
 }
 
 beforeEach(() => { vi.useFakeTimers(); Socket.instances = []; vi.stubGlobal('WebSocket', Socket); });
-afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(() => { setChatPolicy(DEFAULT_CHAT_POLICY); vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+it('applies coordinator settings without treating them as a session frame', async () => {
+  const { connection, error } = harness();
+  await vi.advanceTimersByTimeAsync(0);
+  const policy = { ...DEFAULT_CHAT_POLICY, imageTargetKb: 64 };
+  Socket.instances[0].onmessage?.({ data: JSON.stringify({ type: 'chat-policy', policy }) });
+  expect(getChatPolicy().imageTargetKb).toBe(64);
+  expect(error).not.toHaveBeenCalled();
+  connection.stop();
+});
 
 it('retries an unresponsive handshake without waiting for the socket close event', async () => {
   const { connection, authorize } = harness();

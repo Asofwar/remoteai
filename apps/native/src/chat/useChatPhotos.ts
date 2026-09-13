@@ -1,3 +1,4 @@
+import { ImagePolicyError } from '../../../../shared/remote-chat/compressImage';
 import { useEffect, useRef, useState } from 'react';
 import { Linking } from 'react-native';
 import { getPendingResultAsync, type ImagePickerResult, type ImagePickerErrorResult } from 'expo-image-picker';
@@ -39,7 +40,7 @@ export function useChatPhotos({ threadId, sending }: { threadId: string | null; 
   const fail = (failure: unknown, current: number) => {
     if (!mounted.current || current !== generation.current) return;
     setSettingsRequired(failure instanceof PhotoPermissionError && !failure.canAskAgain);
-    setError(failure instanceof PhotoPermissionError ? failure.message : '照片添加失败，请减少照片或重新选择后再试。');
+    setError((failure instanceof PhotoPermissionError || failure instanceof ImagePolicyError) ? failure.message : '照片添加失败，请减少照片或重新选择后再试。');
   };
   const finish = () => {
     picking.current = false;

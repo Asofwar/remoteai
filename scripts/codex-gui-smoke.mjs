@@ -58,10 +58,11 @@ model_provider = "gui_fixture"
 approval_policy = "on-request"
 cli_auth_credentials_store = "file"
 [model_providers.gui_fixture]
-name = "Local GUI test"
-base_url = "http://127.0.0.1:${port}/v1"
+name = "Codex GUI"
+base_url = "http://127.0.0.1:${port}/codex-gui/v1"
 wire_api = "responses"
 requires_openai_auth = false
+http_headers = { "x-openai-actor-authorization" = "CODEX_SWITCH_LOCAL_PROXY" }
 supports_websockets = false
 `);
 
@@ -105,6 +106,8 @@ function launch() {
     lines.close();
     for (const { timer } of pending.values()) clearTimeout(timer);
     if (child.exitCode === null) { child.kill(); await once(child, "exit"); }
+    // CLI helpers may inherit these pipes and keep Node alive after the CLI exits.
+    child.stdin.destroy(); child.stdout.destroy(); child.stderr.destroy();
   } };
 }
 
@@ -132,6 +135,8 @@ try {
   assert.ok(Array.isArray(during.data));
   const done = await client.waitFor("turn/completed", (params) => params.turn.id === turn.id);
   assert.equal(done.params.turn.status, "completed");
+  assert.ok(requestBodies.some((body) => body.tools?.some((tool) => tool.name === "image_gen")),
+    "The GUI proxy exposes built-in image generation without a local ChatGPT login");
   assert.ok(requestBodies.some((body) => body.input?.some((item) => item.content?.some((part) =>
     part.type === "input_image" && /^data:image\/(png|jpeg);base64,/.test(part.image_url)))),
   "Pasted image reaches the model request");

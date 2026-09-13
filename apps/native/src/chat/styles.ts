@@ -40,6 +40,13 @@ export const styles = StyleSheet.create({
   messageHeader: { marginBottom: 20 },
   messageFooter: { paddingTop: 20, gap: 12 },
   messageListLoading: { opacity: 0 },
+  scrollToBottom: { position: 'absolute', bottom: 12, alignSelf: 'center', maxWidth: 400,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    minHeight: 44, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 22,
+    backgroundColor: '#fff', borderWidth: 1, borderColor: palette.border,
+    elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+  scrollToBottomPressed: { backgroundColor: palette.pale },
+  scrollToBottomText: { color: palette.ink, fontSize: 13, lineHeight: 20, flexShrink: 1 },
   messageLoadingOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 8 },
   // Leave room for Android's fallback font instead of relying on the exact measured text width.
   messageLoadingText: { width: '100%', maxWidth: 400, paddingHorizontal: 16, textAlign: 'center' },

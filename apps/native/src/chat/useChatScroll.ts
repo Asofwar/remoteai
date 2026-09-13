@@ -37,6 +37,9 @@ export function useChatScroll<Entry extends { id: string } = Item>(
   const [initialPositionReady, setInitialPositionReady] = useState(false);
   const [preservePosition, setPreservePosition] = useState(false);
   const [historyBottomSpace, setHistoryBottomSpace] = useState(0);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const updateScrollButton = () => setShowScrollToBottom(!following.current
+    && contentHeight.current - viewportHeight.current - nativePosition.current >= SCROLL_EDGE_DISTANCE);
   const presentLatest = useCallback(() => {
     if (presented.current || presentFrame.current !== undefined) return;
     // Reveal after native cells and the bottom position agree, never at an estimated virtualization spacer.
@@ -90,6 +93,14 @@ export function useChatScroll<Entry extends { id: string } = Item>(
       - nativeEvent.contentOffset.y < SCROLL_EDGE_DISTANCE;
     setPreservePosition(!following.current);
   };
+  const scrollToBottom = () => {
+    following.current = true;
+    scrolling.current = false;
+    setPreservePosition(false);
+    setHistoryBottomSpace(0);
+    setShowScrollToBottom(false);
+    followLatest();
+  };
   const more = async () => {
     if (loadingOlder.current || loadingMore || !loadOlder) return;
     loadingOlder.current = true;
@@ -118,23 +129,26 @@ export function useChatScroll<Entry extends { id: string } = Item>(
     }
     position.current = top;
     nativePosition.current = top;
+    updateScrollButton();
     presentLatest();
   };
   const onLayout = ({ nativeEvent: { layout } }: LayoutChangeEvent) => {
     if (viewportHeight.current === layout.height) return;
     viewportHeight.current = layout.height;
+    updateScrollButton();
     followLatest();
     presentLatest();
   };
   const onContentSizeChange = (_width: number, height: number) => {
     if (contentHeight.current === height) return;
     contentHeight.current = height;
+    updateScrollButton();
     followLatest();
     presentLatest();
   };
   const beginScroll = () => { scrolling.current = true; };
   return { list, more, preservePosition, historyBottomSpace, initializing: Boolean(latestItemId) && !initialPositionReady,
-    onItemLayout, onFooterLayout, onLayout, onContentSizeChange, onScroll,
+    showScrollToBottom, scrollToBottom, onItemLayout, onFooterLayout, onLayout, onContentSizeChange, onScroll,
     onViewableItemsChanged, viewabilityConfig: VIEWABILITY_CONFIG,
     onScrollBeginDrag: beginScroll, onScrollEndDrag: finishScroll,
     onMomentumScrollBegin: beginScroll, onMomentumScrollEnd: finishScroll };

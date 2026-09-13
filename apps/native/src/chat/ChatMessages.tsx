@@ -49,7 +49,8 @@ function TimelineEntry({ entry, open }: { entry: TurnEntry; open: (selection: Se
 
 export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder }: ChatMessagesProps) {
   const entries = useConversationEntries(thread?.turns ?? []);
-  const { list, more, preservePosition, historyBottomSpace, initializing, onItemLayout, onFooterLayout, ...scrollHandlers }
+  const { list, more, preservePosition, historyBottomSpace, initializing, onItemLayout, onFooterLayout,
+    showScrollToBottom, scrollToBottom, ...scrollHandlers }
     = useChatScroll<TurnEntry>({ hasMore, loading, loadingMore, loadOlder,
       latestItemId: entries.at(-1)?.id, bottomPadding: styles.messages.padding });
   const refresh = useHistoryRefresh(more, loadingMore);
@@ -98,6 +99,12 @@ export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder 
     </View>}
     ListFooterComponent={<View style={[styles.messageFooter, { paddingBottom: historyBottomSpace }]}
       onLayout={onFooterLayout} />} />
+    {showScrollToBottom && !showInitialLoading && entries.length > 0 && <Pressable
+      accessibilityRole="button" accessibilityLabel="回到底部" onPress={scrollToBottom}
+      style={({ pressed }) => [styles.scrollToBottom, pressed && styles.scrollToBottomPressed]}>
+      <Ionicons name="arrow-down" size={18} color={palette.ink} />
+      <Text style={styles.scrollToBottomText}>回到底部</Text>
+    </Pressable>}
     {showInitialLoading && <View style={styles.messageLoadingOverlay}>
       <ActivityIndicator size="small" accessibilityLabel="正在加载聊天记录" />
       <Text style={[styles.subtitle, styles.messageLoadingText]}>正在加载聊天记录…</Text>

@@ -4,8 +4,8 @@ import type { CopyAction } from './CopyTextButton';
 import { palette, styles } from './styles';
 import { HighlightedCode } from './ChatCodeHighlight';
 import { SelectableChatText } from './SelectableChatText';
+import { useCodePagination } from './useCodePagination';
 
-const PAGE_CHARS = 12_000;
 interface Props {
   text: string; label?: string; language?: string; lineNumbers?: boolean; copyLabel?: string; replyCopy?: CopyAction;
 }
@@ -13,7 +13,7 @@ interface Props {
 /** Limit native text layout work while keeping the entire output available to read and copy. */
 export function ChatCodeBlock({ text, label = '代码', language = '', lineNumbers = false,
   copyLabel = '复制代码', replyCopy }: Props) {
-  const [limit, setLimit] = useState(PAGE_CHARS);
+  const { limit, ...pagination } = useCodePagination(text.length);
   const [wrap, setWrap] = useState(false);
   const visible = text.slice(0, limit);
   const displayed = lineNumbers
@@ -29,11 +29,9 @@ export function ChatCodeBlock({ text, label = '代码', language = '', lineNumbe
         onPress={() => setWrap(!wrap)} style={codeStyles.action}>
         <Text style={[codeStyles.label, wrap && codeStyles.selected]}>自动换行</Text></Pressable>
     </View>
-    <ScrollView nestedScrollEnabled style={codeStyles.viewport}>
+    <ScrollView nestedScrollEnabled style={codeStyles.viewport} {...pagination}>
       {wrap ? content : <ScrollView horizontal nestedScrollEnabled>{content}</ScrollView>}
     </ScrollView>
-    {text.length > limit && <Pressable accessibilityRole="button" style={styles.button}
-      onPress={() => setLimit(limit + PAGE_CHARS)}><Text style={styles.buttonText}>显示更多内容</Text></Pressable>}
   </View>;
 }
 

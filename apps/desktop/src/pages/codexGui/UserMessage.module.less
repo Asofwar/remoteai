@@ -38,8 +38,6 @@
     box-shadow: none;
     color: var(--edit-text);
     font: inherit;
-    font-size: 16px;
-    line-height: 24px;
     resize: none;
   }
 }
@@ -51,12 +49,12 @@
   margin-top: auto;
 
   .cancelButton, .sendButton {
-    height: 40px;
-    padding-inline: 14px;
-    border-radius: 14px;
+    height: 32px;
+    padding-inline: 10px;
+    border-radius: 10px;
     box-shadow: none;
-    font-size: 16px;
-    line-height: 24px;
+    font-size: calc(1em + 2px);
+    line-height: 1.25;
     &:focus-visible { outline: 2px solid var(--edit-text); outline-offset: 3px; }
     &:disabled { opacity: 0.45; }
   }

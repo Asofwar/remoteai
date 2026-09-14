@@ -4,6 +4,7 @@ import type { ApprovalReply, GuiEvent, ListResponse, Request, SkillsResponse, Th
 import { object, type RpcRequest, type RpcResponse } from '../../../../shared/remote-chat/protocol';
 import { chunks } from '../../../../shared/remote-chat/framing';
 import { guiComposer } from '../pages/codexGui/composerBridge';
+import { composerThreadId } from '../../../../shared/remote-chat/composer';
 import { guiSidebar } from '../pages/codexGui/sidebarBridge';
 import { historyDelta, parseHistoryVersion } from '../../../../shared/remote-chat/historySync';
 import { RemoteImages } from './images';
@@ -108,10 +109,12 @@ export class ChatOperations {
       const sliced = sliceHistory(acknowledgedMessages.merge(this.liveHistory.merge(thread)), window);
       return { ...historyDelta(this.images.prepare(sliced.thread, thread.id), known), page: sliced.page };
     }
-    if (request.method === 'request' && body.operation === 'composerSet') return guiComposer.update(body.settings);
+    if (request.method === 'request' && body.operation === 'composerSet') {
+      return guiComposer.update(body.settings, composerThreadId(body.threadId));
+    }
     if (request.method === 'request' && body.operation === 'threadRead') return guiSidebar.markRead(body);
     if (request.method === 'request' && body.operation === 'models') {
-      const composer = await guiComposer.read();
+      const composer = await guiComposer.read(composerThreadId(body.threadId));
       return { data: composer.models, nextCursor: null, composer };
     }
     if (request.method === 'respond') {

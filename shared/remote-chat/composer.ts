@@ -4,10 +4,19 @@ import { object } from './protocol';
 export type RequestSpeed = 'normal' | 'fast';
 export interface ComposerSettings { model: string; effort: string; access: AccessMode; speed?: RequestSpeed }
 export const COMPOSER_FIELDS = ['model', 'effort', 'access', 'speed'] as const;
-export interface ComposerSnapshot { models: Model[]; settings: ComposerSettings; revision: number }
+export interface ComposerSnapshot {
+  models: Model[]; settings: ComposerSettings; revision: number;
+  /** Omitted by older hosts; null is the new-conversation draft. */
+  threadId?: string | null;
+}
 export interface ComposerModelsResponse { data: Model[]; nextCursor: string | null; composer?: ComposerSnapshot }
 export const COMPOSER_EVENT = 'chat/composer/updated';
 export const DEFAULT_COMPOSER: ComposerSettings = { model: '', effort: '', access: 'workspace-write' };
+export function composerThreadId(value: unknown): string | null | undefined {
+  if (value === undefined || value === null) return value;
+  if (typeof value === 'string' && /^[a-zA-Z0-9_-]{1,200}$/.test(value)) return value;
+  throw new Error('请选择聊天后重试。');
+}
 export const EFFORT_LABELS: Record<string, string> = {
   none: '无', minimal: '极低', low: '低', medium: '中', high: '高', xhigh: '极高', max: '最高', ultra: 'Ultra',
 };

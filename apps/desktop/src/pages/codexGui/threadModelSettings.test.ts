@@ -67,10 +67,10 @@ it("keeps conversation choices separate and sends the setting restored after swi
   expect(guiApi.request).toHaveBeenCalledWith(expect.objectContaining({ operation: "send", threadId: "a",
     model: "first", effort: "xhigh" }));
   controller.newConversation();
-  expect(controller.getSnapshot().settings).toMatchObject({ model: "second", effort: "low" });
+  expect(controller.getSnapshot().settings).toMatchObject({ model: "first", effort: "xhigh" });
   expect(await controller.send("new", [])).toBe(true);
   await controller.select("b"); await controller.select("created");
-  expect(controller.getSnapshot().settings).toMatchObject({ model: "second", effort: "low" });
+  expect(controller.getSnapshot().settings).toMatchObject({ model: "first", effort: "xhigh" });
 });
 
 it("synchronizes the same conversation across clients and restores it after refresh", async () => {

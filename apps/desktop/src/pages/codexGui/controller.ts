@@ -221,6 +221,10 @@ export class GuiController {
   };
   newConversation = () => {
     ++this.selectionGeneration;
+    if (this.state.selected && !this.state.modelSettingsLoading) {
+      const { model, effort } = this.state.settings;
+      this.modelSettings.change({ model, effort }, null);
+    }
     this.patch({ selected: null, error: "", archived: false });
     void this.modelSettings.select(null);
     if (this.state.connection === "ready") void this.refresh();
@@ -271,10 +275,13 @@ export class GuiController {
   }
 
   private acceptSentThread(thread: Thread, context: {
-    selected: string | null; startedAtMs: number; projectOverride?: string;
+    selected: string | null; startedAtMs: number; projectOverride?: string; settings: Settings;
   }) {
     const { selected, startedAtMs, projectOverride } = context;
-    if (!selected) this.modelSettings.created(thread.id);
+    if (!selected) {
+      const { model, effort } = context.settings;
+      this.modelSettings.created(thread.id, { model, effort });
+    }
     const stillSelected = this.state.selected === selected;
     this.patch({ selected: stillSelected ? thread.id : this.state.selected,
       pendingRequest: { threadId: thread.id, startedAtMs },
@@ -306,7 +313,7 @@ export class GuiController {
         : await guiApi.request<{ thread: Thread }>({ operation: "start", cwd: settings.cwd || undefined,
           model: settings.model || undefined, access: settings.access });
       const { thread } = response;
-      this.acceptSentThread(thread, { selected, startedAtMs, projectOverride });
+      this.acceptSentThread(thread, { selected, startedAtMs, projectOverride, settings });
       // Loaded threads can ignore resume overrides; apply project and access settings to each new turn.
       const { turn } = await guiApi.request<{ turn: Turn }>({ operation: "send", threadId: thread.id,
         text, images, skills, ...(attachments.length ? { attachments } : {}), model: settings.model || undefined,

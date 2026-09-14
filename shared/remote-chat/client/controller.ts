@@ -12,9 +12,8 @@ import { compactUnavailableReason } from './composerCommands';
 import type { ConnectionMode } from '../protocol';
 import { chatApprovals, chatHandshake } from '../handshake';
 import { CONNECTION_ERRORS, guiConnectionError } from '../connectionErrors';
-import { COMPOSER_EVENT, COMPOSER_FIELDS, composerPatch, type ComposerModelsResponse,
-  type ComposerSettings, type ComposerSnapshot } from '../composer';
-import { resolveModelSelection } from '../../../apps/desktop/src/pages/codexGui/modelSelection';
+import { COMPOSER_EVENT, type ComposerSettings, type ComposerSnapshot } from '../composer';
+import { RemoteComposerSettings } from './composerSettings';
 import { SIDEBAR_EVENT, type SidebarSnapshot } from '../sidebar';
 import { emptyQueue, QUEUE_EVENT, type QueueAction, type QueueSnapshot } from '../queue';
 import { QueueConnection } from './queueConnection';
@@ -56,10 +55,9 @@ export class ChatController {
   private historyTimer?: ReturnType<typeof setTimeout>;
   private historyDirty = false;
   private olderQueued = false;
-  private composerRevision = -1;
-  private remoteSettings = this.state.settings;
-  private pendingSettings: Partial<ComposerSettings> = {};
-  private savingSettings = false;
+  private readonly composer = new RemoteComposerSettings({ snapshot: () => this.state,
+    update: (patch) => this.update(patch), ready: () => this.active && this.state.ready,
+    request: (body) => this.connection.request('request', body) });
   private viewing = true;
   private loadedThreadId: string | null = null;
   private readonly reading = new Set<string>();
@@ -98,7 +96,7 @@ export class ChatController {
     this.queueConnection.reset();
     if (mode === 'offline') {
       this.skillGeneration += 1;
-      this.composerRevision = -1;
+      this.composer.reset();
       this.update({ sidebar: { ...this.state.sidebar, revision: -1 } });
       this.update({ queue: { ...this.state.queue, revision: -1 } });
     }
@@ -123,7 +121,7 @@ export class ChatController {
         || !this.state.threads.some((thread) => thread.id === event.params.threadId)) void this.list();
       return;
     }
-    if (event?.method === COMPOSER_EVENT) { this.applyComposer(event.params as unknown as ComposerSnapshot); return; }
+    if (event?.method === COMPOSER_EVENT) { this.composer.receive(event.params as unknown as ComposerSnapshot); return; }
     if (event?.method === SIDEBAR_EVENT) { this.applySidebar(event.params as unknown as SidebarSnapshot); return; }
     if (event?.method === QUEUE_EVENT) { this.applyQueue(event.params as unknown as QueueSnapshot); return; }
     this.state = applyChatEvent(this.state, event);
@@ -173,6 +171,7 @@ export class ChatController {
 
   stop() {
     this.active = false;
+    this.composer.reset();
     this.skillGeneration += 1;
     this.historyReader.reset();
     this.queueConnection.reset();
@@ -200,35 +199,16 @@ export class ChatController {
       if (!this.active || generation !== this.synchronization) return;
       const approvals = chatApprovals(response);
       this.update({ approvals, error: '' });
-      await Promise.all([this.list(), this.loadModels(generation), this.refreshSelected(), this.loadQueue(generation)]);
+      await Promise.all([this.list(), this.composer.load(), this.refreshSelected(), this.loadQueue(generation)]);
       if (this.active && generation === this.synchronization) {
         this.update({ ready: true, connecting: false, retryAt: null });
-        void this.flushSettings();
+        this.composer.retry();
       }
     } catch (error) {
       if (!this.active || generation !== this.synchronization) return;
       this.update({ connecting: false, error: guiConnectionError(error) });
       this.scheduleSynchronization();
     } finally { if (this.synchronizing === generation) this.synchronizing = undefined; }
-  }
-
-  private async loadModels(generation: number) {
-    const result = await this.request<ComposerModelsResponse>({ operation: 'models' });
-    if (!this.active || generation !== this.synchronization) return;
-    if (result.composer) this.applyComposer(result.composer);
-    else {
-      const model = result.data.find((entry) => entry.isDefault) ?? result.data[0];
-      this.update({ models: result.data, settings: { ...this.state.settings,
-        model: model?.model ?? '', effort: model?.defaultReasoningEffort ?? '', ...this.pendingSettings } });
-    }
-  }
-
-  private applyComposer(snapshot: ComposerSnapshot) {
-    if (!snapshot || !Array.isArray(snapshot.models) || !snapshot.settings
-      || !Number.isSafeInteger(snapshot.revision) || snapshot.revision < this.composerRevision) return;
-    this.composerRevision = snapshot.revision;
-    this.remoteSettings = snapshot.settings;
-    this.update({ models: snapshot.models, settings: { ...snapshot.settings, ...this.pendingSettings } });
   }
 
   private applySidebar(sidebar?: SidebarSnapshot) {
@@ -285,47 +265,7 @@ export class ChatController {
       .finally(() => { this.reading.delete(key); });
   }
 
-  async setSettings(settings: Partial<ComposerSettings>) {
-    const patch = composerPatch(settings);
-    if (!Object.keys(patch).length) return;
-    if (patch.model && patch.model !== this.state.settings.model) {
-      const selection = resolveModelSelection(this.state.models, { model: patch.model, effort: patch.effort ?? '' });
-      patch.effort = selection.effort;
-    }
-    this.pendingSettings = { ...this.pendingSettings, ...patch };
-    this.update({ settings: { ...this.state.settings, ...patch }, settingsBusy: true, settingsError: '' });
-    // Editing remains available during reconnects and while the PC acknowledges an earlier choice.
-    void this.flushSettings();
-  }
-
-  private async flushSettings() {
-    if (!this.active || !this.state.ready || this.savingSettings || !Object.keys(this.pendingSettings).length) return;
-    this.savingSettings = true;
-    const settings = { ...this.pendingSettings };
-    const generation = this.synchronization;
-    let accepted = false;
-    try {
-      const result = await this.connection.request<ComposerSnapshot>('request', { operation: 'composerSet', settings });
-      if (generation !== this.synchronization) return;
-      if (!result?.settings || !Number.isSafeInteger(result.revision)) throw new Error('电脑尚未确认设置，请重试。');
-      for (const field of COMPOSER_FIELDS) {
-        if (settings[field] !== undefined && this.pendingSettings[field] === settings[field]) {
-          delete this.pendingSettings[field];
-        }
-      }
-      if (result.revision < this.composerRevision) {
-        this.update({ settings: { ...this.remoteSettings, ...this.pendingSettings } });
-      } else this.applyComposer(result);
-      this.update({ settingsBusy: Object.keys(this.pendingSettings).length > 0, settingsError: '' });
-      accepted = true;
-    } catch (error) {
-      if (generation === this.synchronization) this.update({ settingsError: error instanceof Error
-        ? error.message : '设置尚未保存，请重试。' });
-    } finally {
-      this.savingSettings = false;
-      if (accepted || generation !== this.synchronization) void this.flushSettings();
-    }
-  }
+  async setSettings(settings: Partial<ComposerSettings>) { this.composer.set(settings); }
 
   /** Search without replacing the sidebar list or its pagination. */
   searchThreads = (options: { search: string; archived: boolean; cursor?: string }) =>
@@ -357,7 +297,7 @@ export class ChatController {
     this.update({ selected: this.histories.get(thread.id) ?? thread, draftProject: null,
       selectedArchived: this.state.archived, error: '',
       historyHasMore: this.historyPages.get(thread.id)?.hasMore ?? false });
-    await this.refreshSelected();
+    await Promise.all([this.refreshSelected(), this.composer.select()]);
   }
 
   async loadOlder() {
@@ -418,6 +358,8 @@ export class ChatController {
 
   back(project: ChatProject | null = null) {
     if (this.state.sending) return;
+    const inherit = this.state.selected && this.state.ready && !this.state.settingsBusy
+      ? { model: this.state.settings.model, effort: this.state.settings.effort } : undefined;
     this.rememberHistory();
     this.olderQueued = false;
     this.readGeneration += 1;
@@ -425,6 +367,7 @@ export class ChatController {
     this.loadedThreadId = null;
     this.update({ selected: null, draftProject: project ? { cwd: project.cwd, label: project.label } : null,
       selectedArchived: false, error: '', historyHasMore: false, historyLoading: false, historyLoadingMore: false });
+    void this.composer.select(inherit);
     void this.list();
   }
 
@@ -438,24 +381,29 @@ export class ChatController {
     catch (error) { this.failure(error); return false; }
     if (!this.state.ready) { this.update({ error: '正在连接电脑，请稍候再发送。' }); return false; }
     const generation = this.synchronization;
+    const selection = { ...this.state.settings, model: input.model ?? this.state.settings.model,
+      effort: input.effort ?? this.state.settings.effort, access: input.access };
+    const message = { ...input, ...(selection.model ? { model: selection.model } : {}),
+      ...(selection.effort ? { effort: selection.effort } : {}) };
     this.update({ sending: true, error: '' });
     try {
       let thread = this.state.selected;
       const created = !thread;
       if (!thread) {
-        const result = await this.request<{ thread: Thread }>({ operation: 'start', model: input.model,
+        const result = await this.request<{ thread: Thread }>({ operation: 'start', model: selection.model || undefined,
           access: input.access, cwd: this.state.draftProject?.cwd });
         thread = result.thread;
         this.update({ selected: thread, draftProject: null, selectedArchived: false,
           threads: [thread, ...this.state.threads.filter((entry) => entry.id !== result.thread.id)],
           archived: false, search: '', cursor: null });
+        await this.composer.created(thread.id, selection);
       }
       this.ensureCurrent(generation);
       if (!created) {
-        const queue = await this.queueConnection.enqueue(thread, { ...input, images });
+        const queue = await this.queueConnection.enqueue(thread, { ...message, images });
         if (queue && generation === this.synchronization) this.applyQueue(queue);
       } else {
-        await this.request({ operation: 'send', threadId: thread.id, ...input, images });
+        await this.request({ operation: 'send', threadId: thread.id, ...message, images });
       }
       void this.refreshSelected();
       return true;

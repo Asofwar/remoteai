@@ -6,7 +6,8 @@ import { composerPatch, DEFAULT_COMPOSER, type ComposerSettings,
   type ComposerSnapshot, type RequestSpeed } from '../../../../../shared/remote-chat/composer';
 import { RequestSpeedBridge, type RequestSpeedSource } from './requestSpeedBridge';
 
-type Binding = Pick<GuiController, 'getSnapshot' | 'subscribe' | 'settings' | 'setProviderModels'>;
+type Binding = Pick<GuiController, 'getSnapshot' | 'subscribe' | 'settings' | 'setProviderModels' | 'modelSettings'>;
+const MAX_OBSERVED_CONVERSATIONS = 128;
 
 /** Owns the small shared composer state while the main GUI is mounted or the phone is its only client. */
 export class ComposerBridge {
@@ -17,6 +18,8 @@ export class ComposerBridge {
   private loading?: Promise<void>;
   private pendingSettings = false;
   private unsubscribeSpeed?: () => void;
+  private revision = 0;
+  private scoped = new Map<string | null, ComposerSnapshot>();
 
   constructor(private readonly speed?: RequestSpeedSource) {}
 
@@ -43,7 +46,8 @@ export class ComposerBridge {
     };
     update();
     const unsubscribe = binding.subscribe(update);
-    return () => { unsubscribe(); if (this.binding === binding) this.binding = undefined; };
+    const unwatch = binding.modelSettings.watch(() => this.publishScopes());
+    return () => { unsubscribe(); unwatch(); if (this.binding === binding) this.binding = undefined; };
   }
 
   setProviderModels(models: Model[] | null) {
@@ -58,14 +62,36 @@ export class ComposerBridge {
       ...(this.value.settings.speed ? { speed: this.value.settings.speed } : {}) };
     if (models === this.value.models && settings.model === this.value.settings.model
       && settings.effort === this.value.settings.effort && settings.access === this.value.settings.access) return;
-    this.value = { models, settings, revision: this.value.revision + 1 };
+    this.value = { models, settings, revision: ++this.revision };
     for (const listener of this.listeners) listener(this.value);
+    this.publishScopes();
   }
 
   private publishSpeed(speed: RequestSpeed) {
     if (speed === this.value.settings.speed) return;
-    this.value = { ...this.value, settings: { ...this.value.settings, speed }, revision: this.value.revision + 1 };
+    this.value = { ...this.value, settings: { ...this.value.settings, speed }, revision: ++this.revision };
     for (const listener of this.listeners) listener(this.value);
+    this.publishScopes();
+  }
+
+  private publishScope(threadId: string | null): ComposerSnapshot {
+    const settings = { ...this.value.settings, ...this.binding!.modelSettings.selection(threadId) };
+    const previous = this.scoped.get(threadId);
+    if (previous && previous.models === this.value.models
+      && Object.keys(settings).every((key) => settings[key as keyof ComposerSettings]
+        === previous.settings[key as keyof ComposerSettings])) return previous;
+    const snapshot = { models: this.value.models, settings, threadId, revision: ++this.revision };
+    this.scoped.set(threadId, snapshot);
+    if (this.scoped.size > MAX_OBSERVED_CONVERSATIONS) this.scoped.delete(this.scoped.keys().next().value!);
+    for (const listener of this.listeners) listener(snapshot);
+    return snapshot;
+  }
+
+  private publishScopes() {
+    if (!this.binding) return;
+    for (const threadId of this.scoped.keys()) {
+      if (!this.binding.modelSettings.loading(threadId)) this.publishScope(threadId);
+    }
   }
 
   private async loadModels() {
@@ -89,15 +115,18 @@ export class ComposerBridge {
     }
   }
 
-  async read(): Promise<ComposerSnapshot> {
+  async read(threadId?: string | null): Promise<ComposerSnapshot> {
+    if (threadId !== undefined && !this.binding) throw new Error('电脑尚未就绪，请稍后重试。');
     await Promise.all([this.readSelection(), this.speed?.read().then((speed) => this.publishSpeed(speed))
-      .catch(() => { /* Model selection stays usable if the host cannot report its speed yet. */ })]);
-    return this.value;
+      .catch(() => { /* Model selection stays usable if the host cannot report its speed yet. */ }),
+      threadId !== undefined ? this.binding!.modelSettings.ready(threadId) : undefined]);
+    if (threadId !== undefined && !this.binding) throw new Error('电脑尚未就绪，请稍后重试。');
+    return threadId === undefined ? this.value : this.publishScope(threadId);
   }
 
-  async update(input: unknown): Promise<ComposerSnapshot> {
+  async update(input: unknown, threadId?: string | null): Promise<ComposerSnapshot> {
     const patch = composerPatch(input);
-    const current = await this.read();
+    const current = await this.read(threadId);
     const selected = current.models.find((model) => model.model === (patch.model ?? current.settings.model));
     if (!selected) throw new Error('这个模型已不可用，请重新选择。');
     const efforts = selected.supportedReasoningEfforts.map((entry) => entry.reasoningEffort);
@@ -113,11 +142,18 @@ export class ComposerBridge {
       if (patch.speed !== current.settings.speed) this.publishSpeed(await this.speed.set(patch.speed));
     }
     if (patch.model !== undefined || patch.effort !== undefined || patch.access !== undefined) {
-      if (this.binding) this.binding.settings(normalized);
+      if (threadId !== undefined) {
+        if (!this.binding) throw new Error('电脑尚未就绪，请稍后重试。');
+        if (patch.access !== undefined) this.binding.settings({ access: patch.access });
+        if (patch.model !== undefined || patch.effort !== undefined) {
+          this.binding.modelSettings.change({ model: normalized.model, effort: normalized.effort }, threadId);
+          await this.binding.modelSettings.ready(threadId);
+        }
+      } else if (this.binding) this.binding.settings(normalized);
       else this.pendingSettings = true;
-      this.publish(current.models, normalized);
+      if (threadId === undefined) this.publish(current.models, normalized);
     }
-    return this.value;
+    return threadId === undefined ? this.value : this.publishScope(threadId);
   }
 }
 

@@ -25,8 +25,7 @@ export function UserMessage({ item, startedAt, onEdit, editDisabled = false }: {
   return <article className={`${styles.userMessage} ${editing ? userStyles.editingMessage : ""}`}>
     <div className={`${styles.userBubble} ${userStyles.bubble}`}>
       {!editing && parts.filter(isMessageImage).map((part, index) =>
-        part.url ? <MessageImage key={index} src={part.url} alt={`图片附件 ${index + 1}`} />
-          : <span className={styles.imageLabel} key={index}>图片：{part.path?.split(/[\\/]/).pop() ?? "附件"}</span>)}
+        <MessageImage key={index} src={part.url || part.path} alt={`图片附件 ${index + 1}`} />)}
       {parts.filter((part) => part.type === "mention").map((part, index) =>
         part.path && isFileReference(part.path)
           ? <FileMenu path={part.path} key={`reference-${index}`}>{part.name || part.path}</FileMenu>

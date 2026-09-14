@@ -46,6 +46,7 @@ beforeEach(async () => {
     return vi.fn<() => void>();
   });
   vi.mocked(guiApi.request).mockImplementation(async (request) => {
+    if (request.operation === "imagePreview") return { url: "data:image/png;base64,cGljdHVyZQ==" };
     if (request.operation === "list" || request.operation === "models") return { data: [], nextCursor: null };
     return { thread: { ...thread, turns: [] } };
   });
@@ -128,7 +129,10 @@ it("renders deltas between arrivals, preserves code blocks, and flushes when sto
 
 function expectHistory() {
   expect(container.textContent).toContain("检查这个项目");
-  expect(container.textContent).toContain("screenshot.png");
+  expect(guiApi.request).toHaveBeenCalledWith({ operation: "imagePreview", threadId: "one",
+    source: "D:/screenshot.png" });
+  expect(container.querySelector('img[alt="图片附件 1"]')?.getAttribute("src"))
+    .toBe("data:image/png;base64,cGljdHVyZQ==");
   expect(container.textContent).toContain("先检查项目的测试结果");
   expect(container.textContent).toContain("PASS: project tests");
   expect(container.textContent).toContain("项目检查通过");
@@ -161,6 +165,7 @@ it("keeps visible messages and expanded activity after completion, reopening, an
   expect(container.querySelector("[data-processing-phase]")).toBeNull();
 
   vi.mocked(guiApi.request).mockImplementation(async (request) => {
+    if (request.operation === "imagePreview") return { url: "data:image/png;base64,cGljdHVyZQ==" };
     if (request.operation === "list") return { data: [thread], nextCursor: null };
     if (request.operation === "send") return { turn: { id: "next", status: "inProgress", items: [] } };
     return { thread };
@@ -213,7 +218,7 @@ it("places the real send time and copy action outside the user bubble and copies
   const article = container.querySelector("article")!;
   const bubble = article.firstElementChild!;
   const time = article.querySelector("time")!;
-  const copy = article.querySelector("button")!;
+  const copy = article.querySelector<HTMLButtonElement>('[aria-label="复制消息"]')!;
   expect(time.dateTime).toBe(new Date(startedAt * 1000).toISOString());
   expect(time.textContent).toMatch(/^\d{2}:\d{2}$/);
   expect(bubble.contains(time)).toBe(false);
@@ -271,6 +276,9 @@ it("keeps normal continuation requests, attachments, and later steering visible"
   await act(async () => root.render(<Messages selected={thread.id} value={value} />));
   expect(container.textContent).toContain("继续检查测试结果");
   expect(container.textContent).toContain(CONTINUE_MESSAGE);
-  expect(container.textContent).toContain("reference.png");
+  expect(guiApi.request).toHaveBeenCalledWith({ operation: "imagePreview", threadId: "one",
+    source: "D:/reference.png" });
+  expect(container.querySelector('img[alt="图片附件 1"]')?.getAttribute("src"))
+    .toBe("data:image/png;base64,cGljdHVyZQ==");
   expect(container.querySelectorAll("article")).toHaveLength(3);
 });

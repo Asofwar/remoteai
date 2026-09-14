@@ -1,18 +1,26 @@
 import { useId } from "react";
 import { Popover } from "antd";
+import { Settings } from "lucide-react";
 import { formatCompactTokenCount } from "../../utils/tokenContext";
 import type { ThreadTokenUsage } from "./types";
 import { contextUsage, FULL_PERCENT } from "./contextUsage";
 import styles from "./ContextUsageButton.module.less";
 
-export function ContextUsageButton({ usage, open, onOpenChange }: {
+export function ContextUsageButton({ usage, open, onOpenChange, onSettings }: {
   usage?: ThreadTokenUsage; open: boolean; onOpenChange: (open: boolean) => void;
+  onSettings?: () => void;
 }) {
   const id = useId();
   const context = contextUsage(usage);
   const percent = context?.percent;
   const content = <div id={id} className={styles.content}>
-    <div className={styles.heading}>背景信息窗口：</div>
+    <div className={styles.heading}><span>背景信息窗口</span>
+      <button type="button" className={styles.button} aria-label="设置当前对话的上下文容量"
+        disabled={!onSettings} onClick={onSettings}>
+        <Settings size={14} aria-hidden="true" />
+      </button>
+    </div>
+    {!onSettings && <div className={styles.hint}>选择对话后可设置容量</div>}
     {context ? <>
       <div>{percent != null ? `${percent}% 已用（剩余 ${FULL_PERCENT - percent}%）` : "上下文容量未知"}</div>
       <div>已用 {formatCompactTokenCount(context.used, "zh")} Token

@@ -3,6 +3,14 @@ fn dispatch_gui_command(app: AppHandle, command: &str, args: Value) -> Result<Va
     use tauri::Manager;
 
     match command {
+        "codex_gui_context_settings" => serialize(block_on(
+            codex_gui::context_settings::codex_gui_context_settings(app, argument(&args, "threadId")?),
+        )),
+        "codex_gui_set_context_settings" => serialize(block_on(
+            codex_gui::context_settings::codex_gui_set_context_settings(
+                app, argument(&args, "threadId")?, argument(&args, "settings")?,
+            ),
+        )),
         "codex_gui_scheduled_tasks" => serialize(block_on(
             codex_gui::scheduled_tasks::codex_gui_scheduled_tasks(app, argument(&args, "request")?),
         )),

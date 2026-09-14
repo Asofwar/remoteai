@@ -116,6 +116,9 @@ impl Client {
 
     pub(super) async fn request(&self, method: &str, mut params: Value) -> Result<Value> {
         super::home::scope_thread_request(method, &mut params);
+        super::context_settings::apply(self.app.clone(), method, &mut params)
+            .await
+            .map_err(|_| GuiError::ContextSettings)?;
         if method == "turn/start" {
             self.refresh_plugins().await?;
         }

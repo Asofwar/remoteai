@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Switch, Tooltip } from "antd";
 import { useUsageStatus } from "./useUsageStatus";
 import { ContextUsageButton } from "./ContextUsageButton";
+import { ContextSettingsDialog } from "./ContextSettingsDialog";
 import type { ThreadTokenUsage } from "./types";
 import styles from "./UsageStatus.module.less";
 import { formatTokens, formatCost, usageTrailing } from "../../../../../shared/remote-chat/usage";
@@ -30,12 +31,14 @@ export function UsageStatus({ active, threadId, tokenUsage }: {
 }) {
   const { usage, proxy, saving, error, setFastMode, canChangeFastMode } = useUsageStatus(active);
   const [hint, setHint] = useState<UsageHint | null>(null);
+  const [settingsThread, setSettingsThread] = useState<string | null>(null);
   const trailing = usageTrailing(usage);
   const pendingDescription = error || "正在读取今日用量…";
   useEffect(() => {
     if (!active || (hint === "remaining" && !trailing)) setHint(null);
   }, [active, hint, trailing]);
   useEffect(() => { setHint(null); }, [threadId]);
+  useEffect(() => { setSettingsThread(null); }, [threadId, active]);
   const changeHint = (key: UsageHint, open: boolean) => {
     setHint((current) => {
       if (open) return key;
@@ -49,6 +52,7 @@ export function UsageStatus({ active, threadId, tokenUsage }: {
   }}>
     <span className={styles.usage} role="group" aria-label="今日用量">
       <ContextUsageButton usage={tokenUsage} open={active && hint === "context"}
+        onSettings={threadId ? () => { setHint(null); setSettingsThread(threadId); } : undefined}
         onOpenChange={(open) => changeHint("context", open)} />
       <span>今日</span>
       <UsageValue className={styles.tokens} text={usage ? formatTokens(usage.totalTokens) : "—"}
@@ -72,5 +76,7 @@ export function UsageStatus({ active, threadId, tokenUsage }: {
           onChange={(enabled) => void setFastMode(enabled)} />
       </label>
     </Tooltip>
+    {active && settingsThread && settingsThread === threadId && <ContextSettingsDialog key={settingsThread}
+      threadId={settingsThread} onClose={() => setSettingsThread(null)} />}
   </div>;
 }

@@ -12,7 +12,12 @@
   cursor: pointer;
   &:hover, &[aria-expanded="true"] { background: var(--bg); color: var(--ink); }
   &:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+  &:disabled { opacity: 0.4; cursor: default; }
 }
 .track { opacity: 0.2; }
 .content { max-width: 100%; text-align: center; font-size: 12px; line-height: 20px; overflow-wrap: anywhere; }
-.heading { color: var(--muted); }
+.heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); }
+.settings { display: grid; gap: 8px; max-width: 400px; overflow-wrap: anywhere; }
+.hint { margin: 0; color: var(--muted); font-size: 12px; }
+.settingHelp { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.error { color: var(--danger, #dc4446); font-size: 12px; }

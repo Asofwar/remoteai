@@ -1,5 +1,7 @@
 #[derive(Debug, thiserror::Error)]
 pub(super) enum GuiError {
+    #[error("暂时无法读取对话的上下文设置，请重试。")]
+    ContextSettings,
     #[error("视频暂时无法读取，请确认文件仍在当前项目中，且格式为 MP4、MOV 或 WebM。")]
     VideoPreview,
     #[error("视频超过管理员设置的播放大小上限。")]

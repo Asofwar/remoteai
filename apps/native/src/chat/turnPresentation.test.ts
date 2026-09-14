@@ -4,6 +4,32 @@ import type { Item, Turn } from './types';
 import { CONTINUE_MESSAGE } from '../../../../shared/remote-chat/composerAction';
 import { retainInlineTurns } from './useConversationEntries';
 
+it('reuses historical rows while replacing the streamed turn', () => {
+  const old: Turn = { id: 'old', status: 'completed', items: [{ id: 'reply', type: 'agentMessage', text: 'Done' }] };
+  const live: Turn = { id: 'live', status: 'inProgress', items: [{ id: 'stream', type: 'agentMessage', text: 'A' }] };
+  const before = conversationEntries([old, live]);
+  const updated = { ...live, items: [{ ...live.items[0], text: 'AB' }] };
+  const after = conversationEntries([old, updated]);
+  expect(after[0]).toBe(before[0]);
+  expect(after[1]).not.toBe(before[1]);
+  expect(after[1]).toMatchObject({ item: { text: 'AB' } });
+});
+
+it('keeps retained activity and continuation modes separate in the row cache', () => {
+  const previous: Turn = { id: 'previous', status: 'completed', items: [] };
+  const turn: Turn = { id: 'turn', status: 'completed', items: [
+    { id: 'continue', type: 'userMessage', content: [{ type: 'text', text: CONTINUE_MESSAGE }] },
+    { id: 'tool', type: 'commandExecution' },
+  ] };
+  const collapsed = conversationEntries([previous, turn]);
+  const expanded = conversationEntries([previous, turn], new Set([turn.id]));
+  expect(expanded.some((entry) => entry.kind === 'process')).toBe(true);
+  expect(collapsed.some((entry) => entry.kind === 'process')).toBe(false);
+  const continuation = conversationEntries([{ ...previous, status: 'interrupted' }, turn]);
+  expect(continuation.some((entry) => entry.id === 'turn:message:continue')).toBe(false);
+  expect(conversationEntries([previous, turn])[0]).toBe(collapsed[0]);
+});
+
 it('keeps user steering and final replies in order while grouping process messages', () => {
   const items: Item[] = [
     { id: 'user', type: 'userMessage' },

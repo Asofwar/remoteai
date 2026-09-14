@@ -1,4 +1,4 @@
-import { applyHistoryDelta, historyVersion, type HistoryVersion } from '../historySync';
+import { applyHistoryDelta, HistoryVersionCache, type HistoryVersion } from '../historySync';
 import { sliceHistory, type HistoryWindow, type PagedHistoryDelta } from '../historyPage';
 import type { Thread } from './types';
 
@@ -8,6 +8,7 @@ const UNSUPPORTED_OPERATION = '当前手机端暂不支持此操作。';
 
 /** Older PCs expose read but do not recognize incremental history or its paging window. */
 export class HistoryReader {
+  private readonly versions = new HistoryVersionCache();
   private legacy = false;
   private generation = 0;
   constructor(private readonly request: <T>(body: HistoryRequest) => Promise<T>) {}
@@ -19,7 +20,7 @@ export class HistoryReader {
     if (!this.legacy) {
       try {
         const result = await this.request<PagedHistoryDelta>({ operation: 'syncHistory', threadId: selected.id,
-          known: historyVersion(selected), window });
+          known: this.versions.read(selected), window });
         const thread = applyHistoryDelta(selected, result);
         return result.page ? { thread, page: result.page } : sliceHistory(thread, window);
       } catch (error) {

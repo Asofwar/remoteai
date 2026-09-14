@@ -25,13 +25,15 @@ async function pinch(label, direction) {
     '/data/local/tmp/chat-hierarchy.jar', '-c', 'dev.codexswitch.testing.ImageGestureTest',
     '-e', 'label', label, '-e', 'direction', direction);
   assert.ok(result.includes('OK (1 test)'), result);
+  console.log(`PASS ${label} pinch ${direction}`);
   await screenshot(`image-preview-${label}-pinch-${direction}`);
 }
 
 export async function imagePreviewJourney() {
   await adb('emu', 'sensor', 'set', 'acceleration', '0:9.8:0');
   try {
-    for (const [prompt, label] of [['local image preview', '本地图片'], ['remote image preview', '网络图片']]) {
+    // Keep fixture keywords away from the first character, which phone keyboards may capitalize.
+    for (const [prompt, label] of [['test local image preview', '本地图片'], ['test remote image preview', '网络图片']]) {
       await send(prompt, { dismissKeyboard: false });
       await waitText(`放大查看：${label}`);
       await tap(`放大查看：${label}`);

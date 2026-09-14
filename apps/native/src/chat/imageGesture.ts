@@ -14,6 +14,7 @@ export interface ImageGestureState {
 }
 
 function isTapPosition(origin: ImageGestureTouch | undefined, touches: ImageGestureTouch[]): boolean {
+  'worklet';
   const touch = touches[0];
   return !!origin && touches.length === 1 && touch.identifier === origin.identifier
     && Math.hypot(touch.x - origin.x, touch.y - origin.y) <= TAP_DISTANCE;
@@ -22,11 +23,13 @@ function isTapPosition(origin: ImageGestureTouch | undefined, touches: ImageGest
 export function beginImageGesture(
   transform: ImageTransform, touches: ImageGestureTouch[], started: number,
 ): ImageGestureState {
+  'worklet';
   return { transform, anchor: { before: transform, start: touches }, origin: touches[0],
     started, moved: touches.length !== 1, pinched: touches.length > 1 };
 }
 
 export function updateImageGesture(state: ImageGestureState, touches: ImageGestureTouch[]): ImageGestureState {
+  'worklet';
   const sameTouches = touches.length === state.anchor.start.length
     && state.anchor.start.every((before) => touches.some((touch) => touch.identifier === before.identifier));
   // Rebase as fingers join or leave, using the latest transform even before React renders it.
@@ -38,6 +41,7 @@ export function updateImageGesture(state: ImageGestureState, touches: ImageGestu
 export function isImageGestureTap(
   state: ImageGestureState | null, released: ImageGestureTouch[], ended: number, closeBlockedUntil = 0,
 ): boolean {
+  'worklet';
   return !!state && !state.moved && state.started >= closeBlockedUntil && ended - state.started <= TAP_DURATION_MS
     && isTapPosition(state.origin, released);
 }

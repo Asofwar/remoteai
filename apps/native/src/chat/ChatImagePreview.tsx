@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
 import { Keyboard } from 'react-native';
 import { ImageViewer } from './ImageViewer';
 
@@ -8,7 +8,7 @@ const ImagePreviewContext = createContext<((image: ImagePreview) => void) | null
 /** Keep the modal outside virtualized messages so rotation cannot unmount the active image. */
 export function ChatImagePreviewProvider({ children }: { children: ReactNode }) {
   const [image, setImage] = useState<ImagePreview | null>(null);
-  const open = (preview: ImagePreview) => { Keyboard.dismiss(); setImage(preview); };
+  const open = useCallback((preview: ImagePreview) => { Keyboard.dismiss(); setImage(preview); }, []);
   return <ImagePreviewContext.Provider value={open}>
     {children}
     {image && <ImageViewer key={image.key} thumbnail={image.thumbnail} description={image.description}

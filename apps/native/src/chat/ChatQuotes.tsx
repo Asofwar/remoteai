@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Toast } from '../components/AppToast';
 import { appendQuote, clearSubmittedQuotes, quoteKey, type ChatQuote } from './replyQuotes';
 
@@ -35,12 +35,13 @@ export function ChatQuotesProvider({ children, active, enabled, scope }: {
     setState({ scope, quotes: result.quotes });
     return true;
   }, [enabled, scope]);
-  return <Context.Provider value={{ active, enabled, quotes, add,
+  const value = useMemo<QuotesContext>(() => ({ active, enabled, quotes, add,
     remove: (key) => setState((value) => value.scope === scope
       ? { scope, quotes: value.quotes.filter((quote) => quoteKey(quote) !== key) } : value),
     clearSubmitted: (submitted) => setState((value) => value.scope === scope
       ? { scope, quotes: clearSubmittedQuotes(value.quotes, submitted) } : value),
-  }}>{children}</Context.Provider>;
+  }), [active, enabled, quotes, add, scope]);
+  return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 
 export function useChatQuotes() { return useContext(Context); }

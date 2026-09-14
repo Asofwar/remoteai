@@ -62,10 +62,39 @@ function manifest(value: Fields): Manifest {
 
 /** Only fingerprints and string lengths travel back to the PC, never synchronized message bodies. */
 export function historyVersion(thread: Thread): HistoryVersion {
-  return { fields: manifest(fields(thread, 'turns')), turns: (thread.turns ?? []).map((turn) => ({
-    id: turn.id, fields: manifest(fields(turn, 'items')),
-    items: turn.items.map((item) => ({ id: item.id, fields: manifest(fields(item, '')) })),
-  })) };
+  return { fields: manifest(fields(thread, 'turns')), turns: (thread.turns ?? []).map((turn) => turnVersion(turn)) };
+}
+
+function itemVersion(item: Item): ItemVersion {
+  return { id: item.id, fields: manifest(fields(item, '')) };
+}
+
+function turnVersion(turn: Turn, readItem = itemVersion): TurnVersion {
+  return { id: turn.id, fields: manifest(fields(turn, 'items')), items: turn.items.map(readItem) };
+}
+
+/** For immutable client snapshots only; mutable PC history must use historyVersion directly. */
+export class HistoryVersionCache {
+  private readonly items = new WeakMap<Item, ItemVersion>();
+  private readonly turns = new WeakMap<Turn, TurnVersion>();
+
+  private readItem = (item: Item): ItemVersion => {
+    const cached = this.items.get(item);
+    if (cached) return cached;
+    const version = itemVersion(item);
+    this.items.set(item, version);
+    return version;
+  };
+
+  read(thread: Thread): HistoryVersion {
+    return { fields: manifest(fields(thread, 'turns')), turns: (thread.turns ?? []).map((turn) => {
+      const cached = this.turns.get(turn);
+      if (cached) return cached;
+      const version = turnVersion(turn, this.readItem);
+      this.turns.set(turn, version);
+      return version;
+    }) };
+  }
 }
 
 function difference(current: Fields, known: Manifest = {}): Patch {

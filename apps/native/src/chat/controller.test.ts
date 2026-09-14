@@ -5,6 +5,7 @@ import type { Thread } from './types';
 import type { ConnectionEvents } from '../../../../shared/remote-chat/client/connection';
 import { COMPOSER_EVENT, type ComposerSnapshot } from '../../../../shared/remote-chat/composer';
 import { historyDelta, type HistoryVersion } from '../../../../shared/remote-chat/historySync';
+import { sliceHistory, type HistoryWindow } from '../../../../shared/remote-chat/historyPage';
 
 const mocks = vi.hoisted(() => ({ request: vi.fn(), events: null as ConnectionEvents | null }));
 vi.mock('./connection', () => ({ MobileChatConnection: class {
@@ -31,6 +32,37 @@ async function connectedController() {
 }
 
 describe('mobile chat actions', () => {
+  it('reopens expanded history at the latest page and can still load earlier messages', async () => {
+    const controller = await connectedController();
+    const history: Thread = { ...thread, turns: [{ id: 'long-turn', status: 'completed',
+      items: Array.from({ length: 60 }, (_, index) => ({
+        id: `message-${index}`, type: 'agentMessage', text: 'Reply',
+      })) }] };
+    const other = { ...thread, id: 'other' };
+    mocks.request.mockImplementation(async (_method, body: {
+      operation: string; threadId: string; window?: HistoryWindow; known?: HistoryVersion;
+    }) => {
+      if (body.operation !== 'syncHistory') return { data: [], nextCursor: null };
+      const page = sliceHistory(body.threadId === thread.id ? history : other, body.window);
+      return { ...historyDelta(page.thread, body.known), page: page.page };
+    });
+    await controller.select(thread);
+    await controller.loadOlder();
+    await controller.loadOlder();
+    expect(controller.snapshot().selected?.turns?.[0].items).toHaveLength(30);
+    for (let visit = 0; visit < 12; visit++) {
+      await controller.select(other);
+      const selecting = controller.select(thread);
+      expect(controller.snapshot().selected?.turns?.[0].items).toHaveLength(10);
+      expect(controller.snapshot().historyHasMore).toBe(true);
+      await selecting;
+    }
+    await controller.loadOlder();
+    expect(controller.snapshot().selected?.turns?.[0].items).toHaveLength(20);
+    expect(controller.snapshot().selected?.turns?.[0].items[0].id).toBe('message-40');
+    controller.stop();
+  });
+
   it('releases the composer after enqueue acknowledgement while history is still loading', async () => {
     const controller = await connectedController();
     mocks.request.mockResolvedValue({ thread });

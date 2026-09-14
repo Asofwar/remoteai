@@ -6,6 +6,7 @@ import { mergeHistory } from './history';
 import { HISTORY_CHANGED } from '../historySync';
 import type { HistoryPage } from '../historyPage';
 import { HistoryReader } from './historyReader';
+import { HistoryCache } from './historyCache';
 import { ImageCache } from './imageCache';
 import { validateChatImages } from '../attachments';
 import { compactUnavailableReason } from './composerCommands';
@@ -54,7 +55,7 @@ export class ChatController {
   private syncTimer?: ReturnType<typeof setTimeout>;
   private readonly images = new ImageCache(<T>(body: Parameters<ConstructorParameters<typeof ImageCache>[0]>[0]) =>
     this.connection.request<T>('request', body));
-  private readonly histories = new Map<string, Thread>();
+  private readonly histories = new HistoryCache();
   private readonly historyReader = new HistoryReader((body) => this.connection.request('request', body));
   private readonly historyPages = new Map<string, HistoryPage>();
   private historyTimer?: ReturnType<typeof setTimeout>;
@@ -301,7 +302,10 @@ export class ChatController {
     this.rememberHistory();
     this.olderQueued = false;
     this.loadedThreadId = null;
-    this.update({ selected: this.histories.get(thread.id) ?? thread, draftProject: null,
+    const cached = this.histories.get(thread.id);
+    if (cached) this.historyPages.set(thread.id, cached.page);
+    else this.historyPages.delete(thread.id);
+    this.update({ selected: cached?.thread ?? thread, draftProject: null,
       selectedArchived: this.state.archived, error: '',
       historyHasMore: this.historyPages.get(thread.id)?.hasMore ?? false });
     await Promise.all([this.refreshSelected(), this.composer.select()]);
@@ -354,12 +358,9 @@ export class ChatController {
   private rememberHistory() {
     const thread = this.state.selected;
     if (!thread) return;
-    this.histories.delete(thread.id);
-    this.histories.set(thread.id, thread);
-    if (this.histories.size > 8) {
-      const oldest = this.histories.keys().next().value!;
-      this.histories.delete(oldest);
-      this.historyPages.delete(oldest);
+    this.histories.remember(thread, this.historyPages.get(thread.id));
+    for (const id of this.historyPages.keys()) {
+      if (id !== thread.id && !this.histories.has(id)) this.historyPages.delete(id);
     }
   }
 

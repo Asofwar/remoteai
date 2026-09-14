@@ -10,6 +10,9 @@ export type WorkEntry = { id: string; kind: 'work'; turn: Turn; items: Item[]; i
 export type TurnEntry = MessageEntry | WorkEntry | { id: string; kind: 'summary'; turn: Turn }
   | { id: string; kind: 'duration'; turn: Turn };
 
+// History reducers replace changed turns. Reuse unchanged turns without retaining discarded conversations.
+const entryCache = new WeakMap<Turn, Map<string, TurnEntry[]>>();
+
 /** Rejected or still-running edits are not completed file changes. A net diff takes precedence. */
 export function completedTurnFiles(turn: Turn) {
   if (turn.diff?.trim()) return parseDiff(turn.diff);
@@ -27,26 +30,38 @@ function hasSummary(turn: Turn) {
 /** Stable group IDs keep open drawers and measured list cells attached during streamed updates. */
 export function conversationEntries(turns: Turn[], inlineTurns: ReadonlySet<string> = new Set()): TurnEntry[] {
   return turns.flatMap((turn, index) => {
-    const items = turns[index - 1]?.status === 'interrupted' ? visibleContinuationItems(turn.items) : turn.items;
     const inline = turn.status === 'inProgress' || inlineTurns.has(turn.id);
-    const entries = groupTurnItems(items).flatMap((group): TurnEntry[] => {
-      if (group.type === 'message') return [{ id: `${turn.id}:message:${group.items[0].id}`,
-        kind: 'message', turn, item: group.items[0] }];
-      const work: WorkEntry = { id: `${turn.id}:work:${group.items[0].id}`,
-        kind: 'work', turn, items: group.items, inline };
-      if (!inline) return [work];
-      return [work, ...group.items.map((item): MessageEntry => ({
-        id: `${turn.id}:message:${item.id}`, kind: 'process', turn, item,
-      }))];
-    });
-    if (turn.status !== 'inProgress' && turnElapsedMs(turn, 0) != null) {
-      const response = entries.findIndex((entry) => entry.kind !== 'message' || entry.item.type !== 'userMessage');
-      entries.splice(response < 0 ? entries.length : response, 0,
-        { id: `${turn.id}:duration`, kind: 'duration', turn });
-    }
-    if (hasSummary(turn)) entries.push({ id: `${turn.id}:summary`, kind: 'summary', turn });
+    const continuation = turns[index - 1]?.status === 'interrupted';
+    const key = `${inline}:${continuation}`;
+    const cached = entryCache.get(turn)?.get(key);
+    if (cached) return cached;
+    const entries = turnEntries(turn, { inline, continuation });
+    const cache = entryCache.get(turn) ?? new Map<string, TurnEntry[]>();
+    cache.set(key, entries);
+    entryCache.set(turn, cache);
     return entries;
   });
+}
+
+function turnEntries(turn: Turn, { inline, continuation }: { inline: boolean; continuation: boolean }): TurnEntry[] {
+  const items = continuation ? visibleContinuationItems(turn.items) : turn.items;
+  const entries = groupTurnItems(items).flatMap((group): TurnEntry[] => {
+    if (group.type === 'message') return [{ id: `${turn.id}:message:${group.items[0].id}`,
+      kind: 'message', turn, item: group.items[0] }];
+    const work: WorkEntry = { id: `${turn.id}:work:${group.items[0].id}`,
+      kind: 'work', turn, items: group.items, inline };
+    if (!inline) return [work];
+    return [work, ...group.items.map((item): MessageEntry => ({
+      id: `${turn.id}:message:${item.id}`, kind: 'process', turn, item,
+    }))];
+  });
+  if (turn.status !== 'inProgress' && turnElapsedMs(turn, 0) != null) {
+    const response = entries.findIndex((entry) => entry.kind !== 'message' || entry.item.type !== 'userMessage');
+    entries.splice(response < 0 ? entries.length : response, 0,
+      { id: `${turn.id}:duration`, kind: 'duration', turn });
+  }
+  if (hasSummary(turn)) entries.push({ id: `${turn.id}:summary`, kind: 'summary', turn });
+  return entries;
 }
 
 /** Loading an earlier page can prepend activities to an already-open process group. */

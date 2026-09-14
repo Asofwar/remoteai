@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Keyboard, Pressable, RefreshControl, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useChatScroll } from './useChatScroll';
@@ -37,15 +37,18 @@ function WorkSummary({ entry, onOpen }: { entry: WorkEntry; onOpen: () => void }
   </Pressable>;
 }
 
-function TimelineEntry({ entry, open }: { entry: TurnEntry; open: (selection: Selection) => void }) {
+const TimelineEntry = memo(function TimelineEntry({ entry, open }: {
+  entry: TurnEntry; open: (selection: Selection) => void;
+}) {
+  const openItem = useCallback((id: string) => open({ type: 'item', id }), [open]);
   if (entry.kind === 'duration') return <ChatTurnDuration turn={entry.turn} />;
   if (entry.kind === 'summary') return <ChatTurnSummary turn={entry.turn}
     onOpen={(id, panel) => open({ type: 'turn', id, panel })} />;
   if (entry.kind === 'work') return <WorkSummary entry={entry} onOpen={() => open({ type: 'work', id: entry.id })} />;
   return <ChatMessage item={entry.item} process={entry.kind === 'process'}
-    onOpen={(id) => open({ type: 'item', id })}
+    onOpen={openItem}
     running={entry.turn.status === 'inProgress' && entry.item.status !== 'completed'} />;
-}
+});
 
 export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder }: ChatMessagesProps) {
   const { entries, hasObservedLiveTurn } = useConversationEntries(thread?.turns ?? []);

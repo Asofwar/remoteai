@@ -1,4 +1,6 @@
-import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useImageViewer } from '../../../../shared/chat/useImageViewer';
@@ -11,21 +13,22 @@ interface Props { thumbnail: string; description: string; load: () => Promise<st
 export function ImageViewer({ thumbnail, description, load, close }: Props) {
   const image = useImageViewer(load);
   const orientation = useImageOrientation();
-  const { transform, panHandlers } = useImageGestures(close, orientation.displayed);
+  const { gesture, animatedStyle } = useImageGestures(close, orientation.displayed);
   const saving = useSaveImage(image.error ? undefined : image.url);
   const message = saving.message || orientation.error;
   return <Modal visible animationType="fade" onRequestClose={close} statusBarTranslucent
     navigationBarTranslucent supportedOrientations={['portrait', 'portrait-upside-down',
       'landscape-left', 'landscape-right']}>
     <SafeAreaProvider>
-      <View style={styles.overlay}>
-        <View style={styles.stage} {...panHandlers} onAccessibilityEscape={close}>
-          <Image source={{ uri: image.url ?? thumbnail }} accessibilityLabel={description}
-            accessibilityHint="轻点关闭，双指缩放" accessibilityActions={[{ name: 'activate', label: '关闭预览' }]}
-            onAccessibilityAction={close} resizeMode="contain" onError={image.fail}
-            style={[styles.image, { transform: [{ translateX: transform.x },
-              { translateY: transform.y }, { scale: transform.scale }] }]} />
-        </View>
+      <GestureHandlerRootView style={styles.overlay}>
+        <GestureDetector gesture={gesture}>
+          <View style={styles.stage} collapsable={false} onAccessibilityEscape={close}>
+            <Animated.Image source={{ uri: image.url ?? thumbnail }} accessibilityLabel={description}
+              accessibilityHint="轻点关闭，双指缩放" accessibilityActions={[{ name: 'activate', label: '关闭预览' }]}
+              onAccessibilityAction={close} resizeMode="contain" onError={image.fail}
+              fadeDuration={0} style={[styles.image, animatedStyle]} />
+          </View>
+        </GestureDetector>
         <SafeAreaView pointerEvents="box-none" style={styles.controls}>
           <View pointerEvents="box-none" style={styles.footer}>
             <View pointerEvents="box-none" style={styles.actions}>
@@ -53,7 +56,7 @@ export function ImageViewer({ thumbnail, description, load, close }: Props) {
             </View>
           </View>
         </SafeAreaView>
-      </View>
+      </GestureHandlerRootView>
     </SafeAreaProvider>
   </Modal>;
 }

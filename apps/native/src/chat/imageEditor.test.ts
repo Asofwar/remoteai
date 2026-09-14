@@ -1,0 +1,22 @@
+import { describe, expect, it } from 'vitest';
+import { editedImageMessage, imageEditorHtml } from '../../../../shared/chat/imageEditorHtml';
+import { MAX_CHAT_IMAGE_CHARS } from '../../../../shared/remote-chat/attachments';
+
+const image = 'data:image/jpeg;base64,aW1hZ2U=';
+
+describe('image editor boundary', () => {
+  it('accepts saved image data and ignores unrelated messages', () => {
+    expect(editedImageMessage(JSON.stringify({ type: 'save', dataUrl: image }))).toBe(image);
+    for (const message of [null, {}, { type: 'cancel' }, { type: 'save', dataUrl: 12 }]) {
+      expect(editedImageMessage(JSON.stringify(message))).toBeNull();
+    }
+  });
+
+  it('rejects remote URLs, invalid image data and oversized results', () => {
+    for (const dataUrl of ['https://example.test/image.jpg', 'data:text/html;base64,aA==',
+      'data:image/jpeg;base64,invalid<script>', image + 'a'.repeat(MAX_CHAT_IMAGE_CHARS)]) {
+      expect(() => editedImageMessage(JSON.stringify({ type: 'save', dataUrl }))).toThrow();
+      expect(() => imageEditorHtml(dataUrl)).toThrow();
+    }
+  });
+});

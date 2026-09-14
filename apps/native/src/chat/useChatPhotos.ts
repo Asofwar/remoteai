@@ -1,4 +1,5 @@
 import { ImagePolicyError } from '../../../../shared/remote-chat/compressImage';
+import { validateChatImages } from '../../../../shared/remote-chat/attachments';
 import { useEffect, useRef, useState } from 'react';
 import { Linking } from 'react-native';
 import { getPendingResultAsync, type ImagePickerResult, type ImagePickerErrorResult } from 'expo-image-picker';
@@ -76,11 +77,19 @@ export function useChatPhotos({ threadId, sending }: { threadId: string | null; 
   };
 
   const remove = (id: string) => setPhotos((current) => current.filter((photo) => photo.id !== id));
+  const replace = (original: ChatPhoto, dataUrl: string) => {
+    if (sending || picking.current || !photos.includes(original)) throw new Error('photo-unavailable');
+    validateChatImages([dataUrl]);
+    const edited = { ...original, uri: dataUrl, dataUrl };
+    validatePhotos(photos.map((photo) => photo === original ? edited : photo));
+    setPhotos((current) => current.map((photo) => photo === original ? edited : photo));
+    setError('');
+  };
   const clearSubmitted = (submitted: ChatPhoto[]) => {
     setPhotos((current) => current.filter((photo) => !submitted.includes(photo)));
   };
   const openSettings = () => {
     void Linking.openSettings().catch(() => setError('无法打开设置，请在手机设置中找到 Codex Switch。'));
   };
-  return { photos, busy, error, settingsRequired, pick, remove, clearSubmitted, openSettings };
+  return { photos, busy, error, settingsRequired, pick, remove, replace, clearSubmitted, openSettings };
 }

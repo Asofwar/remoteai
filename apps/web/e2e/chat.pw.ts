@@ -3,6 +3,7 @@ import { connect, navigate, send, settled, screenshot, state, fixtureUrl, openCh
 import { chatJourney } from './chat-journey';
 import { historyJourney } from './chat-history';
 import { attachmentJourney } from './chat-attachments';
+import { imageEditorJourney } from './chat-image-editor';
 import { composerLayout } from './chat-composer';
 import { projectPickerJourney } from './chat-project-picker';
 
@@ -26,6 +27,9 @@ test.beforeEach(async ({ page, request }, info) => {
 
 
 test('keeps composer icons below single and multiline drafts', async ({ page }) => composerLayout(page));
+
+test('annotates photos before sending and preserves cancelled edits',
+  async ({ page, request }, info) => imageEditorJourney({ page, request, info }));
 
 for (const [code, message] of [[4004, '电脑的聊天连接尚未就绪。'], [4008, '这台电脑的聊天连接数已满，']] as const) {
   test(`explains connection failure ${code} in a compact message and recovers`, async ({ page }, info) => {

@@ -7,6 +7,7 @@ import { ChatSettings } from './ChatSettings';
 import type { ReadUsage } from '../../../../shared/remote-chat/usage';
 import { ChatAttachmentPreviews, ChatAttachmentSheet } from './ChatAttachments';
 import { pickChatImages } from './pickChatImages';
+import { ChatImageEditor } from './ChatImageEditor';
 import type { Model, SendInput, ThreadTokenUsage } from './types';
 import { composerLabel, type ComposerSettings } from '../../../../shared/remote-chat/composer';
 import { useChatDraft } from '../../../../shared/remote-chat/client/useChatDraft';
@@ -34,6 +35,7 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
   const [settings, setSettings] = useState(false);
   const [attachments, setAttachments] = useState(false);
   const [pausing, setPausing] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const pickerThread = useRef(threadId);
   const textarea = useRef<HTMLTextAreaElement>(null);
@@ -41,6 +43,8 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
   const disabled = !ready || settingsBusy;
   const draft = useChatDraft({ threadId, sending, disabled, selection, send });
   const busy = sending || draft.picking;
+  const editing = draft.images.find((image) => image.id === editingId);
+  useEffect(() => { if (!active || busy || !editing) setEditingId(null); }, [active, busy, editing]);
   const action = composerAction({ running: running && !draft.hasContent, interrupted, hasDraft: draft.hasContent });
   const actionDisabled = action === 'pause' ? !ready || pausing
     : disabled || busy || (action === 'send' && !draft.hasContent);
@@ -75,7 +79,8 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
           event.target.value = '';
           if (pickerThread.current === threadId) void draft.addImages((remaining) => pickChatImages(files, remaining));
         }} />
-      <ChatAttachmentPreviews images={draft.images} busy={busy} remove={draft.removeImage} add={openAttachments} />
+      <ChatAttachmentPreviews images={draft.images} busy={busy} remove={draft.removeImage} add={openAttachments}
+        edit={(id) => { textarea.current?.blur(); setEditingId(id); }} />
       {!!draft.error && <p role="alert" className="chat-error">{draft.error}</p>}
       {draft.picking && <p role="status" className="chat-muted">正在添加图片…</p>}
       <div className={`chat-composer-field${draft.text.length === 0 ? ' chat-composer-field-empty' : ''}`}>
@@ -106,6 +111,8 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
           {' ▾'}</button>
       </div>}
     </form>
+    {active && !busy && editing && <ChatImageEditor key={editing.id} image={editing}
+      save={(url) => draft.replaceImage(editing, url)} close={() => setEditingId(null)} />}
     {attachments && <ChatAttachmentSheet busy={busy} pick={openAlbum} onClose={() => setAttachments(false)} />}
     {settings && <ChatSettings models={models} selection={selection}
       readUsage={readUsage} tokenUsage={tokenUsage}

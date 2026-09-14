@@ -87,6 +87,14 @@ export function useChatDraft({ threadId, sending, disabled, selection, send }: O
     if (sending || busy.current || submitting.current) return;
     setImages((value) => value.filter((image) => image.id !== id)); setError('');
   };
-  return { text, setText, insertSkill, removeText, images, error, picking, addImages, removeImage, submit,
+  const replaceImage = (original: DraftImage, url: string) => {
+    if (sending || busy.current || submitting.current || !images.includes(original)) {
+      throw new ChatImageError('图片已变更，请重新打开后编辑。');
+    }
+    validateChatImages(images.map((image) => image === original ? url : image.url));
+    setImages((current) => current.map((image) => image === original ? { ...image, url } : image));
+    setError('');
+  };
+  return { text, setText, insertSkill, removeText, images, error, picking, addImages, removeImage, replaceImage, submit,
     hasContent: Boolean(text.trim() || images.length) };
 }

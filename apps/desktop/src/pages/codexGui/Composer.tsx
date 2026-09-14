@@ -91,7 +91,8 @@ export const Composer = forwardRef<ComposerHandle, {
     <div ref={composer} className={`${styles.composer} ${attachedQueue ? styles.composerAttached : ""}`}>
       <ImageAttachments key={key} images={draft.images} active={active}
         disabled={state.sending} onRemove={removeImage} />
-      <ComposerReferences items={draft.attachments ?? []} disabled={disabled} onRemove={removeAttachment} />
+      <ComposerReferences key={key} items={draft.attachments ?? []} disabled={disabled}
+        active={active} onRemove={removeAttachment} />
       <ComposerQuotes quotes={draft.quotes ?? []} draftKey={key} active={active} disabled={disabled}
         onRemove={removeQuote} onClear={() => { clearQuotes(); skillInput.current?.focus(); }} />
       <input ref={fileInput} type="file" accept={IMAGE_TYPES.join(",")} multiple hidden disabled={disabled}

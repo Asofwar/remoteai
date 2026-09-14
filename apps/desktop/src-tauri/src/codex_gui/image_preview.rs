@@ -91,7 +91,7 @@ pub(super) async fn preview(
     })
 }
 
-fn source_path(source: &str) -> Result<PathBuf> {
+pub(super) fn source_path(source: &str) -> Result<PathBuf> {
     if source.is_empty() || source.len() > MAX_SOURCE_LENGTH || source.contains('\0') {
         return Err(GuiError::ImagePreview);
     }
@@ -193,7 +193,7 @@ fn read_image(source: &str, workspace: &Path, options: ReadOptions<'_>) -> Resul
     encode_image(&path, options.max_bytes)
 }
 
-fn encode_image(path: &Path, max_bytes: u64) -> Result<String> {
+pub(super) fn encode_image(path: &Path, max_bytes: u64) -> Result<String> {
     let file = File::open(path).map_err(|_| GuiError::ImagePreview)?;
     let metadata = file.metadata().map_err(|_| GuiError::ImagePreview)?;
     if !metadata.is_file() || metadata.len() == 0 || metadata.len() > max_bytes {

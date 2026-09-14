@@ -112,6 +112,20 @@ it("prefers native file paths over duplicate browser image representations", asy
   expect(editor.draft.images).toEqual([]);
 });
 
+it("previews a copied local image and sends its original path only once alongside ordinary files", async () => {
+  const photo = { ...attachment, name: "QQ 截图.png", path: "C:\\Tencent Files\\QQ 截图.png" };
+  const url = "data:image/jpeg;base64,dGh1bWJuYWls";
+  vi.mocked(invoke).mockImplementation(async (command) =>
+    command === "codex_gui_clipboard_files" ? [photo, attachment] : { url });
+  await act(async () => { keydown(); paste([new File(["x"], "preview.png", { type: "image/png" })]); });
+  expect(host.querySelector("img")?.getAttribute("src")).toBe(url);
+  expect(editor.draft.images).toEqual([]);
+  expect(editor.draft.attachments).toEqual([photo, attachment]);
+  await act(async () => editor.send());
+  expect(controller.send).toHaveBeenCalledExactlyOnceWith("", [], [], [photo, attachment]);
+  expect(host.querySelector("img")).toBeNull();
+});
+
 it("reports inaccessible native clipboard files and allows retry", async () => {
   vi.mocked(invoke).mockRejectedValueOnce(new Error("missing")).mockResolvedValue([attachment]);
   await act(async () => { keydown(); paste(); });

@@ -268,6 +268,7 @@ pub fn run() {
             codex_gui::codex_gui_connect,
             codex_gui::scheduled_tasks::codex_gui_scheduled_tasks,
             codex_gui::clipboard::codex_gui_clipboard_files,
+            codex_gui::attachment_preview::codex_gui_attachment_preview,
             codex_gui::image_actions::codex_gui_image_action,
             codex_gui::account_selection::codex_gui_account_selection,
             codex_gui::account_selection::codex_gui_switch_account,

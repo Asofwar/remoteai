@@ -8,11 +8,20 @@ use crate::{commands, models::ProviderSummary, providers, storage::read_app_sett
 
 mod account_label;
 mod account_menu;
+#[cfg(windows)]
+pub(crate) mod quick_menu;
+#[cfg(not(windows))]
 mod refresh;
 #[cfg(windows)]
 pub(crate) mod windows_menu;
 
+#[cfg(not(windows))]
 pub(crate) use refresh::refresh_menu;
+
+#[cfg(windows)]
+pub(crate) fn refresh_menu<R: Runtime>(_app: &AppHandle<R>) {
+    // The glass menu reads a fresh snapshot whenever it opens.
+}
 
 const TRAY_ID: &str = "main-tray";
 const DASHBOARD_ID: &str = "tray:dashboard";
@@ -29,13 +38,29 @@ const PROVIDER_SUBMENU_PREFIX: &str = "tray:provider-submenu:";
 const MENU_PROVIDER_CHARS: usize = 28;
 
 pub(crate) fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(not(windows))]
     let menu = build_initial_menu(app.handle())?;
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
-        .menu(&menu)
         .tooltip("Codex Switch")
         .show_menu_on_left_click(false)
         .on_menu_event(handle_menu_event)
         .on_tray_icon_event(|tray, event| {
+            #[cfg(windows)]
+            if let TrayIconEvent::Click {
+                button: MouseButton::Right,
+                button_state: tauri::tray::MouseButtonState::Up,
+                position,
+                ..
+            } = &event
+            {
+                let app = tray.app_handle().clone();
+                let position = *position;
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = quick_menu::show(&app, position).await {
+                        eprintln!("failed to open tray menu: {error}");
+                    }
+                });
+            }
             if matches!(
                 event,
                 TrayIconEvent::DoubleClick {
@@ -46,6 +71,10 @@ pub(crate) fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
                 show_dashboard(tray.app_handle());
             }
         });
+    #[cfg(not(windows))]
+    {
+        builder = builder.menu(&menu);
+    }
 
     if let Some(icon) = app.default_window_icon().cloned() {
         builder = builder.icon(icon);
@@ -60,6 +89,7 @@ pub(crate) fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[cfg(not(windows))]
 fn build_initial_menu<R: Runtime>(
     app: &AppHandle<R>,
 ) -> Result<Menu<R>, Box<dyn std::error::Error>> {
@@ -267,8 +297,8 @@ pub(crate) fn build_menu<R: Runtime>(
 
 fn floating_bubble_toggle_label(chinese: bool, enabled: bool) -> &'static str {
     match (chinese, enabled) {
-        (true, true) => "隐藏用量悬浮球/卡片",
-        (true, false) => "显示用量悬浮球/卡片",
+        (true, true) => "隐藏悬浮球 / 卡片",
+        (true, false) => "显示悬浮球 / 卡片",
         (false, true) => "Hide Usage Bubble/Card",
         (false, false) => "Show Usage Bubble/Card",
     }
@@ -282,11 +312,7 @@ fn append_provider_items<R: Runtime>(
     let header = MenuItem::with_id(
         app,
         "tray:providers-header",
-        if chinese {
-            "三方 Provider"
-        } else {
-            "Providers"
-        },
+        if chinese { "服务商" } else { "Providers" },
         false,
         None::<&str>,
     )?;
@@ -298,7 +324,11 @@ fn append_provider_items<R: Runtime>(
                 let empty = MenuItem::with_id(
                     app,
                     "tray:providers-empty",
-                    "No providers",
+                    if chinese {
+                        "暂无服务商"
+                    } else {
+                        "No providers"
+                    },
                     false,
                     None::<&str>,
                 )?;
@@ -311,10 +341,15 @@ fn append_provider_items<R: Runtime>(
             }
         }
         Err(error) => {
+            eprintln!("failed to read providers for menu: {error}");
             let item = MenuItem::with_id(
                 app,
                 "tray:providers-error",
-                format!("Providers error: {error}"),
+                if chinese {
+                    "服务商读取失败"
+                } else {
+                    "Unable to load providers"
+                },
                 false,
                 None::<&str>,
             )?;

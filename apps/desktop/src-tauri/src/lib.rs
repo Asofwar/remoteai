@@ -138,6 +138,8 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             #[cfg(windows)]
+            app.manage(system_tray::quick_menu::QuickMenuState::default());
+            #[cfg(windows)]
             installer_lifecycle::setup(app.handle())?;
             storage::migrate_app_settings_for_version(app.handle())?;
             let settings = storage::read_app_settings(app.handle())?;
@@ -246,8 +248,18 @@ pub fn run() {
                 }
             }
             floating_bubble::handle_window_event(window, event);
+            #[cfg(windows)]
+            system_tray::quick_menu::handle_window_event(window, event);
         })
         .invoke_handler(tauri::generate_handler![
+            #[cfg(windows)]
+            system_tray::quick_menu::quick_menu_snapshot,
+            #[cfg(windows)]
+            system_tray::quick_menu::quick_menu_present,
+            #[cfg(windows)]
+            system_tray::quick_menu::quick_menu_dismiss,
+            #[cfg(windows)]
+            system_tray::quick_menu::quick_menu_activate,
             codex_gui::codex_gui_connect,
             codex_gui::scheduled_tasks::codex_gui_scheduled_tasks,
             codex_gui::clipboard::codex_gui_clipboard_files,

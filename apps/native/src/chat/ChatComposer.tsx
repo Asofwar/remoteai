@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Keyboard, Pressable, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { ChatSettings } from './ChatSettings';
 import { ComposerGoal } from './ComposerGoal';
 import { useGoalMode } from '../../../../shared/remote-chat/client/useGoalMode';
@@ -158,9 +158,9 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
       goal={goals ? () => { menu.consumeTrigger(); goalMode.enter(); } : undefined}
       compact={() => { void menu.runCompact(); }} close={menu.close} />;
   };
-  return <>
+  return <View style={styles.composerDock}>
     {queue && <ChatQueue {...queue} {...queueEditor} />}
-    <View style={styles.composer}>
+    <View style={[styles.composer, compactField && styles.composerCompact]}>
     {!!draft.error && <Text accessibilityRole="alert" style={styles.error}>{draft.error}</Text>}
     {compacting && <Text style={styles.subtitle}>正在压缩上下文…</Text>}
     {!!(attachmentError || attachments.error) && <Text accessibilityRole="alert" style={styles.error}>
@@ -172,6 +172,8 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
     </ComposerPopover>}
     <View ref={anchor} collapsable={false} style={[styles.composerField, compactField && styles.composerFieldCompact]}
       onLayout={({ nativeEvent }) => setAnchorHeight(nativeEvent.layout.height)}>
+      <ScrollView style={styles.composerContent} keyboardShouldPersistTaps="always" nestedScrollEnabled
+        contentContainerStyle={styles.composerContentInner}>
       <ChatPhotoPicker photos={photos} disabled={sending} active={active} />
       <ComposerReferences items={attachments.items} disabled={attachmentBusy} remove={attachments.remove} />
       <ComposerQuotes disabled={sending} active={active} />
@@ -181,6 +183,7 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
         placeholderTextColor="#999999" underlineColorAndroid="transparent"
         onSelectionChange={(event) => menu.setSelection(event.nativeEvent.selection)}
         onChangeText={draft.setText} placeholder={ready ? (goalMode.enabled ? '描述想完成的目标…' : '发消息…') : '连接后发消息'} />
+      </ScrollView>
       <View pointerEvents="box-none" style={[styles.composerActions, compactField && styles.composerActionsCompact]}>
         <Pressable accessibilityRole="button" accessibilityLabel="添加内容" style={styles.composerAdd}
           accessibilityState={{ expanded: adding }} onPress={() => { menu.close(); setAdding((current) => !current); }}>
@@ -216,5 +219,5 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
       readUsage={readUsage} usageActive={active && usageActive} tokenUsage={tokenUsage}
       saving={settingsBusy} error={settingsError} ready={ready}
       updateSettings={updateSettings} onClose={() => setSettings(false)} />}
-  </View></>;
+  </View></View>;
 }

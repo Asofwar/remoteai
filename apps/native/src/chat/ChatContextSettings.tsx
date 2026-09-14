@@ -18,7 +18,7 @@ export function ChatContextSettings({ threadId, api, onClose }: {
         disabled: editor.loading || !editor.loaded },
     ]}>
     <SheetScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.settings}>
-      <Text style={styles.subtitle}>仅用于当前对话。保存后，请在电脑上重新连接 Codex。</Text>
+      <Text style={styles.subtitle}>仅用于当前对话，下次发送消息时生效，不会中断当前回复。</Text>
       {editor.loading && <ActivityIndicator accessibilityLabel="正在读取上下文设置" />}
       {editor.loaded && <>
         <Text style={styles.title}>上下文容量（K Token）</Text>
@@ -27,6 +27,7 @@ export function ChatContextSettings({ threadId, api, onClose }: {
           placeholder="使用默认容量" style={[styles.input, styles.questionInput]}
           onSubmitEditing={() => { void save(); }} />
         <Text style={styles.subtitle}>1 K = 1000 Token；留空使用默认容量。</Text>
+        <Text style={styles.subtitle}>用量会在收到回复后更新。程序会预留部分空间，显示的可用容量可能略小。</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="恢复默认" disabled={editor.saving}
           accessibilityState={{ disabled: editor.saving }} style={styles.button} onPress={() => editor.setValue('')}>
           <Text style={styles.buttonText}>恢复默认</Text>

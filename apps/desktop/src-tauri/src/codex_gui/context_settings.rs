@@ -24,7 +24,7 @@ pub(crate) enum ContextSettingsError {
 }
 type Result<T> = std::result::Result<T, ContextSettingsError>;
 
-#[derive(Clone, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ContextSettings {
     capacity: Option<u64>,
@@ -122,21 +122,15 @@ pub(crate) async fn codex_gui_set_context_settings(
         .map_err(|error| error.to_string())
 }
 
-/// Loaded threads ignore config overrides; reconnecting loads the saved value without interrupting a turn.
-pub(super) async fn apply(app: AppHandle, method: &str, params: &mut Value) -> Result<()> {
-    if method != "thread/resume" {
-        return Ok(());
-    }
-    let thread_id = params["threadId"]
-        .as_str()
-        .ok_or(ContextSettingsError::InvalidThread)?
-        .to_owned();
-    let settings = access(app, thread_id, None).await?;
-    apply_capacity(params, &settings);
-    Ok(())
+pub(super) async fn for_thread(app: AppHandle, thread_id: String) -> Result<ContextSettings> {
+    access(app, thread_id, None).await
 }
 
-fn apply_capacity(params: &mut Value, settings: &ContextSettings) {
+pub(super) fn apply_capacity(params: &mut Value, settings: &ContextSettings) {
+    // An explicit empty config resets a previous override when rejoining an unsubscribed thread.
+    if !params["config"].is_object() {
+        params["config"] = serde_json::json!({});
+    }
     if let Some(capacity) = settings.capacity {
         params["config"]["model_context_window"] = capacity.into();
     }

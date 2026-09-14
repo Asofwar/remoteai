@@ -73,3 +73,10 @@ fn resume_overrides_only_capacity_and_default_preserves_model_configuration() {
     );
     assert_eq!(fresh["config"]["model_context_window"], 128_000);
 }
+
+#[test]
+fn default_resume_explicitly_resets_a_previous_runtime_override() {
+    let mut params = json!({"threadId": "one"});
+    apply_capacity(&mut params, &ContextSettings::default());
+    assert_eq!(params["config"], json!({}));
+}

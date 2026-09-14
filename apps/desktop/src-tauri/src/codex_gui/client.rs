@@ -1,3 +1,4 @@
+mod context_capacity;
 mod live_settings;
 mod plugin_refresh;
 
@@ -38,6 +39,7 @@ pub(super) struct Client {
     pending: Mutex<Pending>,
     approvals: Mutex<HashMap<String, GuiEvent>>,
     active_turns: Mutex<HashMap<String, String>>,
+    context_capacity: context_capacity::ContextCapacity,
     plugin_revision: Mutex<Option<String>>,
     next_id: AtomicU64,
     pub(super) alive: AtomicBool,
@@ -84,6 +86,7 @@ impl Client {
             pending: Mutex::new(HashMap::new()),
             approvals: Mutex::new(HashMap::new()),
             active_turns: Mutex::new(HashMap::new()),
+            context_capacity: context_capacity::ContextCapacity::default(),
             plugin_revision: Mutex::new(None),
             next_id: AtomicU64::new(1),
             alive: AtomicBool::new(true),
@@ -116,11 +119,11 @@ impl Client {
 
     pub(super) async fn request(&self, method: &str, mut params: Value) -> Result<Value> {
         super::home::scope_thread_request(method, &mut params);
-        super::context_settings::apply(self.app.clone(), method, &mut params)
-            .await
-            .map_err(|_| GuiError::ContextSettings)?;
         if method == "turn/start" {
             self.refresh_plugins().await?;
+        }
+        if matches!(method, "thread/resume" | "turn/start") {
+            return self.request_with_context(method, params).await;
         }
         self.request_raw(method, params).await
     }

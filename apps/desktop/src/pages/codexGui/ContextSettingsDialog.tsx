@@ -15,7 +15,7 @@ export function ContextSettingsDialog({ threadId, onClose }: { threadId: string;
         onClick={() => void save()}>保存</Button>
     </>}>
     <div className={styles.settings}>
-      <p className={styles.hint}>仅用于当前对话。保存后，重新连接 Codex 生效。</p>
+      <p className={styles.hint}>仅用于当前对话，下次发送消息时生效，不会中断当前回复。</p>
       {editor.loading && <div role="status"><Spin size="small" /> 正在读取设置…</div>}
       {editor.loaded && <>
         <label htmlFor={id}>上下文容量（K Token）</label>
@@ -26,6 +26,7 @@ export function ContextSettingsDialog({ threadId, onClose }: { threadId: string;
           <span className={styles.hint}>1 K = 1000 Token；留空使用默认容量。</span>
           <Button type="link" size="small" disabled={editor.saving} onClick={() => editor.setValue("")}>恢复默认</Button>
         </div>
+        <p className={styles.hint}>用量会在收到回复后更新。程序会预留部分空间，显示的可用容量可能略小。</p>
       </>}
       {editor.error && <div role="alert" className={styles.error}>{editor.error}
         {!editor.loaded && <Button type="link" size="small" onClick={editor.retry}>重试</Button>}

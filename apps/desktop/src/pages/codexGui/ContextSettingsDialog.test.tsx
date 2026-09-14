@@ -43,7 +43,7 @@ afterEach(async () => {
 it("opens while polling is pending, saves only this conversation and restores defaults", async () => {
   await render(); await openSettings();
   expect(input().value).toBe("128");
-  expect(document.querySelector(".ant-modal")?.textContent).toContain("重新连接 Codex 生效");
+  expect(document.querySelector(".ant-modal")?.textContent).toContain("下次发送消息时生效");
   await type("256");
   vi.mocked(invoke).mockResolvedValueOnce({ capacity: 256_000 });
   await click(footerButton("保存"));

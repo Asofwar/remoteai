@@ -2,7 +2,7 @@ import type { BrowserContext } from "@playwright/test";
 import type { ModelSettingsSnapshot } from "../src/pages/codexGui/threadModelSettings";
 import type { ModelSelection } from "../src/pages/codexGui/modelSelection";
 
-export function modelSettingsBackend() {
+export function modelSettingsBackend(liveUpdate?: ModelSettingsSnapshot["liveUpdate"]) {
   const saved = new Map<string | null, ModelSettingsSnapshot>();
   const events: { name: string; payload: unknown }[] = [];
   const sends: Record<string, unknown>[] = [];
@@ -26,7 +26,7 @@ export function modelSettingsBackend() {
         result = saved.get(threadId) ?? { threadId, selection: null, revision: 0 };
       }
       if (command === "codex_gui_set_model_settings") {
-        const snapshot = { threadId, selection: args.selection, revision: (saved.get(threadId)?.revision ?? 0) + 1 };
+        const snapshot = { threadId, selection: args.selection, revision: (saved.get(threadId)?.revision ?? 0) + 1, liveUpdate };
         saved.set(threadId, snapshot);
         events.push({ name: "codex-gui-model-settings-changed", payload: snapshot });
         result = snapshot;
@@ -53,5 +53,7 @@ export function modelSettingsBackend() {
       await route.fulfill({ json: { ok: true, result } });
     });
   }
-  return { attach, sends, releaseUsage: () => usage.splice(0).forEach((resolve) => resolve()) };
+  return { attach, sends, startTurn: (threadId: string) => events.push({ name: "codex-gui-event",
+    payload: { method: "turn/started", params: { threadId,
+      turn: { id: "live", status: "inProgress", items: [] } } } }), releaseUsage: () => usage.splice(0).forEach((resolve) => resolve()) };
 }

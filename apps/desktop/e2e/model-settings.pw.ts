@@ -50,3 +50,37 @@ test("independent conversations synchronize across clients while usage polling i
     backend.releaseUsage(); await pcContext.close(); await webContext.close();
   }
 });
+
+
+test("switches during generation with an inline marker while usage polling waits", async ({ page }) => {
+  const backend = modelSettingsBackend("applied");
+  await backend.attach(page.context());
+  try {
+    await page.goto(url);
+    await page.getByRole("button", { name: "对话 a" }).click();
+    await expect(page.getByRole("status", { name: "模型同步" })).toHaveText("模型设置已同步");
+    backend.startTurn("a");
+    await expect(page.getByRole("button", { name: "停止生成", exact: true })).toBeVisible();
+    await trigger(page).click();
+    await page.getByRole("button", { name: "选择模型", exact: true }).click();
+    const beats = Number(await page.getByLabel("刷新次数").textContent());
+    await page.getByRole("menuitemradio", { name: "模型二" }).click();
+    await page.getByRole("slider", { name: "推理强度" }).press("Escape");
+    const notice = page.getByLabel("对话消息").locator("[data-model-change]");
+    await expect(notice).toHaveText("模型已从 模型一 更改为 模型二");
+    await notice.getByRole("button", { name: "模型切换说明" }).hover();
+    const tooltip = page.getByRole("tooltip").filter({ hasText: "将从下一次请求起生效。" });
+    await expect(tooltip).toContainText("下一次请求");
+    await expect(tooltip).toContainText("可能使响应变慢");
+    expect((await tooltip.boundingBox())!.width).toBeLessThanOrEqual(400);
+    await expect(page.getByRole("button", { name: "停止生成", exact: true })).toBeVisible();
+    await expect(page.getByText("正在刷新用量")).toBeVisible();
+    await expect.poll(async () => Number(await page.getByLabel("刷新次数").textContent())).toBeGreaterThan(beats);
+    expect(backend.sends).toHaveLength(0);
+    await page.screenshot({ path: "../../.codex-tmp/live-model-switch.png", animations: "disabled" });
+    await page.getByRole("button", { name: "对话 b" }).click();
+    await expect(notice).toHaveCount(0);
+    await page.getByRole("button", { name: "对话 a" }).click();
+    await expect(notice).toHaveText("模型已从 模型一 更改为 模型二");
+  } finally { backend.releaseUsage(); }
+});

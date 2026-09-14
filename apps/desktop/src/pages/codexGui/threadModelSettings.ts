@@ -1,10 +1,12 @@
 import { resolveModelSelection, type ModelSelection } from "./modelSelection";
 import type { GuiState } from "./types";
+import { appendModelChange, type PendingModelChange } from "./liveModelNotice";
 
 export interface ModelSettingsSnapshot {
   threadId: string | null;
   selection: ModelSelection | null;
   revision: number;
+  liveUpdate?: "applied" | "nextTurn" | "failed";
 }
 export interface ModelSettingsApi {
   read: (threadId: string | null) => Promise<ModelSettingsSnapshot>;
@@ -34,6 +36,7 @@ export class ThreadModelSettings {
   private deferred = new Map<string | null, ModelSettingsSnapshot>();
   private failed = new Set<string | null>();
   private listeners = new Set<() => void>();
+  private notifying = new Map<string | null, PendingModelChange>();
   constructor(private host: Host) {}
 
   watch(listener: () => void) {
@@ -82,6 +85,14 @@ export class ThreadModelSettings {
     if (patch.model && patch.model !== previous.model && patch.effort === undefined) selection.effort = "";
     const models = this.host.getSnapshot().models;
     const normalized = models.length ? resolveModelSelection(models, selection) : selection;
+    if (threadId && this.host.getSnapshot().conversations[threadId]?.activeTurn
+      && (normalized.model !== previous.model || normalized.effort !== previous.effort)) {
+      const pending = this.notifying.get(threadId);
+      const label = (model: string) => models.find((entry) => entry.model === model)?.displayName || model;
+      this.notifying.set(threadId, { turnId: this.host.getSnapshot().conversations[threadId].activeTurn!,
+        fromModel: pending?.fromModel ?? label(previous.model), toModel: label(normalized.model),
+        modelChanged: Boolean(pending?.modelChanged) || normalized.model !== previous.model });
+    }
     this.entries.set(threadId, { threadId, selection: normalized,
       revision: this.entries.get(threadId)?.revision ?? 0 });
     this.edits.set(threadId, (this.edits.get(threadId) ?? 0) + 1);
@@ -158,7 +169,13 @@ export class ThreadModelSettings {
       this.dirty.delete(threadId);
       try {
         const snapshot = await api.write(threadId, selection);
-        if (!this.dirty.has(threadId)) this.entries.set(threadId, snapshot);
+        if (!this.dirty.has(threadId)) {
+          this.entries.set(threadId, snapshot);
+          if (this.notifying.has(threadId)) {
+            this.host.patch(appendModelChange(this.host.getSnapshot(), snapshot, this.notifying.get(threadId)!));
+            this.notifying.delete(threadId);
+          }
+        }
       } catch (error) {
         if (!this.dirty.has(threadId)) this.dirty.set(threadId, selection);
         throw error;

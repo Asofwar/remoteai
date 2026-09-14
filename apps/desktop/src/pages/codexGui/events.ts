@@ -1,6 +1,7 @@
 import type { Conversation, GuiEvent, GuiState, Item, Thread, Turn } from "./types";
 import { completeTurnTiming, restoreTurnTiming } from "./turnTiming";
 import { cachedTurnDetails } from "./turnDetailsStorage";
+import { restoreModelChanges } from "./modelChangeHistory";
 import { restoreProcessing, trackProcessing } from "./processing";
 import { trackProcessingApproval } from "./processingApprovals";
 import { mergeMessageItems } from "./sentMessages";
@@ -15,7 +16,8 @@ export function conversation(thread: Thread, previous?: Conversation): Conversat
       planExplanation: previousTurn?.planExplanation ?? cached.get(turn.id)?.planExplanation,
       retryError: previousTurn?.retryError,
       ...restoreTurnTiming(turn, previousTurn),
-      items: mergeMessageItems(previousTurn?.items ?? [], turn.items ?? []) };
+      items: mergeMessageItems(previousTurn?.items ?? [],
+        restoreModelChanges(turn.items ?? [], cached.get(turn.id)?.modelChanges)) };
   });
   const active = turns.find((turn) => turn.status === "inProgress");
   return { thread, turns, activeTurn: active?.id ?? null,

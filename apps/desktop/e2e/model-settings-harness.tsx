@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { ConfigProvider } from "antd";
 import { getGuiController, retainGuiSession } from "../src/pages/codexGui/session";
+import { Messages } from "../src/pages/codexGui/Messages";
 import { ModelPicker } from "../src/pages/codexGui/ModelPicker";
 import { ComposerSubmit } from "../src/pages/codexGui/ComposerSubmit";
 import { useUsageStatus } from "../src/pages/codexGui/useUsageStatus";
@@ -25,6 +26,7 @@ function Harness() {
     <p>{usage ? `用量 ${usage.totalTokens}` : "正在刷新用量"}</p>
     <p role="status" aria-label="模型同步">{state.modelSettingsLoading ? "正在同步模型设置" : "模型设置已同步"}</p>
     {!!state.error && <p role="alert">{state.error}</p>}
+    <Messages selected={state.selected} value={state.selected ? state.conversations[state.selected] : undefined} />
     <section><textarea aria-label="聊天消息" value={text} onChange={(event) => setText(event.target.value)} />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
         <ModelPicker models={state.models} {...state.settings} disabled={false} onChange={controller.settings} />

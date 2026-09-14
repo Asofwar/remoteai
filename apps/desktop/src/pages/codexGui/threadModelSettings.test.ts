@@ -177,3 +177,48 @@ it("keeps a pending send on its original conversation without changing the viewe
     model: "first", effort: "xhigh" }));
   expect(controller.getSnapshot()).toMatchObject({ selected: "b", settings: { model: "second", effort: "low" } });
 });
+
+
+const changes = (controller: GuiController) => controller.getSnapshot().conversations.a.turns
+  .flatMap((turn) => turn.items).filter((item) => item.type === "modelChange");
+
+it.each(["applied", "nextTurn", "failed"] as const)("reports the acknowledged live switch outcome: %s", async (liveUpdate) => {
+  const { api } = backend(); const controller = await client(api); await controller.select("a");
+  vi.mocked(guiApi.subscribe).mock.calls[0][0]({ method: "turn/started", params: { threadId: "a",
+    turn: { id: "live", status: "inProgress", items: [] } } });
+  let finish!: (snapshot: ModelSettingsSnapshot) => void;
+  vi.mocked(api.write).mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+  vi.mocked(guiApi.request).mockClear();
+  controller.settings({ model: "second", effort: "high" });
+  expect(changes(controller)).toEqual([]);
+  expect(guiApi.request).not.toHaveBeenCalled();
+  finish({ threadId: "a", selection: { model: "second", effort: "high" }, revision: 1, liveUpdate });
+  await vi.waitFor(() => expect(controller.getSnapshot().modelSettingsLoading).toBe(false));
+  expect(controller.getSnapshot().conversations.a.activeTurn).toBe("live");
+  const [notice] = changes(controller);
+  expect(notice.success).toBe(liveUpdate !== "failed");
+  if (liveUpdate === "failed") expect(notice.text).toContain("未能更新");
+  else {
+    expect(notice.text).toBe("模型已从 first 更改为 second");
+    expect(notice.summary?.[0]).toContain(liveUpdate === "applied" ? "下一次请求" : "下一轮对话");
+    expect(notice.summary?.[0]).toContain("可能使响应变慢");
+  }
+  expect(controller.getSnapshot().settings.model).toBe("second");
+});
+
+it("waits for the latest rapid live selection before showing success", async () => {
+  const { api } = backend(); const controller = await client(api); await controller.select("a");
+  vi.mocked(guiApi.subscribe).mock.calls[0][0]({ method: "turn/started", params: { threadId: "a",
+    turn: { id: "live", status: "inProgress", items: [] } } });
+  const finish: ((snapshot: ModelSettingsSnapshot) => void)[] = [];
+  vi.mocked(api.write).mockImplementation(() => new Promise((resolve) => finish.push(resolve)));
+  controller.settings({ model: "second", effort: "high" });
+  controller.settings({ model: "first", effort: "low" });
+  expect(api.write).toHaveBeenCalledTimes(1);
+  finish[0]({ threadId: "a", selection: { model: "second", effort: "high" }, revision: 1, liveUpdate: "applied" });
+  await vi.waitFor(() => expect(finish).toHaveLength(2));
+  expect(changes(controller)).toEqual([]);
+  finish[1]({ threadId: "a", selection: { model: "first", effort: "low" }, revision: 2, liveUpdate: "failed" });
+  await vi.waitFor(() => expect(changes(controller)[0]?.success).toBe(false));
+  expect(controller.getSnapshot().settings.model).toBe("first");
+});

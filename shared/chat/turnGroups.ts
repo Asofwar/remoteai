@@ -8,7 +8,7 @@ export function groupTurnItems(items: Item[]): TurnItemGroup[] {
   return items.reduce<TurnItemGroup[]>((groups, item, index) => {
     const answer = item.type === 'agentMessage'
       && (item.phase === 'final_answer' || (!item.phase && index === lastAnswer));
-    const type = item.type === 'userMessage' || answer ? 'message' : 'work';
+    const type = item.type === 'userMessage' || item.type === 'modelChange' || answer ? 'message' : 'work';
     if (type === 'work' && groups.at(-1)?.type === 'work') groups[groups.length - 1].items.push(item);
     else groups.push({ type, items: [item] });
     return groups;

@@ -1,7 +1,8 @@
+mod live_settings;
 mod plugin_refresh;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     path::PathBuf,
     process::Stdio,
     sync::{
@@ -36,7 +37,7 @@ pub(super) struct Client {
     process: Mutex<Child>,
     pending: Mutex<Pending>,
     approvals: Mutex<HashMap<String, GuiEvent>>,
-    active_turns: Mutex<HashSet<String>>,
+    active_turns: Mutex<HashMap<String, String>>,
     plugin_revision: Mutex<Option<String>>,
     next_id: AtomicU64,
     pub(super) alive: AtomicBool,
@@ -53,6 +54,8 @@ impl Client {
         let mut command = Command::new(executable.path);
         command
             .arg("app-server")
+            .arg("-c")
+            .arg("features.step_model_switching=true")
             .arg("-c")
             .arg(format!("sqlite_home={}", json!(home.to_string_lossy())))
             .arg("-c")
@@ -80,7 +83,7 @@ impl Client {
             process: Mutex::new(process),
             pending: Mutex::new(HashMap::new()),
             approvals: Mutex::new(HashMap::new()),
-            active_turns: Mutex::new(HashSet::new()),
+            active_turns: Mutex::new(HashMap::new()),
             plugin_revision: Mutex::new(None),
             next_id: AtomicU64::new(1),
             alive: AtomicBool::new(true),
@@ -163,14 +166,11 @@ impl Client {
                 id: value.get("id").cloned(),
             };
             workspaces::hide_project_paths(&mut event.params, &self.projectless_root);
-            if method == "turn/started" {
-                if let Some(id) = event.params["turn"]["id"].as_str() {
-                    self.active_turns.lock().await.insert(id.to_owned());
-                }
+            if matches!(method, "turn/started" | "turn/completed") {
+                self.track_live_turn(&event).await;
             }
             if method == "turn/completed" {
                 if let Some(id) = event.params["turn"]["id"].as_str() {
-                    self.active_turns.lock().await.remove(id);
                     self.approvals
                         .lock()
                         .await

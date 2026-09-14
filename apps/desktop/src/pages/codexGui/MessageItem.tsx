@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { ModelChangeNotice } from "./ModelChangeNotice";
 import type { Item } from "./types";
 import type { SubmitMessageEdit } from "./messageEditContent";
 import { ActivityRow } from "./ActivityRow";
@@ -34,6 +35,7 @@ export const MessageItem = memo(function MessageItem({ item, streaming, startedA
   item: Item; streaming: boolean; startedAt?: number | null;
   onEdit?: SubmitMessageEdit; editDisabled?: boolean;
 }) {
+  if (item.type === "modelChange") return <ModelChangeNotice item={item} />;
   if (item.type === "userMessage") return <UserMessage item={item} startedAt={startedAt}
     onEdit={onEdit} editDisabled={editDisabled} />;
   if (item.type === "agentMessage") return <AgentMessage item={item} streaming={streaming} />;

@@ -37,8 +37,8 @@ pub(crate) enum Effort {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ModelSelection {
-    model: String,
-    effort: Effort,
+    pub(super) model: String,
+    pub(super) effort: Effort,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -47,11 +47,26 @@ pub(crate) struct ModelSettingsSnapshot {
     thread_id: Option<String>,
     selection: Option<ModelSelection>,
     revision: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    live_update: Option<LiveModelUpdate>,
 }
 
 /// Serializes complete file operations and their event publication on background workers.
 #[derive(Default)]
-pub(crate) struct ModelSettingsState(Mutex<()>);
+pub(crate) struct ModelSettingsState {
+    storage: Mutex<()>,
+    // Serialize saves and live publication across desktop and browser clients without blocking the UI.
+    writes: tokio::sync::Mutex<()>,
+}
+
+/// Publication result for the current task; saved choices still apply to future turns.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum LiveModelUpdate {
+    Applied,
+    NextTurn,
+    Failed,
+}
 
 fn settings_path(root: &Path, thread_id: Option<&str>) -> Result<PathBuf> {
     let name = match thread_id {
@@ -85,6 +100,7 @@ fn read(root: &Path, thread_id: Option<String>) -> Result<ModelSettingsSnapshot>
             thread_id,
             selection: None,
             revision: 0,
+            live_update: None,
         }),
         Err(_) => Err(ModelSettingsError::Storage),
     }
@@ -114,6 +130,7 @@ fn save(
             .revision
             .checked_add(1)
             .ok_or(ModelSettingsError::Storage)?,
+        live_update: None,
     };
     fs::create_dir_all(root.join(DIRECTORY)).map_err(|_| ModelSettingsError::Storage)?;
     let value = serde_json::to_value(&snapshot).map_err(|_| ModelSettingsError::Storage)?;
@@ -128,7 +145,10 @@ async fn access(
 ) -> Result<ModelSettingsSnapshot> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<ModelSettingsState>();
-        let _guard = state.0.lock().map_err(|_| ModelSettingsError::Storage)?;
+        let _guard = state
+            .storage
+            .lock()
+            .map_err(|_| ModelSettingsError::Storage)?;
         let root = app
             .path()
             .app_data_dir()
@@ -136,9 +156,7 @@ async fn access(
         let Some(selection) = selection else {
             return read(&root, thread_id);
         };
-        let snapshot = save(&root, thread_id, selection)?;
-        super::web::publish(&app, CHANGED_EVENT, &snapshot);
-        Ok(snapshot)
+        save(&root, thread_id, selection)
     })
     .await
     .map_err(|_| ModelSettingsError::Storage)?
@@ -160,9 +178,18 @@ pub(crate) async fn codex_gui_set_model_settings(
     thread_id: Option<String>,
     selection: ModelSelection,
 ) -> std::result::Result<ModelSettingsSnapshot, String> {
-    access(app, thread_id, Some(selection))
+    let state = app.state::<ModelSettingsState>();
+    let _write = state.writes.lock().await;
+    let mut snapshot = access(app.clone(), thread_id.clone(), Some(selection.clone()))
         .await
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    if let Some(thread_id) = thread_id {
+        if let Ok(client) = super::connected(&app.state::<super::GuiState>()).await {
+            snapshot.live_update = Some(client.update_live_model(&thread_id, &selection).await);
+        }
+    }
+    super::web::publish(&app, CHANGED_EVENT, &snapshot);
+    Ok(snapshot)
 }
 
 #[cfg(test)]

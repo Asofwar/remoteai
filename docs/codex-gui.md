@@ -211,3 +211,26 @@ The protocol smoke test covers initialization, models, image-only input reaching
 live deltas while listing conversations, persisted
 history, rename, process restart/resume, archive/restore, compaction and context usage updates,
 interruption, and independent on-disk storage.
+
+
+## Change models during a task
+
+Changing the model or reasoning effort during generation updates the running task through
+Codex's experimental `turn/settings/update` API. The next model request uses the new choice;
+an already dispatched request finishes with its original settings. The task is not interrupted,
+no extra user message is inserted, and existing child sessions retain their own settings.
+The GUI enables `features.step_model_switching` when starting Codex and updates native thread defaults
+so automatic goal continuations also retain the new selection.
+
+A centered divider in the conversation shows the old and new model after Codex accepts the update.
+Its information icon explains that the next request uses the new model and switching may slow responses.
+Markers retain their chronological position when reopening the conversation in the same browser session.
+If the task has already finished, the saved choice applies
+to the next turn. An unsupported CLI or failed update displays a warning instead of claiming success;
+the saved choice remains available for subsequent turns. Verified with Codex 0.154.0.
+
+Run the local protocol fixture (no model credits required):
+
+```powershell
+node scripts/codex-gui-live-model-smoke.mjs <installed-package>/bin/codex.exe
+```

@@ -24,3 +24,17 @@ it("falls back to server history when optional metadata is malformed or too larg
   rememberTurnDetails(value, "big");
   expect(sessionStorage.getItem("codex-switch:gui-turn-details:v1")).toBe("[]");
 });
+
+it("restores model changes between the same messages after reopening history", () => {
+  const user = { id: "user", type: "userMessage" };
+  const marker = { id: "change", type: "modelChange", text: "模型已从 A 更改为 B", success: true,
+    summary: ["将从下一次请求起生效。中途切换模型可能使响应变慢。"] };
+  const answer = { id: "answer", type: "agentMessage", text: "Done" };
+  const thread = { id: "thread", preview: "", cwd: "", updatedAt: 1,
+    turns: [{ id: "turn", status: "completed", items: [user, marker, answer] }] };
+  rememberTurnDetails(conversation(thread), "turn");
+  const history = { ...thread, turns: [{ ...thread.turns[0], items: [user, answer] }] };
+  expect(conversation(history).turns[0].items).toEqual([user, marker, answer]);
+  expect(conversation(history, conversation(thread)).turns[0].items).toEqual([user, marker, answer]);
+  expect(conversation({ ...history, id: "other" }).turns[0].items).toEqual([user, answer]);
+});

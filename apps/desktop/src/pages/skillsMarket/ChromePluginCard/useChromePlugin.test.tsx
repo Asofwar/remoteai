@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ChromePluginStatus } from "../../../api/chromePlugin";
@@ -68,4 +68,32 @@ it("isolates pending status responses when the selected home remounts the card",
   await act(async () => root.render(<Harness key="second" home="second" />));
   await act(async () => finish(installed));
   expect(hook.status?.enabled).toBe(false);
+});
+
+
+it("finishes the initial check in StrictMode without waiting for the polling interval", async () => {
+  await act(async () => root.render(<StrictMode><Harness /></StrictMode>));
+  expect(hook.status).toEqual(installed);
+  expect(vi.getTimerCount()).toBe(1);
+});
+
+it("checks immediately after reactivation while an older request is pending", async () => {
+  let finish!: (status: ChromePluginStatus) => void;
+  api.chromePluginStatus.mockReturnValueOnce(new Promise<ChromePluginStatus>((resolve) => { finish = resolve; }));
+  await act(async () => root.render(<Harness />));
+  await act(async () => root.render(<Harness active={false} />));
+  await act(async () => root.render(<Harness />));
+  await act(async () => finish({ ...installed, needsRepair: true }));
+  expect(hook.status).toEqual(installed);
+  expect(api.chromePluginStatus).toHaveBeenCalledTimes(2);
+});
+
+it("does not publish a pending response or queue checks after deactivation", async () => {
+  let finish!: (status: ChromePluginStatus) => void;
+  api.chromePluginStatus.mockReturnValueOnce(new Promise<ChromePluginStatus>((resolve) => { finish = resolve; }));
+  await act(async () => root.render(<Harness />));
+  await act(async () => root.render(<Harness active={false} />));
+  await act(async () => finish(installed));
+  expect(hook.status).toBeNull();
+  expect(api.chromePluginStatus).toHaveBeenCalledTimes(1);
 });

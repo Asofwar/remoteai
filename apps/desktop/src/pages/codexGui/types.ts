@@ -107,6 +107,8 @@ export interface ThreadTokenUsage {
   modelContextWindow?: number | null;
 }
 export interface EventParams {
+  serverName?: string;
+  _meta?: { tool_params?: Record<string, unknown> };
   userMessageIndex?: number;
   computerUseSetup?: ComputerUseSetup;
   goal?: ThreadGoal;

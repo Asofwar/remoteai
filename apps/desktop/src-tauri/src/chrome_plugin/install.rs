@@ -23,7 +23,10 @@ fn update_config(home: &Path, id: &str, entry: Option<Table>) -> Result<()> {
         &format!("--chrome-mcp={id}"),
         entry,
     )
-    .map_err(|_| BrowserError::Conflict)
+    .map_err(|error| match error {
+        crate::codex_settings::ManagedMcpError::ForeignEntry => BrowserError::Conflict,
+        crate::codex_settings::ManagedMcpError::Storage => BrowserError::Storage,
+    })
 }
 
 pub(super) fn install(root: &Path, home: &Path, executable: &Path) -> Result<()> {

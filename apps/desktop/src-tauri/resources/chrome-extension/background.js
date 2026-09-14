@@ -2,6 +2,7 @@ import * as permissions from './permissions.js';
 import { execute } from './operations.js';
 import { invalidate } from './snapshot.js';
 import { stopDebugging } from './driver.js';
+import { clearControlledTabs } from './tab-indicator.js';
 
 const HOST = 'dev.codex_switch.chrome';
 const running = new Map();
@@ -95,8 +96,12 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   localMessage(message).then((result) => respond({ result })).catch((error) => respond({ error: error.message }));
   return true;
 });
-chrome.tabs.onUpdated.addListener((tabId, change) => { if (change.status === 'loading' || change.url) invalidate(tabId); });
-chrome.tabs.onRemoved.addListener(invalidate);
+chrome.tabs.onUpdated.addListener((tabId, change) => {
+  if (change.status !== 'loading' && !change.url) return;
+  invalidate(tabId);
+  void clearControlledTabs(tabId);
+});
+chrome.tabs.onRemoved.addListener((tabId) => { invalidate(tabId); void clearControlledTabs(tabId); });
 chrome.windows.onRemoved.addListener(permissions.windowClosed);
 chrome.permissions.onRemoved.addListener(({ origins }) => {
   if (!origins?.length) return;

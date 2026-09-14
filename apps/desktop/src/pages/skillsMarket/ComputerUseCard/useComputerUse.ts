@@ -10,6 +10,7 @@ export function useComputerUse(homeId: string, active: boolean) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const loading = useRef(false);
+  const pendingRefresh = useRef<(() => void) | null>(null);
   const changing = useRef(false);
   const revision = useRef(0);
   const actionError = useRef(false);
@@ -28,14 +29,24 @@ export function useComputerUse(homeId: string, active: boolean) {
       }
     } catch (caught) {
       if (mounted.current && started === revision.current && !actionError.current) setError(String(caught));
-    } finally { loading.current = false; }
+    } finally {
+      loading.current = false;
+      const pending = pendingRefresh.current;
+      pendingRefresh.current = null;
+      pending?.();
+    }
   }, [homeId]);
 
   useEffect(() => {
     if (!active) return;
-    void refresh();
+    if (loading.current) pendingRefresh.current = () => void refresh();
+    else void refresh();
     const timer = setInterval(() => void refresh(), REFRESH_INTERVAL_MS);
-    return () => { clearInterval(timer); revision.current += 1; };
+    return () => {
+      clearInterval(timer);
+      pendingRefresh.current = null;
+      revision.current += 1;
+    };
   }, [active, refresh]);
 
   const perform = async (operation: () => Promise<ComputerUseStatus>) => {

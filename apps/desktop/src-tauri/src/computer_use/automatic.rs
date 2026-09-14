@@ -13,7 +13,8 @@ pub(crate) fn setup_gui(home: &Path, installing: impl FnOnce()) -> Result<()> {
     setup_with(&root, home, || {
         installing();
         install::install(&root, home)
-    })
+    })?;
+    install::refresh_installed(&root, home)
 }
 
 fn setup_with(root: &Path, home: &Path, install: impl FnOnce() -> Result<()>) -> Result<()> {

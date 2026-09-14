@@ -4,14 +4,17 @@ import { ShieldQuestion } from "lucide-react";
 import type { GuiController } from "./controller";
 import type { GuiEvent } from "./types";
 import { submitQuestionOnEnter } from "./questionKeyboard";
+import { mcpConfirmation } from "./mcpConfirmation";
 import styles from "./styles.module.less";
 
-export function Approvals({ events, controller }: { events: GuiEvent[]; controller: GuiController }) {
+type ApprovalController = Pick<GuiController, "respond">;
+
+export function Approvals({ events, controller }: { events: GuiEvent[]; controller: ApprovalController }) {
   return <div className={`${styles.approvals} ${styles.questionWrap}`}>{events.map((event) =>
     <Approval key={event.id} event={event} controller={controller} />)}</div>;
 }
 
-function Approval({ event, controller }: { event: GuiEvent; controller: GuiController }) {
+function Approval({ event, controller }: { event: GuiEvent; controller: ApprovalController }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
@@ -20,6 +23,7 @@ function Approval({ event, controller }: { event: GuiEvent; controller: GuiContr
   const questions = params.questions ?? [];
   const isQuestion = method === "item/tool/requestUserInput";
   const isPermissions = method === "item/permissions/requestApproval";
+  const confirmation = mcpConfirmation(params);
   const decisions = params.availableDecisions;
   const allowAccept = !decisions || decisions.includes("accept");
   const allowDecline = !decisions || decisions.includes("decline");
@@ -37,6 +41,10 @@ function Approval({ event, controller }: { event: GuiEvent; controller: GuiContr
     onKeyDown={isQuestion ? (event) => submitQuestionOnEnter(event, () => respond("accept")) : undefined}>
     <strong><ShieldQuestion size={17} />{isQuestion ? "需要你的补充" : "需要你的确认"}</strong>
     {params.reason && <p>{params.reason}</p>}
+    {method === "mcpServer/elicitation/request" && <div style={{ maxWidth: 400, overflowWrap: "anywhere" }}>
+      <p>{confirmation.message}</p>
+      {confirmation.details.map(({ label, value }) => <p key={label}>{label}：{value}</p>)}
+    </div>}
     {params.command && <pre>{params.command}</pre>}
     {(params.cwd || params.grantRoot) && <p className={styles.muted}>{params.cwd || params.grantRoot}</p>}
     {isPermissions && <div>

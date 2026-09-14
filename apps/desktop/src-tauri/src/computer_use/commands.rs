@@ -41,9 +41,18 @@ pub(crate) async fn computer_use_status(
     home_id: String,
 ) -> std::result::Result<ComputerUseStatus, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        // Read a completed installation, never a partially written record/config pair.
+        let _guard = CHANGES.lock().map_err(|_| ComputerError::Storage)?;
         let home = crate::codex_home::resolve_selected(&app, Some(&home_id))
             .map_err(|_| ComputerError::Storage)?;
-        status(&super::root()?, &home)
+        let root = super::root()?;
+        if platform::asset().is_ok() {
+            match install::refresh_installed(&root, &home) {
+                Ok(()) | Err(ComputerError::Conflict) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        status(&root, &home)
     })
     .await
     .map_err(|_| ComputerError::Storage.to_string())?

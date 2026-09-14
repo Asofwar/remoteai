@@ -94,3 +94,79 @@ fn preserves_user_skills_and_rejects_invalid_record_paths() {
     assert!(state::path(&fixture.0, "../../elsewhere").is_err());
     assert!(state::path(&fixture.0, &"x".repeat(64)).is_err());
 }
+
+fn prepare_package(root: &Path) {
+    let asset = super::super::platform::asset().unwrap();
+    let directory = package::directory(root).unwrap();
+    fs::create_dir_all(&directory).unwrap();
+    for name in asset.files {
+        fs::write(directory.join(name), "fixture").unwrap();
+    }
+    super::super::platform::set_executable(&package::executable(root).unwrap()).unwrap();
+}
+
+#[test]
+fn restores_missing_registration_without_reinstalling_or_revoking_sessions() {
+    if super::super::platform::asset().is_err() {
+        return;
+    }
+    let fixture = Fixture::new();
+    let home = fixture.home("home");
+    install_with(&fixture.0, &home, || Ok(())).unwrap();
+    prepare_package(&fixture.0);
+    let id = state::home_id(&home);
+    let generation = state::read(&fixture.0, &id).unwrap().unwrap().generation;
+    fs::write(home.join("config.toml"), "# preserved\nmodel = 'custom'\n").unwrap();
+    fs::remove_file(skill_path(&home)).unwrap();
+    refresh_installed(&fixture.0, &home).unwrap();
+    assert!(configured(&home, true).unwrap());
+    assert!(skill_matches(&home));
+    assert!(state::allowed(&fixture.0, &id, &generation));
+    let config = fs::read_to_string(home.join("config.toml")).unwrap();
+    assert!(config.starts_with("# preserved\nmodel = 'custom'\n"));
+    refresh_installed(&fixture.0, &home).unwrap();
+    assert_eq!(
+        fs::read_to_string(home.join("config.toml")).unwrap(),
+        config
+    );
+    disable(&fixture.0, &home, false).unwrap();
+    refresh_installed(&fixture.0, &home).unwrap();
+    assert!(configured(&home, false).unwrap());
+    assert!(!skill_path(&home).exists());
+}
+
+#[test]
+fn registration_refresh_preserves_foreign_config_and_missing_packages() {
+    if super::super::platform::asset().is_err() {
+        return;
+    }
+    let fixture = Fixture::new();
+    let home = fixture.home("home");
+    install_with(&fixture.0, &home, || Ok(())).unwrap();
+    let foreign = format!("[mcp_servers.{MCP_SERVER}]\ncommand = 'custom'\nargs = ['mcp']\n");
+    fs::write(home.join("config.toml"), &foreign).unwrap();
+    refresh_installed(&fixture.0, &home).unwrap();
+    prepare_package(&fixture.0);
+    assert!(matches!(
+        refresh_installed(&fixture.0, &home),
+        Err(ComputerError::Conflict)
+    ));
+    assert_eq!(
+        fs::read_to_string(home.join("config.toml")).unwrap(),
+        foreign
+    );
+}
+
+#[test]
+fn skill_line_endings_do_not_require_repair() {
+    let fixture = Fixture::new();
+    let home = fixture.home("home");
+    install_with(&fixture.0, &home, || Ok(())).unwrap();
+    for content in [
+        SKILL.replace("\r\n", "\n"),
+        SKILL.replace("\r\n", "\n").replace('\n', "\r\n"),
+    ] {
+        fs::write(skill_path(&home), content).unwrap();
+        assert!(skill_matches(&home));
+    }
+}

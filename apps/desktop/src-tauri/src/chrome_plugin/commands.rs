@@ -81,6 +81,7 @@ pub(crate) async fn chrome_plugin_action(
 }
 
 fn status(root: &Path, home: &Path) -> Result<ChromePluginStatus> {
+    let guard = INSTALL_CHANGES.lock().map_err(|_| BrowserError::Storage)?;
     let id = config::client_id(home);
     let record = match config::load(root, &id) {
         Ok(record) => Some(record),
@@ -89,10 +90,12 @@ fn status(root: &Path, home: &Path) -> Result<ChromePluginStatus> {
     };
     let mut connected_browsers = 0;
     let mut active_browsers = 0;
-    let needs_repair = record
-        .as_ref()
-        .is_some_and(|record| !install::configured(home, record.enabled).unwrap_or(false));
+    let needs_repair = match record.as_ref() {
+        Some(record) => !install::configured(home, record.enabled)?,
+        None => false,
+    };
     let enabled = record.as_ref().is_some_and(|record| record.enabled) && !needs_repair;
+    drop(guard);
     if let Some(record) = record.as_ref().filter(|_| enabled) {
         let request = BridgeRequest {
             client_id: id,

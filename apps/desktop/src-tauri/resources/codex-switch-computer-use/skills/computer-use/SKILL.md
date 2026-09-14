@@ -10,6 +10,12 @@ description: Inspect and operate Windows and macOS desktop apps through the Code
 Use the `codex_switch_computer_use` MCP server for desktop tasks. Read the available tool schemas
 before calling them; capabilities vary with the installed CUA release and the target application.
 
+For Chrome webpages, first read the `codex-switch-chrome` skill and discover its
+`codex_switch_chrome` tools if tool search is available. Prefer those tools for tabs, page content,
+clicks, typing, and screenshots. Use Computer Use for native desktop apps, browser window controls,
+or website tasks only when Chrome tools are unavailable and desktop access is authorized. Never
+use desktop control to bypass a browser assistant pause, rejected permission, or restricted site.
+
 On macOS, inspect `check_permissions` with `prompt: false` if a tool reports missing permissions.
 The managed driver uses Codex Switch's permissions. Direct the user to the computer assistant's
 community plugin card to enable Accessibility and Screen Recording for **Codex Switch**, then

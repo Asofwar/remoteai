@@ -110,3 +110,60 @@ fn incomplete_installation_fails_closed_and_can_be_repaired() {
     install().unwrap();
     assert!(configured(&home, true).unwrap());
 }
+
+#[test]
+fn copied_managed_config_is_rebound_without_changing_the_source_home() {
+    let fixture = Fixture::new();
+    let source = fixture.home("source");
+    let target = fixture.home("gui");
+    let executable = std::env::current_exe().unwrap();
+    install_home(&fixture.0, &source, &executable, || Ok(())).unwrap();
+    let source_config = fs::read(source.join("config.toml")).unwrap();
+    fs::write(target.join("config.toml"), &source_config).unwrap();
+    install_home(&fixture.0, &target, &executable, || Ok(())).unwrap();
+    assert!(configured(&target, true).unwrap());
+    assert_eq!(fs::read(source.join("config.toml")).unwrap(), source_config);
+    assert!(
+        config::load(&fixture.0, &config::client_id(&source))
+            .unwrap()
+            .enabled
+    );
+}
+
+#[test]
+fn copied_argument_does_not_authorize_overwriting_a_foreign_executable() {
+    let fixture = Fixture::new();
+    let home = fixture.home("home");
+    let executable = std::env::current_exe().unwrap();
+    let foreign = format!(
+        "[mcp_servers.{MCP_SERVER}]\ncommand = 'foreign'\nargs = ['--chrome-mcp={}']\n",
+        config::client_id(&fixture.home("source"))
+    );
+    fs::write(home.join("config.toml"), &foreign).unwrap();
+    assert!(matches!(
+        install_home(&fixture.0, &home, &executable, || panic!(
+            "must not install"
+        )),
+        Err(BrowserError::Conflict)
+    ));
+    assert_eq!(
+        fs::read_to_string(home.join("config.toml")).unwrap(),
+        foreign
+    );
+}
+
+#[test]
+fn invalid_config_is_not_reported_as_a_foreign_plugin() {
+    let fixture = Fixture::new();
+    let home = fixture.home("home");
+    fs::write(home.join("config.toml"), "invalid [").unwrap();
+    assert!(matches!(
+        install_home(
+            &fixture.0,
+            &home,
+            &std::env::current_exe().unwrap(),
+            || panic!("must not install")
+        ),
+        Err(BrowserError::Storage)
+    ));
+}

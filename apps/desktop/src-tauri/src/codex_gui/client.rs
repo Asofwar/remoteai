@@ -1,3 +1,5 @@
+mod plugin_refresh;
+
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
@@ -35,6 +37,7 @@ pub(super) struct Client {
     pending: Mutex<Pending>,
     approvals: Mutex<HashMap<String, GuiEvent>>,
     active_turns: Mutex<HashSet<String>>,
+    plugin_revision: Mutex<Option<String>>,
     next_id: AtomicU64,
     pub(super) alive: AtomicBool,
     app: AppHandle,
@@ -78,6 +81,7 @@ impl Client {
             pending: Mutex::new(HashMap::new()),
             approvals: Mutex::new(HashMap::new()),
             active_turns: Mutex::new(HashSet::new()),
+            plugin_revision: Mutex::new(None),
             next_id: AtomicU64::new(1),
             alive: AtomicBool::new(true),
             app,
@@ -109,6 +113,13 @@ impl Client {
 
     pub(super) async fn request(&self, method: &str, mut params: Value) -> Result<Value> {
         super::home::scope_thread_request(method, &mut params);
+        if method == "turn/start" {
+            self.refresh_plugins().await?;
+        }
+        self.request_raw(method, params).await
+    }
+
+    async fn request_raw(&self, method: &str, params: Value) -> Result<Value> {
         if !self.alive.load(Ordering::Acquire) {
             return Err(GuiError::Disconnected);
         }
@@ -173,7 +184,8 @@ impl Client {
                         | "item/fileChange/requestApproval"
                         | "item/tool/requestUserInput"
                         | "item/permissions/requestApproval"
-                ) {
+                ) && !super::mcp_approval::supported(&event)
+                {
                     if self
                         .write(json!({"id": id, "error": {"code": -32601,
                         "message": "This client does not support this request"}}))

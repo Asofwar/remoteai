@@ -12,11 +12,15 @@ pinned universal binary archive. Older macOS versions and other operating system
    The first installation downloads approximately 28 MB on Windows or 42 MB on macOS from GitHub;
    the GUI shows a preparation notice.
 2. Other Codex Homes can still install the assistant from the community plugin page.
-3. Open a new Codex GUI conversation using the same Home. For example: “打开计算器，计算 6 × 7，并确认结果。”
+3. Send a message in Codex GUI using the same Home. For example: “打开计算器，计算 6 × 7，并确认结果。”
 4. The model can discover CUA tools, inspect applications, operate their controls and receive screenshots.
    The existing GUI tool-result viewer renders the MCP image content directly.
 5. Use **停用** to stop that Home's sessions, **启用 / 修复** to restore its setup, or **卸载** to remove
-   its managed MCP configuration and skill. Start a new conversation after enabling or repairing.
+   its managed MCP configuration and skill. Changed tools load before the next message in existing GUI conversations.
+
+Status checks restore missing managed configuration and skills for enabled installations whose local
+driver package is complete. They do not download a package, change session credentials, enable a disabled
+installation, or replace a foreign configuration. Checks serialize with installation changes on a worker.
 
 An enabled card means the files and configuration are present, not that a particular conversation has
 completed an MCP handshake. Driver startup failures remain visible as tool/connection errors in Codex.

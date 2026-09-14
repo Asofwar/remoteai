@@ -20,7 +20,7 @@ function statusText(status: ComputerUseStatus | null) {
   if (status.needsRepair) return "安装需要修复";
   if (status.enabled && status.permissions
     && (!status.permissions.accessibility || !status.permissions.screenRecording)) return "已安装 · 请开启桌面操作权限";
-  return status.enabled ? "已启用 · 请打开新对话使用" : "已停用";
+  return status.enabled ? "已启用 · 可在对话中使用" : "已停用";
 }
 
 export function ComputerUseCard({ homeId, active, onBusyChange }: Props) {

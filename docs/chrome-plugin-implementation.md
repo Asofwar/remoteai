@@ -8,11 +8,18 @@ The plugin is available in the desktop application's community marketplace for t
 
 1. Select the intended Codex Home in the plugin marketplace and install the Chrome browser assistant.
 2. Follow the setup dialog to load the exported extension through Chrome's normal extension interface.
-3. Confirm that the card reports a connected browser, then start a new Codex session using that home.
+3. Confirm that the card reports a connected browser, then send a message using that home.
+   Existing GUI conversations reload changed MCP configuration before their next turn.
 4. Accept Chrome's website permissions when installing the extension. All HTTP(S) websites are allowed
    by default. Turn off "Allow all websites" in the popup to use per-site session or remembered grants.
 5. Use the extension popup to pause control, revoke a site's permission, rename the browser profile,
    or reconnect. The marketplace provides repair, disable and uninstall actions for each home.
+
+Controlled webpages display a green cursor favicon. Pausing control, revoking access or navigating
+restores the website's icon. Focusing a minimized Chrome window also restores the window.
+GUI conversations support the upstream MCP tool confirmation form with single-use allow/deny choices;
+site access and tool approval remain separate controls. Chrome webpage tasks prefer the Chrome skill,
+which explicitly checks tool availability instead of assuming that an installed skill provides tools.
 
 Chrome 125 or newer is required. The extension has not been published to the Chrome Web Store;
 the current setup therefore includes a manual Chrome loading step. Exporting the files alone does
@@ -62,6 +69,29 @@ webpage content as untrusted, preserve user tabs and respect permission decision
 are masked in accessible snapshots; screenshots can still contain visible page content.
 
 ## Verification
+
+### 2026-09-14 plugin recovery regression
+
+Tested the packaged Windows executable in the local Windows 11 Hyper-V guest with the existing
+upstream connection and a separate Chrome test profile. The existing Computer Use installation
+changed from `needsRepair=true` to enabled without another driver download. Five repeated entries
+into the marketplace while an upstream turn was active showed ready cards within the first
+20 ms polling sample (observed 21–22 ms), without repair warnings.
+
+In the same GUI thread, disable Chrome, complete a turn, enable Chrome, and send another message:
+actual `codex_switch_chrome` calls became available without recreating the thread. The local fixture
+received `CHROME-RELOAD-PASS` through `browser_fill`; `browser_click` and a fresh snapshot confirmed
+`PASS: CHROME-RELOAD-PASS`. The final build restored a deliberately minimized window through
+`browser_focus`. A screenshot showed the green cursor favicon; clicking Pause restored the
+fixture's original purple favicon. The newer upstream MCP confirmation form was displayed and
+accepted through the GUI rather than automatically rejected as unsupported.
+
+The copied-home configuration conflict is covered by Rust tests; it was not reproduced in this guest.
+Final checks passed: 1131 Rust tests (5 ignored), strict Clippy, Rust formatting, 35 relevant React
+tests, 19 Chrome extension/protocol tests, and the desktop TypeScript/Vite and Windows release builds.
+The existing Vite chunk-size warning remains.
+
+### Initial implementation
 
 Automated validation passed:
 

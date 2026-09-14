@@ -368,6 +368,9 @@ impl GuiRequest {
 
 pub(super) fn approval_response(event: &GuiEvent, reply: ApprovalReply) -> Result<Value> {
     match event.method.as_str() {
+        super::mcp_approval::METHOD => {
+            super::mcp_approval::response(event, reply.decision.ok_or(GuiError::InvalidRequest)?)
+        }
         "item/commandExecution/requestApproval" | "item/fileChange/requestApproval" => {
             let decision = reply.decision.ok_or(GuiError::InvalidRequest)?;
             if let Some(available) = event.params["availableDecisions"].as_array() {

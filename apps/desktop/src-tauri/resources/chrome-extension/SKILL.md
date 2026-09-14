@@ -1,12 +1,19 @@
 ---
 name: codex-switch-chrome
-description: Use the user's Chrome browser through the Codex Switch browser assistant to inspect websites, operate existing tabs, click, type, scroll, or take screenshots.
+description: Preferred tool for Chrome website tasks, ahead of Computer Use. Inspect pages, operate existing tabs, click, type, scroll, and take screenshots through the Codex Switch browser assistant.
 ---
 <!-- managed:codex-switch-chrome -->
 
 # Chrome browser assistant
 
 Use the `codex_switch_chrome` MCP tools. This integration does not require ChatGPT or a Node runtime.
+
+For Chrome webpage tasks, use this integration before desktop screenshots or coordinate-based
+Computer Use. If tools are loaded on demand, discover the `codex_switch_chrome` tools through the
+available tool search before concluding they are missing. A skill file alone does not prove that
+its MCP tools are connected. If discovery still finds no tools, explain that the browser assistant
+needs to be enabled in the current Codex GUI plugin page, then retry in the next message. Do not
+claim that Computer Use provides these Chrome MCP tools.
 
 1. Call `browser_list` and select the requested browser profile. If no browser is connected,
    ask the user to connect the Codex Switch browser assistant in Chrome. Never substitute another

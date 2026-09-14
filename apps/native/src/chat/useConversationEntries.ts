@@ -13,5 +13,6 @@ export function useConversationEntries(turns: Turn[]) {
   const [inlineTurns, setInlineTurns] = useState<ReadonlySet<string>>(() => new Set());
   const retained = retainInlineTurns(turns, inlineTurns);
   if (retained !== inlineTurns) setInlineTurns(retained);
-  return useMemo(() => conversationEntries(turns, retained), [turns, retained]);
+  const entries = useMemo(() => conversationEntries(turns, retained), [turns, retained]);
+  return { entries, hasObservedLiveTurn: retained.size > 0 };
 }

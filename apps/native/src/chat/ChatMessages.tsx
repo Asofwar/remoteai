@@ -48,15 +48,14 @@ function TimelineEntry({ entry, open }: { entry: TurnEntry; open: (selection: Se
 }
 
 export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder }: ChatMessagesProps) {
-  const entries = useConversationEntries(thread?.turns ?? []);
+  const { entries, hasObservedLiveTurn } = useConversationEntries(thread?.turns ?? []);
   const { list, more, preservePosition, historyBottomSpace, initializing, onItemLayout, onFooterLayout,
     showScrollToBottom, scrollToBottom, ...scrollHandlers }
     = useChatScroll<TurnEntry>({ hasMore, loading, loadingMore, loadOlder,
       latestItemId: entries.at(-1)?.id, bottomPadding: styles.messages.padding });
   const refresh = useHistoryRefresh(more, loadingMore);
-  // Live work is readable as soon as it arrives, even while the keyboard delays the initial scroll anchor.
-  const hasInlineWork = entries.some((entry) => entry.kind === 'work' && entry.inline);
-  const showInitialLoading = (!hasInlineWork && initializing) || (loading && !loadingMore && !entries.length);
+  // Keep live messages visible through completion, including replies that never call tools.
+  const showInitialLoading = (!hasObservedLiveTurn && initializing) || (loading && !loadingMore && !entries.length);
   const [selection, setSelection] = useState<Selection | null>(null);
   const open = useCallback((value: Selection) => { Keyboard.dismiss(); setSelection(value); }, []);
   // Resolve against live history so open process, plan, output and diff drawers keep receiving updates.

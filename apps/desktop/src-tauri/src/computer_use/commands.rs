@@ -1,5 +1,6 @@
 use super::{
-    automatic, install, package, platform, state, ComputerError, Result, CHANGES, VERSION,
+    automatic, install, package, permissions, platform, state, ComputerError, Result, CHANGES,
+    VERSION,
 };
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -12,6 +13,7 @@ pub(crate) struct ComputerUseStatus {
     needs_repair: bool,
     supported: bool,
     version: &'static str,
+    permissions: Option<permissions::Permissions>,
 }
 
 #[derive(Deserialize)]
@@ -24,14 +26,33 @@ pub(crate) enum ComputerUseAction {
 }
 
 #[tauri::command]
+pub(crate) async fn computer_use_request_permission(
+    permission: permissions::Permission,
+) -> std::result::Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || permissions::request(permission))
+        .await
+        .map_err(|_| ComputerError::Permissions.to_string())?
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 pub(crate) async fn computer_use_status(
     app: tauri::AppHandle,
     home_id: String,
 ) -> std::result::Result<ComputerUseStatus, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        // Read a completed installation, never a partially written record/config pair.
+        let _guard = CHANGES.lock().map_err(|_| ComputerError::Storage)?;
         let home = crate::codex_home::resolve_selected(&app, Some(&home_id))
             .map_err(|_| ComputerError::Storage)?;
-        status(&super::root()?, &home)
+        let root = super::root()?;
+        if platform::asset().is_ok() {
+            match install::refresh_installed(&root, &home) {
+                Ok(()) | Err(ComputerError::Conflict) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        status(&root, &home)
     })
     .await
     .map_err(|_| ComputerError::Storage.to_string())?
@@ -82,5 +103,6 @@ fn status(root: &Path, home: &Path) -> Result<ComputerUseStatus> {
         needs_repair,
         supported,
         version: VERSION,
+        permissions: permissions::status(),
     })
 }

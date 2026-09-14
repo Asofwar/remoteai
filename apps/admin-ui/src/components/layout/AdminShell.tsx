@@ -30,6 +30,7 @@ import { LANGUAGE_OPTIONS, type Language, type TranslationKey } from "../../i18n
 import { useI18n } from "../../i18n-context";
 import type { MenuKey, Permission, Profile } from "../../types";
 import { getLatestAndroidApkUrl } from "../../utils/releaseDownloads";
+import "./AdminShell.css";
 
 interface AdminShellProps {
   activeKey: MenuKey;
@@ -50,6 +51,7 @@ const menuLabelKeys: Record<MenuKey, TranslationKey> = {
   roles: "nav.roles",
   officialAccounts: "nav.officialAccounts",
   announcement: "nav.announcement",
+  chatSettings: "nav.chatSettings",
   currency: "nav.currency",
   codexHomePresets: "nav.codexHomePresets",
   emailTemplates: "nav.emailTemplates",
@@ -69,6 +71,7 @@ const menuPermissions: Record<MenuKey, Permission> = {
   roles: "admin.roles.read",
   officialAccounts: "admin.official-accounts.read",
   announcement: "admin.announcements.read",
+  chatSettings: "admin.chat-settings.read",
   currency: "admin.currency.read",
   codexHomePresets: "admin.codex-home-presets.read",
   emailTemplates: "admin.email-templates.read",
@@ -103,6 +106,7 @@ export function AdminShell({
       { key: "roles" as const, icon: <Shield size={17} />, label: t("nav.roles") },
       { key: "officialAccounts" as const, icon: <BadgeCheck size={17} />, label: t("nav.officialAccounts") },
       { key: "announcement" as const, icon: <BellRing size={17} />, label: t("nav.announcement") },
+      { key: "chatSettings" as const, icon: <MessageSquareText size={17} />, label: t("nav.chatSettings") },
       { key: "currency" as const, icon: <Coins size={17} />, label: t("nav.currency") },
       { key: "codexHomePresets" as const, icon: <FolderCog size={17} />, label: t("nav.codexHomePresets") },
       { key: "emailTemplates" as const, icon: <Mails size={17} />, label: t("nav.emailTemplates") },

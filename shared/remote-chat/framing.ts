@@ -20,6 +20,8 @@ export function* chunks(message: RpcMessage, id: string) {
 export class Assembler {
   private readonly pending = new Map<string, Assembly>();
 
+  constructor(private readonly expireIncomplete = true) {}
+
   accept(text: string): RpcMessage | null {
     const frame = parseMessage(text);
     const { id, index, total, text: part } = frame;
@@ -49,6 +51,7 @@ export class Assembler {
   }
 
   private expire() {
+    if (!this.expireIncomplete) return;
     for (const [id, entry] of this.pending) {
       if (Date.now() - entry.createdAt > ASSEMBLY_TTL_MS) this.pending.delete(id);
     }

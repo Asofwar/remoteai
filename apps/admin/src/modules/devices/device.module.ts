@@ -1,3 +1,4 @@
+import { ChatSettingsModule } from '../chat-settings/chat-settings.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtConfigModule } from '@/modules/jwt/jwt.module';
@@ -13,6 +14,7 @@ import { ChatStunService } from './chat/stun.service';
 
 @Module({
   imports: [
+    ChatSettingsModule,
     JwtConfigModule,
     UserModule,
     SyncModule,

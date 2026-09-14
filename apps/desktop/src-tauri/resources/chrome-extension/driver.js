@@ -1,5 +1,6 @@
 import { authorize, assertRunning } from './permissions.js';
 import { createFrameSessions } from './frame-sessions.js';
+import { markControlledTab, clearControlledTabs } from './tab-indicator.js';
 
 const queues = new Map();
 const attached = new Set();
@@ -30,6 +31,8 @@ async function run(context, args, operation) {
   };
   const sessions = createFrameSessions(target, guard);
   try {
+    await guard();
+    await markControlledTab(tab.id);
     await sessions.initialize();
     const driver = { tab, send: sessions.send, documents: sessions.documents, context, guard };
     return await operation(driver);
@@ -45,6 +48,7 @@ async function run(context, args, operation) {
 export async function stopDebugging() {
   await Promise.all([...attached].map((tabId) => chrome.debugger.detach({ tabId }).catch(() => {})));
   attached.clear();
+  await clearControlledTabs();
 }
 
 export async function pageCall(driver, ref, functionDeclaration, args = []) {

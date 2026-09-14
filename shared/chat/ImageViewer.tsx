@@ -1,12 +1,18 @@
-import { useRef, useState, type PointerEvent } from 'react';
+import { useRef, useState, type MouseEvent, type PointerEvent } from 'react';
 import { useImageViewer } from './useImageViewer';
 import { clampZoom, INITIAL_TRANSFORM, moveImage, type Point } from './imageTransform';
 import './imageViewer.css';
 
-interface Props { thumbnail: string; description: string; load: () => Promise<string>; close: () => void }
+interface Props {
+  thumbnail: string; description: string; load: () => Promise<string>; close: () => void;
+  download?: (url: string) => void;
+  contextMenu?: (event: MouseEvent, url: string) => void;
+  feedback?: string;
+}
 
-export function ImageViewer({ thumbnail, description, load, close }: Props) {
+export function ImageViewer({ thumbnail, description, load, close, download, contextMenu, feedback }: Props) {
   const image = useImageViewer(load);
+  const [downloadError, setDownloadError] = useState('');
   const [transform, setTransform] = useState(INITIAL_TRANSFORM);
   const pointers = useRef(new Map<number, Point>());
   const anchor = useRef({ before: transform, start: [] as Point[] });
@@ -14,9 +20,14 @@ export function ImageViewer({ thumbnail, description, load, close }: Props) {
   const rebase = () => { anchor.current = { before: transform, start: [...pointers.current.values()] }; };
   return <dialog ref={(dialog) => { if (dialog && !dialog.open) dialog.showModal(); }}
     className="cs-image-viewer" aria-label={description} onCancel={close}>
-    <div className="cs-image-stage" onWheel={(event) => setTransform((old) => ({ ...old,
+    <div className="cs-image-stage" onContextMenu={(event) => {
+      if (!contextMenu) return;
+      event.preventDefault();
+      if (image.url && !image.error) contextMenu(event, image.url);
+    }} onWheel={(event) => setTransform((old) => ({ ...old,
       scale: clampZoom(old.scale * (event.deltaY < 0 ? 1.2 : 1 / 1.2)) }))}
       onPointerDown={(event) => {
+        if (event.button !== 0) return;
         event.currentTarget.setPointerCapture(event.pointerId);
         pointers.current.set(event.pointerId, point(event)); rebase();
       }} onPointerMove={(event) => {
@@ -30,6 +41,13 @@ export function ImageViewer({ thumbnail, description, load, close }: Props) {
           + `rotate(${transform.rotation}deg) scale(${transform.scale})` }} />
     </div>
     <button type="button" className="cs-image-close" aria-label="关闭图片" onClick={close}>×</button>
+    {download && <button type="button" className="cs-image-download" disabled={!image.url || image.error}
+      onClick={() => {
+        if (!image.url) return;
+        setDownloadError('');
+        try { download(image.url); }
+        catch (error) { setDownloadError(error instanceof Error ? error.message : '下载失败，请重试。'); }
+      }}>下载图片</button>}
     <div className="cs-image-toolbar">
       <button type="button" aria-label="缩小图片" onClick={() => setTransform((v) => ({ ...v,
         scale: clampZoom(v.scale / 1.5) }))}>−</button>
@@ -41,6 +59,8 @@ export function ImageViewer({ thumbnail, description, load, close }: Props) {
         rotation: (v.rotation + 90) % 360 }))}>↻</button>
     </div>
     {!image.url && !image.error && <div className="cs-image-status" role="status">正在加载原图…</div>}
+    {downloadError && <div className="cs-image-status" role="status">{downloadError}</div>}
+    {feedback && <div className="cs-image-status" role="status">{feedback}</div>}
     {image.error && <div className="cs-image-status" role="status">原图加载失败
       <button type="button" onClick={image.retry}>重试</button></div>}
   </dialog>;

@@ -4,13 +4,16 @@ import { useComposerKeyboard } from './useComposerKeyboard';
 import { composerAction, COMPOSER_ACTION_LABELS, CONTINUE_MESSAGE }
   from '../../../../shared/remote-chat/composerAction';
 import { ChatSettings } from './ChatSettings';
+import type { ReadUsage } from '../../../../shared/remote-chat/usage';
 import { ChatAttachmentPreviews, ChatAttachmentSheet } from './ChatAttachments';
 import { pickChatImages } from './pickChatImages';
-import type { Model, SendInput } from './types';
+import type { Model, SendInput, ThreadTokenUsage } from './types';
 import { composerLabel, type ComposerSettings } from '../../../../shared/remote-chat/composer';
 import { useChatDraft } from '../../../../shared/remote-chat/client/useChatDraft';
 
 interface Props {
+  tokenUsage?: ThreadTokenUsage;
+  readUsage: ReadUsage;
   models: Model[];
   selection: ComposerSettings;
   settingsBusy: boolean;
@@ -26,6 +29,7 @@ interface Props {
   interrupt: () => Promise<void>;
 }
 export function ChatComposer({ models, selection, settingsBusy, settingsError, updateSettings,
+  readUsage, tokenUsage,
   threadId, active, ready, sending, running, interrupted = false, send, interrupt }: Props) {
   const [settings, setSettings] = useState(false);
   const [attachments, setAttachments] = useState(false);
@@ -96,12 +100,15 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
       </div>
       {keyboardVisible && <div className="chat-row chat-composer-settings">
         <button type="button" className="chat-button chat-model" onPointerDown={(event) => event.preventDefault()}
-          aria-label={`${composerLabel(models, selection)}，聊天设置`} onClick={() => setSettings(true)}>
-          {composerLabel(models, selection)} ▾</button>
+          aria-label={`${composerLabel(models, selection)}${selection.speed === 'fast' ? '，快速模式' : ''}，聊天设置`}
+          onClick={() => setSettings(true)}>
+          {composerLabel(models, selection)}{selection.speed === 'fast' && <span aria-hidden="true"> ⚡</span>}
+          {' ▾'}</button>
       </div>}
     </form>
     {attachments && <ChatAttachmentSheet busy={busy} pick={openAlbum} onClose={() => setAttachments(false)} />}
     {settings && <ChatSettings models={models} selection={selection}
+      readUsage={readUsage} tokenUsage={tokenUsage}
       saving={settingsBusy} error={settingsError} ready={ready}
       updateSettings={updateSettings} onClose={() => setSettings(false)} />}
   </>;

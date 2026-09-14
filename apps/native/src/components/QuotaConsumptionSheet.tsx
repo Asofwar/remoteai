@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { AccountSummary } from '../types';
 import { BottomSheet } from './BottomSheet';
+import { SheetScrollView, SheetInset } from './SheetScrollView';
 
 interface QuotaConsumptionSheetProps {
   visible: boolean;
@@ -87,7 +88,7 @@ export function QuotaConsumptionSheet({
     }
   };
 
-  return <BottomSheet
+  return <BottomSheet fullWidthContent
     visible={visible}
     tall
     title="选择消耗额度的账号"
@@ -105,24 +106,25 @@ export function QuotaConsumptionSheet({
       },
     ]}
   >
-    <View style={styles.warning}>
-      <Text style={styles.warningTitle}>此操作会产生真实用量</Text>
-      <Text style={styles.warningText}>手机将直接向所选账号发送“今天天气如何？”，完成后自动刷新用量。</Text>
-    </View>
-    <Pressable
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: allSelected, disabled: busy }}
-      disabled={busy}
-      onPress={() => setSelectedIds(allSelected ? [] : accountIds)}
-      style={({ pressed }) => [styles.selectAllRow, pressed && styles.pressed]}
-    >
-      <Text style={styles.selectAllText}>{allSelected ? '取消全选' : '全选可用账号'}</Text>
-      <View style={[styles.checkbox, allSelected && styles.checkboxChecked]}>
-        <Text style={styles.checkboxText}>{allSelected ? '✓' : ''}</Text>
+    <SheetInset>
+      <View style={styles.warning}>
+        <Text style={styles.warningTitle}>此操作会产生真实用量</Text>
+        <Text style={styles.warningText}>手机将直接向所选账号发送“今天天气如何？”，完成后自动刷新用量。</Text>
       </View>
-    </Pressable>
-    <ScrollView style={styles.list} contentContainerStyle={styles.listContent}
-      showsVerticalScrollIndicator={false}>
+      <Pressable
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: allSelected, disabled: busy }}
+        disabled={busy}
+        onPress={() => setSelectedIds(allSelected ? [] : accountIds)}
+        style={({ pressed }) => [styles.selectAllRow, pressed && styles.pressed]}
+      >
+        <Text style={styles.selectAllText}>{allSelected ? '取消全选' : '全选可用账号'}</Text>
+        <View style={[styles.checkbox, allSelected && styles.checkboxChecked]}>
+          <Text style={styles.checkboxText}>{allSelected ? '✓' : ''}</Text>
+        </View>
+      </Pressable>
+    </SheetInset>
+    <SheetScrollView style={styles.list} contentContainerStyle={styles.listContent}>
       {accounts.map((account) => {
         const selected = selectedIdSet.has(account.id);
         return <Pressable
@@ -154,7 +156,7 @@ export function QuotaConsumptionSheet({
           </View>
         </Pressable>;
       })}
-    </ScrollView>
+    </SheetScrollView>
   </BottomSheet>;
 }
 

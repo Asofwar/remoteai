@@ -1,9 +1,23 @@
 #[derive(Debug, thiserror::Error)]
 pub(super) enum GuiError {
+    #[error("视频暂时无法读取，请确认文件仍在当前项目中，且格式为 MP4、MOV 或 WebM。")]
+    VideoPreview,
+    #[error("视频超过管理员设置的播放大小上限。")]
+    VideoTooLarge,
+    #[error("视频已更改，请重新打开。")]
+    VideoChanged,
+    #[error("视频连接已过期，请重新打开。")]
+    VideoExpired,
+    #[error("正在查看的视频较多，请关闭其他视频后重试。")]
+    VideoBusy,
+    #[error("文件暂时无法读取，请确认文件仍在当前项目中，且大小未超过查看上限。")]
+    TextPreview,
     #[error("文件暂时无法添加，请确认单个文件不超过 2 MB 后重试。")]
     Attachment,
     #[error("暂时无法读取当前项目文件，请确认项目仍可访问。")]
     ProjectFiles,
+    #[error("暂时无法读取文件夹，请确认文件夹仍可访问。")]
+    ProjectDirectories,
     #[error("图片暂时无法显示，请确认文件仍在当前任务目录中。")]
     ImagePreview,
     #[error("对话仍在回复中，请等待结束后再删除。")]

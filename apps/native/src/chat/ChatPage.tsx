@@ -2,16 +2,24 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { BackHandler, Keyboard, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import type { AuthSession, RemoteDevice } from '../types';
 import { ChatApproval } from './ChatApprovals';
+import { ChatAsyncQuestions } from './ChatAsyncQuestions';
 import { ChatComposer } from './ChatComposer';
 import { ChatOverlay } from './ChatOverlay';
 import { ChatQueue } from './ChatQueue';
 import { queueProps } from '../../../../shared/remote-chat/client/queueProps';
 import { ChatMessages } from './ChatMessages';
+import { ChatQuotesProvider } from './ChatQuotes';
 import { ChatProcessing } from './ChatProcessing';
 import { ChatImageContext } from './ChatImage';
+import { ChatImagePreviewProvider } from './ChatImagePreview';
+import { ChatFileProvider } from './ChatFilePreview';
 import { ChatThreads } from './ChatThreads';
+import { ChatProfileMenu } from './ChatProfileMenu';
+import { TokenSummaryPage } from '../tokenSummary/TokenSummaryPage';
+import { ChatSearch } from './ChatSearch';
 import { ChatDrawer, type ChatDrawerMethods } from './ChatDrawer';
 import { ChatDevices } from './ChatDevices';
+import { ChatConnectionInfo } from './ChatConnectionInfo';
 import { useChat } from './useChat';
 import { useChatDrawerSwipe } from './useChatDrawerSwipe';
 import { useChatBackground } from './useChatBackground';
@@ -26,10 +34,11 @@ interface Props {
   session: AuthSession; devices: RemoteDevice[]; active: boolean;
   notification: ChatNotificationTarget | null; notificationError: string;
   notificationHandled: (id: string) => void;
+  tokenSummary: boolean; openTokenSummary: () => void; closeTokenSummary: () => void;
 }
-const modeLabels = { connecting: '正在连接…', direct: '已直连', relay: '通过服务器连接', offline: '等待重新连接' };
 
-export function ChatPage({ session, devices, active, notification, notificationError, notificationHandled }: Props) {
+export function ChatPage(props: Props) {
+  const { session, devices, active, notification, notificationError, notificationHandled } = props;
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const requestedId = notification?.deviceId ?? deviceId;
   const device = requestedId ? devices.find((entry) => entry.deviceId === requestedId)
@@ -47,15 +56,17 @@ export function ChatPage({ session, devices, active, notification, notificationE
     {!!backgroundError && <Text accessibilityRole="alert" style={styles.error}>{backgroundError}</Text>}
     {!!notificationError && <Pressable accessibilityRole="button" accessibilityLabel="打开通知设置"
       onPress={() => { void Linking.openSettings(); }}><Text style={styles.error}>{notificationError}</Text></Pressable>}
-    <ConnectedChat key={`${session.baseUrl}:${session.email}:${device?.deviceId ?? ''}`} session={session}
+    <ConnectedChat key={`${session.baseUrl}:${session.email}:${device?.deviceId ?? ''}`} {...props} session={session}
       device={device} devices={devices} active={active} chooseDevice={chooseDevice}
       notification={notification} notificationError={notificationError} notificationHandled={notificationHandled} />
   </View>;
 }
 
-function ConnectedChat({ session, device, devices, active, chooseDevice, notification, notificationHandled }: Props & {
+function ConnectedChat({ session, device, devices, active: pageActive, chooseDevice, notification, notificationHandled,
+  tokenSummary, openTokenSummary, closeTokenSummary }: Props & {
   device?: RemoteDevice; chooseDevice: (id: string) => void;
 }) {
+  const active = pageActive && !tokenSummary;
   const { state, controller, foreground, catalog } = useChat(session, device?.deviceId ?? '', Boolean(device));
   useChatCompletionNotifications(controller, session, device?.deviceId ?? '');
   useOpenChatNotification({ controller, target: notification?.deviceId === device?.deviceId ? notification : null,
@@ -64,8 +75,11 @@ function ConnectedChat({ session, device, devices, active, chooseDevice, notific
   const drawerRef = useRef<ChatDrawerMethods>(null);
   const afterClose = useRef<(() => void) | undefined>(undefined);
   const [pickingDevice, setPickingDevice] = useState(false);
+  const [searching, setSearching] = useState(false);
   useEffect(() => {
-    if (notification) { afterClose.current = undefined; drawerRef.current?.closeDrawer(); setPickingDevice(false); }
+    if (!notification) return;
+    afterClose.current = undefined;
+    drawerRef.current?.closeDrawer(); setPickingDevice(false); setSearching(false);
   }, [notification]);
   const ready = state.ready;
   const runningTurn = state.selected?.turns?.find((turn) => turn.status === 'inProgress');
@@ -80,10 +94,12 @@ function ConnectedChat({ session, device, devices, active, chooseDevice, notific
     action?.();
   }, []);
   const newChat = (project?: ChatProject) => { if (!state.sending) closeDrawer(() => controller.back(project)); };
-  useEffect(() => { controller.setViewing(active && foreground && !drawer && !pickingDevice); },
-    [active, foreground, drawer, pickingDevice, controller]);
+  useEffect(() => { controller.setViewing(active && foreground && !drawer && !pickingDevice && !searching); },
+    [active, foreground, drawer, pickingDevice, searching, controller]);
   useEffect(() => {
-    if (!active) { afterClose.current = undefined; drawerRef.current?.closeDrawer(); setPickingDevice(false); }
+    if (active) return;
+    afterClose.current = undefined;
+    drawerRef.current?.closeDrawer(); setPickingDevice(false); setSearching(false);
   }, [active]);
   useEffect(() => {
     if (!active || pickingDevice || (!drawer && !state.selected)) return;
@@ -94,10 +110,20 @@ function ConnectedChat({ session, device, devices, active, chooseDevice, notific
     });
     return () => subscription.remove();
   }, [active, drawer, pickingDevice, state.selected?.id, state.sending, controller]);
-  return <ChatDrawer ref={drawerRef} enabled={active && !pickingDevice}
+  return <>
+  {tokenSummary && pageActive && <TokenSummaryPage read={controller.readTokenSummary} ready={ready}
+    foreground={foreground} deviceName={device?.name} onBack={closeTokenSummary} />}
+  <View style={[styles.fill, tokenSummary && styles.hidden]}>
+  <ChatQuotesProvider active={active} scope={state.selected?.id ?? null}
+    enabled={active && !state.selectedArchived}>
+  <ChatDrawer ref={drawerRef} enabled={active && !pickingDevice}
     onOpen={() => setDrawer(true)} onMoving={() => setDrawer(true)} onClose={closed}
-    navigation={<ChatThreads state={state} controller={controller} newChat={newChat} onClose={() => closeDrawer()}
-      deviceName={device?.name ?? '选择电脑'} chooseDevice={() => closeDrawer(() => setPickingDevice(true))}
+    navigation={<ChatThreads state={state} controller={controller} newChat={newChat}
+      openSearch={() => setSearching(true)}
+      profileMenu={<ChatProfileMenu client={controller.guiAccounts} deviceName={device?.name} email={session.email}
+        chooseDevice={() => closeDrawer(() => setPickingDevice(true))}
+        openTokenSummary={() => closeDrawer(openTokenSummary)}
+        ready={ready} active={active && foreground && drawer && !searching} />}
       select={(thread) => closeDrawer(() => { void controller.select(thread); })} />}>
     <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       {...drawerSwipeHandlers}>
@@ -108,12 +134,7 @@ function ConnectedChat({ session, device, devices, active, chooseDevice, notific
       <View style={styles.fill}>
         <Text numberOfLines={1} style={styles.headerTitle}>
           {state.selected ? threadPresentation(state.selected, state.sidebar).title : '新聊天'}</Text>
-        {!state.selected && state.draftProject && <Text numberOfLines={1} style={styles.headerMeta}>
-          {state.draftProject.label}</Text>}
-        <Pressable accessibilityRole="button" accessibilityLabel="选择电脑" onPress={() => setPickingDevice(true)}>
-          <Text numberOfLines={1} style={styles.headerMeta}>{device ? `${device.name} · ${
-            !ready && state.mode !== 'offline' ? '正在同步聊天…' : modeLabels[state.mode]}` : '选择电脑，开始聊天'}</Text>
-        </Pressable>
+        <ChatConnectionInfo state={state} controller={controller} device={device} active={active && foreground} />
       </View>
       {state.selected && state.selectedArchived && <Pressable accessibilityRole="button"
         style={styles.compactButton} disabled={!ready || running}
@@ -122,9 +143,14 @@ function ConnectedChat({ session, device, devices, active, chooseDevice, notific
     </View>
     {!!state.error && <Text accessibilityRole="alert" style={styles.error}>{state.error}</Text>}
     <ChatImageContext.Provider value={{ threadId: state.selected?.id ?? null, ready, load: controller.imagePreview }}>
+      <ChatImagePreviewProvider key={state.selected?.id ?? 'new'}>
+      <ChatFileProvider key={state.selected?.id ?? 'new'} threadId={state.selected?.id ?? null}
+        ready={ready} load={controller.textPreview} videos={controller.videos}>
       <ChatMessages key={state.selected?.id ?? 'new'} thread={state.selected}
         loading={state.historyLoading} loadingMore={state.historyLoadingMore} hasMore={state.historyHasMore}
         loadOlder={() => controller.loadOlder()} />
+      </ChatFileProvider>
+      </ChatImagePreviewProvider>
     </ChatImageContext.Provider>
     {runningTurn && <ChatProcessing key={runningTurn.id} turn={runningTurn} active={active && ready} />}
     {state.approvals.some((event) => event.params.threadId === state.selected?.id) &&
@@ -132,8 +158,13 @@ function ConnectedChat({ session, device, devices, active, chooseDevice, notific
         {state.approvals.filter((event) => event.params.threadId === state.selected?.id).map((event) =>
           <ChatApproval key={String(event.id)} event={event} respond={(reply) => controller.respond(reply)} />)}
       </ScrollView>}
+    <ChatAsyncQuestions thread={state.selected} error={state.error}
+      disabled={!ready || state.sending || state.settingsBusy || state.selectedArchived || state.queueBusy
+        || state.compacting === state.selected?.id}
+      answer={controller.answerAsyncQuestion} />
     <ChatQueue {...queueProps(state, controller)} />
     <ChatComposer threadId={state.selected?.id ?? null} models={state.models} selection={state.settings}
+      readUsage={controller.readUsage} usageActive={foreground} tokenUsage={state.selected?.tokenUsage}
       loadCatalog={controller.loadComposerCatalog} loadFiles={controller.loadProjectFiles}
       catalog={catalog} cwd={state.selected?.cwd ?? state.draftProject?.cwd ?? ''}
       compactReason={compactUnavailableReason(state)} compacting={!!state.compacting
@@ -145,6 +176,8 @@ function ConnectedChat({ session, device, devices, active, chooseDevice, notific
       interrupt={() => controller.interrupt()} />
     {pickingDevice && <ChatDevices devices={devices} onClose={() => setPickingDevice(false)}
       choose={(id) => { chooseDevice(id); setPickingDevice(false); }} />}
+    {searching && active && <ChatSearch state={state} controller={controller} onClose={() => setSearching(false)}
+      select={(thread) => { setSearching(false); closeDrawer(() => { void controller.select(thread); }); }} />}
     </ChatOverlay>
-  </KeyboardAvoidingView></ChatDrawer>;
+  </KeyboardAvoidingView></ChatDrawer></ChatQuotesProvider></View></>;
 }

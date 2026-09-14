@@ -1,54 +1,102 @@
 import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import type { ApprovalReply, GuiEvent } from './types';
-import { styles } from './styles';
+import type { Question } from '../../../desktop/src/pages/codexGui/types';
+import { palette, styles } from './styles';
+import { useApprovalResponse } from './useApprovalResponse';
 
-export function ChatApproval({ event, respond }: { event: GuiEvent; respond: (reply: ApprovalReply) => Promise<void> }) {
+function ApprovalCode({ text }: { text: string }) {
+  return <ScrollView nestedScrollEnabled style={approvalStyles.codeBox}>
+    <Text selectable style={[styles.code, approvalStyles.codeText]}>{text}</Text>
+  </ScrollView>;
+}
+
+function PermissionDetails({ event }: { event: GuiEvent }) {
+  if (event.method !== 'item/permissions/requestApproval') return null;
+  const permissions = event.params.permissions;
+  return <View style={approvalStyles.permissions}>
+    {permissions?.network?.enabled && <Text style={approvalStyles.body}>访问网络</Text>}
+    {permissions?.fileSystem?.read?.map((path) =>
+      <Text selectable key={path} style={approvalStyles.body}>读取：{path}</Text>)}
+    {permissions?.fileSystem?.write?.map((path) =>
+      <Text selectable key={path} style={approvalStyles.body}>编辑：{path}</Text>)}
+    {permissions?.fileSystem?.entries && <ApprovalCode
+      text={JSON.stringify(permissions.fileSystem.entries, null, 2)} />}
+  </View>;
+}
+
+interface QuestionProps { question: Question; value: string; busy: boolean;
+  update: (value: string) => void; submit: () => void }
+
+function ApprovalQuestion({ question, value, busy, update, submit }: QuestionProps) {
+  return <View style={approvalStyles.question}>
+    <Text style={styles.messageText}>{question.question}</Text>
+    {question.options?.map((option) => <Pressable key={option.label} accessibilityRole="radio" disabled={busy}
+      accessibilityState={{ checked: value === option.label, disabled: busy }}
+      style={[approvalStyles.option, busy && styles.disabled]} onPress={() => update(option.label)}>
+      <Ionicons name={value === option.label ? 'radio-button-on' : 'radio-button-off'} size={18}
+        color={value === option.label ? palette.green : palette.muted} />
+      <View style={styles.fill}><Text style={approvalStyles.body}>{option.label}</Text>
+        {!!option.description && <Text style={styles.subtitle}>{option.description}</Text>}</View>
+    </Pressable>)}
+    <TextInput accessibilityLabel={question.question} style={[styles.questionInput, busy && styles.disabled]}
+      placeholder="输入你的回答" placeholderTextColor={palette.muted} editable={!busy}
+      secureTextEntry={question.isSecret} value={value} onChangeText={update} returnKeyType="send"
+      onSubmitEditing={submit} />
+  </View>;
+}
+
+interface ApprovalProps { event: GuiEvent; respond: (reply: ApprovalReply) => Promise<void> }
+
+export function ChatApproval({ event, respond }: ApprovalProps) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
-  const { params, method, id } = event;
-  if (id == null) return null;
+  const { busy, error, send } = useApprovalResponse({ event, answers, respond });
+  if (event.id == null) return null;
+  const { params, method } = event;
   const questions = params.questions ?? [];
   const isQuestion = method === 'item/tool/requestUserInput';
-  const send = async (decision: 'accept' | 'decline' | 'cancel') => {
-    setBusy(true);
-    try {
-      await respond(isQuestion ? { id, answers: Object.fromEntries(questions.map((question) =>
-        [question.id, { answers: [answers[question.id]?.trim() ?? ''] }])) } : { id, decision });
-    } finally { setBusy(false); }
-  };
-  return <View style={styles.approval}>
-    <Text style={styles.title}>{isQuestion ? '需要你的补充' : '需要你的确认'}</Text>
-    {params.reason && <Text style={styles.subtitle}>{params.reason}</Text>}
-    {params.command && <Text selectable style={styles.code}>{params.command}</Text>}
-    {(params.cwd || params.grantRoot) && <Text style={styles.subtitle}>{params.cwd || params.grantRoot}</Text>}
-    {params.permissions?.network?.enabled && <Text style={styles.subtitle}>访问网络</Text>}
-    {params.permissions?.fileSystem?.read?.map((path) => <Text key={path} style={styles.subtitle}>读取：{path}</Text>)}
-    {params.permissions?.fileSystem?.write?.map((path) => <Text key={path} style={styles.subtitle}>编辑：{path}</Text>)}
-    {questions.map((question) => <View key={question.id} style={styles.settings}>
-      <Text style={styles.messageText}>{question.question}</Text>
-      {question.options?.map((option) => <Pressable key={option.label} accessibilityRole="radio"
-        accessibilityState={{ checked: answers[question.id] === option.label }}
-        style={[styles.choice, answers[question.id] === option.label && styles.chosen]}
-        onPress={() => setAnswers((current) => ({ ...current, [question.id]: option.label }))}>
-        <Text style={styles.buttonText}>{option.label}</Text>
-        <Text style={styles.subtitle}>{option.description}</Text>
-      </Pressable>)}
-      <TextInput accessibilityLabel={question.question} style={styles.questionInput} placeholder="输入你的回答"
-        secureTextEntry={question.isSecret} value={answers[question.id] ?? ''}
-        onChangeText={(text) => setAnswers((current) => ({ ...current, [question.id]: text }))} />
-    </View>)}
+  const incomplete = isQuestion && questions.some((question) => !answers[question.id]?.trim());
+  const submit = () => { void send('accept'); };
+  return <View style={[styles.approval, approvalStyles.card]} accessibilityState={{ busy }}>
+    <View style={styles.row}><Ionicons name="shield-outline" size={17} color={palette.ink} />
+      <Text style={approvalStyles.title}>{isQuestion ? '需要你的补充' : '需要你的确认'}</Text></View>
+    {!!params.reason && <Text style={approvalStyles.body}>{params.reason}</Text>}
+    {!!params.command && <ApprovalCode text={params.command} />}
+    {!!(params.cwd || params.grantRoot) && <Text selectable style={styles.subtitle}>
+      {params.cwd || params.grantRoot}</Text>}
+    <PermissionDetails event={event} />
+    {questions.map((question) => <ApprovalQuestion key={question.id} question={question}
+      value={answers[question.id] ?? ''} busy={busy} submit={submit}
+      update={(answer) => setAnswers((current) => ({ ...current, [question.id]: answer }))} />)}
+    {!!error && <Text accessibilityRole="alert" style={approvalStyles.error}>{error}</Text>}
     <View style={styles.row}>
       {(isQuestion || !params.availableDecisions || params.availableDecisions.includes('accept')) &&
-        <Pressable accessibilityRole="button" style={[styles.button, styles.primary]}
-          disabled={busy || (isQuestion && questions.some((question) => !answers[question.id]?.trim()))}
-          onPress={() => { void send('accept'); }}>
+        <Pressable accessibilityRole="button" disabled={busy || incomplete}
+          accessibilityState={{ disabled: busy || incomplete, busy }} onPress={submit}
+          style={[styles.button, styles.primary, approvalStyles.action, (busy || incomplete) && styles.disabled]}>
+          {busy && <ActivityIndicator size="small" color="#fff" />}
           <Text style={[styles.buttonText, styles.primaryText]}>{isQuestion ? '提交回答' : '允许这一次'}</Text>
         </Pressable>}
-      {!isQuestion && <Pressable accessibilityRole="button" style={styles.button} disabled={busy}
+      {!isQuestion && <Pressable accessibilityRole="button" disabled={busy}
+        accessibilityState={{ disabled: busy }} style={[styles.button, approvalStyles.decline, busy && styles.disabled]}
         onPress={() => { void send(params.availableDecisions?.includes('decline') === false ? 'cancel' : 'decline'); }}>
-        <Text style={styles.buttonText}>拒绝</Text>
+        <Text style={approvalStyles.body}>拒绝</Text>
       </Pressable>}
     </View>
   </View>;
 }
+
+const approvalStyles = StyleSheet.create({
+  card: { backgroundColor: '#fff', borderColor: '#e4c993', borderRadius: 12, padding: 16 },
+  title: { color: palette.ink, fontWeight: '700', fontSize: 13, lineHeight: 20 },
+  body: { color: palette.ink, fontSize: 12, lineHeight: 20 },
+  codeBox: { maxHeight: 180, padding: 10, borderRadius: 8, backgroundColor: '#f5f7f6' },
+  codeText: { fontSize: 11, lineHeight: 18 },
+  question: { gap: 10, paddingTop: 4 },
+  option: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  permissions: { gap: 8 },
+  action: { flexDirection: 'row', gap: 6 },
+  decline: { borderWidth: 1, borderColor: palette.border, backgroundColor: '#fff' },
+  error: { maxWidth: 400, color: palette.danger, fontSize: 12, lineHeight: 20 },
+});

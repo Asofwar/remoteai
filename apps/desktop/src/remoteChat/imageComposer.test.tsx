@@ -19,6 +19,7 @@ beforeEach(() => {
   vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false }));
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
   props = { models: [], selection: { model: 'astra', effort: 'high', access: 'workspace-write' },
+    readUsage: vi.fn(),
     settingsBusy: false, settingsError: '', updateSettings: vi.fn(), active: true, ready: true,
     sending: false, running: false, threadId: null, send: vi.fn().mockResolvedValue(true), interrupt: vi.fn() };
   mocks.pick.mockReset().mockImplementation(async () => [draftImage(url)]);

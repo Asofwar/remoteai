@@ -9,6 +9,7 @@ import { sliceHistory, type PagedHistoryDelta } from '../../../../shared/remote-
 import { EventStream } from './eventStream';
 
 vi.mock('../pages/codexGui/api', () => ({ guiApi: { connect: vi.fn(), request: vi.fn(), respond: vi.fn() } }));
+vi.mock('../api/backend', () => ({ invoke: vi.fn() }));
 beforeEach(() => vi.resetAllMocks());
 afterEach(() => vi.useRealTimers());
 
@@ -106,18 +107,18 @@ it('streams before completion even when disk history stays stale, without replay
   expect(vi.getTimerCount()).toBe(0);
 });
 
-it('loads earlier items only once and ignores an older page after leaving the conversation', async () => {
-  const remote = conversation();
+it.each([2, 35])('loads earlier items once and ignores results after leaving (%i items)', async (count) => {
+  const remote = conversation(count);
   const { controller, stream } = await connected(remote);
   await controller.select({ ...remote, turns: [] });
   let finish!: (value: { thread: Thread }) => void;
   vi.mocked(guiApi.request).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
-  const count = vi.mocked(guiApi.request).mock.calls.length;
+  const requests = vi.mocked(guiApi.request).mock.calls.length;
   const older = controller.loadOlder();
   expect(controller.snapshot()).toMatchObject({ historyLoading: true, historyLoadingMore: true });
   await controller.loadOlder();
   await controller.refreshSelected();
-  expect(vi.mocked(guiApi.request).mock.calls.length).toBe(count + 1);
+  expect(vi.mocked(guiApi.request).mock.calls.length).toBe(requests + 1);
   controller.back();
   finish({ thread: remote });
   await older;
@@ -153,8 +154,8 @@ it('joins a running reply during a delayed read without losing its prefix or rep
   expect(vi.getTimerCount()).toBe(0);
 });
 
-it('queues one older page behind a background refresh instead of dropping the scroll request', async () => {
-  const remote = conversation();
+it.each([2, 35])('queues one older page behind a background refresh (%i items)', async (count) => {
+  const remote = conversation(count);
   const { controller, stream } = await connected(remote);
   await controller.select({ ...remote, turns: [] });
   const before = vi.mocked(guiApi.request).mock.calls.length;
@@ -169,7 +170,40 @@ it('queues one older page behind a background refresh instead of dropping the sc
   await refresh;
   await vi.waitFor(() => expect(controller.snapshot().historyLoading).toBe(false));
   expect(vi.mocked(guiApi.request).mock.calls.length).toBe(before + 2);
-  expect(controller.snapshot().selected?.turns?.flatMap((turn) => turn.items)).toHaveLength(20);
+  expect(controller.snapshot().selected?.turns?.flatMap((turn) => turn.items)).toHaveLength(Math.min(count, 20));
+  controller.stop();
+  stream.close();
+});
+
+it.each([0, 2])('retries exhausted history and discovers missing messages (%i items)', async (count) => {
+  const remote = conversation(count);
+  const { controller, stream } = await connected(remote);
+  await controller.select({ ...remote, turns: [] });
+  expect(controller.snapshot().historyHasMore).toBe(false);
+  const before = vi.mocked(guiApi.request).mock.calls.length;
+  await controller.loadOlder();
+  await controller.loadOlder();
+  expect(vi.mocked(guiApi.request).mock.calls.length).toBe(before + 2);
+  expect(controller.snapshot().historyHasMore).toBe(false);
+  remote.turns![0].items.unshift({ id: 'recovered', type: 'userMessage', text: 'Earlier message' });
+  await controller.loadOlder();
+  expect(controller.snapshot().selected?.turns?.flatMap((turn) => turn.items).map((item) => item.id))
+    .toEqual(['recovered', ...Array.from({ length: count }, (_, index) => `item-${index}`)]);
+  controller.stop();
+  stream.close();
+});
+
+it('allows a failed pull to be retried without clearing the visible history', async () => {
+  const remote = conversation(2);
+  const { controller, stream } = await connected(remote);
+  await controller.select({ ...remote, turns: [] });
+  const selected = controller.snapshot().selected;
+  vi.mocked(guiApi.request).mockRejectedValueOnce(new Error('暂时无法加载，请重试。'));
+  await controller.loadOlder();
+  expect(controller.snapshot()).toMatchObject({ selected, error: '暂时无法加载，请重试。',
+    historyLoading: false, historyLoadingMore: false });
+  await controller.loadOlder();
+  expect(controller.snapshot()).toMatchObject({ selected, error: '', historyLoadingMore: false });
   controller.stop();
   stream.close();
 });

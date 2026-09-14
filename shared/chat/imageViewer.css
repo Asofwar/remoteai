@@ -23,3 +23,6 @@
 .cs-image-status { position: absolute; bottom: 88px; left: 50%; transform: translateX(-50%); max-width: 400px;
   font-size: 13px; text-align: center; }
 .cs-image-status button { padding: 8px; text-decoration: underline; }
+.cs-image-download { position: absolute; top: 16px; right: 80px; min-height: 44px; padding: 0 16px;
+  border-radius: 22px; background: #282b2a; color: #eee; }
+.cs-image-download:disabled { opacity: .5; }

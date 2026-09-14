@@ -1,3 +1,4 @@
+import { HotSessions } from './hot-sessions';
 import { randomUUID } from 'crypto';
 import type WebSocket from 'ws';
 import {
@@ -8,11 +9,16 @@ import {
 /** Rendezvous and opaque fallback relay. Conversation data is never stored here. */
 export class ChatSessions {
   private readonly desktops = new Map<string, WebSocket>();
+  private readonly desktopInfo = new Map<WebSocket, { expiresAt: number; version: number }>();
+  private readonly hot = new HotSessions();
   private readonly sessions = new Map<string, ChatSession>();
 
   join(client: WebSocket, identity: ChatIdentity, message: Record<string, unknown>, iceServers: object[]) {
+    this.hot.prune();
     const key = `${identity.ownerId}:${identity.deviceId}`;
     if (identity.role === 'desktop') {
+      this.hot.register(client, identity, message.transportVersion === 2 ? message.sessions : undefined);
+      this.desktopInfo.set(client, { expiresAt: identity.expiresAt, version: Number(message.transportVersion) });
       const previous = this.desktops.get(key);
       if (previous && previous !== client) {
         this.disconnect(previous);
@@ -27,10 +33,18 @@ export class ChatSessions {
       client.close(4004, 'PC chat is offline');
       return;
     }
-    if ([...this.sessions.values()].filter((entry) => entry.desktop === desktop).length >= CHAT_SESSION_LIMIT) {
-      client.close(4008, 'Too many chat connections');
+    const info = this.desktopInfo.get(desktop);
+    const count = [...this.sessions.values()].filter((entry) => entry.desktop === desktop).length
+      + this.hot.count(identity);
+    if (message.resume === undefined && count >= CHAT_SESSION_LIMIT) {
+      client.close(4008, 'Too many chat connections'); return;
+    }
+    if (message.transportVersion === 2 && info?.version === 2) {
+      this.hot.join({ socket: client, identity, message, desktop: { socket: desktop, expiresAt: info.expiresAt },
+        iceServers });
       return;
     }
+    if (message.resume !== undefined) { client.close(4004, 'Session unavailable'); return; }
     const peerKey = publicKey(message.publicKey);
     const id = randomUUID();
     this.sessions.set(id, { id, desktop, mobile: client, startedAt: Date.now(), relay: false });
@@ -39,6 +53,7 @@ export class ChatSessions {
   }
 
   route(client: WebSocket, message: Record<string, unknown>) {
+    if (this.hot.route(client, message)) return;
     const sessionId = identifier(message.sessionId);
     const session = this.sessions.get(sessionId);
     if (!session || (client !== session.desktop && client !== session.mobile)) throw new Error('Unknown session');
@@ -69,7 +84,11 @@ export class ChatSessions {
     throw new Error('Invalid chat frame');
   }
 
-  disconnect(client: WebSocket) {
+  prune() { this.hot.prune(); }
+
+  disconnect(client: WebSocket, revoke = false) {
+    this.hot.disconnect(client, revoke);
+    this.desktopInfo.delete(client);
     for (const [key, desktop] of this.desktops) if (desktop === client) this.desktops.delete(key);
     for (const [id, session] of this.sessions) {
       if (session.desktop !== client && session.mobile !== client) continue;

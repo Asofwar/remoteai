@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
 import { BottomSheet } from '../components/BottomSheet';
+import { SheetScrollView } from '../components/SheetScrollView';
 import { normalizeTotpSecret, parseOtpAuthUri } from './totp';
 import { TotpQrScanner } from './TotpQrScanner';
 import { totpStyles as styles } from './styles';
@@ -100,10 +101,10 @@ export function TotpFormSheet({
   };
 
   return <>
-    <BottomSheet visible={visible && !scannerOpen} tall title={entry ? '编辑 2FA 密钥' : '添加 2FA 密钥'}
+    <BottomSheet fullWidthContent visible={visible && !scannerOpen} tall title={entry ? '编辑 2FA 密钥' : '添加 2FA 密钥'}
       subtitle="支持标准 Authenticator 密钥和二维码" onClose={onCancel}
       actions={[{ label: '取消', onPress: onCancel }, { label: '保存', tone: 'primary', onPress: save }]}>
-      <ScrollView style={styles.formScroll} contentContainerStyle={styles.formContent}
+      <SheetScrollView style={styles.formScroll} contentContainerStyle={styles.formContent}
         keyboardShouldPersistTaps="handled">
         {!entry ? <Pressable style={styles.qrButton} onPress={() => setScannerOpen(true)}>
           <Text style={styles.qrButtonText}>▣ 扫描二维码自动填写</Text>
@@ -136,7 +137,7 @@ export function TotpFormSheet({
         <TextInput value={periodInput} onChangeText={(value) => setPeriodInput(value.replace(/\D/g, '').slice(0, 3))}
           keyboardType="number-pad" placeholder="30" placeholderTextColor="#98a9a0" style={styles.input} />
         <Text style={styles.hint}>支持 15 至 120 秒，通常为 30 秒。</Text>
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>
     <TotpQrScanner visible={visible && scannerOpen} onClose={() => setScannerOpen(false)} onScan={applyQrValue} />
   </>;

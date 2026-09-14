@@ -1,6 +1,6 @@
 import { getGuiController } from '../pages/codexGui/session';
 import { composerPatch } from '../../../../shared/remote-chat/composer';
-import type { QueueSnapshot } from '../../../../shared/remote-chat/queue';
+import { queueTextPreview, type QueueSnapshot } from '../../../../shared/remote-chat/queue';
 import type { GuiController } from '../pages/codexGui/controller';
 import type { GuiState, SkillReference } from '../pages/codexGui/types';
 import { remoteAttachments } from '../../../../shared/remote-chat/composerAttachments';
@@ -8,7 +8,6 @@ import { remoteAttachments } from '../../../../shared/remote-chat/composerAttach
 const MAX_TEXT_LENGTH = 100_000;
 const MAX_IMAGES = 12;
 const MAX_IMAGE_LENGTH = 8 * 1024 * 1024;
-const MAX_PREVIEW_LENGTH = 1000;
 const MAX_SKILLS = 100;
 const MAX_SKILL_PATH_LENGTH = 4096;
 
@@ -23,10 +22,6 @@ function skillInput(value: unknown): SkillReference[] {
     }
     return { name: fields.name, path: fields.path };
   });
-}
-
-function preview(text: string) {
-  return text.length > MAX_PREVIEW_LENGTH ? `${text.slice(0, MAX_PREVIEW_LENGTH)}…` : text;
 }
 
 function identifier(value: unknown): string {
@@ -62,7 +57,7 @@ export class RemoteQueue {
     this.snapshot = { revision: this.snapshot.revision + 1,
       threads: Object.fromEntries(Object.entries(source).filter(([, messages]) => messages.length)
         .map(([id, messages]) => [id, messages.map((item) => ({
-          id: item.id, text: preview(item.text || item.attachments?.map((file) => file.name).join('、') || ''),
+          id: item.id, text: queueTextPreview(item.text || item.attachments?.map((file) => file.name).join('、') || ''),
           imageCount: item.images.length, attachmentCount: item.attachments?.length ?? 0,
           busy: Boolean(item.busy), error: item.error,
         }))])) };

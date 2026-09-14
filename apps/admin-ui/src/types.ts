@@ -8,6 +8,7 @@ export type MenuKey =
   | "roles"
   | "officialAccounts"
   | "announcement"
+  | "chatSettings"
   | "currency"
   | "codexHomePresets"
   | "emailTemplates"
@@ -271,7 +272,7 @@ export interface TelemetryEvent {
   id: string;
   deviceId: string;
   platform: TelemetryPlatform;
-  eventType: "base_url_changed";
+  eventType: "base_url_changed" | "activity";
   createdAt: string;
 }
 
@@ -304,7 +305,10 @@ export interface DashboardOverview {
     date: string;
     users: number;
     installations: number;
+    totalInstallations: number;
+    platforms: Array<{ name: TelemetryPlatform; value: number }>;
   }>;
+  dailyActivePlatforms: Array<{ name: TelemetryPlatform; value: number }>;
   platforms: Array<{
     name: TelemetryPlatform;
     value: number;

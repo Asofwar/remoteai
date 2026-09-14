@@ -1,0 +1,42 @@
+export interface UsageSummary {
+  totalTokens: number;
+  estimatedCostUsd: number;
+  primaryRemainingPercent: number | null;
+  primaryRemainingAggregated: boolean;
+  providerEstimatedCost: { amountUsd: number; aggregated: boolean } | null;
+}
+
+export type ReadUsage = () => Promise<UsageSummary>;
+export const USAGE_REFRESH_INTERVAL_MS = 5_000;
+const MILLION = 1_000_000;
+const THOUSAND = 1_000;
+const LOW_QUOTA_PERCENT = 20;
+const WARNING_QUOTA_PERCENT = 50;
+
+export function formatTokens(value: number) {
+  if (value >= MILLION) return `${(value / MILLION).toLocaleString('en-US', { maximumFractionDigits: 2 })}M`;
+  if (value >= THOUSAND) return `${(value / THOUSAND).toLocaleString('en-US', { maximumFractionDigits: 1 })}K`;
+  return value.toLocaleString('en-US');
+}
+
+export function formatCost(value: number) {
+  return `${value.toLocaleString('en-US', { maximumFractionDigits: value > 0 && value < 0.01 ? 4 : 2 })}USD`;
+}
+
+export function usageTrailing(usage: UsageSummary | null) {
+  const remaining = usage?.primaryRemainingPercent;
+  if (typeof remaining === 'number' && Number.isFinite(remaining)) {
+    const label = usage?.primaryRemainingAggregated ? '并发账户剩余额度合计' : '当前账户剩余额度';
+    return {
+      text: `${Math.round(remaining)}%`,
+      label: usage?.primaryRemainingAggregated ? '合计剩余' : '剩余',
+      description: `${label}：${remaining.toLocaleString('en-US', { maximumFractionDigits: 2 })}%`,
+      tone: remaining <= LOW_QUOTA_PERCENT ? 'low' : remaining <= WARNING_QUOTA_PERCENT ? 'cost' : 'quota',
+    } as const;
+  }
+  const estimate = usage?.providerEstimatedCost;
+  if (!estimate) return null;
+  const label = estimate.aggregated ? '聚合 API 今日预估费用' : '当前 API 今日预估费用';
+  return { text: `API ${formatCost(estimate.amountUsd)}`, label: '',
+    description: `${label}：${formatCost(estimate.amountUsd)}`, tone: 'cost' } as const;
+}

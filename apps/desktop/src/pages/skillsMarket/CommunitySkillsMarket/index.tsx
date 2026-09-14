@@ -5,7 +5,7 @@ import { CodexHomeScope, CodexHomeSelect, useSelectedCodexHome } from "../../../
 import { useCommunitySkills } from "./useCommunitySkills";
 import { ChromePluginCard, chromePluginMatches } from "../ChromePluginCard";
 import { ComputerUseCard, computerUseMatches } from "../ComputerUseCard";
-import type { SkillMarketItem } from "../../../types";
+import { GUI_CODEX_HOME_ID, type SkillMarketItem } from "../../../types";
 import { SkillDetailModal } from "../SkillDetailModal";
 import { SkillMarketGrid } from "../SkillMarketGrid";
 import { SkillPublishModal } from "../SkillPublishModal";
@@ -13,13 +13,14 @@ import { SkillsMarketToolbar } from "../SkillsMarketToolbar";
 import type { CommunitySkillsMarketProps } from "../types";
 
 export function CommunitySkillsMarket(props: CommunitySkillsMarketProps) {
+  if (props.homeId) return <CommunitySkillsContent key={props.homeId} {...props} />;
   if (!hasLocalBackend) return <CommunitySkillsContent {...props} />;
   return <CodexHomeScope active={props.active}><ScopedCommunitySkills {...props} /></CodexHomeScope>;
 }
 
 function ScopedCommunitySkills(props: CommunitySkillsMarketProps) {
   const homeId = useSelectedCodexHome();
-  return <CommunitySkillsContent {...props} homeId={homeId} />;
+  return <CommunitySkillsContent {...props} homeId={homeId} showHomeSelector />;
 }
 
 function CommunitySkillsContent({
@@ -33,7 +34,9 @@ function CommunitySkillsContent({
   onTabChange,
   t,
   homeId,
-}: CommunitySkillsMarketProps & { homeId?: string }) {
+  embedded,
+  showHomeSelector = false,
+}: CommunitySkillsMarketProps & { showHomeSelector?: boolean }) {
   const { items, loading, error, busyAction, load, install, setEnabled, remove } = useCommunitySkills({
     homeId, notify, t,
   });
@@ -66,14 +69,16 @@ function CommunitySkillsContent({
   const markPreviewBroken = (skillId: string) => {
     setBrokenPreviews((current) => new Set(current).add(skillId));
   };
-  const browserCard = isDesktopApp && homeId && (chromeBusy || chromePluginMatches(query))
+  const showBuiltinPlugins = isDesktopApp && homeId === GUI_CODEX_HOME_ID;
+  const browserCard = showBuiltinPlugins && (chromeBusy || chromePluginMatches(query))
     ? <ChromePluginCard key={homeId} homeId={homeId} active={active} onBusyChange={setChromeBusy} /> : null;
-  const computerCard = isDesktopApp && homeId && (computerBusy || computerUseMatches(query))
+  const computerCard = showBuiltinPlugins && (computerBusy || computerUseMatches(query))
     ? <ComputerUseCard key={homeId} homeId={homeId} active={active} onBusyChange={setComputerBusy} /> : null;
 
   return (
     <div className="skills-market-page">
       <SkillsMarketToolbar
+        embedded={embedded}
         active={active}
         activeTab={activeTab}
         loading={loading || busyAction !== null}
@@ -83,7 +88,8 @@ function CommunitySkillsContent({
         onTabChange={onTabChange}
         query={query}
         t={t}
-        homeSelector={homeId && <CodexHomeSelect disabled={busyAction !== null || chromeBusy || computerBusy} />}
+        homeSelector={showHomeSelector && homeId
+          && <CodexHomeSelect disabled={busyAction !== null || chromeBusy || computerBusy} />}
       />
 
       {!authenticated && (

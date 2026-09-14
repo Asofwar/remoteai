@@ -15,6 +15,27 @@ pub(crate) async fn show_floating_bubble_menu<R: Runtime>(
         .get_webview_window(BUBBLE_LABEL)
         .ok_or_else(|| "floating bubble window does not exist".to_string())?;
     let position = bounded_menu_position(&window, position)?;
+    #[cfg(windows)]
+    {
+        let scale = window.scale_factor().map_err(|error| error.to_string())?;
+        let origin = window.inner_position().map_err(|error| error.to_string())?;
+        let anchor = tauri::PhysicalPosition::new(
+            f64::from(origin.x) + position.x * scale,
+            f64::from(origin.y) + position.y * scale,
+        );
+        match crate::system_tray::quick_menu::show(&app, anchor).await {
+            Ok(()) => return Ok(()),
+            Err(error) => eprintln!("failed to open glass menu, using native menu: {error}"),
+        }
+    }
+    show_native_menu(app, window, position).await
+}
+
+async fn show_native_menu<R: Runtime>(
+    app: AppHandle<R>,
+    window: tauri::WebviewWindow<R>,
+    position: LogicalPosition<f64>,
+) -> Result<(), String> {
     let menu_app = app.clone();
     let menu = tauri::async_runtime::spawn_blocking(move || {
         crate::system_tray::build_menu(&menu_app).map_err(|error| error.to_string())

@@ -10,12 +10,17 @@ import { ImageCache } from './imageCache';
 import { validateChatImages } from '../attachments';
 import { compactUnavailableReason } from './composerCommands';
 import type { ConnectionMode } from '../protocol';
-import { COMPOSER_EVENT, composerPatch, type ComposerModelsResponse,
-  type ComposerSettings, type ComposerSnapshot } from '../composer';
-import { resolveModelSelection } from '../../../apps/desktop/src/pages/codexGui/modelSelection';
+import { chatApprovals, chatHandshake } from '../handshake';
+import { CONNECTION_ERRORS, guiConnectionError } from '../connectionErrors';
+import { COMPOSER_EVENT, type ComposerSettings, type ComposerSnapshot } from '../composer';
+import { RemoteComposerSettings } from './composerSettings';
 import { SIDEBAR_EVENT, type SidebarSnapshot } from '../sidebar';
 import { emptyQueue, QUEUE_EVENT, type QueueAction, type QueueSnapshot } from '../queue';
 import { QueueConnection } from './queueConnection';
+import { AsyncAnswers } from './asyncAnswers';
+import { createGuiAccountsClient } from './guiAccounts';
+import type { UsageSummary } from '../usage';
+import { TOKEN_SUMMARY_OPERATION, type ReadTokenSummary } from '../tokenSummary';
 import { initialChatState, type ApprovalReply, type ChatProject, type ChatState, type GuiEvent,
   type ListResponse, type Request, type SendInput, type SkillsResponse, type Thread } from './types';
 
@@ -27,12 +32,20 @@ export class ChatController {
   private readonly eventListeners = new Set<(event: GuiEvent) => void>();
   private readonly connection: Pick<ChatConnection, 'request' | 'start' | 'stop'>;
   private readonly queueConnection = new QueueConnection((body) => this.connection.request('request', body));
+  private readonly asyncAnswers = new AsyncAnswers({ snapshot: () => this.state,
+    request: (body) => this.connection.request('request', body), update: (patch) => this.update(patch),
+    applyQueue: (queue) => this.applyQueue(queue), refresh: () => this.refreshSelected() });
+  readonly guiAccounts = createGuiAccountsClient({
+    request: (body) => this.connection.request('request', body), subscribe: (listener) => this.subscribeEvents(listener),
+  });
   private listGeneration = 0;
   private readGeneration = 0;
   private refreshThreadId: string | null = null;
   private synchronization = 0;
+  private synchronizing?: number;
   private skillGeneration = 0;
   private active = false;
+  private transportConnected = false;
   private syncTimer?: ReturnType<typeof setTimeout>;
   private readonly images = new ImageCache(<T>(body: Parameters<ConstructorParameters<typeof ImageCache>[0]>[0]) =>
     this.connection.request<T>('request', body));
@@ -42,10 +55,9 @@ export class ChatController {
   private historyTimer?: ReturnType<typeof setTimeout>;
   private historyDirty = false;
   private olderQueued = false;
-  private composerRevision = -1;
-  private remoteSettings = this.state.settings;
-  private pendingSettings: Partial<ComposerSettings> = {};
-  private savingSettings = false;
+  private readonly composer = new RemoteComposerSettings({ snapshot: () => this.state,
+    update: (patch) => this.update(patch), ready: () => this.active && this.state.ready,
+    request: (body) => this.connection.request('request', body) });
   private viewing = true;
   private loadedThreadId: string | null = null;
   private readonly reading = new Set<string>();
@@ -54,11 +66,16 @@ export class ChatController {
     this.connection = createConnection({
       mode: (mode) => this.changeMode(mode), error: (error) => this.update({ error }),
       ready: () => { void this.synchronize(); },
+      // Resuming the coordinator socket must not replace a pending GUI initialization deadline.
+      retryAt: (retryAt) => { if (!this.transportConnected) this.update({ retryAt }); },
       event: (event) => this.receive(event as GuiEvent),
     });
   }
 
   snapshot = () => this.state;
+  readUsage = () => this.connection.request<UsageSummary>('request', { operation: 'usageSummary' });
+  readTokenSummary: ReadTokenSummary = (weeks) =>
+    this.connection.request('request', { operation: TOKEN_SUMMARY_OPERATION, weeks });
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
   subscribeEvents = (listener: (event: GuiEvent) => void) => {
     this.eventListeners.add(listener);
@@ -72,11 +89,14 @@ export class ChatController {
   }
 
   private changeMode(mode: ConnectionMode) {
+    // A path outage keeps the logical session, pending requests and loaded history intact.
+    if (mode !== 'offline' && this.transportConnected) { this.update({ mode }); return; }
+    this.transportConnected = mode === 'direct' || mode === 'relay';
     this.historyReader.reset();
     this.queueConnection.reset();
     if (mode === 'offline') {
       this.skillGeneration += 1;
-      this.composerRevision = -1;
+      this.composer.reset();
       this.update({ sidebar: { ...this.state.sidebar, revision: -1 } });
       this.update({ queue: { ...this.state.queue, revision: -1 } });
     }
@@ -88,8 +108,8 @@ export class ChatController {
     clearTimeout(this.syncTimer);
     clearTimeout(this.historyTimer);
     this.historyTimer = undefined;
-    this.update({ mode, ready: false, loading: false, historyLoading: false, historyLoadingMore: false,
-      compacting: undefined });
+    this.update({ mode, ready: false, connecting: mode !== 'offline', retryAt: null,
+      loading: false, historyLoading: false, historyLoadingMore: false, compacting: undefined });
   }
 
   private receive(event: GuiEvent) {
@@ -101,7 +121,7 @@ export class ChatController {
         || !this.state.threads.some((thread) => thread.id === event.params.threadId)) void this.list();
       return;
     }
-    if (event?.method === COMPOSER_EVENT) { this.applyComposer(event.params as unknown as ComposerSnapshot); return; }
+    if (event?.method === COMPOSER_EVENT) { this.composer.receive(event.params as unknown as ComposerSnapshot); return; }
     if (event?.method === SIDEBAR_EVENT) { this.applySidebar(event.params as unknown as SidebarSnapshot); return; }
     if (event?.method === QUEUE_EVENT) { this.applyQueue(event.params as unknown as QueueSnapshot); return; }
     this.state = applyChatEvent(this.state, event);
@@ -116,7 +136,8 @@ export class ChatController {
     }
     if (event?.method === 'connection/closed' || event?.method === 'codex/disconnected') {
       this.skillGeneration += 1;
-      this.update({ ready: false });
+      this.synchronization += 1;
+      this.update({ ready: false, connecting: false, error: CONNECTION_ERRORS.guiDisconnected });
       this.scheduleSynchronization();
     }
   }
@@ -124,6 +145,7 @@ export class ChatController {
   private scheduleSynchronization() {
     clearTimeout(this.syncTimer);
     if (!this.active || !['direct', 'relay'].includes(this.state.mode)) return;
+    this.update({ retryAt: Date.now() + SYNCHRONIZATION_RETRY_MS });
     this.syncTimer = setTimeout(() => { void this.synchronize(); }, SYNCHRONIZATION_RETRY_MS);
   }
 
@@ -137,8 +159,19 @@ export class ChatController {
   }
 
   start() { this.active = true; this.connection.start(); }
+
+  connectNow = () => {
+    if (this.state.ready || this.state.connecting) return;
+    this.active = true;
+    if (this.transportConnected) { void this.synchronize(); return; }
+    this.connection.stop();
+    this.update({ connecting: true, retryAt: null, error: '' });
+    this.connection.start();
+  };
+
   stop() {
     this.active = false;
+    this.composer.reset();
     this.skillGeneration += 1;
     this.historyReader.reset();
     this.queueConnection.reset();
@@ -150,46 +183,32 @@ export class ChatController {
     this.listGeneration += 1;
     this.readGeneration += 1;
     this.refreshThreadId = null;
-    this.update({ ready: false, historyLoading: false, historyLoadingMore: false, compacting: undefined });
+    this.update({ ready: false, connecting: false, retryAt: null,
+      historyLoading: false, historyLoadingMore: false, compacting: undefined });
     this.connection.stop();
   }
 
   private async synchronize() {
+    if (!this.active || this.synchronizing === this.synchronization) return;
     clearTimeout(this.syncTimer);
     const generation = ++this.synchronization;
+    this.synchronizing = generation;
+    this.update({ connecting: true, retryAt: null });
     try {
-      const approvals = await this.connection.request<GuiEvent[]>('connect');
+      const response = await this.connection.request<unknown>('connect', chatHandshake);
       if (!this.active || generation !== this.synchronization) return;
+      const approvals = chatApprovals(response);
       this.update({ approvals, error: '' });
-      await Promise.all([this.list(), this.loadModels(generation), this.refreshSelected(), this.loadQueue(generation)]);
+      await Promise.all([this.list(), this.composer.load(), this.refreshSelected(), this.loadQueue(generation)]);
       if (this.active && generation === this.synchronization) {
-        this.update({ ready: true });
-        void this.flushSettings();
+        this.update({ ready: true, connecting: false, retryAt: null });
+        this.composer.retry();
       }
     } catch (error) {
       if (!this.active || generation !== this.synchronization) return;
-      this.failure(error);
+      this.update({ connecting: false, error: guiConnectionError(error) });
       this.scheduleSynchronization();
-    }
-  }
-
-  private async loadModels(generation: number) {
-    const result = await this.request<ComposerModelsResponse>({ operation: 'models' });
-    if (!this.active || generation !== this.synchronization) return;
-    if (result.composer) this.applyComposer(result.composer);
-    else {
-      const model = result.data.find((entry) => entry.isDefault) ?? result.data[0];
-      this.update({ models: result.data, settings: { ...this.state.settings,
-        model: model?.model ?? '', effort: model?.defaultReasoningEffort ?? '', ...this.pendingSettings } });
-    }
-  }
-
-  private applyComposer(snapshot: ComposerSnapshot) {
-    if (!snapshot || !Array.isArray(snapshot.models) || !snapshot.settings
-      || !Number.isSafeInteger(snapshot.revision) || snapshot.revision < this.composerRevision) return;
-    this.composerRevision = snapshot.revision;
-    this.remoteSettings = snapshot.settings;
-    this.update({ models: snapshot.models, settings: { ...snapshot.settings, ...this.pendingSettings } });
+    } finally { if (this.synchronizing === generation) this.synchronizing = undefined; }
   }
 
   private applySidebar(sidebar?: SidebarSnapshot) {
@@ -220,7 +239,7 @@ export class ChatController {
     try {
       const queue = await this.connection.request<QueueSnapshot>('request', { operation, threadId, id });
       if (generation === this.synchronization) this.applyQueue(queue);
-      await this.refreshSelected();
+      void this.refreshSelected();
     } catch (error) { this.failure(error); }
     finally { this.update({ queueBusy: false }); }
   }
@@ -246,47 +265,11 @@ export class ChatController {
       .finally(() => { this.reading.delete(key); });
   }
 
-  async setSettings(settings: Partial<ComposerSettings>) {
-    const patch = composerPatch(settings);
-    if (!Object.keys(patch).length) return;
-    if (patch.model && patch.model !== this.state.settings.model) {
-      const selection = resolveModelSelection(this.state.models, { model: patch.model, effort: patch.effort ?? '' });
-      patch.effort = selection.effort;
-    }
-    this.pendingSettings = { ...this.pendingSettings, ...patch };
-    this.update({ settings: { ...this.state.settings, ...patch }, settingsBusy: true, settingsError: '' });
-    // Editing remains available during reconnects and while the PC acknowledges an earlier choice.
-    void this.flushSettings();
-  }
+  async setSettings(settings: Partial<ComposerSettings>) { this.composer.set(settings); }
 
-  private async flushSettings() {
-    if (!this.active || !this.state.ready || this.savingSettings || !Object.keys(this.pendingSettings).length) return;
-    this.savingSettings = true;
-    const settings = { ...this.pendingSettings };
-    const generation = this.synchronization;
-    let accepted = false;
-    try {
-      const result = await this.connection.request<ComposerSnapshot>('request', { operation: 'composerSet', settings });
-      if (generation !== this.synchronization) return;
-      if (!result?.settings || !Number.isSafeInteger(result.revision)) throw new Error('电脑尚未确认设置，请重试。');
-      for (const field of ['model', 'effort', 'access'] as const) {
-        if (settings[field] !== undefined && this.pendingSettings[field] === settings[field]) {
-          delete this.pendingSettings[field];
-        }
-      }
-      if (result.revision < this.composerRevision) {
-        this.update({ settings: { ...this.remoteSettings, ...this.pendingSettings } });
-      } else this.applyComposer(result);
-      this.update({ settingsBusy: Object.keys(this.pendingSettings).length > 0, settingsError: '' });
-      accepted = true;
-    } catch (error) {
-      if (generation === this.synchronization) this.update({ settingsError: error instanceof Error
-        ? error.message : '设置尚未保存，请重试。' });
-    } finally {
-      this.savingSettings = false;
-      if (accepted || generation !== this.synchronization) void this.flushSettings();
-    }
-  }
+  /** Search without replacing the sidebar list or its pagination. */
+  searchThreads = (options: { search: string; archived: boolean; cursor?: string }) =>
+    this.request<ListResponse<Thread>>({ operation: 'list', ...options });
 
   async list(options: { search?: string; archived?: boolean; more?: boolean } = {}) {
     const generation = ++this.listGeneration;
@@ -314,11 +297,12 @@ export class ChatController {
     this.update({ selected: this.histories.get(thread.id) ?? thread, draftProject: null,
       selectedArchived: this.state.archived, error: '',
       historyHasMore: this.historyPages.get(thread.id)?.hasMore ?? false });
-    await this.refreshSelected();
+    await Promise.all([this.refreshSelected(), this.composer.select()]);
   }
 
   async loadOlder() {
-    if (!this.state.historyHasMore || !this.state.ready) return;
+    // A manual pull retries even after the PC previously reported the beginning of history.
+    if (!this.state.selected || !this.state.ready) return;
     if (this.refreshThreadId === this.state.selected?.id) {
       if (!this.state.historyLoadingMore) {
         this.olderQueued = true;
@@ -374,6 +358,8 @@ export class ChatController {
 
   back(project: ChatProject | null = null) {
     if (this.state.sending) return;
+    const inherit = this.state.selected && this.state.ready && !this.state.settingsBusy
+      ? { model: this.state.settings.model, effort: this.state.settings.effort } : undefined;
     this.rememberHistory();
     this.olderQueued = false;
     this.readGeneration += 1;
@@ -381,6 +367,7 @@ export class ChatController {
     this.loadedThreadId = null;
     this.update({ selected: null, draftProject: project ? { cwd: project.cwd, label: project.label } : null,
       selectedArchived: false, error: '', historyHasMore: false, historyLoading: false, historyLoadingMore: false });
+    void this.composer.select(inherit);
     void this.list();
   }
 
@@ -394,36 +381,52 @@ export class ChatController {
     catch (error) { this.failure(error); return false; }
     if (!this.state.ready) { this.update({ error: '正在连接电脑，请稍候再发送。' }); return false; }
     const generation = this.synchronization;
+    const selection = { ...this.state.settings, model: input.model ?? this.state.settings.model,
+      effort: input.effort ?? this.state.settings.effort, access: input.access };
+    const message = { ...input, ...(selection.model ? { model: selection.model } : {}),
+      ...(selection.effort ? { effort: selection.effort } : {}) };
     this.update({ sending: true, error: '' });
     try {
       let thread = this.state.selected;
       const created = !thread;
       if (!thread) {
-        const result = await this.request<{ thread: Thread }>({ operation: 'start', model: input.model,
+        const result = await this.request<{ thread: Thread }>({ operation: 'start', model: selection.model || undefined,
           access: input.access, cwd: this.state.draftProject?.cwd });
         thread = result.thread;
         this.update({ selected: thread, draftProject: null, selectedArchived: false,
           threads: [thread, ...this.state.threads.filter((entry) => entry.id !== result.thread.id)],
           archived: false, search: '', cursor: null });
+        await this.composer.created(thread.id, selection);
       }
       this.ensureCurrent(generation);
       if (!created) {
-        const queue = await this.queueConnection.enqueue(thread, { ...input, images });
+        const queue = await this.queueConnection.enqueue(thread, { ...message, images });
         if (queue && generation === this.synchronization) this.applyQueue(queue);
       } else {
-        await this.request({ operation: 'send', threadId: thread.id, ...input, images });
+        await this.request({ operation: 'send', threadId: thread.id, ...message, images });
       }
-      await this.refreshSelected();
+      void this.refreshSelected();
       return true;
     } catch (error) { this.failure(error); return false; }
     finally { this.update({ sending: false }); }
   }
+
+  answerAsyncQuestion = (item: import('./types').Item, answers: string[]) => this.asyncAnswers.submit(item, answers);
 
   private ensureCurrent(generation: number) {
     if (generation !== this.synchronization || !this.state.ready) throw new Error('连接已中断，请连接后再发送。');
   }
 
   imagePreview = (threadId: string, source: string, original = false) => this.images.load(threadId, source, original);
+
+  videos: import('../video').VideoClient = {
+    open: (threadId, path) => this.connection.request('request', { operation: 'videoOpen', threadId, path }),
+    read: (request) => this.connection.request('request', { operation: 'videoRead', ...request }),
+    close: (threadId, id) => this.connection.request('request', { operation: 'videoClose', threadId, id }),
+  };
+
+  textPreview = (threadId: string, path: string) =>
+    this.connection.request<import('../textPreview').TextPreview>('request', { operation: 'textPreview', threadId, path });
 
   loadSkills = async (cwd: string) => {
     const generation = this.skillGeneration;
@@ -444,6 +447,16 @@ export class ChatController {
 
   loadProjectFiles = (options: ProjectFilesRequest) =>
     this.connection.request<ProjectFilesResponse>('request', { operation: 'projectFiles', ...options });
+
+  loadProjectDirectories = (directory: string) =>
+    this.connection.request<import('../projectDirectories').ProjectDirectoriesResponse>('request', {
+      operation: 'projectDirectories', directory,
+    });
+
+  chooseDraftProject = (project: ChatProject) => {
+    if (!this.state.ready || this.state.selected || this.state.sending || !project.cwd.trim()) return;
+    this.update({ draftProject: { cwd: project.cwd, label: project.label }, error: '' });
+  };
 
   compact = async () => {
     const selected = this.state.selected;

@@ -24,6 +24,7 @@ path = "src/test_main.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+arboard = { version = "3.6.1", default-features = false }
 base64 = "0.22"
 bytes = "1"
 aes-gcm = "0.10"
@@ -74,9 +75,13 @@ sysinfo = "0.37"
 qrcode = "0.14.1"
 tauri = { version = "2", features = ["test"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10"
+
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [
   "Win32_Foundation",
+  "Win32_Graphics_Dwm",
   "Win32_Graphics_Gdi",
   "Win32_Networking_WinHttp",
   "Win32_Storage_FileSystem",

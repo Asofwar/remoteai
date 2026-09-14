@@ -32,9 +32,9 @@ export function compactCommand(state: GuiState, run: () => void): CompactCommand
   return { enabled: reason === null, description: reason ?? description, percent, run };
 }
 
-export function composerOptions(skills: Skill[], query: string, command: CompactCommand): ComposerOption[] {
-  const options: ComposerOption[] = [{ kind: "compact", key: "compact", label: "压缩",
-    description: command.description, enabled: command.enabled, command },
+export function composerOptions(skills: Skill[], query: string, command?: CompactCommand): ComposerOption[] {
+  const options: ComposerOption[] = [...(command ? [{ kind: "compact" as const, key: "compact", label: "压缩",
+    description: command.description, enabled: command.enabled, command }] : []),
   ...skills.map((skill): ComposerOption => ({ kind: "skill", key: skill.path, label: skillLabel(skill),
     description: skillDescription(skill), enabled: skill.enabled, skill }))];
   return options.filter((option) => {

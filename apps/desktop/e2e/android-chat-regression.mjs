@@ -4,6 +4,7 @@ import path from 'node:path';
 import { markdownReport } from './android-chat-report.mjs';
 import { existingChatSettings } from './android-existing-settings.mjs';
 import { groupPreviewJourney } from './android-group-preview.mjs';
+import { imagePreviewJourney } from './android-image-preview.mjs';
 import { adb, output, prepare, serverState, waitFor, waitText, tap, input, send, screenshot, hasText }
   from './android-chat-driver.mjs';
 
@@ -12,7 +13,7 @@ const report = {
 };
 const operationCount = async (operation) =>
   (await serverState()).operations.filter((entry) => entry.operation === operation).length;
-const ready = () => waitFor(async () => (await hasText('通过服务器连接')) || (await hasText('已直连')), 'chat connected');
+const ready = () => waitFor(async () => (await hasText('Relay')) || (await hasText('P2P')), 'chat connected');
 const latestTurn = async () => {
   const state = await serverState();
   const operation = state.operations.findLast((entry) => ['send', 'steer'].includes(entry.operation));
@@ -152,28 +153,7 @@ try {
     await adb('shell', 'am', 'start', '-n', 'com.codexswitch.mobile/.MainActivity');
     await ready();
   });
-  await check('12-inline-images-and-preview', async () => {
-    for (const [prompt, label] of [['local image preview', '本地图片'], ['remote image preview', '网络图片']]) {
-      await send(prompt);
-      await settled();
-      await waitText(`放大查看：${label}`);
-      assert.equal(await hasText('图片加载失败'), false);
-      await screenshot(`12-${label === '本地图片' ? 'local' : 'remote'}-image`);
-      await tap(`放大查看：${label}`);
-      await waitText('关闭图片');
-      await waitFor(async () => !(await hasText('正在加载原图…')), 'original image loaded');
-      assert.equal(await hasText('原图加载失败'), false);
-      await tap('放大图片');
-      await waitText('150%');
-      await tap('旋转图片');
-      await screenshot(`12-${label === '本地图片' ? 'local' : 'remote'}-preview`);
-      await tap('关闭图片');
-    }
-    assert.ok(await operationCount('imagePreview') > 0);
-    assert.ok(await operationCount('imageChunk') > 1);
-    await send('message after images');
-    await settled();
-  });
+  await check('12-inline-images-and-preview', imagePreviewJourney);
   await check('13-model-effort-and-access-sync', async () => {
     const response = await fetch('http://127.0.0.1:1490/test/composer', { method: 'POST',
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
@@ -240,7 +220,7 @@ try {
     assert.equal(await hasText('搜索聊天'), false);
     await tap('打开聊天列表');
     assert.equal(await hasText('未读回复'), false);
-    await tap('＋ 新聊天');
+    await tap('新聊天');
     await waitText('想一起完成什么？');
     await waitText('聊天消息');
   });

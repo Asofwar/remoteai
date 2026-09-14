@@ -96,6 +96,7 @@ import { useResetCredits } from "../../hooks/useResetCredits";
 import { useThemeColor } from "../../hooks/useThemeColor";
 import { useThemeMode } from "../../hooks/useThemeMode";
 import { useTokenUsagePreferences } from "../../hooks/useTokenUsagePreferences";
+import { useSseIdleTimeout } from "../../hooks/useSseIdleTimeout";
 import { useUpstream429RetryTimeout } from "../../hooks/useUpstream429RetryTimeout";
 import { useToast } from "../../hooks/useToast";
 import { useTotpEntries } from "../../hooks/useTotpEntries";
@@ -368,6 +369,7 @@ export function DashboardApp() {
   const themeColor = useThemeColor(notify);
   const themeMode = useThemeMode();
   const tokenUsagePreferences = useTokenUsagePreferences(notify);
+  const sseIdleTimeout = useSseIdleTimeout(notify);
   const upstream429RetryTimeout = useUpstream429RetryTimeout(notify);
   const manager = useAccountManager(notify, t, accountCloudSync);
   const providerManager = useProviderManager(notify, t, providerCloudSync);
@@ -1266,17 +1268,20 @@ export function DashboardApp() {
             scrollDurationSeconds={announcement?.scrollDurationSeconds ?? 22}
             style={announcementStyle} text={announcementText}
             trackKey={`${language}:${announcementText}`} />}
-          {(page === "accounts" || page === "providers") && <AccountToolbox t={t}>
+          {!sidebarNavigationEnabled && (
+            <DashboardNavigation onPageChange={setPage} page={page} t={t} />
+          )}
+          {(!sidebarNavigationEnabled || page === "accounts" || page === "providers") && <AccountToolbox t={t}
+            navigation={sidebarNavigationEnabled ? undefined : { page, onPageChange: setPage }}>
+            {(page === "accounts" || page === "providers") && <>
             <AccountDisplayTabs displayMode={accountDisplayMode.displayMode}
               onChange={accountDisplayMode.setDisplayMode} t={t} />
             {usageSpeedPill}
             {titlebarProxyRunning && <CloudRecycleBin t={t} disabled={!cloud.state.authenticated}
               triggerClassName="refresh-all announcement-recycle-bin-button" />}
             <CodexConfigRepairButton disabled={providerManager.proxyBusy} notify={notify} t={t} />
+            </>}
           </AccountToolbox>}
-          {!sidebarNavigationEnabled && (
-            <DashboardNavigation onPageChange={setPage} page={page} t={t} />
-          )}
         </header>
 
         <main className={page === "accounts" ? "accounts-main"
@@ -1314,6 +1319,9 @@ export function DashboardApp() {
                   })}</h1>
                   {page === "skills" && <div id="skills-market-tabs" className="skills-market-tabs-slot" />}
                   {page === "settings" && <SettingsGroupsNav t={t} />}
+                  {page === "codexConfig" && <p className={codexConfigStyles.subtitle}>
+                    管理 Codex 的 config.toml 配置项
+                  </p>}
                 </div>
               </div>
             )}
@@ -1442,6 +1450,7 @@ export function DashboardApp() {
               tokenUsageRefreshSeconds={tokenUsagePreferences.refreshSeconds}
               codexUsageSummaryEnabled={tokenUsagePreferences.codexSummaryEnabled}
               tokenUsagePreferencesLoading={tokenUsagePreferences.loading}
+              sseIdleTimeout={sseIdleTimeout}
               upstream429RetryTimeoutSeconds={upstream429RetryTimeout.timeoutSeconds}
               upstream429RetryTimeoutLoading={upstream429RetryTimeout.loading}
               onUpstream429RetryTimeoutChange={upstream429RetryTimeout.update}
@@ -1489,6 +1498,8 @@ export function DashboardApp() {
           </section>
           <section className={codexGuiStyles.panel} hidden={page !== "codexGui"}>
             <GuiWorkspace active={page === "codexGui"}
+              plugins={{ baseUrl: cloud.state.baseUrl, authenticated: cloud.state.authenticated,
+                currentUserId: cloud.state.userId, onLogin: openCloudLogin, notify, t }}
               windowControls={NATIVE_WINDOW_CONTROLS_ENABLED && <WindowControls onError={notify} t={t} />}
               accounts={manager.accounts}
                 privacyMode={privacyMode.enabled}
@@ -1638,7 +1649,7 @@ export function DashboardApp() {
           loading={providerManager.proxyBusy || chatGptOperation !== null}
           onClose={() => setShowProxySettings(false)}
           onSave={providerManager.setProxyListenOnAllInterfaces}
-          onCopyApiKey={providerManager.copyProxyLanApiKey} notify={notify} t={t} />
+          notify={notify} t={t} />
         <NetworkProxySettingsModal open={showNetworkProxy} value={networkProxy}
           loading={networkProxyLoading} onSave={saveNetworkProxy}
           onClose={() => setShowNetworkProxy(false)} t={t} />

@@ -8,6 +8,7 @@ RUN npm ci
 FROM deps AS build
 COPY apps/admin ./apps/admin
 COPY apps/admin-ui ./apps/admin-ui
+COPY shared ./shared
 RUN npm run build -w @codex-switch/admin-ui
 RUN npm run build -w @codex-switch/backend
 

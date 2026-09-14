@@ -14,11 +14,18 @@ use std::path::PathBuf;
 
 const HOST_NAME: &str = "dev.codex_switch.chrome";
 const EXTENSION_ID: &str = include_str!("../../resources/chrome-extension/extension-id.txt");
-const PLUGIN_VERSION: &str = "1.1.0";
+const PLUGIN_VERSION: &str = "1.1.1";
 const MCP_SERVER: &str = "codex_switch_chrome";
 
 #[derive(Debug, thiserror::Error)]
 enum BrowserError {
+    #[error("未能复制地址，请在 Chrome 地址栏输入 chrome://extensions/ 并回车。")]
+    Clipboard,
+    #[cfg(windows)]
+    #[error("未找到 Chrome，请先安装 Chrome 浏览器。")]
+    ChromeNotFound,
+    #[error("未能打开 Chrome，请手动打开，在地址栏粘贴并回车。")]
+    ChromeLaunch,
     #[error("浏览器插件操作未完成，请重试。")]
     Storage,
     #[error("浏览器插件尚未安装或已停用。")]

@@ -24,10 +24,12 @@ function focusEditor(node: HTMLDivElement, saved: Range | null): Range {
 export const SkillInput = forwardRef<SkillInputHandle, {
   value: ComposerText; draftKey: string; cwd: string; active: boolean; connected: boolean; disabled: boolean;
   placeholder: string; onChange: (value: ComposerText) => void;
-  compact: CompactCommand;
+  compact?: CompactCommand;
+  editing?: { onCancel: () => void; className: string };
   onPaste: (event: ClipboardEvent<HTMLElement>) => void; onSend: () => void;
+  onPasteKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
 }>(function SkillInput({ value, draftKey, cwd, active, connected, disabled, placeholder,
-  compact, onChange, onPaste, onSend }, ref) {
+  compact, editing, onChange, onPaste, onPasteKeyDown, onSend }, ref) {
   const editor = useRef<HTMLDivElement>(null);
   const savedCaret = useRef<Range | null>(null);
   const composing = useRef(false);
@@ -82,6 +84,8 @@ export const SkillInput = forwardRef<SkillInputHandle, {
     if (option.kind === "compact") option.command.run();
   };
   const keyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (disabled || !active) return;
+    onPasteKeyDown?.(event);
     if (composing.current || event.nativeEvent.isComposing || event.keyCode === 229) return;
     const menuKey = ["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key);
     if (open && menuKey && !(event.key === "Enter" && event.shiftKey)) {
@@ -93,12 +97,16 @@ export const SkillInput = forwardRef<SkillInputHandle, {
       } else if (options[selectedIndex]?.enabled) choose(options[selectedIndex]);
       return;
     }
+    if (event.key === "Escape" && editing) { event.preventDefault(); editing.onCancel(); return; }
     if (event.key !== "Enter") return;
     event.preventDefault();
-    if (event.shiftKey) { document.execCommand("insertLineBreak"); change(); }
+    if (event.shiftKey || (editing && !event.ctrlKey && !event.metaKey)) {
+      document.execCommand("insertLineBreak"); change();
+    }
     else onSend();
   };
   const paste = (event: ClipboardEvent<HTMLDivElement>) => {
+    if (disabled || !active) { event.preventDefault(); return; }
     onPaste(event);
     if (event.defaultPrevented) return;
     event.preventDefault();
@@ -108,11 +116,14 @@ export const SkillInput = forwardRef<SkillInputHandle, {
   };
   return <div className={styles.inputWrap}>
     {open && <SkillMenu id={listId} options={options} selected={selectedIndex}
-      loading={catalog.loading} error={catalog.error} onChoose={choose} />}
-    <div ref={editor} role="textbox" aria-label="消息" aria-multiline="true" aria-disabled={disabled}
+      loading={catalog.loading} error={catalog.error} onChoose={choose} below={Boolean(editing)}
+      skillsOnly={!compact} />}
+    <div ref={editor} role="textbox" aria-label={editing ? "编辑消息内容" : "消息"}
+      aria-multiline="true" aria-disabled={disabled}
       aria-autocomplete="list" aria-controls={open ? listId : undefined}
       aria-activedescendant={open && options.length ? `${listId}-${selectedIndex}` : undefined}
-      className={styles.editor} contentEditable={!disabled} suppressContentEditableWarning
+      className={`${styles.editor} ${editing?.className ?? ""}`} contentEditable={!disabled}
+      suppressContentEditableWarning
       data-placeholder={placeholder} data-empty={!value.text} onInput={change} onKeyDown={keyDown}
       onKeyUp={(event) => { if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) inspect(); }}
       onClick={inspect} onBlur={() => {

@@ -5,6 +5,8 @@ use serde_json::{json, Value};
 use super::{
     client::Client,
     error::{GuiError, Result},
+    images::MAX_IMAGES,
+    prompt::SkillInput,
     protocol::{id, thread_params, AccessMode, GuiRequest, GuiResponse},
     workspaces,
 };
@@ -24,6 +26,11 @@ pub(crate) struct EditRequest {
     turn_id: String,
     item_id: String,
     text: String,
+    #[serde(default)]
+    removed_image_indexes: Vec<usize>,
+    #[serde(default)]
+    images: Vec<String>,
+    skills: Option<Vec<SkillInput>>,
     model: Option<String>,
     effort: Option<String>,
     access: AccessMode,
@@ -83,12 +90,7 @@ fn edited_input(thread: &Value, edit: &EditRequest) -> Result<Vec<Value>> {
             .ok_or(GuiError::InvalidRequest)?;
         if message["id"] == edit.item_id {
             input.push(json!({"type": "text", "text": edit.text, "text_elements": []}));
-            input.extend(
-                content
-                    .iter()
-                    .filter(|part| part["type"] != "text")
-                    .cloned(),
-            );
+            input.extend(edited_attachments(content, edit)?);
             break;
         }
         input.extend(content.iter().cloned());
@@ -96,18 +98,22 @@ fn edited_input(thread: &Value, edit: &EditRequest) -> Result<Vec<Value>> {
     Ok(input)
 }
 
-async fn prepare(client: &Client, edit: &EditRequest) -> Result<Value> {
-    let mut request = GuiRequest::Send {
+fn send_request(edit: &EditRequest) -> GuiRequest {
+    GuiRequest::Send {
         thread_id: edit.thread_id.clone(),
         text: edit.text.clone(),
-        images: vec![],
-        skills: vec![],
+        images: edit.images.clone(),
+        skills: edit.skills.clone().unwrap_or_default(),
         attachments: vec![],
         model: edit.model.clone(),
         effort: edit.effort.clone(),
         access: None,
         cwd: edit.cwd.clone(),
-    };
+    }
+}
+
+async fn prepare(client: &Client, edit: &EditRequest) -> Result<Value> {
+    let mut request = send_request(edit);
     let root = client.projectless_root.clone();
     let mut params = tauri::async_runtime::spawn_blocking(move || {
         workspaces::prepare_request(&mut request, &root)?;
@@ -149,10 +155,10 @@ pub(super) async fn submit(client: &Client, edit: EditRequest) -> Result<GuiResp
     Ok(GuiResponse { data })
 }
 
-async fn replace_message<F, Fut>(
+async fn load_edit_history<F, Fut>(
     edit: &EditRequest,
-    mut params: Value,
-    mut request: F,
+    params: &Value,
+    request: &mut F,
 ) -> Result<Value>
 where
     F: FnMut(&'static str, Value) -> Fut,
@@ -164,9 +170,74 @@ where
     if let Some(cwd) = params.get("cwd") {
         resume["cwd"] = cwd.clone();
     }
-    let source = request("thread/resume", resume).await?;
-    // Attachments come from the server's stored message, never arbitrary frontend content.
-    params["input"] = json!(edited_input(&source["thread"], edit)?);
+    request("thread/resume", resume).await?;
+    // Interrupted turns can get transient item IDs in resume responses. Read the
+    // persisted history used by the UI so stale-target checks compare stable IDs.
+    request(
+        "thread/read",
+        json!({"threadId": edit.thread_id, "includeTurns": true}),
+    )
+    .await
+}
+
+fn edited_attachments(content: &[Value], edit: &EditRequest) -> Result<Vec<Value>> {
+    let mut retained = retained_attachments(content, &edit.removed_image_indexes)?;
+    let image_count = retained
+        .iter()
+        .filter(|part| matches!(part["type"].as_str(), Some("image" | "localImage")))
+        .count();
+    if image_count + edit.images.len() > MAX_IMAGES {
+        return Err(GuiError::InvalidRequest);
+    }
+    if edit.skills.is_some() {
+        retained.retain(|part| part["type"] != "skill");
+    }
+    Ok(retained)
+}
+
+fn retained_attachments(content: &[Value], removed: &[usize]) -> Result<Vec<Value>> {
+    let is_image = |part: &&Value| part["type"] == "image" || part["type"] == "localImage";
+    let image_count = content.iter().filter(is_image).count();
+    let removed: std::collections::BTreeSet<_> = removed.iter().copied().collect();
+    if removed.iter().any(|index| *index >= image_count) {
+        return Err(GuiError::InvalidRequest);
+    }
+    let mut image_index = 0;
+    Ok(content
+        .iter()
+        .filter(|part| {
+            if !is_image(part) {
+                return part["type"] != "text";
+            }
+            let retain = !removed.contains(&image_index);
+            image_index += 1;
+            retain
+        })
+        .cloned()
+        .collect())
+}
+
+async fn replace_message<F, Fut>(
+    edit: &EditRequest,
+    mut params: Value,
+    mut request: F,
+) -> Result<Value>
+where
+    F: FnMut(&'static str, Value) -> Fut,
+    Fut: std::future::Future<Output = Result<Value>>,
+{
+    let source = load_edit_history(edit, &params, &mut request).await?;
+    // Retain stored attachments and append additions validated by the ordinary send path.
+    let mut input = edited_input(&source["thread"], edit)?;
+    if let Some(additions) = params["input"].as_array() {
+        input.extend(
+            additions
+                .iter()
+                .filter(|part| part["type"] != "text")
+                .cloned(),
+        );
+    }
+    params["input"] = json!(input);
     let (method, rewind) = rewind_request(&source["thread"], edit)?;
     let mut data = request(method, rewind).await?;
     // Paginated revert returns metadata only. The validated prefix remains unchanged.

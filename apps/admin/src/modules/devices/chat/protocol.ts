@@ -37,6 +37,8 @@ export function publicKey(value: unknown): string {
 
 export function signal(value: unknown) {
   const message = record(value);
+  if (message.generation !== undefined && (!Number.isSafeInteger(message.generation)
+    || Number(message.generation) < 0)) throw new Error('Invalid generation');
   if (message.kind === 'key') return { kind: 'key', key: publicKey(message.key) };
   if (message.kind === 'sdp' && (message.type === 'offer' || message.type === 'answer')
     && typeof message.sdp === 'string' && message.sdp.length <= 24_000) return message;

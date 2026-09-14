@@ -1,11 +1,28 @@
 import assert from 'node:assert/strict';
 import { test, beforeEach } from 'node:test';
 import { validate, website } from '../apps/desktop/src-tauri/resources/chrome-extension/validation.js';
+import { execute } from '../apps/desktop/src-tauri/resources/chrome-extension/operations.js';
 
 let storage;
 let permissionModule;
 let closedWindows;
 let chromeWebsiteAccess;
+
+test('focusing restores a minimized window and preserves maximized windows', async () => {
+  storage.local.siteAccessMode = 'all';
+  const updates = [];
+  chrome.tabs = { get: async () => ({ id: 1, windowId: 2, url: 'https://example.com' }),
+    update: async (id, options) => updates.push({ id, ...options }) };
+  chrome.windows.update = async (id, options) => updates.push({ id, ...options });
+  for (const state of ['minimized', 'maximized']) {
+    updates.length = 0;
+    chrome.windows.get = async () => ({ state });
+    assert.deepEqual(await execute({ clientId: 'test' }, { operation: 'focus', args: { tabId: 1 } }),
+      { focused: true });
+    assert.deepEqual(updates, [{ id: 1, active: true }, { id: 2, focused: true,
+      ...(state === 'minimized' ? { state: 'normal' } : {}) }]);
+  }
+});
 beforeEach(async () => {
   storage = {local:{siteAccessMode:'ask'},session:{}};
   closedWindows = [];

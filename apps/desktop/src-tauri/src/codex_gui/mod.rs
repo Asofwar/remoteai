@@ -6,6 +6,7 @@ mod attachment_uploads;
 pub(crate) mod auto_switch_policy;
 pub(crate) mod auto_switch_settings;
 mod client;
+pub(crate) mod clipboard;
 mod computer_use_setup;
 pub(crate) mod deletion;
 mod error;
@@ -15,22 +16,28 @@ mod goals;
 mod home;
 mod icons;
 mod identity;
+pub(crate) mod image_actions;
 mod image_download;
 mod image_preview;
 mod image_thumbnail;
 mod images;
+mod mcp_approval;
 mod message_edit;
 pub(crate) mod model_settings;
 mod platform;
 pub(crate) mod plugin_client;
+mod project_directories;
 mod project_files;
 mod prompt;
 mod protocol;
 pub(crate) mod releases;
+pub(crate) mod scheduled_tasks;
 #[cfg(test)]
 mod tests;
+mod text_preview;
 pub(crate) mod undo;
 pub(crate) mod usage;
+mod video_stream;
 pub(crate) mod web;
 mod workspaces;
 
@@ -48,6 +55,7 @@ use protocol::{ApprovalReply, GuiEvent, GuiRequest, GuiResponse};
 #[derive(Default)]
 pub(crate) struct GuiState {
     client: Mutex<Option<Arc<Client>>>,
+    videos: Arc<video_stream::VideoStreams>,
 }
 
 async fn prepare_paths(app: AppHandle) -> Result<(PathBuf, PathBuf)> {
@@ -122,37 +130,66 @@ pub(crate) async fn codex_gui_request(
     state: State<'_, GuiState>,
     request: GuiRequest,
 ) -> std::result::Result<GuiResponse, String> {
-    async {
-        let client = connected(&state).await?;
-        if let GuiRequest::ProjectFiles(options) = request {
-            return project_files::list(&client, options).await;
+    execute_request(&state, request)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// Share request validation and typed failures with background GUI operations.
+async fn execute_request(state: &GuiState, request: GuiRequest) -> Result<GuiResponse> {
+    let client = connected(state).await?;
+    match request {
+        GuiRequest::VideoOpen(options) => {
+            return Arc::clone(&state.videos).open(&client, options).await
         }
-        if let GuiRequest::EditMessage(edit) = request {
-            return message_edit::submit(&client, edit).await;
-        }
-        if let GuiRequest::ImagePreview {
+        GuiRequest::VideoRead(options) => return Arc::clone(&state.videos).read(options).await,
+        GuiRequest::VideoClose(options) => return Arc::clone(&state.videos).close(options).await,
+        _ => {}
+    }
+    if let GuiRequest::TextPreview {
+        thread_id,
+        path,
+        max_bytes,
+    } = request
+    {
+        return text_preview::preview(&client, thread_id, path, max_bytes).await;
+    }
+    if let GuiRequest::ProjectFiles(options) = request {
+        return project_files::list(&client, options).await;
+    }
+    if let GuiRequest::ProjectDirectories { directory } = request {
+        return project_directories::list(directory).await;
+    }
+    if let GuiRequest::EditMessage(edit) = request {
+        return message_edit::submit(&client, edit).await;
+    }
+    if let GuiRequest::ImagePreview {
+        thread_id,
+        source,
+        variant,
+        max_bytes,
+    } = request
+    {
+        return image_preview::preview(
+            &client,
             thread_id,
             source,
-            variant,
-        } = request
-        {
-            return image_preview::preview(&client, thread_id, source, variant).await;
-        }
-        let projectless_root = client.projectless_root.clone();
-        let response_root = projectless_root.clone();
-        let (method, params) = tauri::async_runtime::spawn_blocking(move || {
-            let mut request = request;
-            workspaces::prepare_request(&mut request, &projectless_root)?;
-            request.into_rpc()
-        })
-        .await
-        .map_err(|_| GuiError::InvalidRequest)??;
-        let mut data = icons::resolve(method, client.request(method, params).await?).await?;
-        workspaces::hide_project_paths(&mut data, &response_root);
-        Ok(GuiResponse { data })
+            image_preview::PreviewOptions { variant, max_bytes },
+        )
+        .await;
     }
+    let projectless_root = client.projectless_root.clone();
+    let response_root = projectless_root.clone();
+    let (method, params) = tauri::async_runtime::spawn_blocking(move || {
+        let mut request = request;
+        workspaces::prepare_request(&mut request, &projectless_root)?;
+        request.into_rpc()
+    })
     .await
-    .map_err(|error: GuiError| error.to_string())
+    .map_err(|_| GuiError::InvalidRequest)??;
+    let mut data = icons::resolve(method, client.request(method, params).await?).await?;
+    workspaces::hide_project_paths(&mut data, &response_root);
+    Ok(GuiResponse { data })
 }
 
 #[tauri::command]

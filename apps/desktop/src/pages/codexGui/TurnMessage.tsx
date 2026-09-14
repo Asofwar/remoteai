@@ -1,5 +1,6 @@
 import { Fragment, memo, useMemo } from "react";
 import type { Item, Turn } from "./types";
+import type { SubmitMessageEdit } from "./messageEditContent";
 import { MessageItem } from "./MessageItem";
 import { TurnDuration } from "./TurnDuration";
 import { TurnPlan } from "./TurnPlan";
@@ -10,26 +11,14 @@ import styles from "./styles.module.less";
 import { GeneratedImages } from "./GeneratedImages";
 import { DeferredDetails } from "./DeferredDetails";
 import { RequestErrorNotice } from "./RequestErrorNotice";
-
-interface Group { type: "work" | "message"; items: Item[] }
-
-/** Only process messages collapse; user steering and final answers stay in chronological order. */
-export function groupTurnItems(items: Item[]): Group[] {
-  const lastAnswer = items.reduce((last, item, index) => item.type === "agentMessage" ? index : last, -1);
-  return items.reduce<Group[]>((groups, item, index) => {
-    const answer = item.type === "agentMessage"
-      && (item.phase === "final_answer" || (!item.phase && index === lastAnswer));
-    const type = item.type === "userMessage" || answer ? "message" : "work";
-    if (type === "work" && groups.at(-1)?.type === "work") groups[groups.length - 1].items.push(item);
-    else groups.push({ type, items: [item] });
-    return groups;
-  }, []);
-}
+import { WorkItems } from "./WorkItems";
+import { groupTurnItems } from "../../../../../shared/chat/turnGroups";
+export { groupTurnItems } from "../../../../../shared/chat/turnGroups";
 
 export const TurnMessage = memo(function TurnMessage({ turn, running, active, followsInterruption = false,
   editableItemId, onEdit, editDisabled, threadId, visibleItems = turn.items }: {
   turn: Turn; running: boolean; active: boolean; followsInterruption?: boolean;
-  editableItemId?: string; onEdit?: (text: string) => Promise<boolean>; editDisabled?: boolean;
+  editableItemId?: string; onEdit?: SubmitMessageEdit; editDisabled?: boolean;
   threadId?: string;
   visibleItems?: Item[];
 }) {
@@ -50,9 +39,7 @@ export const TurnMessage = memo(function TurnMessage({ turn, running, active, fo
       {group.type === "work" ? <DeferredDetails className={styles.workGroup} defaultOpen={running}
         summary={<summary data-history-anchor>{running ? "正在处理" : "查看处理过程"}
           <span>{group.items.length} 项活动</span></summary>}>
-        {() => <div className={styles.workItems}>{group.items.map((item) => <div key={item.id} data-message-id={item.id}>
-          <MessageItem item={item} startedAt={turn.startedAt} streaming={running && item.status !== "completed"} />
-        </div>)}</div>}
+        {() => <WorkItems items={group.items} startedAt={turn.startedAt} running={running} />}
       </DeferredDetails> : <div className={styles.messageEntry} data-message-id={group.items[0].id}>
         <MessageItem item={group.items[0]} startedAt={turn.startedAt}
         onEdit={group.items[0].id === editableItemId ? onEdit : undefined} editDisabled={editDisabled}

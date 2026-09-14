@@ -4,7 +4,6 @@ import {
   activateAggregateApi,
   activateProvider,
   activateProviderGroup,
-  copyLocalProxyLanApiKey,
   deactivateProvider,
   queryProviderBalance,
   removeAggregateApi,
@@ -47,6 +46,7 @@ import type {
   SystemPromptRule,
 } from "../types";
 import { useProviderData } from "./useProviderData";
+import { runSwitchFollowUp } from "./switchFollowUp";
 
 interface ProviderCloudSync {
   pushProvider?: (id: string) => Promise<void> | void;
@@ -249,12 +249,8 @@ export function useProviderManager(
       );
       await activateProvider(id);
       notify(t("toast.providerSwitchedHot"));
-      await Promise.all([
-        load(),
-        refreshesBalance
-          ? queryProviderBalance(id).catch(() => undefined)
-          : Promise.resolve(),
-      ]);
+      await load();
+      if (refreshesBalance) runSwitchFollowUp(() => queryProviderBalance(id));
       return true;
     } catch (error) {
       notify(providerErrorMessage(error, t));
@@ -298,7 +294,7 @@ export function useProviderManager(
       await switchProviderModel(id, model);
       notify(t("toast.providerModelSwitched"));
       await load();
-      await cloudSync?.pushProvider?.(id);
+      runSwitchFollowUp(() => cloudSync?.pushProvider?.(id));
     } catch (error) {
       notify(providerErrorMessage(error, t));
     } finally {
@@ -754,17 +750,6 @@ export function useProviderManager(
     }
   }, [load, notify, t]);
 
-  const copyProxyLanApiKey = useCallback(async () => {
-    try {
-      await copyLocalProxyLanApiKey();
-      notify(t("toast.proxyLanApiKeyCopied"));
-    } catch (error) {
-      notify(String(error).includes("Local network API key is not configured")
-        ? t("providers.error.lanApiKeyRequired")
-        : String(error));
-    }
-  }, [notify, t]);
-
   return {
     providers,
     aggregateApis,
@@ -808,7 +793,6 @@ export function useProviderManager(
     saveSystemPromptFilterRules,
     setSystemPromptInjection,
     saveSystemPromptInjectionPrompts,
-    copyProxyLanApiKey,
     reload: load,
   };
 }

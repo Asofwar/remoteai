@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, type ReactNode } from "react";
 import Markdown, { defaultUrlTransform, type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CodeBlock } from "./CodeBlock";
@@ -16,7 +16,7 @@ const COMPONENTS: Components = {
 };
 const PLUGINS = [remarkGfm];
 
-export const RichText = memo(function RichText({ text }: { text: string }) {
+export const RichText = memo(function RichText({ text, trailing }: { text: string; trailing?: ReactNode }) {
   const sections = useMemo(() => messageSections(text), [text]);
   return <div className={styles.markdown}>
     {sections.map((section, index) => section.type === "review"
@@ -26,5 +26,6 @@ export const RichText = memo(function RichText({ text }: { text: string }) {
       if (key === "href" && (isFileReference(url) || localImageSource(url))) return url;
       return defaultUrlTransform(url);
     }}>{section.text}</Markdown>)}
+    {trailing && <span className={styles.messageCopy} data-quote-exclude>{trailing}</span>}
   </div>;
 });

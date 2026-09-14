@@ -204,6 +204,7 @@ button:focus-visible { outline: 3px solid rgba(45, 131, 87, .24); outline-offset
 .announcement-copy svg { flex: 0 0 auto; color: currentColor; }
 .announcement-marquee:hover .announcement-track { animation-play-state: paused; }
 .top-tabs { height: 40px; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid #dbe4dc; border-radius: 10px; background: #eef3ef; }
+.app-menu > .top-tabs { margin-left: auto; }
 .top-tabs button { height: 30px; border: 0; display: inline-flex; gap: 8px; align-items: center; padding: 0 13px; border-radius: 7px; color: #64736a; background: transparent; cursor: pointer; transition: .18s ease; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .top-tabs button:hover { color: var(--ink); background: rgba(255,255,255,.72); }
 .top-tabs button.selected { color: #17251d; background: var(--green-highlight); box-shadow: 0 7px 18px rgba(var(--green-rgb), .18); }
@@ -238,9 +239,6 @@ main { width: 100%; min-width: 0; min-height: 0; overflow-x: hidden; overflow-y:
 .third-party-apps-page { min-height: 0; overflow: auto; padding: 30px 16px 0; }
 .third-party-apps-card { width: 100%; max-width: none; border-color: var(--line); }
 .third-party-apps-topbar-controls { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px 18px; }
-.third-party-apps-proxy-warning { display: inline-flex; align-items: center; max-width: 400px; min-width: 0; }
-.third-party-apps-proxy-warning .ant-typography { font-size: 11px; }
-.third-party-apps-proxy-warning .ant-btn { padding: 0 3px; font-size: 11px; }
 .third-party-apps-topbar-control { display: inline-flex; align-items: center; gap: 9px; white-space: nowrap; }
 .third-party-apps-topbar-control .ant-typography { font-size: 12px; }
 .third-party-apps-list-heading {

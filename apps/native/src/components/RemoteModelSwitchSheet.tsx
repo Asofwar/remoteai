@@ -1,6 +1,7 @@
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { AccountSummary, RemoteDevice, RemoteProviderSummary } from '../types';
 import { BottomSheet } from './BottomSheet';
+import { SheetScrollView } from './SheetScrollView';
 
 interface ModelOptionProps {
   badge: string;
@@ -90,7 +91,7 @@ export function RemoteModelSwitchSheet({
     if (await onSwitchProviderGroup(device.deviceId, group)) onClose();
   };
 
-  return <BottomSheet
+  return <BottomSheet fullWidthContent
     visible={Boolean(device)}
     title="切换模型"
     subtitle={device ? `${device.name} · 选择这台 PC 使用的模型来源` : undefined}
@@ -98,7 +99,7 @@ export function RemoteModelSwitchSheet({
     dismissible={!busy}
     tall
   >
-    <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+    <SheetScrollView style={styles.scroll}>
       <Text style={styles.sectionTitle}>官方模型</Text>
       {!accounts.length ? <Text style={styles.emptyText}>暂无已同步的官方账号。</Text> : accounts.map((account) => {
         const current = !device?.activeProviderId
@@ -151,7 +152,7 @@ export function RemoteModelSwitchSheet({
       <Text style={styles.footerHint}>
         在官方模型与第三方 Provider 之间切换后，需要重启 ChatGPT/Codex 才能加载当前模型。
       </Text>
-    </ScrollView>
+    </SheetScrollView>
   </BottomSheet>;
 }
 

@@ -1,3 +1,4 @@
+import { imagePreviewByteLimit, imagePreviewCharLimit } from '../../../../shared/remote-chat/policy';
 import { guiApi } from '../pages/codexGui/api';
 import type { Thread } from '../pages/codexGui/types';
 import { contentHash } from '../../../../shared/remote-chat/historySync';
@@ -6,7 +7,6 @@ import { isInlineImage } from '../../../../shared/chat/imageSources';
 const IMAGE_PREFIX = 'chat-image://';
 const CHUNK_CHARS = 256 * 1024;
 const CACHE_CHARS = 64 * 1024 * 1024;
-const MAX_ORIGINAL_CHARS = 28 * 1024 * 1024;
 
 /** Inline originals stay on the PC. History contains only stable, task-scoped references. */
 export class RemoteImages {
@@ -43,7 +43,8 @@ export class RemoteImages {
   private trim(cache: Map<string, string>) {
     let size = [...cache.values()].reduce((total, value) => total + value.length, 0);
     for (const [key, value] of cache) {
-      if (size <= CACHE_CHARS) break;
+      // Keep the active original even when its configured limit exceeds the cache budget.
+      if (size <= CACHE_CHARS || cache.size === 1) break;
       cache.delete(key);
       size -= value.length;
     }
@@ -62,15 +63,16 @@ export class RemoteImages {
   }
 
   private load(threadId: string, source: string, variant: 'thumbnail' | 'original') {
-    const key = JSON.stringify([threadId, source, variant]);
+    const maxBytes = imagePreviewByteLimit();
+    const key = JSON.stringify([threadId, source, variant, maxBytes]);
     const cached = this.images.get(key);
     if (cached) return Promise.resolve(cached);
     const existing = this.pending.get(key);
     if (existing) return existing;
     const request = this.resolve(threadId, source).then(async (resolved) => {
       const { url } = await guiApi.request<{ url: string }>({ operation: 'imagePreview', threadId,
-        source: resolved, variant });
-      const limit = variant === 'thumbnail' ? 100_000 : MAX_ORIGINAL_CHARS;
+        source: resolved, variant, maxBytes });
+      const limit = variant === 'thumbnail' ? 100_000 : imagePreviewCharLimit();
       if (!isInlineImage(url) || url.length > limit) throw new Error('图片暂时无法加载，请重试。');
       this.images.set(key, url);
       this.trim(this.images);

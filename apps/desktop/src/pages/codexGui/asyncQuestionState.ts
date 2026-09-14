@@ -1,7 +1,7 @@
 import type { Conversation, Item, Turn } from "./types";
 
 /** Async questions are agent messages; a later user message answers or supersedes them. */
-export function pendingAsyncQuestions(value?: Conversation): Item[] {
+export function pendingAsyncQuestions(value?: Pick<Conversation, 'turns'>): Item[] {
   let pending: Item[] = [];
   for (const turn of value?.turns ?? []) {
     for (const item of turn.items) {

@@ -1,0 +1,63 @@
+import { createContext, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Keyboard, Text } from 'react-native';
+import type { FileReference } from '../../../../shared/chat/fileReference';
+import type { TextPreview } from '../../../../shared/remote-chat/textPreview';
+import { BottomSheet } from '../components/BottomSheet';
+import { SheetScrollView } from '../components/SheetScrollView';
+import { ChatCodeBlock } from './ChatCodeBlock';
+import { fileLanguage } from './ChatCodeHighlight';
+import { styles } from './styles';
+
+import { isVideoPath, type VideoClient } from '../../../../shared/remote-chat/video';
+import { VideoViewer } from './video/VideoViewer';
+
+export const ChatFileContext = createContext<((file: FileReference) => void) | null>(null);
+interface Props {
+  threadId: string | null;
+  ready: boolean;
+  load: (threadId: string, path: string) => Promise<TextPreview>;
+  children: ReactNode;
+  videos: VideoClient;
+}
+
+function FilePreview({ file, threadId, ready, load, close }: Omit<Props, 'children'> & {
+  file: FileReference; close: () => void;
+}) {
+  const [result, setResult] = useState<TextPreview>();
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (!threadId || !ready) return;
+    let cancelled = false;
+    setError(''); setResult(undefined);
+    void load(threadId, file.path).then((value) => { if (!cancelled) setResult(value); }, () => {
+      if (!cancelled) setError('文件暂时无法读取，请确认文件仍在当前项目中，且大小未超过查看上限。');
+    });
+    return () => { cancelled = true; };
+  }, [threadId, ready, load, file.path, attempt]);
+  return <BottomSheet fullWidthContent visible tall title="文件内容" subtitle={file.path} onClose={close} dragFromHeaderOnly
+    actions={error ? [{ label: '重试', onPress: () => setAttempt(attempt + 1), disabled: !ready }] : []}>
+    <SheetScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
+      {!ready && !result && <Text style={styles.subtitle}>请连接电脑后查看文件。</Text>}
+      {ready && !result && !error && <ActivityIndicator accessibilityLabel="正在读取文件" />}
+      {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+      {result && <>
+        <Text style={styles.subtitle}>当前文件内容{file.line ? ` · 引用第 ${file.line} 行` : ''}</Text>
+        <ChatCodeBlock text={result.text} label="完整文本" language={fileLanguage(file.path)}
+          lineNumbers copyLabel="复制文件内容" />
+      </>}
+    </SheetScrollView>
+  </BottomSheet>;
+}
+
+export function ChatFileProvider({ children, ...options }: Props) {
+  const [file, setFile] = useState<FileReference | null>(null);
+  const open = useCallback((value: FileReference) => { Keyboard.dismiss(); setFile(value); }, []);
+  return <ChatFileContext.Provider value={open}>
+    {children}
+    {file && (isVideoPath(file.path)
+      ? <VideoViewer key={file.path} path={file.path} threadId={options.threadId}
+        ready={options.ready} client={options.videos} close={() => setFile(null)} />
+      : <FilePreview key={file.path} {...options} file={file} close={() => setFile(null)} />)}
+  </ChatFileContext.Provider>;
+}

@@ -1,11 +1,20 @@
 import { test, expect } from '@playwright/test';
-import { connect, navigate, send, settled, screenshot, state, fixtureUrl } from './chat-helpers';
+import { connect, navigate, send, settled, screenshot, state, fixtureUrl, openChatSettings } from './chat-helpers';
 import { chatJourney } from './chat-journey';
 import { historyJourney } from './chat-history';
 import { attachmentJourney } from './chat-attachments';
 import { composerLayout } from './chat-composer';
+import { projectPickerJourney } from './chat-project-picker';
 
-test.beforeEach(async ({ page, request }) => {
+test.beforeEach(async ({ page, request }, info) => {
+  // Login can open chat immediately; install the network fault before any peer is created.
+  if (info.title.endsWith('over relay') || info.title.startsWith('falls back after direct discovery')) {
+    await page.addInitScript(() => {
+      window.RTCPeerConnection = class {
+        constructor() { throw new Error('Direct transport disabled for the relay regression'); }
+      } as unknown as typeof RTCPeerConnection;
+    });
+  }
   await request.post(`${fixtureUrl}/test/reset`);
   await expect.poll(async () => (await state(request)).operations.length).toBe(0);
   await page.goto('./');
@@ -18,10 +27,57 @@ test.beforeEach(async ({ page, request }) => {
 
 test('keeps composer icons below single and multiline drafts', async ({ page }) => composerLayout(page));
 
+for (const [code, message] of [[4004, '电脑的聊天连接尚未就绪。'], [4008, '这台电脑的聊天连接数已满，']] as const) {
+  test(`explains connection failure ${code} in a compact message and recovers`, async ({ page }, info) => {
+    let rejectConnection = true;
+    await page.routeWebSocket('**/device-chat', (socket) => {
+      if (!rejectConnection) { socket.connectToServer(); return; }
+      socket.onMessage(() => socket.close({ code, reason: 'Private server details must not be displayed' }));
+    });
+    // Login opens chat immediately, so recreate that socket after installing the failure route.
+    await page.reload();
+    await connect(page);
+    const alert = page.getByRole('alert').filter({ hasText: message });
+    await expect(alert).toBeVisible();
+    await expect(page.getByRole('status')).toHaveText('连接未完成');
+    const box = await alert.boundingBox();
+    expect(box?.width).toBeLessThanOrEqual(400);
+    await screenshot(page, info, `connection-failure-${code}`);
+    rejectConnection = false;
+    await expect(page.getByRole('status').filter({ hasText: /P2P|Relay/ })).toBeVisible({ timeout: 20_000 });
+    await expect(alert).toHaveCount(0);
+  });
+}
+
+test('syncs request speed with the PC and shows a lightning indicator only in fast mode', async ({ page, request }) => {
+  await connect(page);
+  await expect(page.getByRole('status').filter({ hasText: /P2P|Relay/ })).toBeVisible({ timeout: 16_000 });
+  await openChatSettings(page);
+  await page.getByRole('button', { name: '设置速度模式', exact: true }).click();
+  await page.getByRole('radio', { name: '快速模式', exact: true }).click();
+  await expect.poll(async () => (await state(request)).composer.settings.speed).toBe('fast');
+  await page.getByRole('button', { name: '完成', exact: true }).click();
+  await page.getByRole('textbox', { name: '聊天消息' }).focus();
+  await page.evaluate(() => {
+    // This web composer shows its model control while the keyboard is open.
+    if (!window.visualViewport) throw new Error('Visual viewport is required');
+    Object.defineProperty(window.visualViewport, 'height', { configurable: true, get: () => innerHeight - 300 });
+    window.visualViewport.dispatchEvent(new Event('resize'));
+  });
+  const settings = page.getByRole('button', { name: /聊天设置/ });
+  await expect(settings).toContainText('⚡');
+  await request.post(`${fixtureUrl}/test/composer`, { data: { speed: 'normal' } });
+  await expect(settings).not.toContainText('⚡');
+  await openChatSettings(page);
+  await expect(page.getByRole('button', { name: '设置速度模式', exact: true })).toContainText('普通模式');
+});
+
 test('syncs PC chats over direct transport, supports actions and reconnects without duplicate sends',
   async ({ page, request }, info) => chatJourney({ page, request, info }));
 
 for (const relay of [false, true]) {
+  test(`selects a computer folder for a new chat over ${relay ? 'relay' : 'direct'}`,
+    async ({ page, request }) => projectPickerJourney({ page, request, relay }));
   test(`sends album photos over ${relay ? 'relay' : 'direct'}`,
     async ({ page, request }, info) => attachmentJourney({ page, request, info, relay }));
   test(`pages history and streams with a processing timer over ${relay ? 'relay' : 'direct'}`,
@@ -30,7 +86,7 @@ for (const relay of [false, true]) {
 
 test('keeps the PC chat after login renewal and disconnects on logout', async ({ page, request }) => {
   await connect(page);
-  await expect(page.getByRole('status').filter({ hasText: '已直连' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('status').filter({ hasText: 'P2P' })).toBeVisible({ timeout: 15_000 });
   await page.getByRole('button', { name: '打开聊天列表' }).click();
   await page.getByRole('button', { name: /移动端聊天体验/ }).click();
   await navigate(page, '账号');
@@ -44,7 +100,7 @@ test('keeps the PC chat after login renewal and disconnects on logout', async ({
   const refreshed = page.waitForResponse((response) => response.url().endsWith('/auth/refresh'));
   await navigate(page, '聊天');
   expect((await refreshed).status()).toBe(200);
-  await expect(page.getByRole('status').filter({ hasText: '已直连' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('status').filter({ hasText: 'P2P' })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('heading', { name: '移动端聊天体验', exact: true })).toBeVisible();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('codex-switch.web.session.v1') ?? '{}').accessToken))
     .toBe('renewed-test-token');
@@ -64,7 +120,7 @@ test('falls back after direct discovery fails and keeps the composer within a sm
     });
     const started = Date.now();
     await connect(page);
-    await expect(page.getByRole('status').filter({ hasText: '通过服务器连接' })).toBeVisible({ timeout: 16_000 });
+    await expect(page.getByRole('status').filter({ hasText: 'Relay' })).toBeVisible({ timeout: 16_000 });
     expect(Date.now() - started).toBeGreaterThanOrEqual(10_000);
     await page.getByRole('button', { name: '打开聊天列表' }).click();
     await page.getByRole('button', { name: /移动端聊天体验/ }).click();

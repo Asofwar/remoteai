@@ -202,7 +202,8 @@ fn set_proxy_auth(provider: &mut Table, options: &LocalProxyConfig<'_>) {
     provider["auth"] = Item::Value(Value::InlineTable(auth));
 }
 
-fn proxy_headers() -> InlineTable {
+/// Marks the local proxy as an OpenAI actor so Codex exposes built-in image tools.
+pub(crate) fn proxy_headers() -> InlineTable {
     let mut headers = InlineTable::new();
     headers.insert(
         LOCAL_PROXY_ACTOR_AUTHORIZATION_HEADER,

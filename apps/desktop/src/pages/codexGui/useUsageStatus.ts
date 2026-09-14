@@ -1,16 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke, isHostedWebApp, canManageCodexConnection } from "../../api/backend";
 import type { LocalProxyStatus } from "../../types";
+import { USAGE_REFRESH_INTERVAL_MS, type UsageSummary } from "../../../../../shared/remote-chat/usage";
+export type { UsageSummary } from "../../../../../shared/remote-chat/usage";
 
-const REFRESH_INTERVAL_MS = 5_000;
 const CAN_CHANGE_FAST_MODE = !isHostedWebApp || canManageCodexConnection;
-export interface UsageSummary {
-  totalTokens: number;
-  estimatedCostUsd: number;
-  primaryRemainingPercent: number | null;
-  primaryRemainingAggregated: boolean;
-  providerEstimatedCost: { amountUsd: number; aggregated: boolean } | null;
-}
 
 export function useUsageStatus(active: boolean) {
   const [usage, setUsage] = useState<UsageSummary | null>(null);
@@ -49,7 +43,7 @@ export function useUsageStatus(active: boolean) {
       } finally { loading.current = false; }
     };
     queueMicrotask(() => void refresh());
-    const timer = setInterval(() => void refresh(), REFRESH_INTERVAL_MS);
+    const timer = setInterval(() => void refresh(), USAGE_REFRESH_INTERVAL_MS);
     return () => { cancelled = true; clearInterval(timer); };
   }, [active]);
 

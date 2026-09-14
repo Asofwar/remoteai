@@ -1,11 +1,22 @@
 import type { AccessMode, Model } from './client/types';
 import { object } from './protocol';
 
-export interface ComposerSettings { model: string; effort: string; access: AccessMode }
-export interface ComposerSnapshot { models: Model[]; settings: ComposerSettings; revision: number }
+export type RequestSpeed = 'normal' | 'fast';
+export interface ComposerSettings { model: string; effort: string; access: AccessMode; speed?: RequestSpeed }
+export const COMPOSER_FIELDS = ['model', 'effort', 'access', 'speed'] as const;
+export interface ComposerSnapshot {
+  models: Model[]; settings: ComposerSettings; revision: number;
+  /** Omitted by older hosts; null is the new-conversation draft. */
+  threadId?: string | null;
+}
 export interface ComposerModelsResponse { data: Model[]; nextCursor: string | null; composer?: ComposerSnapshot }
 export const COMPOSER_EVENT = 'chat/composer/updated';
 export const DEFAULT_COMPOSER: ComposerSettings = { model: '', effort: '', access: 'workspace-write' };
+export function composerThreadId(value: unknown): string | null | undefined {
+  if (value === undefined || value === null) return value;
+  if (typeof value === 'string' && /^[a-zA-Z0-9_-]{1,200}$/.test(value)) return value;
+  throw new Error('请选择聊天后重试。');
+}
 export const EFFORT_LABELS: Record<string, string> = {
   none: '无', minimal: '极低', low: '低', medium: '中', high: '高', xhigh: '极高', max: '最高', ultra: 'Ultra',
 };
@@ -25,7 +36,7 @@ export const ACCESS_OPTIONS = [
 
 export function composerPatch(value: unknown): Partial<ComposerSettings> {
   const input = object(value);
-  if (Object.keys(input).some((key) => !['model', 'effort', 'access'].includes(key))) {
+  if (Object.keys(input).some((key) => !(COMPOSER_FIELDS as readonly string[]).includes(key))) {
     throw new Error('聊天设置无效，请重新选择。');
   }
   for (const key of ['model', 'effort'] as const) {
@@ -35,6 +46,9 @@ export function composerPatch(value: unknown): Partial<ComposerSettings> {
   }
   if (input.access !== undefined && !ACCESS_OPTIONS.some((option) => option.value === input.access)) {
     throw new Error('请选择有效的访问权限。');
+  }
+  if (input.speed !== undefined && input.speed !== 'normal' && input.speed !== 'fast') {
+    throw new Error('请选择普通模式或快速模式。');
   }
   return input as Partial<ComposerSettings>;
 }

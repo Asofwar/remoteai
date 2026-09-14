@@ -38,7 +38,9 @@ async function tabAction(context, operation, args) {
   }
   if (operation === 'focus') {
     await chrome.tabs.update(tab.id, { active: true });
-    await chrome.windows.update(tab.windowId, { focused: true });
+    const window = await chrome.windows.get(tab.windowId);
+    await chrome.windows.update(tab.windowId, { focused: true,
+      ...(window.state === 'minimized' ? { state: 'normal' } : {}) });
     return { focused: true };
   }
   const url = website(args.url).href;

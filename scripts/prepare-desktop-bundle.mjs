@@ -1,10 +1,12 @@
-import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
+import { buildInstallerHelper } from "./build-installer-helper.mjs";
 import { packagedExecutable } from "./verify-tauri-assets.mjs";
+import { verifyWindowsRuntime } from "./verify-windows-runtime.mjs";
 
 if (process.platform === "win32") {
+  verifyWindowsRuntime(packagedExecutable);
+  // MSI still needs its embedded shutdown guard. NSIS calls Windows APIs directly
+  // and never embeds or executes this binary.
   const bytes = readFileSync(packagedExecutable);
   const peOffset = bytes.readUInt32LE(0x3c);
   const targets = new Map([
@@ -14,16 +16,5 @@ if (process.platform === "win32") {
   ]);
   const target = targets.get(bytes.readUInt16LE(peOffset + 4));
   if (!target) throw new Error("Unsupported Windows application architecture.");
-  const root = fileURLToPath(new URL("../apps/desktop/src-tauri/installer-helper/", import.meta.url));
-  const result = spawnSync("cargo", ["build", "--locked", "--release", "--target", target], {
-    cwd: root,
-    // The helper uses a separate target directory, including when the application overrides its own.
-    env: { ...process.env, CARGO_TARGET_DIR: `${root}target` },
-    stdio: "inherit",
-  });
-  if (result.error) throw result.error;
-  if (result.status !== 0) process.exit(result.status ?? 1);
-  const helper = join(root, "target", target, "release", "csw-installer-helper.exe").replaceAll("$", "$$");
-  writeFileSync(new URL("../apps/desktop/src-tauri/target/installer-helper-path.nsh", import.meta.url),
-    `!define CSW_HELPER_PATH "${helper}"\n`);
+  buildInstallerHelper({ target });
 }

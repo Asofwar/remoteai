@@ -9,7 +9,6 @@ use super::error::{GuiError, Result};
 
 // Includes base64 overhead, so the complete thumbnail URL stays below 100 kB on the wire.
 const MAX_THUMBNAIL_BYTES: usize = 74_000;
-const MAX_INLINE_CHARS: usize = 28 * 1024 * 1024;
 const MAX_DECODE_BYTES: u64 = 128 * 1024 * 1024;
 
 #[derive(Debug, Default, Deserialize)]
@@ -25,7 +24,7 @@ pub(super) fn render(url: String, variant: ImageVariant) -> Result<String> {
         return Ok(url);
     }
     let (header, encoded) = url.split_once(',').ok_or(GuiError::ImagePreview)?;
-    if url.len() > MAX_INLINE_CHARS || !header.starts_with("data:image/") {
+    if !header.starts_with("data:image/") {
         return Err(GuiError::ImagePreview);
     }
     let bytes = STANDARD

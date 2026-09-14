@@ -30,7 +30,7 @@ async function render(items: Item[], extra: Partial<Turn> = {}) {
 }
 
 async function openDetails() {
-  for (let level = 0; level < 3; level++) {
+  for (let level = 0; level < 4; level++) {
     await act(async () => container.querySelectorAll<HTMLDetailsElement>("details:not([open])").forEach((entry) => {
       entry.open = true;
       entry.dispatchEvent(new Event("toggle"));

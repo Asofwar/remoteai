@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import Feather from '@expo/vector-icons/Feather';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { BottomSheet } from '../components/BottomSheet';
+import { SheetFlatList, SheetInset, SHEET_READABLE_WIDTH } from '../components/SheetScrollView';
 import type { ProjectFile, ProjectFilesRequest, ProjectFilesResponse } from '../../../../shared/remote-chat/projectFiles';
 
 interface Props {
@@ -31,17 +32,20 @@ export function ComposerProjectFiles({ imagesOnly, threadId, cwd, load, choose, 
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [load, threadId, cwd, directory, imagesOnly, revision]);
-  return <BottomSheet visible title={imagesOnly ? '电脑照片' : '电脑文件'} subtitle="当前聊天项目"
+  return <BottomSheet fullWidthContent visible title={imagesOnly ? '电脑照片' : '电脑文件'} subtitle="当前聊天项目"
     onClose={close} dragFromHeaderOnly>
     <View style={fileStyles.root}>
-      {result?.parent !== null && result?.parent !== undefined && <Pressable accessibilityRole="button"
-        onPress={() => setDirectory(result.parent ?? '')} style={fileStyles.row}>
-        <Feather name="arrow-left" size={20} /><Text style={fileStyles.name}>返回上一级</Text>
-      </Pressable>}
-      {loading && <ActivityIndicator style={fileStyles.message} />}
-      {!!error && <Pressable accessibilityRole="button" accessibilityLabel="重试加载项目文件"
-        onPress={() => setRevision((value) => value + 1)}><Text style={fileStyles.message}>{error}</Text></Pressable>}
-      <FlatList data={result?.entries ?? []} keyExtractor={(entry) => entry.path} style={fileStyles.list}
+      <SheetInset style={fileStyles.readable}>
+        {result?.parent !== null && result?.parent !== undefined && <Pressable accessibilityRole="button"
+          onPress={() => setDirectory(result.parent ?? '')} style={fileStyles.row}>
+          <Feather name="arrow-left" size={20} /><Text style={fileStyles.name}>返回上一级</Text>
+        </Pressable>}
+        {loading && <ActivityIndicator style={fileStyles.message} />}
+        {!!error && <Pressable accessibilityRole="button" accessibilityLabel="重试加载项目文件"
+          onPress={() => setRevision((value) => value + 1)}><Text style={fileStyles.message}>{error}</Text></Pressable>}
+      </SheetInset>
+      <SheetFlatList data={result?.entries ?? []} keyExtractor={(entry) => entry.path} style={fileStyles.list}
+        contentContainerStyle={fileStyles.readable}
         keyboardShouldPersistTaps="handled" nestedScrollEnabled
         renderItem={({ item }) => <Pressable accessibilityRole="button" accessibilityLabel={item.name}
           onPress={() => { if (item.directory) setDirectory(item.path); else choose(item); }}
@@ -58,7 +62,8 @@ export function ComposerProjectFiles({ imagesOnly, threadId, cwd, load, choose, 
 }
 
 const fileStyles = StyleSheet.create({
-  root: { maxWidth: 400, width: '100%', alignSelf: 'center', paddingBottom: 12 },
+  root: { flexShrink: 1, paddingBottom: 12 },
+  readable: { maxWidth: SHEET_READABLE_WIDTH, width: '100%', alignSelf: 'center' },
   list: { maxHeight: 380, flexGrow: 0 },
   row: { flexDirection: 'row', gap: 12, alignItems: 'center', padding: 12, minHeight: 48, borderRadius: 12 },
   name: { fontSize: 15, color: '#222', flex: 1 },

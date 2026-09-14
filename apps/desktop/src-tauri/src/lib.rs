@@ -118,6 +118,7 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .manage(AppState::default())
         .manage(codex_gui::GuiState::default())
+        .manage(codex_gui::scheduled_tasks::ScheduledTasksState::default())
         .manage(std::sync::Arc::new(gui_terminal::TerminalState::default()))
         .manage(codex_gui::git::GitState::default())
         .manage(codex_gui::web::WebEventState::default())
@@ -136,6 +137,8 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
+            #[cfg(windows)]
+            app.manage(system_tray::quick_menu::QuickMenuState::default());
             #[cfg(windows)]
             installer_lifecycle::setup(app.handle())?;
             storage::migrate_app_settings_for_version(app.handle())?;
@@ -200,6 +203,7 @@ pub fn run() {
                 }
                 eprintln!("failed to restore web version server: {error}");
             }
+            codex_gui::scheduled_tasks::start(app.handle());
             remote_control::start(app.handle().clone());
             Ok(())
         })
@@ -244,9 +248,22 @@ pub fn run() {
                 }
             }
             floating_bubble::handle_window_event(window, event);
+            #[cfg(windows)]
+            system_tray::quick_menu::handle_window_event(window, event);
         })
         .invoke_handler(tauri::generate_handler![
+            #[cfg(windows)]
+            system_tray::quick_menu::quick_menu_snapshot,
+            #[cfg(windows)]
+            system_tray::quick_menu::quick_menu_present,
+            #[cfg(windows)]
+            system_tray::quick_menu::quick_menu_dismiss,
+            #[cfg(windows)]
+            system_tray::quick_menu::quick_menu_activate,
             codex_gui::codex_gui_connect,
+            codex_gui::scheduled_tasks::codex_gui_scheduled_tasks,
+            codex_gui::clipboard::codex_gui_clipboard_files,
+            codex_gui::image_actions::codex_gui_image_action,
             codex_gui::account_selection::codex_gui_account_selection,
             codex_gui::account_selection::codex_gui_switch_account,
             codex_gui::model_settings::codex_gui_model_settings,
@@ -388,6 +405,7 @@ pub fn run() {
             local_proxy::get_official_model_context_settings,
             local_proxy::set_official_model_context_window,
             local_proxy::set_upstream_429_retry_timeout,
+            local_proxy::sse_idle_timeout::set_sse_idle_timeout,
             local_proxy::list_proxy_sessions,
             local_proxy::list_proxy_session_requests,
             local_proxy::get_proxy_conversation_attachment,
@@ -424,6 +442,9 @@ pub fn run() {
             local_proxy::set_local_proxy_openai_auth_account,
             local_proxy::set_local_proxy_listen_on_all_interfaces,
             local_proxy::copy_local_proxy_lan_api_key,
+            local_proxy::lan_keys::commands::list_local_proxy_lan_api_keys,
+            local_proxy::lan_keys::commands::save_local_proxy_lan_api_key,
+            local_proxy::lan_keys::commands::delete_local_proxy_lan_api_key,
             floating_bubble::get_app_settings,
             autostart::set_launch_at_startup,
             main_window::set_close_to_tray,
@@ -484,6 +505,7 @@ pub fn run() {
             chrome_plugin::commands::chrome_plugin_action,
             computer_use::commands::computer_use_status,
             computer_use::commands::computer_use_action,
+            computer_use::commands::computer_use_request_permission,
             skills_market::upload_market_skill,
             skills_market::install_market_skill,
             skills_market::remove_market_skill,

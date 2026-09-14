@@ -1,120 +1,119 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Keyboard, Pressable, Text, View } from 'react-native';
-import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
-import { ChatMarkdown } from './Markdown';
-import { ChatImage } from './ChatImage';
-import { ChatToolDetails, messageContent, toolLabel } from './ChatToolDetails';
-import { itemImageSources } from '../../../../shared/chat/imageSources';
-import type { Item } from './types';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, FlatList, Keyboard, Pressable, RefreshControl, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useChatScroll } from './useChatScroll';
+import { useHistoryRefresh } from './useHistoryRefresh';
+import { ChatMessage } from './ChatMessage';
+import { ChatToolDetails } from './ChatToolDetails';
+import { ChatWorkDrawer } from './ChatWorkDrawer';
+import { ChatTurnDuration, ChatTurnSummary, type TurnPanel } from './ChatTurnSummary';
+import { ChatTurnDetails } from './ChatTurnDetails';
+import { findWorkEntry, type TurnEntry, type WorkEntry } from './turnPresentation';
+import { useConversationEntries } from './useConversationEntries';
 import type { ChatMessagesProps } from '../../../../shared/remote-chat/client/messageProps';
-import { styles } from './styles';
+import { palette, styles } from './styles';
 
-const SCROLL_EDGE_DISTANCE = 100;
+type Selection = { type: 'work'; id: string } | { type: 'item'; id: string; workId?: string }
+  | { type: 'turn'; id: string; panel: TurnPanel };
 
-function ToolMessage({ item, onOpen }: { item: Item; onOpen: (id: string) => void }) {
-  return <View style={styles.tool}>
-    <Pressable accessibilityRole="button" accessibilityLabel={`查看${toolLabel(item)}详情`}
-      onPress={() => onOpen(item.id)}>
-      <Text style={styles.subtitle}>▸ {toolLabel(item)}
-        {item.status === 'inProgress' ? ' · 进行中' : ''}</Text>
-      {item.command && <Text numberOfLines={1} style={styles.code}>{item.command}</Text>}
-    </Pressable>
-  </View>;
+const PROCESS_SEPARATOR_STYLE = { height: 14 };
+
+function MessageSeparator({ leadingItem }: { leadingItem?: TurnEntry }) {
+  const process = leadingItem?.kind === 'process' || (leadingItem?.kind === 'work' && leadingItem.inline);
+  return <View style={process ? PROCESS_SEPARATOR_STYLE : styles.messageSeparator} />;
 }
 
-const ChatMessage = memo(function ChatMessage({ item, onOpen }: { item: Item; onOpen: (id: string) => void }) {
-  const images = itemImageSources(item);
-  if (item.type === 'userMessage') return <View style={[styles.userMessage, images.length > 0 && { width: '92%' }]}>
-    <Text selectable style={styles.messageText}>{messageContent(item)}</Text>
-    {images.map((source, index) => <ChatImage key={index} source={source} />)}
+function WorkSummary({ entry, onOpen }: { entry: WorkEntry; onOpen: () => void }) {
+  if (entry.inline) return <View style={[styles.row, { paddingVertical: 5 }]}>
+    <Text style={styles.subtitle}>{entry.turn.status === 'inProgress' ? '正在处理' : '处理过程'}</Text>
+    <Text style={styles.subtitle}>{entry.items.length} 项活动</Text>
   </View>;
-  if (images.length) return <View>{images.map((source, index) => <ChatImage key={index} source={source} />)}</View>;
-  if (item.type !== 'agentMessage') return <ToolMessage item={item} onOpen={onOpen} />;
-  return <View style={styles.assistantMessage}>
-    <Text style={styles.speaker}>Codex</Text>
-    <ChatMarkdown text={messageContent(item)} />
-  </View>;
-});
+  const label = entry.turn.status === 'inProgress' ? '正在处理' : '查看处理过程';
+  return <Pressable accessibilityRole="button" accessibilityLabel={`${label}，${entry.items.length} 项活动`}
+    style={[styles.row, { paddingVertical: 5 }]} onPress={onOpen}>
+    <Text style={styles.subtitle}>{label}</Text>
+    <Text style={[styles.subtitle, styles.fill]}>{entry.items.length} 项活动</Text>
+    <Ionicons name="chevron-forward" size={15} color={palette.muted} />
+  </Pressable>;
+}
+
+function TimelineEntry({ entry, open }: { entry: TurnEntry; open: (selection: Selection) => void }) {
+  if (entry.kind === 'duration') return <ChatTurnDuration turn={entry.turn} />;
+  if (entry.kind === 'summary') return <ChatTurnSummary turn={entry.turn}
+    onOpen={(id, panel) => open({ type: 'turn', id, panel })} />;
+  if (entry.kind === 'work') return <WorkSummary entry={entry} onOpen={() => open({ type: 'work', id: entry.id })} />;
+  return <ChatMessage item={entry.item} process={entry.kind === 'process'}
+    onOpen={(id) => open({ type: 'item', id })}
+    running={entry.turn.status === 'inProgress' && entry.item.status !== 'completed'} />;
+}
 
 export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder }: ChatMessagesProps) {
-  const list = useRef<FlatList<Item>>(null);
-  const following = useRef(true);
-  const scrolling = useRef(false);
-  const position = useRef(0);
-  const contentHeight = useRef(0);
-  const followFrame = useRef<ReturnType<typeof requestAnimationFrame> | undefined>(undefined);
-  const [preservePosition, setPreservePosition] = useState(false);
-  const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
-  const openTool = useCallback((id: string) => { Keyboard.dismiss(); setSelectedToolId(id); }, []);
-  const items = thread?.turns?.flatMap((turn) => turn.items) ?? [];
-  // Resolve from the live messages so output keeps updating while the drawer is open.
-  const selectedTool = items.find((item) => item.id === selectedToolId);
-  const lastTurn = thread?.turns?.at(-1);
-  const followLatest = () => {
-    if (followFrame.current !== undefined) cancelAnimationFrame(followFrame.current);
-    // A fast history read can arrive before the new list has a viewport. Scroll after native layout settles.
-    followFrame.current = requestAnimationFrame(() => {
-      followFrame.current = undefined;
-      if (following.current && !scrolling.current) {
-        list.current?.scrollToOffset({ offset: contentHeight.current, animated: false });
-      }
-    });
-  };
-  useEffect(() => () => {
-    if (followFrame.current !== undefined) cancelAnimationFrame(followFrame.current);
-  }, []);
-  const updateFollowing = ({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
-    following.current = nativeEvent.contentSize.height - nativeEvent.layoutMeasurement.height
-      - nativeEvent.contentOffset.y < SCROLL_EDGE_DISTANCE;
-    setPreservePosition(!following.current);
-  };
-  const more = () => {
-    if (!hasMore || loadingMore || !loadOlder) return;
-    following.current = false;
-    setPreservePosition(true);
-    void loadOlder();
-  };
-  const finishScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    updateFollowing(event);
-    scrolling.current = false;
-    // Android can deliver the final scroll position after the drag event has ended.
-    if (event.nativeEvent.contentOffset.y < SCROLL_EDGE_DISTANCE) more();
-  };
-  return <><FlatList ref={list} data={items} keyExtractor={(item) => item.id}
-    contentContainerStyle={items.length ? styles.messages : styles.empty}
-    renderItem={({ item }) => <ChatMessage item={item} onOpen={openTool} />}
+  const { entries, hasObservedLiveTurn } = useConversationEntries(thread?.turns ?? []);
+  const { list, more, preservePosition, historyBottomSpace, initializing, onItemLayout, onFooterLayout,
+    showScrollToBottom, scrollToBottom, ...scrollHandlers }
+    = useChatScroll<TurnEntry>({ hasMore, loading, loadingMore, loadOlder,
+      latestItemId: entries.at(-1)?.id, bottomPadding: styles.messages.padding });
+  const refresh = useHistoryRefresh(more, loadingMore);
+  // Keep live messages visible through completion, including replies that never call tools.
+  const showInitialLoading = (!hasObservedLiveTurn && initializing) || (loading && !loadingMore && !entries.length);
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const open = useCallback((value: Selection) => { Keyboard.dismiss(); setSelection(value); }, []);
+  // Resolve against live history so open process, plan, output and diff drawers keep receiving updates.
+  const selectedEntry = selection?.type === 'work' ? findWorkEntry(entries, selection.id) : undefined;
+  const selectedTool = selection?.type === 'item'
+    ? thread?.turns?.flatMap((turn) => turn.items).find((item) => item.id === selection.id) : undefined;
+  const selectedTurn = selection?.type === 'turn' ? thread?.turns?.find((turn) => turn.id === selection.id) : undefined;
+  const workId = selection?.type === 'item' ? selection.workId : undefined;
+  const close = () => setSelection(null);
+  return <><View style={styles.fill}><FlatList ref={list} data={entries} keyExtractor={(entry) => entry.id}
+    style={showInitialLoading && styles.messageListLoading}
+    pointerEvents={showInitialLoading ? 'none' : 'auto'} accessibilityElementsHidden={showInitialLoading}
+    importantForAccessibility={showInitialLoading ? 'no-hide-descendants' : 'auto'}
+    contentContainerStyle={entries.length ? styles.messages : styles.empty}
+    renderItem={({ item: entry }) => <View collapsable={false} onLayout={() => onItemLayout(entry.id)}>
+      <TimelineEntry entry={entry} open={open} />
+    </View>}
+    ItemSeparatorComponent={MessageSeparator}
     keyboardShouldPersistTaps="handled" initialNumToRender={10}
-    maintainVisibleContentPosition={preservePosition ? { minIndexForVisible: 1 } : undefined}
-    // Image loads also emit scroll events. Only a user's gesture should turn off following new replies.
-    onScrollBeginDrag={() => { scrolling.current = true; }}
-    onScrollEndDrag={finishScroll}
-    onMomentumScrollBegin={() => { scrolling.current = true; }}
-    onMomentumScrollEnd={finishScroll}
-    onScroll={(event) => {
-      const top = event.nativeEvent.contentOffset.y;
-      if (scrolling.current) {
-        updateFollowing(event);
-        if (top < position.current && top < SCROLL_EDGE_DISTANCE) more();
-      }
-      position.current = top;
-    }} scrollEventThrottle={100}
-    onLayout={followLatest}
-    onContentSizeChange={(_, height) => { contentHeight.current = height; followLatest(); }}
-    ListHeaderComponent={hasMore || (loading && !items.length) ? <View style={styles.historyStatus}>
-      {loadingMore || (loading && !items.length) ? <>
+    // Keep message views attached while the keyboard changes the native clipping bounds.
+    removeClippedSubviews={false}
+    alwaysBounceVertical
+    refreshControl={<RefreshControl {...refresh} colors={[palette.green]} tintColor={palette.green}
+      progressBackgroundColor={palette.background} />}
+    // FlatList accounts for the header itself; anchor the first message even in a one-message conversation.
+    maintainVisibleContentPosition={preservePosition ? { minIndexForVisible: 0 } : undefined}
+    {...scrollHandlers} scrollEventThrottle={100}
+    ListHeaderComponent={<View style={hasMore && [styles.historyStatus, styles.messageHeader]}>
+      {hasMore && (loadingMore ? <>
         <ActivityIndicator size="small" accessibilityLabel="正在加载聊天记录" />
         <Text style={styles.subtitle}>正在加载聊天记录…</Text>
       </> : <Pressable accessibilityRole="button" onPress={more}>
         <Text style={styles.subtitle}>加载更早的消息</Text>
-      </Pressable>}
-    </View> : null}
-    ListEmptyComponent={loading ? null : <View style={styles.empty}>
-      <Text style={styles.emptyGlyph}>✳</Text>
-      <Text style={styles.title}>想一起完成什么？</Text>
-      <Text style={[styles.subtitle, styles.centerText]}>消息会发送到你的电脑，随时可以接着聊。</Text>
+      </Pressable>)}
     </View>}
-    ListFooterComponent={lastTurn?.error ? <Text style={styles.error}>{lastTurn.error.message}</Text> : null} />
-    {selectedTool && <ChatToolDetails key={selectedTool.id} item={selectedTool}
-      onClose={() => setSelectedToolId(null)} />}
+    ListEmptyComponent={showInitialLoading ? null : <View style={styles.empty}>
+      <Ionicons name="terminal-outline" size={28} color={palette.green} />
+      <Text style={styles.title}>想一起完成什么？</Text>
+      <Text style={[styles.subtitle, styles.centerText]}>直接提问，或选择一个项目开始任务。</Text>
+    </View>}
+    ListFooterComponent={<View style={[styles.messageFooter, { paddingBottom: historyBottomSpace }]}
+      onLayout={onFooterLayout} />} />
+    {showScrollToBottom && !showInitialLoading && entries.length > 0 && <Pressable
+      accessibilityRole="button" accessibilityLabel="回到底部" onPress={scrollToBottom}
+      style={({ pressed }) => [styles.scrollToBottom, pressed && styles.scrollToBottomPressed]}>
+      <Ionicons name="arrow-down" size={18} color={palette.ink} />
+      <Text style={styles.scrollToBottomText}>回到底部</Text>
+    </Pressable>}
+    {showInitialLoading && <View style={styles.messageLoadingOverlay}>
+      <ActivityIndicator size="small" accessibilityLabel="正在加载聊天记录" />
+      <Text style={[styles.subtitle, styles.messageLoadingText]}>正在加载聊天记录…</Text>
+    </View>}
+    </View>
+    {selectedEntry?.kind === 'work' && <ChatWorkDrawer entry={selectedEntry} onClose={close}
+      onOpen={(id) => open({ type: 'item', id, workId: selectedEntry.id })} />}
+    {selectedTool && <ChatToolDetails key={selectedTool.id} item={selectedTool} onClose={close}
+      onBack={workId ? () => open({ type: 'work', id: workId }) : undefined} />}
+    {selectedTurn && selection?.type === 'turn' && <ChatTurnDetails turn={selectedTurn}
+      panel={selection.panel} onClose={close} />}
   </>;
 }

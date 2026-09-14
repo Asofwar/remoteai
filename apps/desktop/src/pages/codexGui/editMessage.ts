@@ -2,9 +2,10 @@ import { guiApi } from "./api";
 import { conversation } from "./events";
 import { visibleContinuationItems } from "./continuation";
 import { editedMessageDraft } from "./editedMessageDraft";
+import type { MessageEditContent } from "./messageEditContent";
 import type { Conversation, GuiState, Item, MessageInput, Thread, Turn } from "./types";
 
-export interface MessageEdit { threadId: string; turnId: string; itemId: string; text: string }
+export interface MessageEdit extends MessageEditContent { threadId: string; turnId: string; itemId: string }
 export type EditMessage = (edit: MessageEdit) => Promise<boolean>;
 
 export function lastUserMessage(value?: Conversation): { turnId: string; item: Item } | undefined {

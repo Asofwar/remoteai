@@ -1,7 +1,7 @@
 {
   "name": "@codex-switch/desktop",
   "private": true,
-  "version": "1.4.25",
+  "version": "1.5.11",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -10,12 +10,13 @@
     "test:chat:android:background": "node e2e/android-background-chat.mjs",
     "test:chat:android:history": "node e2e/android-history-regression.mjs",
     "test:chat:android:drawer": "node e2e/android-drawer-regression.mjs",
+    "test:chat:android:search": "node e2e/android-search-regression.mjs",
     "test:chat:android:skills": "node e2e/android-skills-regression.mjs",
     "dev": "vite",
     "build": "tsc && vite build",
     "check": "npm run build",
     "test": "vitest run --exclude src/pages/codexConfig/schema.test.mjs && node --test src/pages/codexConfig/schema.test.mjs",
-    "check:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo test --manifest-path src-tauri/Cargo.toml && node ../../scripts/check-installer-helper.mjs",
+    "check:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo test --manifest-path src-tauri/Cargo.toml && node ../../scripts/check-installer-helper.mjs && node ../../scripts/check-installer-fixture.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
     "dev:app": "tauri dev",

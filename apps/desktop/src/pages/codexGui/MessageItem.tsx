@@ -1,18 +1,21 @@
 import { memo } from "react";
 import type { Item } from "./types";
+import type { SubmitMessageEdit } from "./messageEditContent";
 import { ActivityRow } from "./ActivityRow";
 import { RichText } from "./RichText";
 import { CopyButton } from "./CopyButton";
 import { UserMessage } from "./UserMessage";
 import { useStreamingText } from "./useStreamingText";
 import styles from "./styles.module.less";
+import activeStyles from "./activeText.module.less";
 
 function AgentMessage({ item, streaming }: { item: Item; streaming: boolean }) {
   const text = item.text ?? "";
   const visible = useStreamingText(text, streaming);
-  return <article className={styles.agentMessage} data-phase={item.phase ?? "final_answer"}>
-    <div data-quote-source={item.id}><RichText text={visible} /></div>
-    {!streaming && <CopyButton text={text} />}
+  return <article className={styles.agentMessage} data-phase={item.phase ?? "final_answer"}
+    data-streaming={streaming || undefined}>
+    <div data-quote-source={item.id} className={streaming ? activeStyles.response : undefined}>
+      <RichText text={visible} trailing={!streaming && <CopyButton text={text} />} /></div>
   </article>;
 }
 
@@ -29,7 +32,7 @@ function toolText(item: Item) {
 
 export const MessageItem = memo(function MessageItem({ item, streaming, startedAt, onEdit, editDisabled }: {
   item: Item; streaming: boolean; startedAt?: number | null;
-  onEdit?: (text: string) => Promise<boolean>; editDisabled?: boolean;
+  onEdit?: SubmitMessageEdit; editDisabled?: boolean;
 }) {
   if (item.type === "userMessage") return <UserMessage item={item} startedAt={startedAt}
     onEdit={onEdit} editDisabled={editDisabled} />;

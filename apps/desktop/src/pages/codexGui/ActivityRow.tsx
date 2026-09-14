@@ -62,17 +62,23 @@ function activitySummary(item: Item, text: string) {
   return { icon, preview: [label, content, status].filter(Boolean).join(" · ") };
 }
 
-export function ActivityRow({ item, text }: { item: Item; text: string }) {
+export function ActivitySummary({ item, text, count }: { item: Item; text: string; count?: number }) {
   const reasoning = item.type === "reasoning";
   const summary = activitySummary(item, text);
   const Icon = summary.icon;
   const preview = summary.preview.slice(0, MAX_ACTIVITY_PREVIEW).replace(/\s+/g, " ").trim();
-  return <DeferredDetails className={styles.row} status={item.status}
-    summary={<summary className={styles.summary} aria-label={reasoning ? `思考过程：${preview}` : preview}>
+  const label = reasoning ? `思考过程：${preview}` : preview;
+  return <summary className={styles.summary} aria-label={count ? `${label}，查看全部 ${count} 项活动` : label}>
       <Icon className={styles.icon} size={15} aria-hidden="true" />
       <span className={styles.preview}>{preview}</span>
       <ChevronDown className={styles.toggle} size={15} aria-hidden="true" />
-    </summary>}>
+    </summary>;
+}
+
+export function ActivityRow({ item, text }: { item: Item; text: string }) {
+  const reasoning = item.type === "reasoning";
+  return <DeferredDetails className={styles.row} status={item.status}
+    summary={<ActivitySummary item={item} text={text} />}>
     {() => <div className={reasoning ? styles.reasoningBody : styles.commandBody}>
       <ToolDetails item={item} text={text} /></div>}
   </DeferredDetails>;

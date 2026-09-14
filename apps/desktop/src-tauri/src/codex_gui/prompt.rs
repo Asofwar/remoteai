@@ -6,7 +6,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 const MAX_PROMPT_BYTES: usize = 256_000;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub(crate) struct SkillInput {
     name: String,
     path: String,

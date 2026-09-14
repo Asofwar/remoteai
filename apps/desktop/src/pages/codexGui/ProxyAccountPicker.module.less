@@ -6,16 +6,28 @@
   border: 0; border-top: 1px solid var(--line); background: transparent; color: var(--ink);
   text-align: left; cursor: pointer;
   > svg { flex-shrink: 0; color: var(--muted); }
-  &:hover { background: var(--green-selection-hover); }
+  &:hover { background: color-mix(in srgb, var(--green) 8%, transparent); }
   &:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+}
+.popup :global(.ant-popover-inner) {
+  padding: 0; overflow: hidden; border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  background: var(--panel, #fff);
+  box-shadow: 0 8px 24px #00000014, inset 0 1px 0 color-mix(in srgb, var(--panel) 70%, transparent);
+  @supports (backdrop-filter: blur(16px)) {
+    background: color-mix(in srgb, var(--panel, #fff) 82%, transparent);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    backdrop-filter: blur(16px) saturate(140%);
+  }
 }
 .panel {
   width: 100%; max-width: min(400px, calc(100vw - 24px)); box-sizing: border-box;
   padding: 12px 0; color: var(--ink); overflow-wrap: anywhere;
 }
-.header { padding: 0 12px; }
-.heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 13px; }
-.headingActions { display: flex; align-items: center; gap: 8px; }
+.footer { margin-top: 10px; padding: 10px 12px 0; border-top: 1px solid var(--line); }
+.toolbar { display: flex; align-items: center; gap: 8px; }
+.search { flex: 1; min-width: 0; }
+.actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .settings {
   display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0;
   border: 0; border-radius: 5px; background: transparent; color: var(--muted); cursor: pointer;
@@ -24,7 +36,7 @@
   &:disabled { cursor: default; opacity: 0.5; }
 }
 .list {
-  max-height: min(380px, 55vh); overflow-y: auto; margin-top: 10px; padding-left: 12px;
+  max-height: min(380px, 55vh); overflow-y: auto; padding-left: 12px;
   overscroll-behavior: contain;
 }
 .group {
@@ -42,6 +54,7 @@
   &:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
   &:disabled { opacity: 0.5; cursor: default; }
 }
+.optionName { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .selected { background: var(--green-selection); }
 .hint, .error { margin: 8px; font-size: 12px; color: var(--muted); }
 .error { color: var(--ant-color-error, #c43c3c); }

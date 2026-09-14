@@ -8,12 +8,15 @@ use super::error::{GuiError, Result};
 
 pub(super) const MAX_IMAGES: usize = 8;
 const MAX_IMAGE_BYTES: usize = 20 * 1024 * 1024;
-const MAX_BASE64_BYTES: usize = MAX_IMAGE_BYTES.div_ceil(3) * 4;
 
 // Clipboard and file-picker images travel inline, without granting the WebView filesystem access.
 pub(super) fn input(image: String) -> Result<Value> {
+    input_limited(image, MAX_IMAGE_BYTES as u64)
+}
+
+pub(super) fn input_limited(image: String, max_bytes: u64) -> Result<Value> {
     if image.starts_with("data:") {
-        validate_data_url(&image)?;
+        decode_data_url(&image, max_bytes)?;
         return Ok(json!({"type": "image", "url": image}));
     }
     let path = Path::new(&image);
@@ -26,7 +29,7 @@ pub(super) fn input(image: String) -> Result<Value> {
         || !path.is_file()
         || path
             .metadata()
-            .map(|metadata| metadata.len() == 0 || metadata.len() > MAX_IMAGE_BYTES as u64)
+            .map(|metadata| metadata.len() == 0 || metadata.len() > max_bytes)
             .unwrap_or(true)
         || !["png", "jpg", "jpeg", "webp", "gif"].contains(&extension.as_str())
     {
@@ -35,7 +38,7 @@ pub(super) fn input(image: String) -> Result<Value> {
     Ok(json!({"type": "localImage", "path": image}))
 }
 
-fn validate_data_url(url: &str) -> Result<()> {
+pub(super) fn decode_data_url(url: &str, max_bytes: u64) -> Result<Vec<u8>> {
     let (header, encoded) = url.split_once(',').ok_or(GuiError::InvalidRequest)?;
     let format = match header {
         "data:image/png;base64" => ImageFormat::Png,
@@ -44,14 +47,14 @@ fn validate_data_url(url: &str) -> Result<()> {
         "data:image/gif;base64" => ImageFormat::Gif,
         _ => return Err(GuiError::InvalidRequest),
     };
-    if encoded.is_empty() || encoded.len() > MAX_BASE64_BYTES {
+    if encoded.is_empty() || encoded.len() as u64 > max_bytes.div_ceil(3).saturating_mul(4) {
         return Err(GuiError::InvalidRequest);
     }
     let bytes = STANDARD
         .decode(encoded)
         .map_err(|_| GuiError::InvalidRequest)?;
-    if bytes.len() > MAX_IMAGE_BYTES || image::guess_format(&bytes).ok() != Some(format) {
+    if bytes.len() as u64 > max_bytes || image::guess_format(&bytes).ok() != Some(format) {
         return Err(GuiError::InvalidRequest);
     }
-    Ok(())
+    Ok(bytes)
 }

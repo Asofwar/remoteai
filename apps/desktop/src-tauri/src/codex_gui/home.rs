@@ -85,6 +85,9 @@ fn configure_gui_proxy(document: &mut DocumentMut) -> Result<()> {
     provider["wire_api"] = value("responses");
     provider["requires_openai_auth"] = value(false);
     provider["experimental_bearer_token"] = value(crate::codex_config::LOCAL_PROXY_TOKEN);
+    provider["http_headers"] = Item::Value(toml_edit::Value::InlineTable(
+        crate::codex_config::proxy_headers(),
+    ));
     provider["supports_websockets"] = value(false);
     if !document.contains_key("model_providers") {
         document["model_providers"] = Item::Table(Table::new());
@@ -94,4 +97,41 @@ fn configure_gui_proxy(document: &mut DocumentMut) -> Result<()> {
         .ok_or(GuiError::Startup)?
         .insert(GUI_PROVIDER_ID, Item::Table(provider));
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::isolated_config;
+    use crate::codex_config::{LOCAL_PROXY_ACTOR_AUTHORIZATION_HEADER, LOCAL_PROXY_TOKEN};
+    use toml_edit::DocumentMut;
+
+    #[test]
+    fn repairs_existing_gui_provider_without_changing_model_or_routing() {
+        let previous = r#"
+model = "saved-model"
+[model_providers.codex-switch-gui]
+name = "Codex GUI"
+base_url = "http://127.0.0.1:15722/codex-gui/v1"
+requires_openai_auth = false
+"#;
+        let root = std::env::temp_dir();
+        let repaired = isolated_config(previous, &root).unwrap();
+        let document: DocumentMut = repaired.parse().unwrap();
+        let provider = &document["model_providers"]["codex-switch-gui"];
+        assert_eq!(document["model"].as_str(), Some("saved-model"));
+        assert_eq!(
+            document["model_provider"].as_str(),
+            Some("codex-switch-gui")
+        );
+        assert_eq!(
+            provider["http_headers"][LOCAL_PROXY_ACTOR_AUTHORIZATION_HEADER].as_str(),
+            Some(LOCAL_PROXY_TOKEN)
+        );
+        assert_eq!(provider["requires_openai_auth"].as_bool(), Some(false));
+        assert_eq!(
+            provider["base_url"].as_str(),
+            Some("http://127.0.0.1:15722/codex-gui/v1")
+        );
+        assert_eq!(isolated_config(&repaired, &root).unwrap(), repaired);
+    }
 }

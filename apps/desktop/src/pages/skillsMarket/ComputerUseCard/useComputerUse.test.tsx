@@ -1,15 +1,16 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ComputerUseStatus } from "../../../api/computerUse";
 import { useComputerUse } from "./useComputerUse";
 
-const api = vi.hoisted(() => ({ computerUseStatus: vi.fn(), computerUseAction: vi.fn() }));
+const api = vi.hoisted(() => ({ computerUseStatus: vi.fn(), computerUseAction: vi.fn(),
+  requestComputerUsePermission: vi.fn() }));
 vi.mock("../../../api/computerUse", () => api);
 
 const installed: ComputerUseStatus = { installed: true, enabled: true, needsRepair: false,
-  version: "0.25.0", supported: true };
+  version: "0.25.0", supported: true, permissions: null };
 let root: Root;
 let hook: ReturnType<typeof useComputerUse>;
 function Harness({ home = "first", active = true }: { home?: string; active?: boolean }) {
@@ -68,4 +69,51 @@ it("isolates pending status responses when the selected home remounts the card",
   await act(async () => root.render(<Harness key="second" home="second" />));
   await act(async () => finish(installed));
   expect(hook.status?.enabled).toBe(false);
+});
+
+it("requests macOS permissions only after an action and pauses polling while settings open", async () => {
+  let finish!: () => void;
+  api.requestComputerUsePermission.mockReturnValue(new Promise<void>((resolve) => { finish = resolve; }));
+  await act(async () => root.render(<Harness />));
+  await act(async () => vi.advanceTimersByTimeAsync(5000));
+  expect(api.requestComputerUsePermission).not.toHaveBeenCalled();
+  let pending!: Promise<boolean>;
+  await act(async () => { pending = hook.requestPermission("screenRecording"); });
+  expect(api.requestComputerUsePermission).toHaveBeenCalledWith("screenRecording");
+  const polls = api.computerUseStatus.mock.calls.length;
+  await act(async () => vi.advanceTimersByTimeAsync(10000));
+  expect(api.computerUseStatus).toHaveBeenCalledTimes(polls);
+  expect(hook.busy).toBe(true);
+  api.computerUseStatus.mockResolvedValue({ ...installed, permissions: { accessibility: true, screenRecording: true } });
+  await act(async () => { finish(); await pending; });
+  expect(hook.status?.permissions?.screenRecording).toBe(true);
+  expect(hook.busy).toBe(false);
+});
+
+
+it("finishes the initial check in StrictMode without waiting for the polling interval", async () => {
+  await act(async () => root.render(<StrictMode><Harness /></StrictMode>));
+  expect(hook.status).toEqual(installed);
+  expect(vi.getTimerCount()).toBe(1);
+});
+
+it("checks immediately after reactivation while an older request is pending", async () => {
+  let finish!: (status: ComputerUseStatus) => void;
+  api.computerUseStatus.mockReturnValueOnce(new Promise<ComputerUseStatus>((resolve) => { finish = resolve; }));
+  await act(async () => root.render(<Harness />));
+  await act(async () => root.render(<Harness active={false} />));
+  await act(async () => root.render(<Harness />));
+  await act(async () => finish({ ...installed, needsRepair: true }));
+  expect(hook.status).toEqual(installed);
+  expect(api.computerUseStatus).toHaveBeenCalledTimes(2);
+});
+
+it("does not publish a pending response or queue checks after deactivation", async () => {
+  let finish!: (status: ComputerUseStatus) => void;
+  api.computerUseStatus.mockReturnValueOnce(new Promise<ComputerUseStatus>((resolve) => { finish = resolve; }));
+  await act(async () => root.render(<Harness />));
+  await act(async () => root.render(<Harness active={false} />));
+  await act(async () => finish(installed));
+  expect(hook.status).toBeNull();
+  expect(api.computerUseStatus).toHaveBeenCalledTimes(1);
 });

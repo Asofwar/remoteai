@@ -35,7 +35,10 @@ fn update(home: &Path, enabled: Option<bool>) -> Result<()> {
         &format!("{HELPER_ARGUMENT}{}", state::home_id(home)),
         enabled.map(|enabled| entry(home, enabled)).transpose()?,
     )
-    .map_err(|_| ComputerError::Conflict)
+    .map_err(|error| match error {
+        crate::codex_settings::ManagedMcpError::ForeignEntry => ComputerError::Conflict,
+        crate::codex_settings::ManagedMcpError::Storage => ComputerError::Storage,
+    })
 }
 
 pub(super) fn configured(home: &Path, enabled: bool) -> Result<bool> {
@@ -58,7 +61,29 @@ fn check_skill(home: &Path) -> Result<()> {
 }
 
 pub(super) fn skill_matches(home: &Path) -> bool {
-    fs::read_to_string(skill_path(home)).is_ok_and(|content| content == SKILL)
+    fs::read_to_string(skill_path(home))
+        .is_ok_and(|content| content.replace("\r\n", "\n") == SKILL.replace("\r\n", "\n"))
+}
+
+/// Restore local registration for enabled installations without downloading or revoking sessions.
+pub(super) fn refresh_installed(root: &Path, home: &Path) -> Result<()> {
+    let Some(record) = state::read(root, &state::home_id(home))? else {
+        return Ok(());
+    };
+    if !record.enabled || !package::present(root)? {
+        return Ok(());
+    }
+    check_skill(home)?;
+    if !configured(home, true)? {
+        update(home, Some(true))?;
+    }
+    if !skill_matches(home) {
+        let skill = skill_path(home);
+        fs::create_dir_all(skill.parent().ok_or(ComputerError::Storage)?)
+            .map_err(|_| ComputerError::Storage)?;
+        crate::storage::write_text_atomic(&skill, SKILL).map_err(|_| ComputerError::Storage)?;
+    }
+    Ok(())
 }
 
 pub(super) fn install(root: &Path, home: &Path) -> Result<()> {

@@ -885,9 +885,11 @@ name = "csw"
 version = "1.0.21"
 dependencies = [
  "aes-gcm",
+ "arboard",
  "base64 0.22.1",
  "bytes",
  "chrono",
+ "core-foundation",
  "crypto_box",
  "dirs 6.0.0",
  "ed25519-dalek",

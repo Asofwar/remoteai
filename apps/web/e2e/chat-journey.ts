@@ -7,7 +7,7 @@ import { openChatSettings } from './chat-helpers';
 
 interface Journey { page: Page; request: APIRequestContext; info: TestInfo; transport?: 'direct' | 'either' }
 const ready = (page: Page, transport?: Journey['transport']) => expect(page.getByRole('status')
-  .filter({ hasText: transport === 'either' ? /已直连|通过服务器连接/ : '已直连' }))
+  .filter({ hasText: transport === 'either' ? /P2P|Relay/ : 'P2P' }))
   .toBeVisible({ timeout: 16_000 });
 
 async function initialChat({ page, request, info, transport }: Journey) {
@@ -140,7 +140,8 @@ async function synchronizeComposer({ page, request, info }: Journey) {
   } });
   await expect.poll(async () => (await state(request)).composer.settings.model).toBe('second-model');
   await openChatSettings(page);
-  await expect(page.locator('.chat-setting-entry')).toHaveCount(3);
+  await expect(page.locator('.chat-setting-entry')).toHaveCount(4);
+  await expect(page.getByRole('button', { name: '设置速度模式', exact: true })).toBeVisible();
   await expect(page.getByRole('radio')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '设置模型' })).toContainText('第二模型');
   await expect(page.getByRole('button', { name: '设置推理强度' })).toContainText('极高');
@@ -180,7 +181,7 @@ async function recoverConnection({ page, request, info, transport }: Journey) {
   await ready(page, transport);
   await expect(page.getByRole('heading', { name: '移动端聊天体验', exact: true })).toBeVisible();
   await request.post(`${fixtureUrl}/test/fallback`);
-  await expect(page.getByRole('status').filter({ hasText: '通过服务器连接' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Relay' })).toBeVisible();
   await send(page, 'message after direct interruption');
   await settled(page);
   expect((await state(request)).relayFrames).toBeGreaterThan(0);

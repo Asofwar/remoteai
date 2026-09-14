@@ -1,30 +1,19 @@
-import { useEffect, useRef, useState, type ClipboardEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useFilePaste } from "./useFilePaste";
 import type { GuiController } from "./controller";
 import type { ComposerText } from "./types";
 import { MAX_ATTACHMENTS, type AttachmentReference } from "./attachmentTypes";
 import { MAX_REPLY_QUOTES, MAX_QUOTE_CHARACTERS, quoteKey, quotedReply, type ReplyQuote } from "./replyQuotes";
 import { queuedMessageText } from "./queuedMessageDraft";
 
-export const MAX_IMAGES = 8;
-export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
-export const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
-export interface DraftImage { id: string; name: string; url?: string }
+import { IMAGE_TYPES, MAX_IMAGES, MAX_IMAGE_BYTES, readImage, type DraftImage } from "./draftImages";
+export { IMAGE_TYPES, MAX_IMAGES, MAX_IMAGE_BYTES, readImage, type DraftImage } from "./draftImages";
 interface Draft extends ComposerText {
   images: DraftImage[];
   attachments?: AttachmentReference[];
   quotes?: ReplyQuote[];
 }
 const EMPTY_DRAFT: Draft = { text: "", mentions: [], images: [] };
-
-export function readImage(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => typeof reader.result === "string"
-      ? resolve(reader.result) : reject(new Error("Invalid image"));
-    reader.onerror = reader.onabort = () => reject(new Error("Image read failed"));
-    reader.readAsDataURL(file);
-  });
-}
 
 export function useComposerDraft(key: string, controller: GuiController) {
   const submitting = useRef(false);
@@ -102,15 +91,9 @@ export function useComposerDraft(key: string, controller: GuiController) {
         .catch(() => { removeImage(id); controller.report("图片读取失败，请重新粘贴或选择图片。"); });
     }
   };
-  const paste = (event: ClipboardEvent<HTMLElement>) => {
-    const files = Array.from(event.clipboardData.items)
-      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
-      .map((item) => item.getAsFile()).filter((file): file is File => file !== null);
-    if (!files.length) return;
-    event.preventDefault();
-    addImages(files);
-  };
-  const reading = draft.images.some((image) => !image.url);
+  const { paste, pasteKeyDown, readingFiles } = useFilePaste({ key, addAttachments, addImages,
+    report: controller.report });
+  const reading = readingFiles || draft.images.some((image) => !image.url);
   const send = async () => {
     if (reading || submitting.current) return;
     submitting.current = true;
@@ -131,6 +114,7 @@ export function useComposerDraft(key: string, controller: GuiController) {
       }
     } finally { submitting.current = false; }
   };
-  return { draft, reading, editText, editContent, removeImage, addImages, paste, send, addAttachments, removeAttachment,
+  return { draft, reading, editText, editContent, removeImage, addImages, paste, pasteKeyDown,
+    send, addAttachments, removeAttachment,
     addQuote, removeQuote, clearQuotes, editQueued };
 }

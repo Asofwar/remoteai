@@ -36,8 +36,8 @@ afterEach(async () => {
   else Reflect.deleteProperty(HTMLElement.prototype, "scrollTo");
 });
 
-async function render(disabled = false, selected = thread.id) {
-  await act(async () => root.render(<Messages selected={selected} value={conversation(thread)}
+async function render(disabled = false, selected = thread.id, source = thread) {
+  await act(async () => root.render(<Messages selected={selected} value={conversation(source)}
     onEdit={onEdit} editDisabled={disabled} />));
 }
 async function click(label: string) {
@@ -47,10 +47,10 @@ async function click(label: string) {
   await act(async () => button.click());
 }
 async function type(text: string) {
-  const textarea = container.querySelector("textarea")!;
+  const editor = container.querySelector('[role="textbox"]')!;
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, text);
-    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    editor.textContent = text;
+    editor.dispatchEvent(new InputEvent("input", { bubbles: true }));
   });
 }
 
@@ -67,41 +67,72 @@ it("cancels without sending or changing the conversation and resets the draft", 
   expect(container.textContent).toContain("最后的问题");
   expect(container.textContent).toContain("原回复");
   await click("编辑消息");
-  expect(container.querySelector("textarea")?.value).toBe("最后的问题");
+  expect(container.querySelector('[role="textbox"]')?.textContent).toBe("最后的问题");
 });
 
 it("submits the edited text with the original message position", async () => {
-  await click("编辑消息"); await type("修改后的问题"); await click("保存并发送");
+  await click("编辑消息"); await type("修改后的问题"); await click("发送");
   expect(onEdit).toHaveBeenCalledExactlyOnceWith({ threadId: "thread", turnId: "last",
     itemId: "latest", text: "修改后的问题" });
-  expect(container.querySelector("textarea")).toBeNull();
+  expect(container.querySelector('[role="textbox"]')).toBeNull();
 });
 
 it("retains the draft on failure and blocks blank submissions", async () => {
   onEdit.mockResolvedValue(false);
-  await click("编辑消息"); await type("重试的内容"); await click("保存并发送");
-  expect(container.querySelector("textarea")?.value).toBe("重试的内容");
-  await type("  "); await click("保存并发送");
+  await click("编辑消息"); await type("重试的内容"); await click("发送");
+  expect(container.querySelector('[role="textbox"]')?.textContent).toBe("重试的内容");
+  await type("  "); await click("发送");
   expect(onEdit).toHaveBeenCalledTimes(1);
 });
 
 it("disables editing while busy and discards drafts when switching conversations", async () => {
   await render(true); await click("编辑消息");
-  expect(container.querySelector("textarea")).toBeNull();
+  expect(container.querySelector('[role="textbox"]')).toBeNull();
   await render(); await click("编辑消息"); await type("未发送的内容");
   await render(false, "other");
-  expect(container.querySelector("textarea")).toBeNull();
+  expect(container.querySelector('[role="textbox"]')).toBeNull();
   expect(onEdit).not.toHaveBeenCalled();
 });
 
 it("allows Escape to cancel and prevents duplicate submissions", async () => {
   await click("编辑消息");
-  await act(async () => container.querySelector("textarea")!
+  await act(async () => container.querySelector('[role="textbox"]')!
     .dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
-  expect(container.querySelector("textarea")).toBeNull();
+  expect(container.querySelector('[role="textbox"]')).toBeNull();
   let finish!: (value: boolean) => void;
   onEdit.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
-  await click("编辑消息"); await click("保存并发送"); await click("保存并发送");
+  await click("编辑消息"); await click("发送"); await click("发送");
   expect(onEdit).toHaveBeenCalledTimes(1);
   await act(async () => finish(true));
+});
+
+function threadWithImages(): Thread {
+  const source = structuredClone(thread);
+  source.turns![1].items[0].content = [{ type: "text", text: "最后的问题" },
+    ...[1, 2, 3].map((index) => ({ type: "image", url: `https://example.com/${index}.png` }))];
+  return source;
+}
+
+it("keeps image removals in the draft and restores all images on cancel", async () => {
+  await render(false, thread.id, threadWithImages());
+  await click("编辑消息");
+  await click("移除图片 1");
+  await click("移除图片 3");
+  expect(container.querySelectorAll('[aria-label^="放大查看："]')).toHaveLength(1);
+  await click("取消编辑");
+  expect(onEdit).not.toHaveBeenCalled();
+  expect(container.querySelectorAll('[aria-label^="放大查看："]')).toHaveLength(3);
+  await click("编辑消息");
+  expect(container.querySelectorAll('[aria-label^="移除图片"]')).toHaveLength(3);
+});
+
+it("submits original image positions and retains removals after a failed send", async () => {
+  await render(false, thread.id, threadWithImages());
+  onEdit.mockResolvedValue(false);
+  await click("编辑消息"); await click("移除图片 1"); await click("移除图片 3");
+  await click("发送");
+  expect(onEdit).toHaveBeenCalledExactlyOnceWith({ threadId: "thread", turnId: "last",
+    itemId: "latest", text: "最后的问题", removedImageIndexes: [0, 2] });
+  expect(container.querySelectorAll('[aria-label^="放大查看："]')).toHaveLength(1);
+  expect(container.querySelector('[aria-label="移除图片 2"]')).not.toBeNull();
 });

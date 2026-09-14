@@ -1,9 +1,10 @@
 {
   "name": "@codex-switch/native",
-  "version": "1.4.25",
+  "version": "1.5.11",
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
+    "postinstall": "node ./scripts/patch-drawer-taps.cjs",
     "start": "node ./scripts/expo.cjs start",
     "android": "node ./scripts/expo.cjs start --android",
     "ios": "node ./scripts/expo.cjs start --ios",
@@ -20,6 +21,7 @@
     "@noble/ciphers": "^1.3.0",
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.8.0",
+    "buffer": "^6.0.3",
     "expo": "^53.0.0",
     "expo-application": "~6.1.4",
     "expo-asset": "~11.1.7",
@@ -31,10 +33,14 @@
     "expo-font": "~13.3.2",
     "expo-image-manipulator": "~13.1.7",
     "expo-image-picker": "~16.1.4",
+    "expo-media-library": "~17.1.7",
     "expo-notifications": "^0.31.5",
+    "expo-screen-orientation": "~8.1.7",
     "expo-secure-store": "~14.2.0",
+    "expo-sensors": "~14.1.4",
     "expo-status-bar": "~2.2.3",
     "expo-system-ui": "~5.0.11",
+    "lowlight": "^3.3.0",
     "markdown-it": "^15.0.1",
     "react": "19.0.0",
     "react-native": "0.79.5",
@@ -42,10 +48,12 @@
     "react-native-gesture-handler": "~2.24.0",
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
+    "react-native-tcp-socket": "^6.4.3",
     "react-native-webrtc": "^124.0.8",
     "react-native-webview": "13.13.5"
   },
   "devDependencies": {
+    "@types/hast": "^3.0.5",
     "@types/react": "~19.0.10",
     "typescript": "~5.8.3",
     "vitest": "^4.1.9"

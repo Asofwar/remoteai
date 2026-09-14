@@ -11,10 +11,15 @@ import { historyNotification } from '../../../shared/remote-chat/historyNotifica
 import { RemoteImages } from '../src/remoteChat/images';
 import { demoImageResponse } from './demo-images';
 import { parseHistoryWindow, sliceHistory } from '../../../shared/remote-chat/historyPage';
-import { seedDemoHistory } from './demo-history';
+import { seedDemoCompactHistory, seedDemoFooterHistory, seedDemoHistory, seedDemoOpeningHistory } from './demo-history';
 import { demoSkills } from './demo-skills';
 import { demoPlugins, demoProjectFiles } from './demo-attachments';
+import { demoProjectDirectories } from './demo-project-directories';
 import { demoQueueRequest, demoQueueSnapshot, flushDemoQueue } from './demo-queue';
+import { demoGuiAccounts } from './demo-gui-accounts';
+import { demoTokenSummary } from './demo-token-summary';
+import { detailText, seedDemoDetails } from './demo-details';
+import { demoVideoResponse, seedDemoVideo } from './demo-videos';
 
 const images = new RemoteImages();
 const synchronization: { bytes: number; changedItems: number; text: string }[] = [];
@@ -52,13 +57,16 @@ export function demoResponse(request: RpcRequest, link: ChatLink): unknown {
   if (request.method === 'connect') return [...approvals.values()].map(({ event }) => event);
   const input = (request.body ?? {}) as Record<string, unknown>;
   operations.push({ ...input, method: request.method });
+  if (input.operation === 'tokenSummary') return demoTokenSummary(input);
   if (request.method === 'respond') return respond(input);
   if (input.operation === 'models') return { data: demoComposer().models, nextCursor: null, composer: demoComposer() };
   if (input.operation === 'skills') return { ...demoSkills(), ...(input.includePlugins ? { plugins: demoPlugins } : {}) };
   if (input.operation === 'projectFiles') return demoProjectFiles(input);
+  if (input.operation === 'projectDirectories') return demoProjectDirectories(input);
   if (input.operation === 'composerSet') return changeDemoComposer(input.settings, link);
   if (input.operation === 'threadRead') return guiSidebar.markRead(input);
   if (input.operation === 'queueRead') return demoQueueSnapshot();
+  if (input.operation === 'guiAccountsRead' || input.operation === 'guiAccountSelect') return demoGuiAccounts(input);
   if (input.operation === 'list') return { data: [...threads.values()].filter((thread) =>
     archived.has(thread.id) === (input.archived === true)
       && `${thread.name} ${thread.preview}`.includes(String(input.search ?? '')))
@@ -77,6 +85,8 @@ export function demoResponse(request: RpcRequest, link: ChatLink): unknown {
 }
 
 function threadOperation(thread: Thread, input: Record<string, unknown>, link: ChatLink) {
+  if (['videoOpen', 'videoRead', 'videoClose'].includes(String(input.operation))) return demoVideoResponse(input);
+  if (input.operation === 'textPreview') return { path: String(input.path), text: detailText };
   if (String(input.operation).startsWith('queue')) return demoQueueRequest(input, queueHost(thread, link));
   if (input.operation === 'syncHistory') {
     const sliced = sliceHistory(thread, parseHistoryWindow(input.window));
@@ -171,6 +181,12 @@ export function changeDemoSidebar(action: string, link: ChatLink) {
   sidebarLink = link;
   if (action === 'group-preview') seedThreadGroups(link);
   if (action === 'history-pages') seedDemoHistory(welcome);
+  if (action === 'history-compact') seedDemoCompactHistory(welcome);
+  if (action === 'history-opening') seedDemoOpeningHistory(welcome);
+  if (action === 'history-empty') welcome.turns = [];
+  if (action === 'history-footer') seedDemoFooterHistory(welcome);
+  if (action === 'message-details') seedDemoDetails(welcome);
+  if (action === 'video-preview') seedDemoVideo(welcome);
   if (action === 'start' && welcome.turns?.some((turn) => turn.status === 'inProgress')) {
     throw new Error('Wait for the current demo turn before starting a background turn');
   }

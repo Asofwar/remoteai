@@ -1,13 +1,19 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BottomSheet } from '../components/BottomSheet';
-import type { Model } from './types';
+import { SheetScrollView, SHEET_READABLE_WIDTH } from '../components/SheetScrollView';
+import type { Model, ThreadTokenUsage } from './types';
 import type { ComposerSettings } from '../../../../shared/remote-chat/composer';
-import { SETTINGS_FIELDS, settingOptions, settingValue, settingsNotice,
+import { SETTINGS_FIELDS, settingOptions, settingValue, settingsNotice, visibleSettingsFields,
   type SettingField } from '../../../../shared/remote-chat/settingsMenu';
 import { palette, styles } from './styles';
+import { ChatUsage } from './ChatUsage';
+import type { ReadUsage } from '../../../../shared/remote-chat/usage';
 
 interface Props {
+  tokenUsage?: ThreadTokenUsage;
+  readUsage: ReadUsage;
+  usageActive: boolean;
   models: Model[];
   selection: ComposerSettings;
   saving: boolean;
@@ -17,7 +23,8 @@ interface Props {
   onClose: () => void;
 }
 
-export function ChatSettings({ models, selection, saving, ready, error, updateSettings, onClose }: Props) {
+export function ChatSettings({ models, selection, saving, ready, error, updateSettings, onClose,
+  readUsage, usageActive, tokenUsage }: Props) {
   const [field, setField] = useState<SettingField | null>(null);
   const notice = settingsNotice({ saving, ready, error });
   const choose = async (value: string) => {
@@ -25,10 +32,10 @@ export function ChatSettings({ models, selection, saving, ready, error, updateSe
     if (value !== selection[field] || error) await updateSettings({ [field]: value });
     setField((current) => current === field ? null : current);
   };
-  return <BottomSheet visible title="聊天设置" onClose={onClose}>
-    <View style={[styles.settings, menuStyles.content]}
+  return <BottomSheet visible fullWidthContent title="聊天设置" onClose={onClose}>
+    <SheetScrollView contentContainerStyle={[styles.settings, menuStyles.content]}
       accessibilityElementsHidden={field !== null} importantForAccessibility={field ? 'no-hide-descendants' : 'auto'}>
-      {SETTINGS_FIELDS.map((entry) => <Pressable key={entry.field} accessibilityRole="button"
+      {visibleSettingsFields(selection).map((entry) => <Pressable key={entry.field} accessibilityRole="button"
         accessibilityLabel={`设置${entry.label}`} onPress={() => setField(entry.field)} style={menuStyles.entry}>
         <Text style={styles.title}>{entry.label}</Text>
         <Text numberOfLines={1} style={menuStyles.value}>{settingValue(entry.field, models, selection)}</Text>
@@ -38,10 +45,12 @@ export function ChatSettings({ models, selection, saving, ready, error, updateSe
         style={error ? styles.error : styles.subtitle}>{notice}</Text>}
       {!!error && <Pressable accessibilityRole="button" style={styles.button}
         onPress={() => { void updateSettings(selection); }}><Text style={styles.buttonText}>重新保存</Text></Pressable>}
-    </View>
-    {field && <BottomSheet visible title={SETTINGS_FIELDS.find((entry) => entry.field === field)!.title}
+      <ChatUsage read={readUsage} active={usageActive && !field} ready={ready} tokenUsage={tokenUsage} />
+    </SheetScrollView>
+    {field && <BottomSheet fullWidthContent
+      visible title={SETTINGS_FIELDS.find((entry) => entry.field === field)!.title}
       onBack={() => setField(null)} onClose={() => setField(null)}>
-      <ScrollView key={field} contentContainerStyle={[styles.settings, menuStyles.content]}>
+      <SheetScrollView key={field} contentContainerStyle={[styles.settings, menuStyles.content, menuStyles.options]}>
         {settingOptions(field, models, selection).map((option) => <Pressable key={option.value}
           accessibilityRole="radio" accessibilityLabel={option.label}
           accessibilityState={{ checked: selection[field] === option.value }}
@@ -53,15 +62,16 @@ export function ChatSettings({ models, selection, saving, ready, error, updateSe
           </View>
           {option.description && <Text style={styles.subtitle}>{option.description}</Text>}
         </Pressable>)}
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>}
   </BottomSheet>;
 }
 
 const menuStyles = StyleSheet.create({
   content: { paddingBottom: 18 },
+  options: { maxWidth: SHEET_READABLE_WIDTH },
   entry: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, padding: 14,
     borderWidth: 1, borderColor: palette.border, borderRadius: 12 },
-  value: { flex: 1, textAlign: 'right', color: palette.green, fontSize: 13 },
+  value: { flex: 1, textAlign: 'right', color: palette.green, fontSize: 13, lineHeight: 20 },
   arrow: { color: palette.muted, fontSize: 22 },
 });

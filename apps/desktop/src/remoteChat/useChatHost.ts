@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { ChatHost, type ChatHostConfig } from './host';
 import { retainGuiSession } from '../pages/codexGui/session';
+import { mobileConnection } from './mobileConnection';
 
 const HOST_REFRESH_MS = 10_000;
 
@@ -18,9 +19,9 @@ export function useChatHost() {
         const config = await invoke<ChatHostConfig | null>('remote_chat_config');
         if (stopped) return;
         if (!config) { host?.close(); host = undefined; return; }
-        if (host?.alive && JSON.stringify(host.config) === JSON.stringify(config)) return;
+        if (host?.updateConfig(config)) return;
         host?.close();
-        host = new ChatHost(config);
+        host = new ChatHost(config, mobileConnection.setConnected);
       } catch {
         // A transient configuration refresh failure must not tear down a healthy active chat.
         if (host && !host.alive) host = undefined;

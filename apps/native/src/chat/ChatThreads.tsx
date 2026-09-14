@@ -20,7 +20,7 @@ export function ChatThreads({ state, controller, newChat, openSearch, select, pr
         <Pressable accessibilityRole="button" accessibilityLabel="搜索聊天" onPress={openSearch}
           style={listStyles.search}><Feather name="search" size={23} color={palette.ink} /></Pressable>
       </View>
-      <Pressable accessibilityRole="button" style={listStyles.filter} disabled={!state.ready || state.loading}
+      <Pressable accessibilityRole="button" style={listStyles.filter} disabled={state.loading}
         onPress={() => { void controller.list({ archived: !state.archived }); }}>
         <Text style={styles.subtitle}>{state.archived ? '已归档 ▾' : '最近聊天 ▾'}</Text>
       </Pressable>

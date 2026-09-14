@@ -23,6 +23,9 @@ export interface SendInput {
 export interface ChatProject { cwd: string; label: string }
 
 export interface ChatState {
+  cachedThreadIds?: string[];
+  historyOffline?: boolean;
+  cacheError?: string;
   goals?: Record<string, import('../../../apps/desktop/src/pages/codexGui/goalTypes').ThreadGoal | null>;
   goalBusy?: boolean;
   mode: ConnectionMode;

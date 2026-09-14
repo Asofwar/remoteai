@@ -8,13 +8,15 @@ export const ChatImageContext = createContext<ImagePreviewOptions | null>(null);
 const PREVIEW_ASPECT_RATIO = 4 / 3;
 
 export function ChatImage({ source, description = '图片' }: { source?: string; description?: string }) {
-  const image = useChatImage(source, useContext(ChatImageContext));
+  const context = useContext(ChatImageContext);
+  const image = useChatImage(source, context);
   const openPreview = useChatImagePreview();
   const previewReady = !image.failed && !image.loading && Boolean(image.url);
   // Loading, decoding and retrying must not resize a measured history row or move the replies below it.
   return <View style={imageStyles.container}>
     {image.failed && <View style={imageStyles.notice}>
-      <Text style={styles.subtitle}>{description}：图片加载失败</Text>
+      <Text style={styles.subtitle}>
+        {context?.ready ? `${description}：图片加载失败` : '这张图片尚未缓存，连接电脑后查看。'}</Text>
       <Pressable accessibilityRole="button" accessibilityLabel={`重新加载：${description}`} onPress={image.retry}>
         <Text style={styles.buttonText}>重试</Text>
       </Pressable>

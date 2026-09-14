@@ -38,6 +38,7 @@
     "expo-screen-orientation": "~8.1.7",
     "expo-secure-store": "~14.2.0",
     "expo-sensors": "~14.1.4",
+    "expo-sqlite": "~15.2.14",
     "expo-status-bar": "~2.2.3",
     "expo-system-ui": "~5.0.11",
     "lowlight": "^3.3.0",
@@ -55,6 +56,8 @@
   "devDependencies": {
     "@types/hast": "^3.0.5",
     "@types/react": "~19.0.10",
+    "@types/sql.js": "^1.4.11",
+    "sql.js": "^1.14.2",
     "typescript": "~5.8.3",
     "vitest": "^4.1.9"
   }

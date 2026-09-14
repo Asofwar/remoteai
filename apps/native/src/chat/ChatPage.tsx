@@ -21,6 +21,7 @@ import { ChatDrawer, type ChatDrawerMethods } from './ChatDrawer';
 import { ChatDevices } from './ChatDevices';
 import { ChatConnectionInfo } from './ChatConnectionInfo';
 import { useChat } from './useChat';
+import { useOfflineDevices } from './offline/devices';
 import { useChatDrawerSwipe } from './useChatDrawerSwipe';
 import { useChatBackground } from './useChatBackground';
 import { useChatCompletionNotifications, useOpenChatNotification } from './useChatNotifications';
@@ -38,7 +39,8 @@ interface Props {
 }
 
 export function ChatPage(props: Props) {
-  const { session, devices, active, notification, notificationError, notificationHandled } = props;
+  const { session, active, notification, notificationError, notificationHandled } = props;
+  const devices = useOfflineDevices(session, props.devices);
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const requestedId = notification?.deviceId ?? deviceId;
   const device = requestedId ? devices.find((entry) => entry.deviceId === requestedId)
@@ -82,7 +84,7 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
     drawerRef.current?.closeDrawer(); setPickingDevice(false); setSearching(false);
   }, [notification]);
   const ready = state.ready;
-  const runningTurn = state.selected?.turns?.find((turn) => turn.status === 'inProgress');
+  const runningTurn = ready ? state.selected?.turns?.find((turn) => turn.status === 'inProgress') : undefined;
   const running = Boolean(runningTurn);
   const openDrawer = useCallback(() => { Keyboard.dismiss(); setDrawer(true); drawerRef.current?.openDrawer(); }, []);
   const drawerSwipeHandlers = useChatDrawerSwipe(active && !drawer && !pickingDevice, openDrawer);
@@ -142,18 +144,22 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
         <Text style={styles.buttonText}>恢复</Text></Pressable>}
     </View>
     {!!state.error && <Text accessibilityRole="alert" style={styles.error}>{state.error}</Text>}
-    <ChatImageContext.Provider value={{ threadId: state.selected?.id ?? null, ready, load: controller.imagePreview }}>
+    {!ready && !!device && <Text style={[styles.subtitle, { maxWidth: 400, paddingHorizontal: 16 }]}>
+      离线浏览，仅显示已缓存的内容；连接后更新。</Text>}
+    {!!state.cacheError && <Text style={[styles.subtitle, { maxWidth: 400 }]}>{state.cacheError}</Text>}
+    <ChatImageContext.Provider value={{ threadId: state.selected?.id ?? null, ready, offline: true,
+      load: controller.imagePreview }}>
       <ChatImagePreviewProvider key={state.selected?.id ?? 'new'}>
       <ChatFileProvider key={state.selected?.id ?? 'new'} threadId={state.selected?.id ?? null}
         ready={ready} load={controller.textPreview} videos={controller.videos}>
-      <ChatMessages key={state.selected?.id ?? 'new'} thread={state.selected}
+      <ChatMessages key={state.selected?.id ?? 'new'} thread={state.selected} offline={!ready}
         loading={state.historyLoading} loadingMore={state.historyLoadingMore} hasMore={state.historyHasMore}
         loadOlder={() => controller.loadOlder()} />
       </ChatFileProvider>
       </ChatImagePreviewProvider>
     </ChatImageContext.Provider>
     {runningTurn && <ChatProcessing key={runningTurn.id} turn={runningTurn} active={active && ready} />}
-    {state.approvals.some((event) => event.params.threadId === state.selected?.id) &&
+    {ready && state.approvals.some((event) => event.params.threadId === state.selected?.id) &&
       <ScrollView style={{ maxHeight: 280 }} contentContainerStyle={styles.padded} keyboardShouldPersistTaps="handled">
         {state.approvals.filter((event) => event.params.threadId === state.selected?.id).map((event) =>
           <ChatApproval key={String(event.id)} event={event} respond={(reply) => controller.respond(reply)} />)}
@@ -166,7 +172,7 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
     <ChatComposer threadId={state.selected?.id ?? null} models={state.models} selection={state.settings}
       goals={controller.goals} goal={state.selected ? state.goals?.[state.selected.id] : null} goalBusy={state.goalBusy}
       contextSettings={controller.contextSettings}
-      readUsage={controller.readUsage} usageActive={foreground} tokenUsage={state.selected?.tokenUsage}
+      readUsage={controller.readUsage} usageActive={foreground && ready} tokenUsage={state.selected?.tokenUsage}
       loadCatalog={controller.loadComposerCatalog} loadFiles={controller.loadProjectFiles}
       catalog={catalog} cwd={state.selected?.cwd ?? state.draftProject?.cwd ?? ''}
       compactReason={compactUnavailableReason(state)} compacting={!!state.compacting

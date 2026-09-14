@@ -35,12 +35,13 @@ export function ChatThreadList({ state, newChat, select, refresh, loadMore, bott
       renderItem={({ item }) => {
         const view = threadPresentation(item, state.sidebar);
         return <Pressable accessibilityRole="button" accessibilityLabel={view.title}
-          accessibilityState={{ selected: state.selected?.id === item.id }} disabled={!ready || state.sending}
+          accessibilityState={{ selected: state.selected?.id === item.id }}
+          disabled={(!ready && !state.cachedThreadIds?.includes(item.id)) || state.sending}
           style={[listStyles.thread, state.selected?.id === item.id && listStyles.selected]}
           onPress={() => select(item)}>
           <Text numberOfLines={1} style={listStyles.title}>{view.title}</Text>
           <View style={listStyles.status}>
-            {view.running ? <ActivityIndicator size="small" color={palette.muted} accessibilityLabel="正在回复" />
+            {ready && view.running ? <ActivityIndicator size="small" color={palette.muted} accessibilityLabel="正在回复" />
               : view.unread && <View accessible accessibilityLabel="未读回复" style={listStyles.dot} />}
           </View>
         </Pressable>;

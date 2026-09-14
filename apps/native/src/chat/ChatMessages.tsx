@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Keyboard, Pressable, RefreshControl, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useChatScroll } from './useChatScroll';
@@ -50,8 +50,10 @@ const TimelineEntry = memo(function TimelineEntry({ entry, open }: {
     running={entry.turn.status === 'inProgress' && entry.item.status !== 'completed'} />;
 });
 
-export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder }: ChatMessagesProps) {
-  const { entries, hasObservedLiveTurn } = useConversationEntries(thread?.turns ?? []);
+export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder, offline }: ChatMessagesProps) {
+  const turns = useMemo(() => (thread?.turns ?? []).map((turn) => offline && turn.status === 'inProgress'
+    ? { ...turn, status: 'cached' } : turn), [thread?.turns, offline]);
+  const { entries, hasObservedLiveTurn } = useConversationEntries(turns);
   const { list, more, preservePosition, historyBottomSpace, initializing, onItemLayout, onFooterLayout,
     showScrollToBottom, scrollToBottom, ...scrollHandlers }
     = useChatScroll<TurnEntry>({ hasMore, loading, loadingMore, loadOlder,

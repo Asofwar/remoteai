@@ -13,12 +13,13 @@ function mergeItem(snapshot: Item, live: Item, before?: Item): Item {
   return merged;
 }
 
-function mergeTurn(snapshot: Turn, live: Turn, before?: Turn): Turn {
+function mergeTurn(snapshot: Turn, live: Turn, before?: Turn, authoritative = false): Turn {
   const original = new Map(before?.items.map((item) => [item.id, item]));
   const hasAcknowledgements = snapshot.items.some((item) => item.localEcho) || live.items.some((item) => item.localEcho);
   const items = new Map(reconcileAcknowledgedItems(snapshot.items, live.items).map((item) => [item.id, item]));
   for (const item of reconcileAcknowledgedItems(live.items, snapshot.items)) {
-    if (item === original.get(item.id) && live.status !== 'inProgress' && !hasAcknowledgements) continue;
+    if (item === original.get(item.id)
+      && (authoritative || (live.status !== 'inProgress' && !hasAcknowledgements))) continue;
     const existing = items.get(item.id);
     items.set(item.id, existing ? mergeItem(existing, item, original.get(item.id)) : item);
   }
@@ -27,15 +28,15 @@ function mergeTurn(snapshot: Turn, live: Turn, before?: Turn): Turn {
 }
 
 /** Preserve notifications received while a history snapshot was in flight. */
-export function mergeHistory(snapshot: Thread, live: Thread, before: Thread): Thread {
+export function mergeHistory(snapshot: Thread, live: Thread, before: Thread, authoritative = false): Thread {
   if (snapshot.id !== live.id) return snapshot;
   const original = new Map(before.turns?.map((turn) => [turn.id, turn]));
   const turns = new Map(snapshot.turns?.map((turn) => [turn.id, turn]));
   for (const turn of live.turns ?? []) {
     const existing = turns.get(turn.id);
-    if (turn === original.get(turn.id) && turn.status !== 'inProgress'
-      && !turn.items.some((item) => item.localEcho) && !existing?.items.some((item) => item.localEcho)) continue;
-    turns.set(turn.id, existing ? mergeTurn(existing, turn, original.get(turn.id)) : turn);
+    if (turn === original.get(turn.id) && (authoritative || (turn.status !== 'inProgress'
+      && !turn.items.some((item) => item.localEcho) && !existing?.items.some((item) => item.localEcho)))) continue;
+    turns.set(turn.id, existing ? mergeTurn(existing, turn, original.get(turn.id), authoritative) : turn);
   }
   const previous = new Map(live.turns?.map((turn) => [turn.id, turn]));
   // Notifications received during a history read take precedence, including decreases after compaction.

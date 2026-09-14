@@ -10,7 +10,7 @@ export function ChatDevices({ devices, choose, onClose }: {
   return <BottomSheet fullWidthContent visible title="选择电脑" onClose={onClose}>
     <SheetScrollView contentContainerStyle={[styles.settings, { maxWidth: SHEET_READABLE_WIDTH }]}>
       {devices.map((device) => <Pressable key={device.deviceId} accessibilityRole="button"
-        style={[styles.card, !device.online && styles.disabled]} disabled={!device.online}
+        style={styles.card}
         onPress={() => choose(device.deviceId)}>
         <View style={styles.row}><Text style={[styles.title, styles.fill]}>{device.name}</Text>
           <Text style={styles.subtitle}>{device.online ? '在线' : '离线'}</Text></View>

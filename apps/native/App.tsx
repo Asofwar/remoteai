@@ -1714,7 +1714,12 @@ function DeviceSwitchDrawer({ account, devices, switching, onClose, onSwitch }: 
 }
 
 function AppContent() {
-  const [session, setSession] = useState<AuthSession | null>(null);
+  const [session, updateSession] = useState<AuthSession | null>(null);
+  const sessionRef = useRef(session);
+  const setSession = useCallback((next: AuthSession | null) => {
+    sessionRef.current = next;
+    updateSession(next);
+  }, []);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activePage, setActivePage] = useState<AppPage>(DEFAULT_APP_PAGE);
   const openChat = useCallback(() => setActivePage('chat'), []);
@@ -1866,6 +1871,7 @@ function AppContent() {
         if (!mounted) return;
         setGlobalRefreshMinutes(storedRefreshMinutes);
         setSession(stored);
+        setInitializing(false);
         if (stored) {
           setProfile(stored.profile ?? null);
           setLoading(true);
@@ -1875,7 +1881,7 @@ function AppContent() {
             fetchRemoteProviders(stored),
             fetchUserProfile(stored),
           ]);
-          if (!mounted) return;
+          if (!mounted || sessionRef.current !== stored) return;
 
           const sessionError = [accountsResult, devicesResult, providersResult, profileResult]
             .find((result) => result.status === 'rejected' && isSessionExpiredError(result.reason));

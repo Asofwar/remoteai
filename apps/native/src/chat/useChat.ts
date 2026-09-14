@@ -20,6 +20,7 @@ export function useChat(session: AuthSession, deviceId: string, enabled: boolean
     const stopped = DeviceEventEmitter.addListener(CHAT_SERVICE_STOPPED, () => controller.stop());
     const resumed = AppState.addEventListener('change', (next) => {
       if (next === 'active') { controller.start(); void controller.refreshSelected(); }
+      else void controller.flushCache();
     });
     return () => { stopped.remove(); resumed.remove(); controller.stop(); };
   }, [enabled, controller]);

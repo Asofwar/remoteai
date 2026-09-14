@@ -3,11 +3,13 @@ import type { RemoteComposerCatalog } from '../composerCatalog';
 import type { ProjectFilesRequest, ProjectFilesResponse } from '../projectFiles';
 import { applyChatEvent } from './events';
 import { mergeHistory } from './history';
-import { HISTORY_CHANGED } from '../historySync';
+import { contentHash, HISTORY_CHANGED } from '../historySync';
 import type { HistoryPage } from '../historyPage';
 import { HistoryReader } from './historyReader';
 import { HistoryCache } from './historyCache';
 import { ImageCache } from './imageCache';
+import { OfflineWriter, type OfflineHistoryStore } from './offline';
+import { offlineImage } from './offlineImages';
 import { validateChatImages } from '../attachments';
 import { compactUnavailableReason } from './composerCommands';
 import type { ConnectionMode } from '../protocol';
@@ -68,7 +70,15 @@ export class ChatController {
   private loadedThreadId: string | null = null;
   private readonly reading = new Set<string>();
 
-  constructor(createConnection: (events: ConnectionEvents) => Pick<ChatConnection, 'request' | 'start' | 'stop'>) {
+  private readonly offlineWriter?: OfflineWriter;
+  private cacheStarted = false;
+  private cacheFailure = () => {
+    if (!this.state.cacheError) this.update({ cacheError: '部分内容未能缓存，连接电脑后可继续查看。' });
+  };
+
+  constructor(createConnection: (events: ConnectionEvents) => Pick<ChatConnection, 'request' | 'start' | 'stop'>,
+    private readonly offline?: OfflineHistoryStore) {
+    if (offline) this.offlineWriter = new OfflineWriter(offline, this.cacheFailure);
     this.connection = createConnection({
       mode: (mode) => this.changeMode(mode), error: (error) => this.update({ error }),
       ready: () => { void this.synchronize(); },
@@ -89,7 +99,14 @@ export class ChatController {
     this.eventListeners.add(listener);
     return () => { this.eventListeners.delete(listener); };
   };
-  private emit() { for (const listener of this.listeners) listener(); }
+  private emit() {
+    const { selected, ready, historyOffline, selectedArchived } = this.state;
+    if (ready && selected && !historyOffline && this.loadedThreadId === selected.id) {
+      this.offlineWriter?.remember({ thread: selected, archived: selectedArchived,
+        page: this.historyPages.get(selected.id) ?? { hasMore: false } });
+    }
+    for (const listener of this.listeners) listener();
+  }
   private update(patch: Partial<ChatState>) { this.state = { ...this.state, ...patch }; this.emit(); }
   private request<T>(body: Request) { return this.connection.request<T>('request', body); }
   private failure(error: unknown) {
@@ -117,12 +134,18 @@ export class ChatController {
     clearTimeout(this.historyTimer);
     this.historyTimer = undefined;
     this.update({ mode, ready: false, connecting: mode !== 'offline', retryAt: null,
+      historyOffline: this.offline && this.state.selected ? true : this.state.historyOffline,
       loading: false, historyLoading: false, historyLoadingMore: false, compacting: undefined });
+    if (this.offline) void this.flushCache().then(() => this.listOffline());
   }
 
   private receive(event: GuiEvent) {
     if (!event?.params || typeof event.method !== 'string') return;
     for (const listener of this.eventListeners) listener(event);
+    if (event.method === 'thread/deleted' && event.params.threadId) {
+      if (this.loadedThreadId === event.params.threadId) this.loadedThreadId = null;
+      this.offlineWriter?.forget(event.params.threadId);
+    }
     if (event?.method === HISTORY_CHANGED) {
       if (event.params.threadId === this.state.selected?.id) this.scheduleHistory();
       if (event.params.reason?.startsWith('thread/')
@@ -166,7 +189,27 @@ export class ChatController {
     }, 100);
   }
 
-  start() { this.active = true; this.connection.start(); }
+  start() {
+    this.active = true;
+    if (this.offline && !this.cacheStarted) { this.cacheStarted = true; void this.listOffline(); }
+    this.connection.start();
+  }
+
+  flushCache = () => this.offlineWriter?.flush() ?? Promise.resolve();
+
+  private async listOffline() {
+    if (!this.offline) return;
+    const generation = this.listGeneration;
+    try {
+      const cached = await this.offline.list();
+      if (!this.active || generation !== this.listGeneration || this.state.ready) return;
+      const { archived, search } = this.state;
+      const threads = cached.filter((value) => value.archived === archived
+        && `${value.thread.name ?? ''} ${value.thread.preview}`.toLowerCase().includes(search.toLowerCase()))
+        .map((value) => value.thread);
+      this.update({ threads, cachedThreadIds: cached.map((value) => value.thread.id), cursor: null });
+    } catch { this.cacheFailure(); }
+  }
 
   connectNow = () => {
     if (this.state.ready || this.state.connecting) return;
@@ -178,6 +221,7 @@ export class ChatController {
   };
 
   stop() {
+    void this.flushCache();
     this.active = false;
     this.composer.reset();
     this.skillGeneration += 1;
@@ -207,6 +251,11 @@ export class ChatController {
       if (!this.active || generation !== this.synchronization) return;
       const approvals = chatApprovals(response);
       this.update({ approvals, error: '' });
+      // A disk read begun during connection must not delay or replace the authoritative refresh.
+      if (this.offline && this.state.historyLoading) {
+        this.readGeneration += 1;
+        this.refreshThreadId = null;
+      }
       await Promise.all([this.list(), this.composer.load(), this.refreshSelected(), this.loadQueue(generation)]);
       if (this.active && generation === this.synchronization) {
         this.update({ ready: true, connecting: false, retryAt: null });
@@ -256,7 +305,8 @@ export class ChatController {
 
   private markViewed() {
     const thread = this.state.selected;
-    if (!this.active || !this.viewing || !thread || this.loadedThreadId !== thread.id) return;
+    if (!this.active || !this.viewing || !this.transportConnected || this.state.historyOffline
+      || !thread || this.loadedThreadId !== thread.id) return;
     const receipt = this.state.sidebar.readState[thread.id];
     if (!receipt?.unread) return;
     const seen = thread.turns?.some((turn) => turn.id === receipt.turnId && turn.status !== 'inProgress')
@@ -285,12 +335,18 @@ export class ChatController {
     const archived = options.archived ?? this.state.archived;
     const cursor = options.more ? this.state.cursor ?? undefined : undefined;
     this.update({ search, archived, loading: true });
+    if (this.offline && !this.state.ready && this.synchronizing !== this.synchronization) {
+      await this.listOffline();
+      if (generation === this.listGeneration) this.update({ loading: false });
+      return;
+    }
     try {
       const result = await this.request<ListResponse<Thread> & { sidebar?: SidebarSnapshot }>({
         operation: 'list', search, archived, cursor,
       });
       if (generation !== this.listGeneration) return;
       this.applySidebar(result.sidebar);
+      void this.offline?.updateSummaries?.(result.data, archived).catch(this.cacheFailure);
       const threads = options.more ? [...this.state.threads, ...result.data] : result.data;
       this.update({ threads: [...new Map(threads.map((thread) => [thread.id, thread])).values()],
         cursor: result.nextCursor });
@@ -300,20 +356,27 @@ export class ChatController {
 
   async select(thread: Thread) {
     this.rememberHistory();
+    void this.flushCache();
+    this.readGeneration += 1;
+    this.refreshThreadId = null;
     this.olderQueued = false;
     this.loadedThreadId = null;
     const cached = this.histories.get(thread.id);
     if (cached) this.historyPages.set(thread.id, cached.page);
     else this.historyPages.delete(thread.id);
     this.update({ selected: cached?.thread ?? thread, draftProject: null,
-      selectedArchived: this.state.archived, error: '',
+      selectedArchived: this.state.archived, error: '', historyOffline: Boolean(this.offline),
       historyHasMore: this.historyPages.get(thread.id)?.hasMore ?? false });
+    if (this.offline && !this.state.ready) await this.readOffline(false);
+    if (this.state.selected?.id !== thread.id || (this.offline && !this.transportConnected)) return;
     await Promise.all([this.refreshSelected(), this.composer.select()]);
   }
 
   async loadOlder() {
     // A manual pull retries even after the PC previously reported the beginning of history.
-    if (!this.state.selected || !this.state.ready) return;
+    if (!this.state.selected) return;
+    if (this.offline && !this.state.ready) { await this.readOffline(true); return; }
+    if (!this.state.ready) return;
     if (this.refreshThreadId === this.state.selected?.id) {
       if (!this.state.historyLoadingMore) {
         this.olderQueued = true;
@@ -325,6 +388,7 @@ export class ChatController {
   }
 
   async refreshSelected(older = false) {
+    if (this.offline && !this.transportConnected) return;
     const selected = this.state.selected;
     if (!selected || this.refreshThreadId === selected.id) return;
     this.refreshThreadId = selected.id;
@@ -337,7 +401,8 @@ export class ChatController {
       if (generation === this.readGeneration && this.state.selected?.id === selected.id) {
         this.loadedThreadId = selected.id;
         if (result.page) this.historyPages.set(selected.id, result.page);
-        this.update({ selected: mergeHistory(result.thread, this.state.selected, selected), error: '',
+        this.update({ selected: mergeHistory(result.thread, this.state.selected, selected, this.state.historyOffline),
+          error: '', historyOffline: false,
           historyHasMore: result.page.hasMore });
         this.rememberHistory();
         this.markViewed();
@@ -351,6 +416,31 @@ export class ChatController {
         this.update({ historyLoading: false, historyLoadingMore: false });
         if (olderQueued) void this.loadOlder();
         else if (this.historyDirty) this.scheduleHistory();
+      }
+    }
+  }
+
+  private async readOffline(older: boolean) {
+    const selected = this.state.selected;
+    if (!this.offline || !selected || this.refreshThreadId === selected.id) return;
+    const generation = ++this.readGeneration;
+    this.refreshThreadId = selected.id;
+    this.update({ historyLoading: true, historyLoadingMore: older });
+    try {
+      await this.flushCache();
+      const result = await this.offline.read(selected.id,
+        { start: older ? this.historyPages.get(selected.id)?.start : undefined, older });
+      if (generation !== this.readGeneration || this.state.selected?.id !== selected.id) return;
+      if (result) {
+        this.historyPages.set(selected.id, result.page);
+        this.update({ selected: result.thread, selectedArchived: result.archived,
+          historyOffline: true, historyHasMore: result.page.hasMore });
+      }
+    } catch { this.cacheFailure(); }
+    finally {
+      if (generation === this.readGeneration) {
+        this.refreshThreadId = null;
+        this.update({ historyLoading: false, historyLoadingMore: false });
       }
     }
   }
@@ -375,7 +465,8 @@ export class ChatController {
     this.loadedThreadId = null;
     this.update({ selected: null, draftProject: project ? { cwd: project.cwd, label: project.label } : null,
       selectedArchived: false, error: '', historyHasMore: false, historyLoading: false, historyLoadingMore: false });
-    void this.composer.select(inherit);
+    void this.flushCache();
+    if (!this.offline || this.transportConnected) void this.composer.select(inherit);
     void this.list();
   }
 
@@ -426,7 +517,10 @@ export class ChatController {
     if (generation !== this.synchronization || !this.state.ready) throw new Error('连接已中断，请连接后再发送。');
   }
 
-  imagePreview = (threadId: string, source: string, original = false) => this.images.load(threadId, source, original);
+  imagePreview = (threadId: string, source: string, original = false) => offlineImage({
+    store: this.offline, online: this.state.ready, key: JSON.stringify([threadId, contentHash(source), original]),
+    load: () => this.images.load(threadId, source, original), failed: this.cacheFailure,
+  });
 
   videos: import('../video').VideoClient = {
     open: (threadId, path) => this.connection.request('request', { operation: 'videoOpen', threadId, path }),

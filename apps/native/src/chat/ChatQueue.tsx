@@ -1,26 +1,47 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { QueueProps } from '../../../../shared/remote-chat/client/queueProps';
 import { palette, styles } from './styles';
+import Feather from '@expo/vector-icons/Feather';
+import { useQueueSelection } from '../../../../shared/remote-chat/client/useQueueSelection';
 
-export function ChatQueue({ messages, running, disabled, act }: QueueProps) {
+type Props = QueueProps & { edit: (id: string) => Promise<void>; editDisabled: boolean };
+
+export function ChatQueue({ messages, running, disabled, act, edit, editDisabled }: Props) {
+  const { selected, select, canMoveUp, canMoveDown } = useQueueSelection(messages, disabled);
   if (!messages.length) return null;
   const sending = messages.some((message) => message.busy);
   return <View style={queueStyles.queue} accessibilityLabel="待发送消息">
     <View style={queueStyles.heading}><Text style={styles.subtitle}>待发送 · {messages.length}</Text>
+      <View style={queueStyles.actions}>
       {!running && <Pressable accessibilityRole="button" disabled={disabled || sending}
         style={queueStyles.action} onPress={() => void act('queueFlush')}>
         <Text style={[styles.buttonText, (disabled || sending) && styles.disabled]}>发送全部</Text>
-      </Pressable>}</View>
+      </Pressable>}
+      <Pressable accessibilityRole="button" accessibilityLabel="上移待发送消息" disabled={!canMoveUp}
+        style={[queueStyles.action, !canMoveUp && styles.disabled]}
+        onPress={() => void act('queueMoveUp', selected.id)}>
+        <Feather name="arrow-up" size={17} color={palette.muted} /></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="下移待发送消息" disabled={!canMoveDown}
+        style={[queueStyles.action, !canMoveDown && styles.disabled]}
+        onPress={() => void act('queueMoveDown', selected.id)}>
+        <Feather name="arrow-down" size={17} color={palette.muted} /></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="编辑待发送消息"
+        disabled={disabled || editDisabled || selected.busy} style={queueStyles.action}
+        onPress={() => void edit(selected.id)}>
+        <Text style={[styles.buttonText, (disabled || editDisabled || selected.busy) && styles.disabled]}>编辑</Text>
+      </Pressable></View></View>
     <ScrollView style={queueStyles.list} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
-      {messages.map((message) => <View key={message.id} style={queueStyles.item}>
+      {messages.map((message) => <View key={message.id}
+        style={[queueStyles.item, messages.length > 1 && selected.id === message.id && queueStyles.selected]}>
         <Text style={styles.subtitle}>↳</Text>
-        <View style={styles.fill}>
+        <Pressable style={styles.fill} accessibilityRole="button" accessibilityLabel={`选择待发送消息：${message.text}`}
+          accessibilityState={{ selected: selected.id === message.id }} onPress={() => select(message.id)}>
           <Text numberOfLines={2} style={queueStyles.text}>{message.text || '图片消息'}</Text>
           {message.imageCount > 0 && <Text style={styles.subtitle}>{message.imageCount} 张图片</Text>}
           {message.attachmentCount > 0 && <Text style={styles.subtitle}>{message.attachmentCount} 个附件</Text>}
           {message.busy && <Text accessibilityLiveRegion="polite" style={styles.subtitle}>正在发送…</Text>}
           {message.error && <Text accessibilityRole="alert" style={queueStyles.error}>{message.error}</Text>}
-        </View>
+        </Pressable>
         <Pressable accessibilityRole="button" disabled={disabled || sending} style={queueStyles.action}
           onPress={() => void act('queueSendNow', message.id)}>
           <Text style={[styles.buttonText, (disabled || sending) && styles.disabled]}>立即发送</Text></Pressable>
@@ -34,6 +55,8 @@ export function ChatQueue({ messages, running, disabled, act }: QueueProps) {
 }
 
 const queueStyles = StyleSheet.create({
+  actions: { flexDirection: 'row', alignItems: 'center' },
+  selected: { backgroundColor: '#edf7f3' },
   queue: { marginHorizontal: 12, borderWidth: 1, borderColor: palette.border, borderRadius: 12,
     backgroundColor: '#fff', overflow: 'hidden' },
   heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12,

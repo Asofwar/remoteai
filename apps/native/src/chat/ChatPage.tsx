@@ -5,7 +5,6 @@ import { ChatApproval } from './ChatApprovals';
 import { ChatAsyncQuestions } from './ChatAsyncQuestions';
 import { ChatComposer } from './ChatComposer';
 import { ChatOverlay } from './ChatOverlay';
-import { ChatQueue } from './ChatQueue';
 import { queueProps } from '../../../../shared/remote-chat/client/queueProps';
 import { ChatMessages } from './ChatMessages';
 import { ChatQuotesProvider } from './ChatQuotes';
@@ -168,9 +167,9 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
       disabled={!ready || state.sending || state.settingsBusy || state.selectedArchived || state.queueBusy
         || state.compacting === state.selected?.id}
       answer={controller.answerAsyncQuestion} />
-    <ChatQueue {...queueProps(state, controller)} />
-    <ChatComposer threadId={state.selected?.id ?? null} models={state.models} selection={state.settings}
+    <ChatComposer queue={queueProps(state, controller)}
       goals={controller.goals} goal={state.selected ? state.goals?.[state.selected.id] : null} goalBusy={state.goalBusy}
+      threadId={state.selected?.id ?? null} models={state.models} selection={state.settings}
       contextSettings={controller.contextSettings}
       readUsage={controller.readUsage} usageActive={foreground && ready} tokenUsage={state.selected?.tokenUsage}
       loadCatalog={controller.loadComposerCatalog} loadFiles={controller.loadProjectFiles}

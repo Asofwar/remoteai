@@ -4,7 +4,6 @@ import { PanelLeft, X } from 'lucide-react';
 import type { AuthSession, RemoteDevice } from '../types';
 import { ChatApproval } from './ChatApproval';
 import { ChatComposer } from './ChatComposer';
-import { ChatQueue } from './ChatQueue';
 import { queueProps } from '../../../../shared/remote-chat/client/queueProps';
 import { ChatMessages } from './ChatMessages';
 import { ChatProcessing } from './ChatProcessing';
@@ -68,8 +67,8 @@ function ConnectedChat({ session, device, devices, active, chooseDevice }: Props
       {approvals.map((event) => <ChatApproval key={String(event.id)} event={event}
         ready={ready} respond={(reply) => controller.respond(reply)} />)}
     </div>}
-    <ChatQueue {...queueProps(state, controller)} />
-    <ChatComposer threadId={state.selected?.id ?? null} models={state.models} selection={state.settings}
+    <ChatComposer queue={queueProps(state, controller)}
+      threadId={state.selected?.id ?? null} models={state.models} selection={state.settings}
       readUsage={controller.readUsage} tokenUsage={state.selected?.tokenUsage}
       settingsBusy={state.settingsBusy} settingsError={state.settingsError}
       updateSettings={(settings) => controller.setSettings(settings)}

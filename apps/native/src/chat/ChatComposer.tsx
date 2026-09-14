@@ -32,11 +32,15 @@ import { useChatDraft } from '../../../../shared/remote-chat/client/useChatDraft
 import type { Model, SendInput, ThreadTokenUsage } from './types';
 import { styles } from './styles';
 import { composerLabel, type ComposerSettings } from '../../../../shared/remote-chat/composer';
+import { ChatQueue } from './ChatQueue';
+import type { QueueProps } from '../../../../shared/remote-chat/client/queueProps';
+import { useQueueEditor } from '../../../../shared/remote-chat/client/useQueueEditor';
 
 interface Props {
   goals?: RemoteGoals;
   goal?: ThreadGoal | null;
   goalBusy?: boolean;
+  queue?: QueueProps;
   contextSettings: ContextSettingsApi;
   tokenUsage?: ThreadTokenUsage;
   readUsage: ReadUsage;
@@ -64,7 +68,7 @@ interface Props {
 }
 
 export function ChatComposer({ models, selection, settingsBusy, settingsError, updateSettings,
-  readUsage, usageActive, tokenUsage, contextSettings, goals, goal, goalBusy,
+  readUsage, usageActive, tokenUsage, contextSettings, queue, goals, goal, goalBusy,
   threadId, active, ready, sending, running, interrupted = false, send, interrupt,
   catalog, cwd, compactReason, compacting, compact, loadCatalog, loadFiles }: Props) {
   const [settings, setSettings] = useState(false);
@@ -95,12 +99,20 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
   }, [quoteCount, active, menu.input]);
   const hasDraft = draft.hasContent || photos.photos.length > 0 || attachments.items.length > 0
     || Boolean(quoteDraft?.quotes.length);
+  const queueEditor = useQueueEditor({ threadId, queue,
+    disabled: !active || disabled || sending || photos.busy || attachments.busy || hasDraft,
+    restore: (message) => {
+      draft.restore({ ...message, images: [], attachments: [] });
+      photos.restore(message.images); attachments.restore(message.attachments ?? []);
+      menu.setSelection({ start: message.text.length, end: message.text.length });
+      requestAnimationFrame(() => menu.input.current?.focus());
+    } });
   const compactField = !goalMode.enabled && !goal && !draft.text.length && !hasDraft && !photos.busy && !photos.error;
   useEffect(() => { if (!active) { setSettings(false); setAdding(false); setProjectFiles(null); } }, [active]);
   useEffect(() => { setSettings(false); setAdding(false); setProjectFiles(null); setAttachmentError(''); }, [threadId]);
   useEffect(() => { setProjectFiles(null); }, [cwd]);
   const action = composerAction({ running: running && !hasDraft, interrupted: interrupted && !goalMode.enabled, hasDraft });
-  const attachmentBusy = sending || photos.busy || attachments.busy;
+  const attachmentBusy = sending || photos.busy || attachments.busy || queueEditor.loading;
   const cannotSend = disabled || attachmentBusy || goalBusy || (goalMode.enabled && running)
     || (action === 'send' && !hasDraft);
   const actionDisabled = action === 'pause' ? !ready || pausing : cannotSend;
@@ -146,7 +158,9 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
       goal={goals ? () => { menu.consumeTrigger(); goalMode.enter(); } : undefined}
       compact={() => { void menu.runCompact(); }} close={menu.close} />;
   };
-  return <View style={styles.composer}>
+  return <>
+    {queue && <ChatQueue {...queue} {...queueEditor} />}
+    <View style={styles.composer}>
     {!!draft.error && <Text accessibilityRole="alert" style={styles.error}>{draft.error}</Text>}
     {compacting && <Text style={styles.subtitle}>正在压缩上下文…</Text>}
     {!!(attachmentError || attachments.error) && <Text accessibilityRole="alert" style={styles.error}>
@@ -163,7 +177,7 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
       <ComposerQuotes disabled={sending} active={active} />
       <TextInput ref={menu.input} accessibilityLabel="聊天消息"
         style={[styles.input, compactField && styles.inputCompact]}
-        multiline value={draft.text} maxLength={100_000} selection={menu.selection}
+        multiline value={draft.text} maxLength={100_000} selection={menu.selection} editable={!queueEditor.loading}
         placeholderTextColor="#999999" underlineColorAndroid="transparent"
         onSelectionChange={(event) => menu.setSelection(event.nativeEvent.selection)}
         onChangeText={draft.setText} placeholder={ready ? (goalMode.enabled ? '描述想完成的目标…' : '发消息…') : '连接后发消息'} />
@@ -202,5 +216,5 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
       readUsage={readUsage} usageActive={active && usageActive} tokenUsage={tokenUsage}
       saving={settingsBusy} error={settingsError} ready={ready}
       updateSettings={updateSettings} onClose={() => setSettings(false)} />}
-  </View>;
+  </View></>;
 }

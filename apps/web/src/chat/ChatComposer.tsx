@@ -11,8 +11,12 @@ import { ChatImageEditor } from './ChatImageEditor';
 import type { Model, SendInput, ThreadTokenUsage } from './types';
 import { composerLabel, type ComposerSettings } from '../../../../shared/remote-chat/composer';
 import { useChatDraft } from '../../../../shared/remote-chat/client/useChatDraft';
+import { ChatQueue } from './ChatQueue';
+import type { QueueProps } from '../../../../shared/remote-chat/client/queueProps';
+import { useQueueEditor } from '../../../../shared/remote-chat/client/useQueueEditor';
 
 interface Props {
+  queue?: QueueProps;
   tokenUsage?: ThreadTokenUsage;
   readUsage: ReadUsage;
   models: Model[];
@@ -30,7 +34,7 @@ interface Props {
   interrupt: () => Promise<void>;
 }
 export function ChatComposer({ models, selection, settingsBusy, settingsError, updateSettings,
-  readUsage, tokenUsage,
+  readUsage, tokenUsage, queue,
   threadId, active, ready, sending, running, interrupted = false, send, interrupt }: Props) {
   const [settings, setSettings] = useState(false);
   const [attachments, setAttachments] = useState(false);
@@ -42,7 +46,10 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
   const keyboardVisible = useComposerKeyboard(active);
   const disabled = !ready || settingsBusy;
   const draft = useChatDraft({ threadId, sending, disabled, selection, send });
-  const busy = sending || draft.picking;
+  const queueEditor = useQueueEditor({ threadId, queue,
+    disabled: !active || disabled || sending || draft.picking || draft.hasContent,
+    restore: (message) => { draft.restore(message); requestAnimationFrame(() => textarea.current?.focus()); } });
+  const busy = sending || draft.picking || queueEditor.loading;
   const editing = draft.images.find((image) => image.id === editingId);
   useEffect(() => { if (!active || busy || !editing) setEditingId(null); }, [active, busy, editing]);
   const action = composerAction({ running: running && !draft.hasContent, interrupted, hasDraft: draft.hasContent });
@@ -72,6 +79,7 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
   };
   const ActionIcon = { send: ArrowUp, pause: Pause, continue: Play }[action];
   return <>
+    {queue && <ChatQueue {...queue} {...queueEditor} />}
     <form className="chat-composer" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
       <input ref={fileInput} type="file" accept="image/*" multiple hidden aria-label="选择相册图片"
         onChange={(event) => {
@@ -81,10 +89,14 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
         }} />
       <ChatAttachmentPreviews images={draft.images} busy={busy} remove={draft.removeImage} add={openAttachments}
         edit={(id) => { textarea.current?.blur(); setEditingId(id); }} />
+      {draft.references.map((item) => <div className="chat-row" key={`${item.kind}:${item.path}:${item.name}`}>
+        <span>{item.name}</span><button type="button" disabled={busy} aria-label={`移除${item.name}`}
+          onClick={() => draft.removeReference(item)}>×</button></div>)}
       {!!draft.error && <p role="alert" className="chat-error">{draft.error}</p>}
       {draft.picking && <p role="status" className="chat-muted">正在添加图片…</p>}
       <div className={`chat-composer-field${draft.text.length === 0 ? ' chat-composer-field-empty' : ''}`}>
         <textarea ref={textarea} aria-label="聊天消息" value={draft.text} maxLength={100_000} rows={1}
+          readOnly={queueEditor.loading}
           onChange={(event) => draft.setText(event.target.value)}
           placeholder={ready ? '发消息给 Codex…' : '连接后即可发送消息'}
           onKeyDown={(event) => {

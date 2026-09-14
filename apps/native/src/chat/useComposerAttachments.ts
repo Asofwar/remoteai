@@ -54,7 +54,7 @@ export function useComposerAttachments({ threadId, sending }: { threadId: string
     try { setItems(remoteAttachments([...items.filter((entry) => entry.path !== item.path), item])); setError(''); }
     catch { setError('每条消息最多添加 8 个文件或插件。'); }
   };
-  return { items, busy, error, pick, addPlugin, addFile,
+  return { items, busy, error, pick, addPlugin, addFile, restore: setItems,
     remove: (item: AttachmentReference) => setItems((current) => current.filter((entry) => entry !== item)),
     clearSubmitted: (submitted: AttachmentReference[]) =>
       setItems((current) => current.filter((entry) => !submitted.includes(entry))) };

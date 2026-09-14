@@ -43,7 +43,9 @@ const READ_OPERATIONS = new Set([
   'textPreview',
   'guiAccountsRead', 'syncHistory', 'imageChunk', 'imagePreview', 'models', 'list', 'read', 'goalGet', 'skills', 'projectFiles', 'queueRead',
 ]);
-const QUEUE_OPERATIONS = new Set(['queueRead', 'queueEnqueue', 'queueSendNow', 'queueRemove', 'queueFlush']);
+const QUEUE_OPERATIONS = new Set([
+  'queueRead', 'queueEnqueue', 'queueSendNow', 'queueRemove', 'queueFlush', 'queueEdit', 'queueMoveUp', 'queueMoveDown',
+]);
 
 function operationError(error: unknown) {
   // Tauri rejects with the safe string produced by the Rust command boundary.

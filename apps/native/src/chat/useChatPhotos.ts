@@ -91,5 +91,8 @@ export function useChatPhotos({ threadId, sending }: { threadId: string | null; 
   const openSettings = () => {
     void Linking.openSettings().catch(() => setError('无法打开设置，请在手机设置中找到 Codex Switch。'));
   };
-  return { photos, busy, error, settingsRequired, pick, remove, replace, clearSubmitted, openSettings };
+  const restore = (images: string[]) => setPhotos(images.map((dataUrl, index) => ({
+    id: `queued-${index}`, uri: dataUrl, dataUrl,
+  })));
+  return { photos, busy, error, settingsRequired, pick, remove, replace, restore, clearSubmitted, openSettings };
 }

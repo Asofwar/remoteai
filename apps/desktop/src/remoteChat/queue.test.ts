@@ -33,6 +33,40 @@ beforeEach(async () => {
 });
 afterEach(() => controller.dispose());
 
+it('shares phone and PC ordering and takes the complete draft for editing', async () => {
+  const text = '完整内容'.repeat(400);
+  const images = ['data:image/png;base64,aGVsbG8='];
+  const skills = [{ name: 'review', path: '/skills/review/SKILL.md' }];
+  const attachments = [{ kind: 'file' as const, name: 'note.txt', path: '/project/note.txt' }];
+  await queue.request({ ...input, text, images, skills, attachments });
+  controller.queue.enqueue('phone', { text: 'PC message', images: [], skills: [] });
+  const [first, second] = queue.read().threads.phone;
+  expect(first.text.length).toBeLessThan(text.length);
+  const updates = vi.fn();
+  const unsubscribe = queue.subscribe(updates);
+  await queue.request({ operation: 'queueMoveDown', threadId: 'phone', id: first.id });
+  expect(controller.getSnapshot().queued.phone.map((item) => item.id)).toEqual([second.id, first.id]);
+  controller.queue.move('phone', first.id, 'up');
+  expect(queue.read().threads.phone.map((item) => item.id)).toEqual([first.id, second.id]);
+  const result = await queue.request({ operation: 'queueEdit', threadId: 'phone', id: first.id });
+  expect(result).toMatchObject({ draft: { text, images, skills, attachments } });
+  expect(controller.getSnapshot().queued.phone.map((item) => item.id)).toEqual([second.id]);
+  expect(updates).toHaveBeenCalledTimes(3);
+  await expect(queue.request({ operation: 'queueEdit', threadId: 'phone', id: first.id })).rejects.toThrow();
+  unsubscribe();
+});
+
+it('keeps unavailable drafts in the PC queue and cannot move past a sending message', async () => {
+  await queue.request(input);
+  controller.queue.enqueue('phone', { text: 'local image', images: ['/private/photo.png'], skills: [] });
+  const [first, local] = queue.read().threads.phone;
+  await expect(queue.request({ operation: 'queueEdit', threadId: 'phone', id: local.id })).rejects.toThrow();
+  controller.getSnapshot().queued.phone[0].busy = true;
+  await expect(queue.request({ operation: 'queueEdit', threadId: 'phone', id: first.id })).rejects.toThrow();
+  await queue.request({ operation: 'queueMoveUp', threadId: 'phone', id: local.id });
+  expect(controller.getSnapshot().queued.phone.map((item) => item.id)).toEqual([first.id, local.id]);
+});
+
 it('publishes confirmed supplements before history catches up and restores them after reconnecting', async () => {
   const acknowledgements = new AcknowledgedMessages(() => controller);
   let mobile = structuredClone(thread);

@@ -13,3 +13,7 @@
 .chat-queue button { flex-shrink: 0; border: 0; background: transparent; color: var(--chat-green);
   min-height: 40px; padding: 4px 7px; font: inherit; cursor: pointer; }
 .chat-queue button:disabled { opacity: .4; cursor: default; }
+.chat-queue-actions { display: flex; align-items: center; }
+.chat-queue-actions button { min-width: 32px; display: flex; align-items: center; justify-content: center; }
+.chat-queue-selected { background: #edf7f3; }
+.chat-queue .chat-queue-select { width: 100%; text-align: left; color: inherit; padding: 0; }

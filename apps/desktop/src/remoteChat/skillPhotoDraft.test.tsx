@@ -23,6 +23,24 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); vi.unstubAllGlobals(); });
 
+it('restores full queued text, photos, attachments and editable skills and preserves them on failure', async () => {
+  const attachments = [{ kind: 'file' as const, name: 'note.txt', path: '/project/note.txt' }];
+  const send = vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true);
+  await render({ threadId: 'chat', send });
+  const text = '完整内容'.repeat(400) + ' $review';
+  await act(async () => draft.restore({ text, images, attachments, skills: [skill] }));
+  expect(draft.text).toBe(text);
+  expect(draft.images.map((image) => image.url)).toEqual(images);
+  expect(draft.references).toEqual(attachments);
+  await act(async () => draft.setText(draft.text + ' 修改后'));
+  await act(async () => { expect(await draft.submit()).toBe(false); });
+  expect(draft.hasContent).toBe(true);
+  await act(async () => { expect(await draft.submit()).toBe(true); });
+  expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ text: text + ' 修改后', images, attachments,
+    skills: [{ name: skill.name, path: skill.path }] }));
+  expect(draft.hasContent).toBe(false);
+});
+
 it('retains skill references after a failed first photo send and clears them only after a successful retry', async () => {
   let finish!: (sent: boolean) => void;
   const send = vi.fn().mockImplementationOnce(() => new Promise<boolean>((resolve) => { finish = resolve; }))

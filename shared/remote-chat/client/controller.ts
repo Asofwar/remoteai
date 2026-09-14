@@ -301,6 +301,22 @@ export class ChatController {
     finally { this.update({ queueBusy: false }); }
   }
 
+  async takeQueuedMessage(id: string) {
+    const threadId = this.state.selected?.id;
+    if (!threadId || !this.state.ready || this.state.queueBusy || this.state.sending) return;
+    const generation = this.synchronization;
+    this.update({ queueBusy: true, error: '' });
+    try {
+      const result = await this.connection.request<import('../queue').QueueEditResult>('request', {
+        operation: 'queueEdit', threadId, id,
+      });
+      const { draft, ...queue } = result;
+      if (generation === this.synchronization) this.applyQueue(queue);
+      return draft;
+    } catch (error) { this.failure(error); }
+    finally { this.update({ queueBusy: false }); }
+  }
+
   setViewing(viewing: boolean) { this.viewing = viewing; this.markViewed(); }
 
   private markViewed() {

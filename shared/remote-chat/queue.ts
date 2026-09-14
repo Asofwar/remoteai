@@ -17,4 +17,7 @@ export interface QueueMessage {
 }
 export interface QueueSnapshot { revision: number; threads: Record<string, QueueMessage[]> }
 export const emptyQueue = (): QueueSnapshot => ({ revision: -1, threads: {} });
-export type QueueAction = 'queueSendNow' | 'queueRemove' | 'queueFlush';
+export type QueueAction = 'queueSendNow' | 'queueRemove' | 'queueFlush' | 'queueMoveUp' | 'queueMoveDown';
+
+export type QueueDraft = import('../../apps/desktop/src/pages/codexGui/types').MessageInput;
+export interface QueueEditResult extends QueueSnapshot { draft: QueueDraft }

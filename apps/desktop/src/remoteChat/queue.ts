@@ -4,12 +4,16 @@ import { queueTextPreview, type QueueSnapshot } from '../../../../shared/remote-
 import type { GuiController } from '../pages/codexGui/controller';
 import type { GuiState, SkillReference } from '../pages/codexGui/types';
 import { remoteAttachments } from '../../../../shared/remote-chat/composerAttachments';
+import { validateChatImages } from '../../../../shared/remote-chat/attachments';
+import type { QueueEditResult } from '../../../../shared/remote-chat/queue';
+import { chunks } from '../../../../shared/remote-chat/framing';
 
 const MAX_TEXT_LENGTH = 100_000;
 const MAX_IMAGES = 12;
 const MAX_IMAGE_LENGTH = 8 * 1024 * 1024;
 const MAX_SKILLS = 100;
 const MAX_SKILL_PATH_LENGTH = 4096;
+const MAX_REQUEST_ID_LENGTH = 160;
 
 function skillInput(value: unknown): SkillReference[] {
   if (value === undefined) return [];
@@ -73,7 +77,7 @@ export class RemoteQueue {
     });
   }
 
-  async request(body: Record<string, unknown>) {
+  async request(body: Record<string, unknown>): Promise<QueueSnapshot> {
     const controller = this.controller();
     if (controller.getSnapshot().connection !== 'ready') await controller.connect({ reuseExisting: true });
     if (controller.getSnapshot().connection !== 'ready') throw new Error('电脑暂未就绪，请稍后重试。');
@@ -83,13 +87,31 @@ export class RemoteQueue {
     if (body.operation === 'queueFlush') await controller.queue.flush(threadId);
     else {
       const id = identifier(body.id);
-      if (body.operation === 'queueRemove') controller.queue.remove(threadId, id);
+      if (body.operation === 'queueEdit') return this.edit(controller, threadId, id);
+      if (body.operation === 'queueMoveUp' || body.operation === 'queueMoveDown') {
+        controller.queue.move(threadId, id, body.operation === 'queueMoveUp' ? 'up' : 'down');
+      } else if (body.operation === 'queueRemove') controller.queue.remove(threadId, id);
       else if (body.operation === 'queueSendNow') {
         if (controller.getSnapshot().conversations[threadId]?.activeTurn) await controller.queue.steer(threadId, id);
         else await controller.queue.flush(threadId);
       } else throw new Error('当前手机端暂不支持此操作。');
     }
     return this.read();
+  }
+
+  private edit(controller: GuiController, threadId: string, id: string): QueueEditResult {
+    const item = controller.getSnapshot().queued[threadId]?.find((message) => message.id === id);
+    if (!item || item.busy) throw new Error('这条消息已开始发送或已被移除。');
+    // Validate before removing: a desktop-only or oversized image must not lose the queued message.
+    validateChatImages(item.images);
+    remoteAttachments(item.attachments);
+    const { text, images, skills, attachments } = item;
+    chunks({ kind: 'response', id: 'x'.repeat(MAX_REQUEST_ID_LENGTH), data: {
+      ...this.read(), draft: { text, images, skills, attachments },
+    } }, 'queue-edit').next();
+    const draft = controller.queue.take(threadId, id);
+    if (!draft) throw new Error('这条消息已开始发送或已被移除。');
+    return { ...this.read(), draft };
   }
 
   private async enqueue(controller: GuiController, threadId: string, body: Record<string, unknown>) {

@@ -36,6 +36,18 @@ export function flushDemoQueue(host: QueueHost) {
 export function demoQueueRequest(input: Record<string, unknown>, host: QueueHost) {
   const threadId = host.thread.id;
   const items = pending.get(threadId) ?? [];
+  const selected = items.find((item) => item.id === input.id);
+  if (input.operation === 'queueEdit') {
+    if (!selected) throw new Error('这条消息已开始发送或已被移除。');
+    pending.set(threadId, items.filter((item) => item !== selected));
+    publish(host.link);
+    return { ...demoQueueSnapshot(), draft: { images: [], skills: [], ...selected.input } };
+  }
+  if (input.operation === 'queueMoveUp' || input.operation === 'queueMoveDown') {
+    const index = items.findIndex((item) => item === selected);
+    const neighbor = index + (input.operation === 'queueMoveUp' ? -1 : 1);
+    if (selected && items[neighbor]) [items[index], items[neighbor]] = [items[neighbor], selected];
+  }
   if (input.operation === 'queueEnqueue') pending.set(threadId, [...items, { id: crypto.randomUUID(), input }]);
   if (input.operation === 'queueRemove') pending.set(threadId, items.filter((item) => item.id !== input.id));
   if (input.operation === 'queueSendNow') {

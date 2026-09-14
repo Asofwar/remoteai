@@ -10,6 +10,7 @@ import { emptySidebar, type SidebarSnapshot } from '../sidebar';
 import { emptyQueue, type QueueSnapshot } from '../queue';
 
 export interface SendInput {
+  goalMode?: boolean;
   text: string;
   images?: string[];
   skills?: SkillReference[];
@@ -22,6 +23,8 @@ export interface SendInput {
 export interface ChatProject { cwd: string; label: string }
 
 export interface ChatState {
+  goals?: Record<string, import('../../../apps/desktop/src/pages/codexGui/goalTypes').ThreadGoal | null>;
+  goalBusy?: boolean;
   mode: ConnectionMode;
   ready: boolean;
   connecting: boolean;

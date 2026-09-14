@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Target } from "lucide-react";
 import { ComposerSkillIcon } from "./ComposerSkillIcon";
 import type { ComposerOption } from "./composerOptions";
 import styles from "./SkillInput.module.less";
@@ -21,6 +22,7 @@ export function SkillMenu({ id, options, selected, loading, error, onChoose, bel
         aria-selected={selected === index} aria-disabled={!option.enabled}
         onClick={() => option.enabled && onChoose(option)}>
         {option.kind === "skill" ? <ComposerSkillIcon skill={option.skill} />
+          : option.kind === "goal" ? <Target size={18} aria-hidden="true" />
           : <svg width="18" height="18" viewBox="0 0 16 16"
           fill="none" aria-hidden="true">
           <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" opacity=".25" />

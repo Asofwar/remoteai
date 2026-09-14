@@ -12,12 +12,13 @@
   > button:hover:not(:disabled) { background: var(--line); color: var(--ink); }
   > button:disabled { cursor: default; opacity: .5; }
 }
-.goalChip { display: flex; align-items: center; gap: 7px; width: fit-content; max-width: 100%; margin: 0 8px 8px;
-  padding: 6px 9px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink);
-  background: var(--bg, #edf1f0); cursor: pointer; font-size: 12px;
-  > svg, > small { flex-shrink: 0; }
-  > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  > small { color: var(--muted); }
+.goalChip { display: inline-flex; align-items: center; flex-shrink: 0;
+  padding: 2px 4px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink);
+  background: var(--bg, #edf1f0); font-size: 12px;
+  > button { display: inline-flex; align-items: center; gap: 4px; padding: 4px;
+    border: 0; border-radius: 999px; color: inherit; background: transparent; cursor: pointer; }
+  > button:hover:not(:disabled) { background: var(--line); }
+  > button:disabled { opacity: .5; cursor: default; }
 }
 .goalActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .goalStatus { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; color: var(--ink); font-size: 12px;

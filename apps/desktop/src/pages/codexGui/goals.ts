@@ -60,8 +60,7 @@ export class GuiGoals {
   };
   clear = async (threadId: string) => {
     const state = this.host.getSnapshot();
-    if (state.goalBusy || state.sending || state.connection !== "ready"
-      || state.conversations[threadId]?.activeTurn || state.archived) return false;
+    if (state.goalBusy || state.sending || state.connection !== "ready" || state.archived) return false;
     this.host.patch({ goalBusy: true });
     try {
       await guiApi.request({ operation: "goalClear", threadId });

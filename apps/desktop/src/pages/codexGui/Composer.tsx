@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { Target } from "lucide-react";
+import { Target, X } from "lucide-react";
+import { useGoalMode } from "../../../../../shared/remote-chat/client/useGoalMode";
 import { ComposerAddMenu } from "./ComposerAddMenu";
 import { ComposerFilesDialog } from "./ComposerFilesDialog";
 import { ComposerReferences } from "./ComposerReferences";
@@ -43,6 +44,7 @@ export const Composer = forwardRef<ComposerHandle, {
   const skillInput = useRef<SkillInputHandle>(null);
   const key = state.selected ?? "new";
   const [dialog, setDialog] = useState<"files" | "goal" | null>(null);
+  const goalMode = useGoalMode(state.selected, Boolean(state.goalBusy));
   const workspaceBusy = Boolean(state.workspaceBusy);
   const { draft, reading, editContent, removeImage, addImages, paste, pasteKeyDown, send: sendDraft,
     addAttachments, removeAttachment, addQuote, removeQuote, clearQuotes, editQueued } = useComposerDraft(key, controller);
@@ -70,7 +72,7 @@ export const Composer = forwardRef<ComposerHandle, {
     && hasDraft;
   const send = async () => {
     if (!canSend) return;
-    await sendDraft();
+    await sendDraft(goalMode.enabled, goalMode.exit);
   };
   const editQueuedMessage = (id: string) => {
     if (disabled || reading || !active) return;
@@ -92,9 +94,6 @@ export const Composer = forwardRef<ComposerHandle, {
       <ComposerReferences items={draft.attachments ?? []} disabled={disabled} onRemove={removeAttachment} />
       <ComposerQuotes quotes={draft.quotes ?? []} draftKey={key} active={active} disabled={disabled}
         onRemove={removeQuote} onClear={() => { clearQuotes(); skillInput.current?.focus(); }} />
-      {goal && <button type="button" className={extras.goalChip} onClick={() => setDialog("goal")}>
-        <Target size={15} /><span>{goal.objective}</span><small>{GOAL_STATUS[goal.status]}</small>
-      </button>}
       <input ref={fileInput} type="file" accept={IMAGE_TYPES.join(",")} multiple hidden disabled={disabled}
         aria-label="选择图片" onChange={(event) => {
           addImages(Array.from(event.target.files ?? [])); event.target.value = "";
@@ -102,7 +101,9 @@ export const Composer = forwardRef<ComposerHandle, {
       <SkillInput ref={skillInput} value={draft} draftKey={key} cwd={project} active={active}
         connected={state.connection === "ready"} disabled={disabled}
         compact={compactCommand(state, () => void controller.compact())}
-        placeholder={state.archived ? "恢复对话后即可继续" : "描述任务，或输入 / 选择命令和技能…"}
+        goal={{ enabled: !disabled && !running, run: goalMode.enter }}
+        placeholder={state.archived ? "恢复对话后即可继续" : goalMode.enabled
+          ? "描述想完成的目标…" : "描述任务，或输入 / 选择命令和技能…"}
         onChange={editContent} onPaste={paste} onPasteKeyDown={pasteKeyDown} onSend={() => void send()} />
       <div className={styles.composerControls}>
         <ComposerAddMenu cwd={project} active={active} disabled={disabled} anchor={composer}
@@ -111,10 +112,21 @@ export const Composer = forwardRef<ComposerHandle, {
         <AccessPicker value={state.settings.access}
           disabled={false} onChange={(access: AccessMode) => controller.settings({ access })} />
         <div className={styles.modelControls}>
+          {(goalMode.enabled || goal) && <div className={extras.goalChip}>
+            <button type="button" onClick={() => goal && setDialog("goal")}
+              title={goal ? `${goal.objective}（${GOAL_STATUS[goal.status]}）` : "目标模式"}>
+              <Target size={14} /><span>目标</span></button>
+            <button type="button" aria-label="移除目标" disabled={disabled || Boolean(state.goalBusy)}
+              onClick={async () => {
+                if (goal && state.selected && !await controller.goals.clear(state.selected)) return;
+                goalMode.exit(); skillInput.current?.focus();
+              }}><X size={13} /></button>
+          </div>}
           <UsageStatus active={active} threadId={state.selected} tokenUsage={current?.tokenUsage} />
           <ModelPicker models={state.models} model={state.settings.model} effort={state.settings.effort}
             disabled={false} onChange={controller.settings} />
           <ComposerSubmit state={state} controller={controller}
+            goalMode={goalMode.enabled}
             hasDraft={hasDraft} reading={reading || workspaceBusy || Boolean(state.modelSettingsLoading)} onSend={send} />
         </div>
       </div>

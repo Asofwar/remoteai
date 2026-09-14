@@ -60,7 +60,9 @@ export function useChatDraft({ threadId, sending, disabled, selection, send }: O
       if (current === generation.current) { busy.current = false; setPicking(false); }
     }
   };
-  const submit = async (override: { text?: string; images?: string[]; attachments?: AttachmentReference[] } = {}) => {
+  const submit = async (override: {
+    text?: string; images?: string[]; attachments?: AttachmentReference[]; goalMode?: boolean;
+  } = {}) => {
     const submittedText = override.text ?? text;
     const submittedImages = override.images ?? images.map((image) => image.url);
     if (disabled || sending || busy.current || submitting.current
@@ -70,6 +72,7 @@ export function useChatDraft({ threadId, sending, disabled, selection, send }: O
     try {
       const skills = draftSkills(content);
       const sent = await send({ text: submittedText, images: submittedImages, ...selection,
+        ...(override.goalMode ? { goalMode: true } : {}),
         ...(override.attachments?.length ? { attachments: override.attachments } : {}),
         ...(skills.length ? { skills } : {}) });
       if (!sent || current !== generation.current) return false;

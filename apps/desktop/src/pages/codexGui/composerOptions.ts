@@ -9,8 +9,11 @@ export interface CompactCommand {
   run: () => void;
 }
 export type ComposerOption =
+  | { kind: "goal"; key: string; label: string; description: string; enabled: boolean; command: GoalCommand }
   | { kind: "compact"; key: string; label: string; description: string; enabled: boolean; command: CompactCommand }
   | { kind: "skill"; key: string; label: string; description: string; enabled: boolean; skill: Skill };
+
+export interface GoalCommand { enabled: boolean; run: () => void }
 
 export function compactUnavailableReason(state: GuiState): string | null {
   const id = state.selected;
@@ -32,13 +35,17 @@ export function compactCommand(state: GuiState, run: () => void): CompactCommand
   return { enabled: reason === null, description: reason ?? description, percent, run };
 }
 
-export function composerOptions(skills: Skill[], query: string, command?: CompactCommand): ComposerOption[] {
+export function composerOptions(skills: Skill[], query: string, command?: CompactCommand,
+  goal?: GoalCommand): ComposerOption[] {
   const options: ComposerOption[] = [...(command ? [{ kind: "compact" as const, key: "compact", label: "压缩",
     description: command.description, enabled: command.enabled, command }] : []),
+  ...(goal ? [{ kind: "goal" as const, key: "goal", label: "目标 /goal",
+    description: "持续推进，直到完成目标", enabled: goal.enabled, command: goal }] : []),
   ...skills.map((skill): ComposerOption => ({ kind: "skill", key: skill.path, label: skillLabel(skill),
     description: skillDescription(skill), enabled: skill.enabled, skill }))];
   return options.filter((option) => {
-    const name = option.kind === "compact" ? "compact 压缩 上下文" : option.skill.name;
+    const name = option.kind === "skill" ? option.skill.name
+      : { compact: "compact 压缩 上下文", goal: "goal 目标" }[option.kind];
     return `${name} ${option.label} ${option.description}`.toLocaleLowerCase().includes(query.toLocaleLowerCase());
   });
 }

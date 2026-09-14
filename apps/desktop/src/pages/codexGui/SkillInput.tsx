@@ -2,7 +2,7 @@ import { forwardRef, useId, useImperativeHandle, useLayoutEffect, useRef, useSta
   type ClipboardEvent, type KeyboardEvent } from "react";
 import type { ComposerText, Skill } from "./types";
 import { insertSkill, readEditor, skillTrigger, writeEditor } from "./skillEditorDom";
-import { composerOptions, type CompactCommand, type ComposerOption } from "./composerOptions";
+import { composerOptions, type CompactCommand, type ComposerOption, type GoalCommand } from "./composerOptions";
 import type { SkillTrigger } from "./skillEditorDom";
 import { useComposerSkills } from "./useComposerSkills";
 import { SkillMenu } from "./SkillMenu";
@@ -25,11 +25,12 @@ export const SkillInput = forwardRef<SkillInputHandle, {
   value: ComposerText; draftKey: string; cwd: string; active: boolean; connected: boolean; disabled: boolean;
   placeholder: string; onChange: (value: ComposerText) => void;
   compact?: CompactCommand;
+  goal?: GoalCommand;
   editing?: { onCancel: () => void; className: string };
   onPaste: (event: ClipboardEvent<HTMLElement>) => void; onSend: () => void;
   onPasteKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
 }>(function SkillInput({ value, draftKey, cwd, active, connected, disabled, placeholder,
-  compact, editing, onChange, onPaste, onPasteKeyDown, onSend }, ref) {
+  compact, goal, editing, onChange, onPaste, onPasteKeyDown, onSend }, ref) {
   const editor = useRef<HTMLDivElement>(null);
   const savedCaret = useRef<Range | null>(null);
   const composing = useRef(false);
@@ -39,7 +40,7 @@ export const SkillInput = forwardRef<SkillInputHandle, {
   const open = Boolean(trigger) && active && !disabled;
   const catalog = useComposerSkills({ cwd, active: open, connected });
   const query = trigger?.query.toLocaleLowerCase() ?? "";
-  const options = composerOptions(catalog.skills, query, compact);
+  const options = composerOptions(catalog.skills, query, compact, goal);
   const selectedIndex = Math.min(selected, Math.max(0, options.length - 1));
 
   useLayoutEffect(() => {
@@ -81,7 +82,7 @@ export const SkillInput = forwardRef<SkillInputHandle, {
     else trigger.range.deleteContents();
     change();
     setTrigger(null);
-    if (option.kind === "compact") option.command.run();
+    if (option.kind !== "skill") option.command.run();
   };
   const keyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (disabled || !active) return;
@@ -117,7 +118,7 @@ export const SkillInput = forwardRef<SkillInputHandle, {
   return <div className={styles.inputWrap}>
     {open && <SkillMenu id={listId} options={options} selected={selectedIndex}
       loading={catalog.loading} error={catalog.error} onChoose={choose} below={Boolean(editing)}
-      skillsOnly={!compact} />}
+      skillsOnly={!compact && !goal} />}
     <div ref={editor} role="textbox" aria-label={editing ? "编辑消息内容" : "消息"}
       aria-multiline="true" aria-disabled={disabled}
       aria-autocomplete="list" aria-controls={open ? listId : undefined}

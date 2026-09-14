@@ -10,14 +10,16 @@ interface Props {
   compactReason: string | null;
   choose: (skill: Skill) => void;
   compact: () => void;
+  goal?: () => void;
   close: () => void;
 }
 
-export function ChatCommandMenu({ catalog, query, skillsOnly, compactReason, choose, compact, close }: Props) {
+export function ChatCommandMenu({ catalog, query, skillsOnly, compactReason, choose, compact, goal, close }: Props) {
   const search = query.toLocaleLowerCase();
   const skills = catalog.skills.filter((skill) =>
     `${skill.name} ${skillLabel(skill)} ${skillDescription(skill)}`.toLocaleLowerCase().includes(search));
   const showCompact = !skillsOnly && 'compact 压缩 上下文'.includes(search);
+  const showGoal = !!goal && !skillsOnly && 'goal 目标 持续推进'.includes(search);
   return <View style={menuStyles.panel} accessibilityLabel="命令和技能">
     <View style={menuStyles.heading}>
       <Text style={styles.buttonText}>命令和技能</Text>
@@ -27,12 +29,17 @@ export function ChatCommandMenu({ catalog, query, skillsOnly, compactReason, cho
     </View>
     <FlatList data={skills} keyExtractor={(skill) => skill.path} style={menuStyles.list}
       keyboardShouldPersistTaps="always" nestedScrollEnabled
-      ListHeaderComponent={showCompact ? <Pressable accessibilityRole="button" accessibilityLabel="压缩上下文"
+      ListHeaderComponent={<>{showCompact ? <Pressable accessibilityRole="button" accessibilityLabel="压缩上下文"
         disabled={compactReason !== null} accessibilityState={{ disabled: compactReason !== null }}
         onPress={compact} style={[menuStyles.option, compactReason !== null && styles.disabled]}>
         <Text style={styles.buttonText}>压缩 <Text style={styles.subtitle}>/compact</Text></Text>
         <Text style={styles.subtitle}>{compactReason ?? '压缩此对话的上下文'}</Text>
       </Pressable> : null}
+      {showGoal && <Pressable accessibilityRole="button" accessibilityLabel="目标模式" onPress={goal}
+        style={menuStyles.option}>
+        <Text style={styles.buttonText}>目标 <Text style={styles.subtitle}>/goal</Text></Text>
+        <Text style={styles.subtitle}>持续推进，直到完成目标</Text>
+      </Pressable>}</>}
       renderItem={({ item: skill }) => <Pressable accessibilityRole="button"
         accessibilityLabel={`使用技能 ${skillLabel(skill)}`} disabled={!skill.enabled}
         accessibilityState={{ disabled: !skill.enabled }} onPress={() => choose(skill)}
@@ -43,7 +50,7 @@ export function ChatCommandMenu({ catalog, query, skillsOnly, compactReason, cho
       ListFooterComponent={<>
         {!catalog.loaded && catalog.loading && <Text style={menuStyles.message}>正在加载技能…</Text>}
         {!!catalog.error && <Text style={menuStyles.message}>{catalog.error}</Text>}
-        {catalog.loaded && !skills.length && !showCompact
+        {catalog.loaded && !skills.length && !showCompact && !showGoal
           && <Text style={menuStyles.message}>没有找到匹配的命令或技能</Text>}
       </>} />
   </View>;

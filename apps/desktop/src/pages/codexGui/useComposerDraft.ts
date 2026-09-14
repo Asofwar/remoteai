@@ -94,19 +94,26 @@ export function useComposerDraft(key: string, controller: GuiController) {
   const { paste, pasteKeyDown, readingFiles } = useFilePaste({ key, addAttachments, addImages,
     report: controller.report });
   const reading = readingFiles || draft.images.some((image) => !image.url);
-  const send = async () => {
+  const send = async (goalMode = false, onAccepted?: () => void) => {
     if (reading || submitting.current) return;
+    if (goalMode && (!draft.text.trim() || draft.text.length > 4000
+      || draft.images.length || draft.attachments?.length || draft.mentions.length)) {
+      controller.report("请用 4000 字以内的文字描述目标；图片、文件和技能可退出目标模式后发送。");
+      return;
+    }
     submitting.current = true;
     const skills = [...new Map(draft.mentions.map(({ skill }) =>
       [skill.path, { name: skill.name, path: skill.path }])).values()];
     try {
       const images = draft.images.flatMap((image) => image.url ? [image.url] : []);
       const text = quotedReply(draft.text, draft.quotes);
-      const accepted = draft.attachments?.length
+      const accepted = goalMode ? await controller.goals.set({ objective: text, status: "active" })
+        : draft.attachments?.length
         ? await controller.send(text, images, skills, draft.attachments)
         : await controller.send(text, images, skills);
       if (accepted) {
         setDrafts((values) => values[key] === draft ? { ...values, [key]: EMPTY_DRAFT } : values);
+        onAccepted?.();
       } else {
         const selected = key === "new" ? controller.getSnapshot().selected ?? "new" : key;
         setDrafts((values) => values[key] !== draft || selected === key || values[selected]

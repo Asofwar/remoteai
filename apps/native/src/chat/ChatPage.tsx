@@ -164,6 +164,7 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
       answer={controller.answerAsyncQuestion} />
     <ChatQueue {...queueProps(state, controller)} />
     <ChatComposer threadId={state.selected?.id ?? null} models={state.models} selection={state.settings}
+      goals={controller.goals} goal={state.selected ? state.goals?.[state.selected.id] : null} goalBusy={state.goalBusy}
       contextSettings={controller.contextSettings}
       readUsage={controller.readUsage} usageActive={foreground} tokenUsage={state.selected?.tokenUsage}
       loadCatalog={controller.loadComposerCatalog} loadFiles={controller.loadProjectFiles}

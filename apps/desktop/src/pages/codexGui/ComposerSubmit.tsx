@@ -5,16 +5,17 @@ import type { GuiState } from "./types";
 import styles from "./ComposerSubmit.module.less";
 import { CONTINUE_MESSAGE } from "./continuation";
 
-export function ComposerSubmit({ state, controller, hasDraft, reading, onSend }: {
+export function ComposerSubmit({ state, controller, hasDraft, reading, onSend, goalMode = false }: {
   state: GuiState;
   controller: GuiController;
   hasDraft: boolean;
   reading: boolean;
   onSend: () => Promise<void>;
+  goalMode?: boolean;
 }) {
   const current = state.selected ? state.conversations[state.selected] : undefined;
   const interrupted = current?.turns[current.turns.length - 1]?.status === "interrupted";
-  const continuing = interrupted && !hasDraft;
+  const continuing = interrupted && !hasDraft && !goalMode;
   const disabled = state.connection !== "ready" || state.sending || state.archived || reading;
   const submit = async () => {
     if (disabled) return;

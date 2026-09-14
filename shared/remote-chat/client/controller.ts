@@ -14,6 +14,7 @@ import { chatApprovals, chatHandshake } from '../handshake';
 import { CONNECTION_ERRORS, guiConnectionError } from '../connectionErrors';
 import { COMPOSER_EVENT, type ComposerSettings, type ComposerSnapshot } from '../composer';
 import { RemoteComposerSettings } from './composerSettings';
+import { RemoteGoals } from './goals';
 import { SIDEBAR_EVENT, type SidebarSnapshot } from '../sidebar';
 import { emptyQueue, QUEUE_EVENT, type QueueAction, type QueueSnapshot } from '../queue';
 import { QueueConnection } from './queueConnection';
@@ -28,6 +29,9 @@ import { initialChatState, type ApprovalReply, type ChatProject, type ChatState,
 const SYNCHRONIZATION_RETRY_MS = 3000;
 
 export class ChatController {
+  readonly goals = new RemoteGoals({ snapshot: () => this.state, update: (patch) => this.update(patch),
+    request: (body) => this.request(body), created: (id, settings) => this.composer.created(id, settings),
+    generation: () => this.synchronization });
   private state = initialChatState();
   private readonly listeners = new Set<() => void>();
   private readonly eventListeners = new Set<(event: GuiEvent) => void>();
@@ -375,6 +379,7 @@ export class ChatController {
   }
 
   async send(input: SendInput) {
+    if (input.goalMode) return this.goals.start(input);
     const images = input.images ?? [];
     if (this.state.selectedArchived) { this.update({ error: '请先恢复聊天，再发送消息。' }); return false; }
     if (this.state.sending || this.state.settingsBusy || (this.state.compacting
@@ -495,7 +500,10 @@ export class ChatController {
     const thread = this.state.selected;
     const turn = thread?.turns?.find((entry) => entry.status === 'inProgress');
     if (!thread || !turn) return;
-    try { await this.request({ operation: 'interrupt', threadId: thread.id, turnId: turn.id }); }
+    try {
+      await this.goals.pause(thread.id);
+      await this.request({ operation: 'interrupt', threadId: thread.id, turnId: turn.id });
+    }
     catch (error) { this.failure(error); }
   }
 

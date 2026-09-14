@@ -63,6 +63,9 @@ export function applyChatEvent(state: ChatState, event: GuiEvent): ChatState {
     return { ...state, ready: false, compacting: undefined, error: '电脑上的聊天已断开，正在重新连接…' };
   }
   const threadId = params.threadId ?? params.thread?.id;
+  if (threadId && ['thread/goal/updated', 'thread/goal/cleared'].includes(method)) {
+    return { ...state, goals: { ...state.goals, [threadId]: params.goal ?? null } };
+  }
   let threads = state.threads;
   if (method === 'thread/started' && params.thread) {
     threads = [params.thread, ...threads.filter((thread) => thread.id !== params.thread!.id)];

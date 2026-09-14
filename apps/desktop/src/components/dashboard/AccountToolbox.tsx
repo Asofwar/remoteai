@@ -38,9 +38,8 @@ export function AccountToolbox({ children, navigation, t }: AccountToolboxProps)
           {children}
         </div>
       )}>
-      <button ref={triggerRef} type="button" className={`refresh-all ${styles.trigger}${
-        navigation ? ` ${styles.topNavigation}` : ""
-      }${selected ? ` ${styles.selected}` : ""}`}
+      <button ref={triggerRef} type="button"
+        className={`refresh-all ${styles.trigger}${selected ? ` ${styles.selected}` : ""}`}
         aria-expanded={open} aria-controls={open ? panelId : undefined}
         onKeyDown={(event) => {
           if (event.key === "Escape") setOpen(false);

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{path::Path, sync::Mutex};
+use tauri_plugin_clipboard_manager::ClipboardExt;
 
 use super::{config, extension, install, native, protocol::*, registration, BrowserError, Result};
 
@@ -62,7 +63,12 @@ pub(crate) async fn chrome_plugin_action(
             ChromePluginAction::Enable => install::install(&root, &home, &executable)?,
             ChromePluginAction::Disable => install::disable(&root, &home, &executable)?,
             ChromePluginAction::Remove => install::remove(&root, &home)?,
-            ChromePluginAction::OpenExtensions => registration::open_extensions()?,
+            ChromePluginAction::OpenExtensions => {
+                app.clipboard()
+                    .write_text("chrome://extensions/")
+                    .map_err(|_| BrowserError::Clipboard)?;
+                registration::open_extensions()?;
+            }
             ChromePluginAction::OpenFolder => {
                 let path = extension::directory(&root);
                 if !path.is_dir() {

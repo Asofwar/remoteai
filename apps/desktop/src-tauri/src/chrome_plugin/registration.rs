@@ -31,6 +31,8 @@ pub(super) fn supported() -> bool {
 }
 
 pub(super) fn open_extensions() -> Result<()> {
+    // Chrome rejects chrome://extensions/ in external startup arguments. The caller
+    // copies that address so the user can paste it into a normal browser window.
     platform::open_extensions()
 }
 
@@ -49,13 +51,13 @@ mod platform {
             .map(PathBuf::from)
             .map(|path| path.join("Google/Chrome/Application/chrome.exe"))
             .find(|path| path.is_file())
-            .ok_or(BrowserError::Disconnected)?;
+            .ok_or(BrowserError::ChromeNotFound)?;
         std::process::Command::new(executable)
-            .arg("chrome://extensions/")
+            .args(["--new-window", "about:blank"])
             .creation_flags(0x0800_0000)
             .spawn()
             .map(|_| ())
-            .map_err(|_| BrowserError::Storage)
+            .map_err(|_| BrowserError::ChromeLaunch)
     }
     pub(super) fn register(path: &Path) -> Result<()> {
         let root = RegKey::predef(HKEY_CURRENT_USER);
@@ -94,16 +96,17 @@ mod platform {
     pub(super) fn open_extensions() -> Result<()> {
         let mut command = if cfg!(target_os = "macos") {
             let mut command = std::process::Command::new("open");
-            command.args(["-a", "Google Chrome"]);
+            command.args(["-a", "Google Chrome", "about:blank"]);
             command
         } else {
-            std::process::Command::new("google-chrome")
+            let mut command = std::process::Command::new("google-chrome");
+            command.args(["--new-window", "about:blank"]);
+            command
         };
         command
-            .arg("chrome://extensions/")
             .spawn()
             .map(|_| ())
-            .map_err(|_| BrowserError::Storage)
+            .map_err(|_| BrowserError::ChromeLaunch)
     }
     pub(super) fn register(path: &Path) -> Result<()> {
         let destination = destination()?;

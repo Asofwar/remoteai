@@ -21,6 +21,11 @@ GUI conversations support the upstream MCP tool confirmation form with single-us
 site access and tool approval remain separate controls. Chrome webpage tasks prefer the Chrome skill,
 which explicitly checks tool availability instead of assuming that an installed skill provides tools.
 
+The setup button copies `chrome://extensions/` and opens Chrome. Paste into the address bar and
+press Enter to reach extension management. Chrome rejects that internal address in external startup
+arguments, even when the browser process launches successfully. Copy or launch failures remain visible
+inside the setup dialog, and the address is also displayed for manual entry.
+
 Chrome 125 or newer is required. The extension has not been published to the Chrome Web Store;
 the current setup therefore includes a manual Chrome loading step. Exporting the files alone does
 not mean the browser extension has been installed. No browser installation policies are changed.
@@ -69,6 +74,24 @@ webpage content as untrusted, preserve user tabs and respect permission decision
 are masked in accessible snapshots; screenshots can still contain visible page content.
 
 ## Verification
+
+### 2026-09-14 extension setup launch regression
+
+Reproduced the old setup button in the Windows 11 Hyper-V guest: the action returned success,
+but Chrome showed a new tab instead of extension management. Chromium's
+[external startup URL validation](https://chromium.googlesource.com/chromium/src/+/lkgr/chrome/browser/ui/startup/url_util.cc)
+does not accept `chrome://extensions/` as a startup URL.
+
+Tested the fixed Tauri release through the actual setup button. The clipboard contained exactly
+`chrome://extensions/`; Chrome opened an `about:blank` window. Pasting in its address bar and pressing
+Enter displayed the real extension manager, confirmed by its window title and a desktop screenshot.
+The marketplace remained responsive while the action and status refresh ran (64 timer callbacks at
+20 ms); the setup text measured 400 CSS pixels wide. This flow deliberately requires paste and Enter;
+it does not claim that launching the browser navigates directly to the extension manager.
+
+Checks passed: Rust formatting, strict Clippy, 1131 Rust tests (5 ignored), 11 relevant React tests,
+the desktop TypeScript/Vite production build, and the repository's Windows Tauri application build.
+The existing Vite chunk-size warning remains. macOS/Linux launch changes were not tested live.
 
 ### 2026-09-14 plugin recovery regression
 

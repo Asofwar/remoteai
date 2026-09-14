@@ -65,7 +65,7 @@ export function ChromePluginCard({ homeId, active, onBusyChange }: Props) {
         {busy ? "正在安装…" : "安装"}
       </button>}
     </div>
-    {setup && status && <ChromeSetup status={status} busy={busy} onClose={() => setSetup(false)}
+    {setup && status && <ChromeSetup status={status} busy={busy} error={error} onClose={() => setSetup(false)}
       onAction={run} onRefresh={refresh} />}
   </article>;
 }

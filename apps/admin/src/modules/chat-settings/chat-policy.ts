@@ -5,10 +5,10 @@ export const CHAT_POLICY_FIELDS = {
   imageSourceMaxMb: { min: 1, max: undefined, default: 20 },
   imageMaxEdge: { min: 256, max: undefined, default: 2048 },
   imageTargetKb: { min: 32, max: undefined, default: 512 },
-  filePreviewMaxMb: { min: 1, max: 2, default: 2 },
+  filePreviewMaxMb: { min: 1, max: undefined, default: 2 },
   imagePreviewMaxMb: { min: 1, max: undefined, default: 20 },
   videoPreviewMaxMb: { min: 1, max: undefined, default: 100 },
-  fileDownloadMaxMb: { min: 1, max: 20, default: 20 },
+  fileDownloadMaxMb: { min: 1, max: undefined, default: 20 },
 } as const;
 
 export type ChatPolicy = { [K in keyof typeof CHAT_POLICY_FIELDS]: number };

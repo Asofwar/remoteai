@@ -1,5 +1,6 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ImageSavePermissionError, saveImage } from './saveImage';
+import { DEFAULT_CHAT_POLICY, MIB, setChatPolicy } from '../../../../shared/remote-chat/policy';
 
 const mocks = vi.hoisted(() => ({
   platform: { OS: 'android', Version: 35 },
@@ -19,6 +20,7 @@ vi.mock('react-native-blob-util', () => ({
   default: { MediaCollection: { copyToMediaStore: mocks.mediaStore } },
 }));
 const directory = 'file:///cache/save-image-unique-id/';
+afterEach(() => setChatPolicy(DEFAULT_CHAT_POLICY));
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.platform.OS = 'android';
@@ -47,6 +49,19 @@ it('uses the response MIME type for remote images with no filename extension', a
   expect(mocks.disk.moveAsync).toHaveBeenCalledWith({ from: directory + 'download', to: directory + 'image.jpg' });
   expect(mocks.mediaStore).toHaveBeenCalledWith(expect.objectContaining({ mimeType: 'image/jpeg' }),
     'Image', '/cache/save-image-unique-id/image.jpg');
+});
+
+it('uses updated download settings when saving remote images above the old cap', async () => {
+  mocks.disk.downloadAsync.mockResolvedValue({
+    status: 200, uri: directory + 'download', headers: { 'content-type': 'image/png' },
+  });
+  mocks.disk.getInfoAsync.mockResolvedValue({ exists: true, size: 21 * MIB });
+  setChatPolicy({ ...DEFAULT_CHAT_POLICY, fileDownloadMaxMb: 100 });
+  await saveImage('https://example.test/image');
+  expect(mocks.mediaStore).toHaveBeenCalledOnce();
+  setChatPolicy({ ...DEFAULT_CHAT_POLICY, fileDownloadMaxMb: 10 });
+  await expect(saveImage('https://example.test/image')).rejects.toThrow('10 MB');
+  expect(mocks.mediaStore).toHaveBeenCalledOnce();
 });
 
 it.each(['ios', 'android'])('requests write-only access on %s when needed', async (platform) => {

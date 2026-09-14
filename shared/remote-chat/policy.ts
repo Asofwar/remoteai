@@ -23,6 +23,9 @@ export function imagePreviewByteLimit() {
 export function imagePreviewCharLimit() {
   return Math.min(Number.MAX_SAFE_INTEGER, Math.ceil(imagePreviewByteLimit() / 3) * 4 + 64);
 }
+export function textPreviewByteLimit() {
+  return Math.min(Number.MAX_SAFE_INTEGER, current.filePreviewMaxMb * MIB);
+}
 export class DownloadPolicyError extends Error {}
 export function checkDownloadSize(bytes: number) {
   if (bytes > current.fileDownloadMaxMb * MIB) {

@@ -26,11 +26,11 @@ export const POLICY_SECTIONS: PolicySection[] = [
     { key: 'historyPageSize', label: ['历史消息数量', 'History messages per page'],
       hint: ['每次加载 1–100 条历史消息', 'Load 1–100 older messages at a time'], unit: ['条', 'items'] },
   ] },
-  { key: 'files', title: ['文件', 'Files'], hint: ['设置文本预览和文件下载的大小限制。',
-    'Set size limits for text previews and downloads.'], fields: [
+  { key: 'files', title: ['文件', 'Files'], hint: ['设置文本预览和文件下载的大小限制，数值不设上限。',
+    'Set size limits for text previews and downloads. Values have no upper cap.'], fields: [
     { key: 'filePreviewMaxMb', label: ['文本查看上限', 'Text preview limit'],
-      hint: ['支持 1–2 MB 的文本文件', 'Allow text files up to 1–2 MB'], unit: ['MB', 'MB'] },
+      hint: ['允许查看的最大文本文件大小', 'Maximum text file size for preview'], unit: ['MB', 'MB'] },
     { key: 'fileDownloadMaxMb', label: ['文件下载上限', 'File download limit'],
-      hint: ['支持设置为 1–20 MB', 'Choose a limit from 1–20 MB'], unit: ['MB', 'MB'] },
+      hint: ['允许下载的最大文件大小', 'Maximum file size for download'], unit: ['MB', 'MB'] },
   ] },
 ];

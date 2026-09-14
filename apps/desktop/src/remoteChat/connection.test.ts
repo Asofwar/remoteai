@@ -34,9 +34,12 @@ afterEach(() => { setChatPolicy(DEFAULT_CHAT_POLICY); vi.useRealTimers(); vi.uns
 it('applies coordinator settings without treating them as a session frame', async () => {
   const { connection, error } = harness();
   await vi.advanceTimersByTimeAsync(0);
-  const policy = { ...DEFAULT_CHAT_POLICY, imageTargetKb: 64 };
+  const policy = { ...DEFAULT_CHAT_POLICY, imageTargetKb: 64, filePreviewMaxMb: 100, fileDownloadMaxMb: 1000 };
   Socket.instances[0].onmessage?.({ data: JSON.stringify({ type: 'chat-policy', policy }) });
-  expect(getChatPolicy().imageTargetKb).toBe(64);
+  expect(getChatPolicy()).toEqual(policy);
+  const updated = { ...policy, filePreviewMaxMb: 200, fileDownloadMaxMb: 2000 };
+  Socket.instances[0].onmessage?.({ data: JSON.stringify({ type: 'chat-policy', policy: updated }) });
+  expect(getChatPolicy()).toEqual(updated);
   expect(error).not.toHaveBeenCalled();
   connection.stop();
 });

@@ -58,6 +58,24 @@ it('compresses actual bytes to the target and reduces dimensions when quality al
   await expect(compressChatImage(async () => ({ value: '', bytes: MIB }))).rejects.toThrow('32 KB');
 });
 
+it.each([100, Number.MAX_SAFE_INTEGER])('forwards larger text preview limits safely: %s MB', async (limit) => {
+  setChatPolicy({ ...DEFAULT_CHAT_POLICY, filePreviewMaxMb: limit });
+  vi.mocked(guiApi.request).mockResolvedValue({ path: 'text.txt', text: 'content' });
+  const result = await new ChatOperations().execute({ kind: 'request', id: 'large-preview', method: 'request',
+    body: { operation: 'textPreview', threadId: 'chat', path: 'text.txt', maxBytes: 1 } });
+  expect(result.error).toBeUndefined();
+  expect(guiApi.request).toHaveBeenCalledWith(expect.objectContaining({
+    maxBytes: Math.min(Number.MAX_SAFE_INTEGER, limit * MIB),
+  }));
+});
+
+it('allows downloads above the old cap and enforces the configured size', () => {
+  setChatPolicy({ ...DEFAULT_CHAT_POLICY, fileDownloadMaxMb: 100 });
+  expect(() => checkDownloadSize(21 * MIB)).not.toThrow();
+  expect(() => checkDownloadSize(100 * MIB)).not.toThrow();
+  expect(() => checkDownloadSize(100 * MIB + 1)).toThrow('100 MB');
+});
+
 it('counts base64 padding accurately and applies new download limits at the time of saving', () => {
   expect(base64Bytes('data:image/png;base64,YQ==')).toBe(1);
   expect(base64Bytes('YWI=')).toBe(2);

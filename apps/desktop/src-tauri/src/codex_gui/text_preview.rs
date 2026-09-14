@@ -7,7 +7,7 @@ use super::{
 use serde::Serialize;
 use std::{fs::File, io::Read, path::Path};
 
-const MAX_TEXT_BYTES: u64 = 2 * 1024 * 1024;
+const DEFAULT_TEXT_BYTES: u64 = 2 * 1024 * 1024;
 const MAX_PATH_LENGTH: usize = 4096;
 
 #[derive(Serialize)]
@@ -22,7 +22,7 @@ pub(super) async fn preview(
     path: String,
     max_bytes: Option<u64>,
 ) -> Result<GuiResponse> {
-    let max_bytes = max_bytes.unwrap_or(MAX_TEXT_BYTES).clamp(1, MAX_TEXT_BYTES);
+    let max_bytes = max_bytes.unwrap_or(DEFAULT_TEXT_BYTES).max(1);
     validate_path(&path)?;
     let response = client
         .request("thread/read", thread_params(thread_id)?)
@@ -64,7 +64,7 @@ fn validate_path(path: &str) -> Result<()> {
 
 #[cfg(test)]
 fn read_text(root: &Path, source: &str) -> Result<TextPreview> {
-    read_text_limited(root, source, MAX_TEXT_BYTES)
+    read_text_limited(root, source, DEFAULT_TEXT_BYTES)
 }
 
 fn read_text_limited(root: &Path, source: &str, max_bytes: u64) -> Result<TextPreview> {
@@ -85,7 +85,7 @@ fn read_text_limited(root: &Path, source: &str, max_bytes: u64) -> Result<TextPr
         return Err(GuiError::TextPreview);
     }
     let mut text = String::new();
-    file.take(max_bytes + 1)
+    file.take(max_bytes.saturating_add(1))
         .read_to_string(&mut text)
         .map_err(|_| GuiError::TextPreview)?;
     if text.len() as u64 > max_bytes || text.contains('\0') {

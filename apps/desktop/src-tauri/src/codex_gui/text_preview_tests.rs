@@ -9,6 +9,22 @@ fn applies_configured_limit_to_utf8_bytes() {
     assert!(read_text_limited(&fixture.root(), "small.txt", 5).is_err());
 }
 
+#[test]
+fn reads_text_above_the_default_with_a_larger_configured_limit() {
+    let fixture = Fixture::new();
+    let text = "a".repeat(DEFAULT_TEXT_BYTES as usize + 1);
+    fs::write(fixture.root().join("large.txt"), &text).unwrap();
+    assert!(read_text(&fixture.root(), "large.txt").is_err());
+    for limit in [text.len() as u64, u64::MAX] {
+        assert_eq!(
+            read_text_limited(&fixture.root(), "large.txt", limit)
+                .unwrap()
+                .text,
+            text
+        );
+    }
+}
+
 struct Fixture(PathBuf);
 impl Fixture {
     fn new() -> Self {
@@ -45,7 +61,7 @@ fn rejects_escape_binary_large_missing_and_directory_targets() {
     fs::write(fixture.root().join("invalid"), [0xff]).unwrap();
     fs::write(
         fixture.root().join("large"),
-        vec![b'a'; MAX_TEXT_BYTES as usize + 1],
+        vec![b'a'; DEFAULT_TEXT_BYTES as usize + 1],
     )
     .unwrap();
     for path in [

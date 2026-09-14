@@ -1,5 +1,6 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { copyText, MAX_ANDROID_CLIPBOARD_CHARACTERS, saveTextFile } from './copyText';
+import { DEFAULT_CHAT_POLICY, MIB, setChatPolicy } from '../../../../shared/remote-chat/policy';
 
 const mocks = vi.hoisted(() => ({
   platform: { OS: 'android', Version: 31 }, clipboard: vi.fn(), mediaStore: vi.fn(),
@@ -13,6 +14,7 @@ vi.mock('expo-file-system', () => ({ ...mocks.disk, cacheDirectory: 'file:///cac
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'unique-id' }));
 vi.mock('react-native-blob-util', () => ({ default: { MediaCollection: { copyToMediaStore: mocks.mediaStore } } }));
 
+afterEach(() => setChatPolicy(DEFAULT_CHAT_POLICY));
 beforeEach(() => {
   vi.resetAllMocks(); mocks.platform.OS = 'android'; mocks.platform.Version = 31;
   mocks.disk.deleteAsync.mockResolvedValue(undefined);
@@ -57,6 +59,16 @@ it('preserves cancellation of the folder picker on older Android devices', async
   expect(await saveTextFile('complete')).toBeNull();
   expect(mocks.disk.writeAsStringAsync).not.toHaveBeenCalled();
   expect(mocks.mediaStore).not.toHaveBeenCalled();
+});
+
+it('uses updated download settings for text exports above the old cap', async () => {
+  const text = 'a'.repeat(21 * MIB);
+  setChatPolicy({ ...DEFAULT_CHAT_POLICY, fileDownloadMaxMb: 100 });
+  await expect(saveTextFile(text)).resolves.toMatchObject({ location: 'downloads' });
+  expect(mocks.mediaStore).toHaveBeenCalledOnce();
+  setChatPolicy({ ...DEFAULT_CHAT_POLICY, fileDownloadMaxMb: 10 });
+  await expect(saveTextFile(text)).rejects.toThrow('10 MB');
+  expect(mocks.mediaStore).toHaveBeenCalledOnce();
 });
 
 it('writes only to the system-selected folder when scoped downloads are unavailable', async () => {

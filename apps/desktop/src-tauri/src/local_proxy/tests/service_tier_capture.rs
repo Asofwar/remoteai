@@ -247,13 +247,13 @@ fn forwarded_multipart_service_tier_ignores_file_names_and_file_contents() {
 }
 
 #[test]
-fn disabled_fast_mode_rewrites_only_the_multipart_service_tier_text_field() {
+fn disabled_fast_mode_removes_only_the_multipart_service_tier_text_field() {
     let mut provider = openai_provider("http://localhost/v1".to_string());
     provider.fast_mode_enabled = false;
     let headers = service_tier_multipart_headers();
     let body = service_tier_multipart(Some("priority"));
     let rewritten = enforce_provider_service_tier(body, &headers, &provider);
-    assert_eq!(rewritten, service_tier_multipart(Some("default")));
+    assert_eq!(rewritten, service_tier_multipart(None));
     let missing = service_tier_multipart(None);
     assert_eq!(
         enforce_provider_service_tier(missing.clone(), &headers, &provider),
@@ -328,7 +328,10 @@ fn provider_forwarding_reports_the_service_tier_actually_sent_to_the_upstream() 
             ProviderApiFormat::OpenaiResponses,
             false,
         );
-        assert_eq!(request["service_tier"], expected);
+        assert_eq!(
+            request.get("service_tier"),
+            fast_mode_enabled.then_some(&json!(expected))
+        );
         assert_eq!(payload.token_usage_service_tier.as_deref(), Some(expected));
         let sent = payload.token_usage_service_tier.clone();
         let response = read_upstream_payload(payload);
@@ -346,7 +349,10 @@ fn chat_bridge_forwarding_keeps_sent_and_actual_tiers_for_json_and_sse() {
                 ProviderApiFormat::OpenaiChat,
                 stream,
             );
-            assert_eq!(request["service_tier"], expected);
+            assert_eq!(
+                request.get("service_tier"),
+                fast_mode_enabled.then_some(&json!(expected))
+            );
             assert_eq!(payload.token_usage_service_tier.as_deref(), Some(expected));
             let sent = payload.token_usage_service_tier.clone();
             let content_type = payload.content_type.clone();
@@ -444,7 +450,10 @@ fn anthropic_provider_forwarding_preserves_frozen_tier_and_respects_disabled_fas
             forward_anthropic_provider(snapshot, &provider, SERVICE_TIER_TEST_MODEL).unwrap();
         let (path, request) = handle.join().unwrap();
         assert_eq!(path, "/v1/responses");
-        assert_eq!(request["service_tier"], expected);
+        assert_eq!(
+            request.get("service_tier"),
+            fast_mode_enabled.then_some(&json!(expected))
+        );
         assert_eq!(request["model"], SERVICE_TIER_TEST_MODEL);
         assert_eq!(payload.status, 200);
         assert_eq!(payload.token_usage_service_tier.as_deref(), Some(expected));

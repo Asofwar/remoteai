@@ -92,6 +92,12 @@ fn multipart_request_text_field(
 }
 
 fn multipart_text_part(part: &[u8], field_name: &str) -> Option<String> {
+    let content = multipart_text_part_content(part, field_name)?;
+    let value = std::str::from_utf8(content).ok()?.trim();
+    (!value.is_empty()).then(|| value.to_string())
+}
+
+fn multipart_text_part_content<'a>(part: &'a [u8], field_name: &str) -> Option<&'a [u8]> {
     let header_end = find_bytes(part, b"\r\n\r\n")?;
     let headers = std::str::from_utf8(&part[..header_end]).ok()?;
     let disposition = headers.lines().find(|line| {
@@ -105,6 +111,5 @@ fn multipart_text_part(part: &[u8], field_name: &str) -> Option<String> {
     {
         return None;
     }
-    let value = std::str::from_utf8(&part[header_end + 4..]).ok()?.trim();
-    (!value.is_empty()).then(|| value.to_string())
+    Some(&part[header_end + 4..])
 }

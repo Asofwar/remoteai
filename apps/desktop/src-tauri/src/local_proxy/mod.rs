@@ -99,6 +99,7 @@ mod tests {
     include!("tests/history.rs");
     include!("tests/service_tier_db.rs");
     include!("tests/service_tier_capture.rs");
+    include!("tests/provider_service_tier.rs");
     include!("tests/token_usage_breakdown.rs");
     include!("tests/token_usage_responsiveness.rs");
     include!("tests/token_usage_capture.rs");

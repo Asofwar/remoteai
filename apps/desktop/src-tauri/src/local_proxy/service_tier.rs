@@ -120,16 +120,25 @@ fn enforce_provider_service_tier(
         if value.get("service_tier").is_none() {
             return body;
         }
-        apply_proxy_service_tier(&mut value, Some(ProxyServiceTier::Default));
+        omit_unsupported_provider_service_tier(&mut value, provider);
         return serde_json::to_vec(&value).unwrap_or(body);
     }
     let Some(boundary) = header_value(headers, "content-type").and_then(multipart_boundary) else {
         return body;
     };
-    replace_multipart_service_tier(body, boundary)
+    remove_multipart_service_tier(body, boundary)
 }
 
-fn replace_multipart_service_tier(mut body: Vec<u8>, boundary: &str) -> Vec<u8> {
+fn omit_unsupported_provider_service_tier(value: &mut Value, provider: &ProviderProfile) {
+    if !provider.fast_mode_enabled {
+        if let Some(object) = value.as_object_mut() {
+            // Some Codex-compatible upstreams reject even an explicit "default" tier.
+            object.remove("service_tier");
+        }
+    }
+}
+
+fn remove_multipart_service_tier(mut body: Vec<u8>, boundary: &str) -> Vec<u8> {
     let marker = format!("--{boundary}");
     let separator = format!("\r\n{marker}");
     let mut cursor = 0;
@@ -143,14 +152,11 @@ fn replace_multipart_service_tier(mut body: Vec<u8>, boundary: &str) -> Vec<u8> 
         };
         let part_end = part_start + part_length;
         let part = &body[part_start..part_end];
-        if multipart_text_part(part, "service_tier").is_some() {
-            if let Some(header_end) = find_bytes(part, b"\r\n\r\n") {
-                body.splice(
-                    part_start + header_end + 4..part_end,
-                    b"default".iter().copied(),
-                );
-                return body;
-            }
+        if multipart_text_part_content(part, "service_tier").is_some() {
+            let marker_start = cursor + start;
+            body.drain(marker_start..part_end + 2);
+            cursor = marker_start;
+            continue;
         }
         cursor = part_end + 2;
     }

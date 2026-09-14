@@ -565,7 +565,7 @@ fn openai_provider_uses_default_model_when_request_has_none() {
 }
 
 #[test]
-fn provider_without_fast_support_forces_standard_requests() {
+fn provider_without_fast_support_omits_service_tier() {
     let mut provider = openai_provider("https://upstream.example.com/v1".to_string());
     provider.fast_mode_enabled = false;
     let body = serde_json::to_vec(&json!({
@@ -578,7 +578,7 @@ fn provider_without_fast_support_forces_standard_requests() {
     let forwarded = provider_body_for_upstream(&Method::Post, "/v1/responses", body, &provider);
     let parsed: Value = serde_json::from_slice(&forwarded).unwrap();
 
-    assert_eq!(parsed["service_tier"], "default");
+    assert!(parsed.get("service_tier").is_none());
 }
 
 #[test]

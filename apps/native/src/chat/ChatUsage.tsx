@@ -1,18 +1,28 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
 import { useChatUsage } from '../../../../shared/remote-chat/client/useChatUsage';
 import { formatCost, formatTokens, usageTrailing, type ReadUsage } from '../../../../shared/remote-chat/usage';
 import { palette } from './styles';
 import { contextUsageLabel } from '../../../../shared/remote-chat/contextUsage';
 import type { ThreadTokenUsage } from './types';
 
-export function ChatUsage({ read, active, ready, tokenUsage }: {
+export function ChatUsage({ read, active, ready, tokenUsage, onContextSettings }: {
   read: ReadUsage; active: boolean; ready: boolean; tokenUsage?: ThreadTokenUsage;
+  onContextSettings?: () => void;
 }) {
   const { usage, error } = useChatUsage(read, active && ready);
   const trailing = usageTrailing(usage);
   const notice = ready ? error || '正在读取今日用量…' : '连接后查看今日用量';
   return <View style={styles.container}>
-    <Text style={styles.row}>{contextUsageLabel(tokenUsage)}</Text>
+    <View style={styles.context}>
+      <Text style={[styles.row, styles.contextText]}>{contextUsageLabel(tokenUsage)}</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="设置当前对话的上下文容量"
+        accessibilityState={{ disabled: !onContextSettings }} disabled={!onContextSettings}
+        style={({ pressed }) => [styles.settings, pressed && styles.pressed, !onContextSettings && styles.disabled]}
+        onPress={onContextSettings}>
+        <Feather name="settings" size={16} color={palette.muted} />
+      </Pressable>
+    </View>
     {usage ? <Text style={styles.row} accessibilityLabel={[
       `今日 Token 用量：${usage.totalTokens.toLocaleString('en-US')}`,
       `今日预估费用：${formatCost(usage.estimatedCostUsd)}`, trailing?.description,
@@ -26,6 +36,11 @@ export function ChatUsage({ read, active, ready, tokenUsage }: {
 }
 
 const styles = StyleSheet.create({
+  context: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  contextText: { flex: 1 },
+  settings: { minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+  pressed: { backgroundColor: palette.pale },
+  disabled: { opacity: 0.4 },
   container: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.border, paddingTop: 14, gap: 4 },
   row: { color: palette.muted, fontSize: 12, lineHeight: 20, flexShrink: 1 },
   tokens: { color: palette.green, fontWeight: '600' },

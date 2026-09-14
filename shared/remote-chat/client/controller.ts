@@ -19,6 +19,7 @@ import { emptyQueue, QUEUE_EVENT, type QueueAction, type QueueSnapshot } from '.
 import { QueueConnection } from './queueConnection';
 import { AsyncAnswers } from './asyncAnswers';
 import { createGuiAccountsClient } from './guiAccounts';
+import { createContextSettingsClient } from './contextSettings';
 import type { UsageSummary } from '../usage';
 import { TOKEN_SUMMARY_OPERATION, type ReadTokenSummary } from '../tokenSummary';
 import { initialChatState, type ApprovalReply, type ChatProject, type ChatState, type GuiEvent,
@@ -74,6 +75,8 @@ export class ChatController {
 
   snapshot = () => this.state;
   readUsage = () => this.connection.request<UsageSummary>('request', { operation: 'usageSummary' });
+  readonly contextSettings = createContextSettingsClient(<T>(body: unknown) =>
+    this.connection.request<T>('request', body));
   readTokenSummary: ReadTokenSummary = (weeks) =>
     this.connection.request('request', { operation: TOKEN_SUMMARY_OPERATION, weeks });
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };

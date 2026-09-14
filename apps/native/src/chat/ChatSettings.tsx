@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BottomSheet } from '../components/BottomSheet';
 import { SheetScrollView, SHEET_READABLE_WIDTH } from '../components/SheetScrollView';
@@ -9,8 +9,12 @@ import { SETTINGS_FIELDS, settingOptions, settingValue, settingsNotice, visibleS
 import { palette, styles } from './styles';
 import { ChatUsage } from './ChatUsage';
 import type { ReadUsage } from '../../../../shared/remote-chat/usage';
+import type { ContextSettingsApi } from '../../../../shared/remote-chat/contextSettings';
+import { ChatContextSettings } from './ChatContextSettings';
 
 interface Props {
+  threadId: string | null;
+  contextSettings: ContextSettingsApi;
   tokenUsage?: ThreadTokenUsage;
   readUsage: ReadUsage;
   usageActive: boolean;
@@ -24,8 +28,11 @@ interface Props {
 }
 
 export function ChatSettings({ models, selection, saving, ready, error, updateSettings, onClose,
-  readUsage, usageActive, tokenUsage }: Props) {
+  readUsage, usageActive, tokenUsage, threadId, contextSettings }: Props) {
   const [field, setField] = useState<SettingField | null>(null);
+  const [contextOpen, setContextOpen] = useState(false);
+  const nestedOpen = field !== null || contextOpen;
+  useEffect(() => { setContextOpen(false); }, [threadId, ready]);
   const notice = settingsNotice({ saving, ready, error });
   const choose = async (value: string) => {
     if (!field) return;
@@ -34,7 +41,7 @@ export function ChatSettings({ models, selection, saving, ready, error, updateSe
   };
   return <BottomSheet visible fullWidthContent title="聊天设置" onClose={onClose}>
     <SheetScrollView contentContainerStyle={[styles.settings, menuStyles.content]}
-      accessibilityElementsHidden={field !== null} importantForAccessibility={field ? 'no-hide-descendants' : 'auto'}>
+      accessibilityElementsHidden={nestedOpen} importantForAccessibility={nestedOpen ? 'no-hide-descendants' : 'auto'}>
       {visibleSettingsFields(selection).map((entry) => <Pressable key={entry.field} accessibilityRole="button"
         accessibilityLabel={`设置${entry.label}`} onPress={() => setField(entry.field)} style={menuStyles.entry}>
         <Text style={styles.title}>{entry.label}</Text>
@@ -45,8 +52,11 @@ export function ChatSettings({ models, selection, saving, ready, error, updateSe
         style={error ? styles.error : styles.subtitle}>{notice}</Text>}
       {!!error && <Pressable accessibilityRole="button" style={styles.button}
         onPress={() => { void updateSettings(selection); }}><Text style={styles.buttonText}>重新保存</Text></Pressable>}
-      <ChatUsage read={readUsage} active={usageActive && !field} ready={ready} tokenUsage={tokenUsage} />
+      <ChatUsage read={readUsage} active={usageActive && !nestedOpen} ready={ready} tokenUsage={tokenUsage}
+        onContextSettings={threadId && ready ? () => setContextOpen(true) : undefined} />
     </SheetScrollView>
+    {contextOpen && threadId && ready && <ChatContextSettings key={threadId} threadId={threadId}
+      api={contextSettings} onClose={() => setContextOpen(false)} />}
     {field && <BottomSheet fullWidthContent
       visible title={SETTINGS_FIELDS.find((entry) => entry.field === field)!.title}
       onBack={() => setField(null)} onClose={() => setField(null)}>

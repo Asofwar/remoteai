@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Keyboard, Pressable, Text, TextInput, View } from 'react-native';
 import { ChatSettings } from './ChatSettings';
 import type { ReadUsage } from '../../../../shared/remote-chat/usage';
+import type { ContextSettingsApi } from '../../../../shared/remote-chat/contextSettings';
 import { ComposerActionButton } from './ComposerActionButton';
 import Feather from '@expo/vector-icons/Feather';
 import { modelLabelTail } from './modelLabel';
@@ -29,6 +30,7 @@ import { styles } from './styles';
 import { composerLabel, type ComposerSettings } from '../../../../shared/remote-chat/composer';
 
 interface Props {
+  contextSettings: ContextSettingsApi;
   tokenUsage?: ThreadTokenUsage;
   readUsage: ReadUsage;
   usageActive: boolean;
@@ -55,7 +57,7 @@ interface Props {
 }
 
 export function ChatComposer({ models, selection, settingsBusy, settingsError, updateSettings,
-  readUsage, usageActive, tokenUsage,
+  readUsage, usageActive, tokenUsage, contextSettings,
   threadId, active, ready, sending, running, interrupted = false, send, interrupt,
   catalog, cwd, compactReason, compacting, compact, loadCatalog, loadFiles }: Props) {
   const [settings, setSettings] = useState(false);
@@ -179,6 +181,7 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
         attachments.addFile({ kind: 'file', name: file.name, path: file.path }); setProjectFiles(null);
       }} />}
     {settings && <ChatSettings models={models} selection={selection}
+      threadId={threadId} contextSettings={contextSettings}
       readUsage={readUsage} usageActive={active && usageActive} tokenUsage={tokenUsage}
       saving={settingsBusy} error={settingsError} ready={ready}
       updateSettings={updateSettings} onClose={() => setSettings(false)} />}

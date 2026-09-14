@@ -1,25 +1,15 @@
 import { useEffect, useState } from "react";
-import { Modal } from "antd";
 import { X } from "lucide-react";
 import type { DraftImage } from "./useComposerDraft";
-import { useImageMenu } from "./useImageMenu";
+import { ImagePreview } from "./ImagePreview";
 import styles from "./ImageAttachments.module.less";
-
-function AttachmentPreview({ image, close }: { image: DraftImage; close: () => void }) {
-  const menu = useImageMenu();
-  return <Modal open title="图片预览" footer={null} centered
-    width="min(960px, 94vw)" onCancel={close} destroyOnClose>
-    <img className={styles.preview} src={image.url} alt={image.name}
-      onContextMenu={(event) => { if (image.url) menu.contextMenu?.(event, image.url); }} />
-    {menu.feedback && <div className={styles.feedback} role="status">{menu.feedback}</div>}
-  </Modal>;
-}
 
 export function ImageAttachments({ images, disabled, active = true, onRemove }: {
   images: DraftImage[]; disabled: boolean; active?: boolean; onRemove: (id: string) => void;
 }) {
   const [previewId, setPreviewId] = useState<string | null>(null);
   const preview = images.find((image) => image.id === previewId);
+  const previewUrl = preview?.url;
   useEffect(() => { if (!active || !preview) setPreviewId(null); }, [active, preview]);
   if (!images.length) return null;
   return <><div className={styles.attachments} aria-label="图片附件">
@@ -33,7 +23,8 @@ export function ImageAttachments({ images, disabled, active = true, onRemove }: 
         disabled={disabled} onClick={() => onRemove(image.id)}><X size={14} /></button>
     </div>)}
   </div>
-    {active && preview?.url && <AttachmentPreview key={preview.id} image={preview}
+    {active && preview && previewUrl && <ImagePreview key={preview.id} thumbnail={previewUrl} description={preview.name}
+      load={async () => previewUrl}
       close={() => setPreviewId(null)} />}
   </>;
 }

@@ -16,6 +16,7 @@ mod goals;
 mod home;
 mod icons;
 mod identity;
+pub(crate) mod image_actions;
 mod image_download;
 mod image_preview;
 mod image_thumbnail;

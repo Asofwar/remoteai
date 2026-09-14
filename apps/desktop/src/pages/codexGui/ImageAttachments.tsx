@@ -2,7 +2,18 @@ import { useEffect, useState } from "react";
 import { Modal } from "antd";
 import { X } from "lucide-react";
 import type { DraftImage } from "./useComposerDraft";
+import { useImageMenu } from "./useImageMenu";
 import styles from "./ImageAttachments.module.less";
+
+function AttachmentPreview({ image, close }: { image: DraftImage; close: () => void }) {
+  const menu = useImageMenu();
+  return <Modal open title="图片预览" footer={null} centered
+    width="min(960px, 94vw)" onCancel={close} destroyOnClose>
+    <img className={styles.preview} src={image.url} alt={image.name}
+      onContextMenu={(event) => { if (image.url) menu.contextMenu?.(event, image.url); }} />
+    {menu.feedback && <div className={styles.feedback} role="status">{menu.feedback}</div>}
+  </Modal>;
+}
 
 export function ImageAttachments({ images, disabled, active = true, onRemove }: {
   images: DraftImage[]; disabled: boolean; active?: boolean; onRemove: (id: string) => void;
@@ -22,9 +33,7 @@ export function ImageAttachments({ images, disabled, active = true, onRemove }: 
         disabled={disabled} onClick={() => onRemove(image.id)}><X size={14} /></button>
     </div>)}
   </div>
-    <Modal open={active && Boolean(preview?.url)} title="图片预览" footer={null} centered
-      width="min(960px, 94vw)" onCancel={() => setPreviewId(null)} destroyOnClose>
-      {preview?.url && <img className={styles.preview} src={preview.url} alt={preview.name} />}
-    </Modal>
+    {active && preview?.url && <AttachmentPreview key={preview.id} image={preview}
+      close={() => setPreviewId(null)} />}
   </>;
 }

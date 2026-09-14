@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ImageViewer } from "../../../../../shared/chat/ImageViewer";
+import { ImagePreview } from "./ImagePreview";
 import styles from "./MessageImage.module.less";
 import { useImageSource } from "./useImageSource";
 
@@ -23,7 +23,7 @@ export function MessageImage({ src, alt, title }: MessageImageProps) {
       <img src={image.url} alt={description} loading="lazy" decoding="async" referrerPolicy="no-referrer"
         onError={() => setFailedSource(image.url)} />
     </button>
-    {preview && <ImageViewer key={src} thumbnail={image.url} description={description}
+    {preview && <ImagePreview key={src} thumbnail={image.url} description={description}
       load={image.original} close={() => setPreview(false)} />}
   </>;
 }

@@ -3,8 +3,13 @@ import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { ConfigProvider } from "antd";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { invoke } from "@tauri-apps/api/core";
+import { Menu } from "@tauri-apps/api/menu";
 import { ImageAttachments } from "./ImageAttachments";
 import type { DraftImage } from "./useComposerDraft";
+
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), isTauri: () => true }));
+vi.mock("@tauri-apps/api/menu", () => ({ Menu: { new: vi.fn() } }));
 
 const images: DraftImage[] = [
   { id: "one", name: "第一张.png", url: "data:image/png;base64,b25l" },
@@ -80,4 +85,28 @@ it("closes previews when leaving the page or switching drafts", async () => {
   await click("放大查看：图片 1");
   await render({ draftKey: "other" });
   expect(dialog()).toBeNull();
+});
+
+it("copies and saves the selected attachment from its preview context menu", async () => {
+  let items: { action: (id: string) => void }[] = [];
+  const release = vi.fn().mockResolvedValue(undefined);
+  vi.mocked(invoke).mockResolvedValue({ completed: true });
+  vi.mocked(Menu.new).mockImplementation(async (options) => {
+    items = options?.items as typeof items;
+    return { popup: vi.fn().mockResolvedValue(undefined), close: release } as unknown as Menu;
+  });
+  await render();
+  await click("放大查看：图片 2");
+  const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+  await act(async () => { dialog()?.querySelector("img")?.dispatchEvent(event); });
+  expect(event.defaultPrevented).toBe(true);
+  for (const [index, action] of ["copy", "saveAs"].entries()) {
+    await act(async () => items[index].action(action));
+    expect(invoke).toHaveBeenLastCalledWith("codex_gui_image_action", {
+      request: { source: images[1].url, action },
+    });
+  }
+  await render({ active: false });
+  expect(release).toHaveBeenCalledOnce();
+  expect(submitted).not.toHaveBeenCalled();
 });

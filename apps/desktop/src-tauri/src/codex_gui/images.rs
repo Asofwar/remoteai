@@ -16,7 +16,7 @@ pub(super) fn input(image: String) -> Result<Value> {
 
 pub(super) fn input_limited(image: String, max_bytes: u64) -> Result<Value> {
     if image.starts_with("data:") {
-        validate_data_url(&image, max_bytes)?;
+        decode_data_url(&image, max_bytes)?;
         return Ok(json!({"type": "image", "url": image}));
     }
     let path = Path::new(&image);
@@ -38,7 +38,7 @@ pub(super) fn input_limited(image: String, max_bytes: u64) -> Result<Value> {
     Ok(json!({"type": "localImage", "path": image}))
 }
 
-fn validate_data_url(url: &str, max_bytes: u64) -> Result<()> {
+pub(super) fn decode_data_url(url: &str, max_bytes: u64) -> Result<Vec<u8>> {
     let (header, encoded) = url.split_once(',').ok_or(GuiError::InvalidRequest)?;
     let format = match header {
         "data:image/png;base64" => ImageFormat::Png,
@@ -56,5 +56,5 @@ fn validate_data_url(url: &str, max_bytes: u64) -> Result<()> {
     if bytes.len() as u64 > max_bytes || image::guess_format(&bytes).ok() != Some(format) {
         return Err(GuiError::InvalidRequest);
     }
-    Ok(())
+    Ok(bytes)
 }

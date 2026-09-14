@@ -74,6 +74,7 @@ mod tests {
         assert!(!LAN_COMMAND_ALLOWLIST.contains(&"launch_chatgpt"));
         assert!(!LAN_COMMAND_ALLOWLIST.contains(&"codex_gui_scheduled_tasks"));
         assert!(!LAN_COMMAND_ALLOWLIST.contains(&"codex_gui_file_action"));
+        assert!(!LAN_COMMAND_ALLOWLIST.contains(&"codex_gui_image_action"));
         assert!(!LAN_COMMAND_ALLOWLIST.contains(&"codex_gui_file_applications"));
     }
 

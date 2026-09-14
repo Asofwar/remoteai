@@ -57,6 +57,7 @@ mod provider_platform;
 mod providers;
 mod remote_chat;
 mod remote_control;
+mod remote_websocket;
 mod skills_market;
 mod storage;
 mod system_proxy;
@@ -206,6 +207,9 @@ pub fn run() {
             }
             codex_gui::scheduled_tasks::start(app.handle());
             remote_control::start(app.handle().clone());
+            if !launch_options.headless {
+                remote_chat::start(app.handle().clone());
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -275,7 +279,11 @@ pub fn run() {
             codex_gui::auto_switch_settings::codex_gui_set_auto_switch_settings,
             gui_terminal::codex_gui_terminal_open,
             gui_terminal::codex_gui_terminal_command,
-            remote_chat::remote_chat_config,
+            remote_chat::remote_chat_attach,
+            remote_chat::remote_chat_send,
+            remote_chat::remote_chat_ack,
+            remote_chat::remote_chat_reconnect,
+            remote_chat::remote_chat_detach,
             codex_gui::releases::codex_gui_cli_status,
             codex_gui::releases::codex_gui_cli_release,
             codex_gui::releases::codex_gui_cli_install,

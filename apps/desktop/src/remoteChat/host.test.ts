@@ -4,8 +4,15 @@ import type { ConnectionMode } from '../../../../shared/remote-chat/protocol';
 import { ChatHost } from './host';
 import { mobileConnection } from './mobileConnection';
 import { DEFAULT_CHAT_POLICY, getChatPolicy, setChatPolicy } from '../../../../shared/remote-chat/policy';
+import type { HostTransportEvent } from './nativeTransport';
 
 const links = vi.hoisted(() => new Map<string, { mode: (mode: ConnectionMode) => void; close: () => void }>());
+const native = vi.hoisted(() => ({ receive: undefined as ((event: HostTransportEvent) => void) | undefined }));
+vi.mock('./nativeTransport', () => ({ NativeChatTransport: class {
+  ready = true; bufferedAmount = 0;
+  constructor(receive: (event: HostTransportEvent) => void) { native.receive = receive; }
+  send = vi.fn(); forgetSession = vi.fn(); reconnect = vi.fn(); close = vi.fn();
+} }));
 vi.mock('../pages/codexGui/api', () => ({ guiApi: { subscribe: vi.fn(async () => vi.fn()) } }));
 vi.mock('../pages/codexGui/webEvents', () => ({ subscribeGuiEvent: vi.fn(async () => vi.fn()) }));
 vi.mock('./operations', () => ({ ChatOperations: class {} }));
@@ -24,32 +31,28 @@ vi.mock('../../../../shared/remote-chat/link', () => ({ ChatLink: class {
 } }));
 
 let host: ChatHost;
-let socket: { readyState: number; send: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn>;
-  onmessage?: (event: { data: string }) => void; onclose?: () => void };
+const message = (data: object) => native.receive!({ type: 'message', generation: 1, data: JSON.stringify(data) });
 
 beforeEach(() => {
   links.clear();
   mobileConnection.setConnected(false);
-  socket = { readyState: 1, send: vi.fn(), close: vi.fn() };
-  vi.stubGlobal('WebSocket', Object.assign(vi.fn(function () { return socket; }), { OPEN: 1 }));
-  host = new ChatHost({ websocketUrl: 'ws://localhost', accessToken: 'test', deviceId: 'pc' },
-    mobileConnection.setConnected);
+  host = new ChatHost(mobileConnection.setConnected);
 });
 afterEach(() => { host.close(); setChatPolicy(DEFAULT_CHAT_POLICY); vi.unstubAllGlobals(); });
 
 it('accepts configuration from the coordinator before pairing and while a direct session is active', async () => {
   const policy = { ...DEFAULT_CHAT_POLICY, threadPageSize: 6 };
-  socket.onmessage?.({ data: JSON.stringify({ type: 'chat-policy', policy }) });
+  message({ type: 'chat-policy', policy });
   expect(getChatPolicy().threadPageSize).toBe(6);
   await receive('peer-open', 'phone');
   links.get('phone')!.mode('direct');
-  socket.onmessage?.({ data: JSON.stringify({ type: 'chat-policy', policy: { ...policy, threadPageSize: 9 } }) });
+  message({ type: 'chat-policy', policy: { ...policy, threadPageSize: 9 } });
   expect(getChatPolicy().threadPageSize).toBe(9);
   expect(mobileConnection.getSnapshot()).toBe(true);
 });
 
 async function receive(type: string, sessionId: string) {
-  socket.onmessage?.({ data: JSON.stringify({ type, sessionId, publicKey: 'test', iceServers: [] }) });
+  message({ type, sessionId, publicKey: 'test', iceServers: [] });
   await Promise.resolve();
 }
 
@@ -74,7 +77,7 @@ it('stays connected until the last phone disconnects and resets when the host cl
   await receive('relay-ready', 'second');
   await receive('peer-close', 'first');
   expect(mobileConnection.getSnapshot()).toBe(true);
-  socket.onclose?.();
+  native.receive!({ type: 'disconnected', generation: 2 });
   expect(mobileConnection.getSnapshot()).toBe(false);
   links.get('second')!.mode('direct');
   expect(mobileConnection.getSnapshot()).toBe(false);

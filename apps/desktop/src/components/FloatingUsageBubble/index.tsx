@@ -36,25 +36,20 @@ import type {
   Provider,
   UsageSummary,
 } from "../../types";
-import { remainingTone, resetClockTime } from "../../utils/format";
+import { remainingTone } from "../../utils/format";
 import { ConcurrentUsageCard } from "./ConcurrentUsageCard";
 import { FloatingProviderCard } from "../FloatingProviderCard";
 import { useConcurrentUsageStats } from "./useConcurrentUsageStats";
 import { accountParticipatesInConcurrentRouting } from "./concurrentUsageSummary";
 import styles from "./index.module.less";
+import { BubbleResetLabel } from "./BubbleResetLabel";
+import { ClassicBubbleVisual } from "./ClassicBubbleVisual";
 
 function usageColor(remaining: number) {
   const tone = remainingTone(remaining);
   if (tone === "danger") return "#ef6b62";
   if (tone === "warning") return "#e5b84f";
   return "var(--green-highlight)";
-}
-
-function waterColors(remaining: number | null) {
-  const tone = remaining === null ? "good" : remainingTone(remaining);
-  if (tone === "danger") return { top: "#ff8a78", main: "#ef4f45", bottom: "#c92e32" };
-  if (tone === "warning") return { top: "#ffd76a", main: "#e5b84f", bottom: "#c88716" };
-  return { top: "#20b7ed", main: "#0b93d9", bottom: "#0873d5" };
 }
 
 const ignoreThemeError = () => undefined;
@@ -88,67 +83,12 @@ function floatingUsageClassName(mode: FloatingUsageMode, glass: boolean, settlin
   if (mode === "concurrent") {
     return ["floating-concurrent-card", refreshing ? "is-refreshing" : ""].filter(Boolean).join(" ");
   }
-  let modeClass = "";
+  let modeClass = "floating-bubble-classic";
   if (mode === "provider") modeClass = "floating-provider-card";
   else if (glass) modeClass = "floating-bubble-glass";
   return ["floating-bubble", modeClass, settling ? "is-water-settling" : "", refreshing ? "is-refreshing" : ""]
     .filter(Boolean)
     .join(" ");
-}
-
-function BubbleResetLabel({ timestamp, language, display, className, compact = false }: {
-  timestamp?: number | null;
-  language: "en" | "zh";
-  display: BubbleResetDisplay;
-  className?: string;
-  compact?: boolean;
-}) {
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (!timestamp || display !== "countdown") return;
-    setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [display, timestamp]);
-
-  if (display === "resetAt") {
-    const clock = resetClockTime(timestamp);
-    if (compact) {
-      return (
-        <small className={`floating-bubble-reset ${className ?? ""}`}>
-          <span>{clock ?? (language === "zh" ? "未知" : "unknown")}</span>
-        </small>
-      );
-    }
-    return (
-      <small className={`floating-bubble-reset floating-bubble-reset-stacked ${className ?? ""}`}>
-        <span>{language === "zh" ? (clock ? "重置于" : "重置时间") : (clock ? "Resets at" : "Reset time")}</span>
-        <span>{clock ?? (language === "zh" ? "未知" : "unknown")}</span>
-      </small>
-    );
-  }
-
-  const totalSeconds = timestamp ? Math.max(0, Math.ceil((timestamp * 1000 - now) / 1000)) : null;
-  const days = totalSeconds === null ? null : Math.floor(totalSeconds / 86_400);
-  const hours = totalSeconds === null ? null : Math.floor((totalSeconds % 86_400) / 3_600);
-  const minutes = totalSeconds === null ? null : Math.floor((totalSeconds % 3_600) / 60);
-  const seconds = totalSeconds === null ? null : totalSeconds % 60;
-  const time = hours === null || minutes === null || seconds === null
-    ? null
-    : `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  if (compact) {
-    return (
-      <small className={`floating-bubble-reset ${className ?? ""}`}>
-        <span>{time ? `${days}${language === "zh" ? "天" : "d"}\u00a0${time}` : "--"}</span>
-      </small>
-    );
-  }
-  return (
-    <small className={`floating-bubble-reset floating-bubble-reset-stacked ${className ?? ""}`}>
-      {time ? <><span>{days}{language === "zh" ? "天" : "d"}</span><span>{time}</span></> : <span>--</span>}
-    </small>
-  );
 }
 
 export function FloatingUsageBubble() {
@@ -266,8 +206,6 @@ export function FloatingUsageBubble() {
   const secondary = usage?.secondary;
   const remaining = primary ? clampPercent(primary.remainingPercent) : null;
   const weeklyRemaining = secondary ? clampPercent(secondary.remainingPercent) : null;
-  const ringRemaining = bubbleStyle === "glass" ? remaining : weeklyRemaining;
-  const water = waterColors(remaining);
   const secondaryUsed = weeklyRemaining === null ? null : 100 - weeklyRemaining;
   const status = remaining === null
     ? "--"
@@ -278,12 +216,8 @@ export function FloatingUsageBubble() {
         : (language === "zh" ? "额度充足" : "Quota healthy");
   const bubbleLabel = bubbleActionLabel(language, refreshing, floatingMode);
   const ringStyle = {
-    "--bubble-progress": `${ringRemaining ?? 0}%`,
-    "--bubble-color": ringRemaining === null ? "#7b8780" : usageColor(ringRemaining),
-    "--bubble-water-level": `${remaining ?? 0}%`,
-    "--bubble-water-top": water.top,
-    "--bubble-water-color": water.main,
-    "--bubble-water-bottom": water.bottom,
+    "--bubble-progress": `${remaining ?? 0}%`,
+    "--bubble-color": remaining === null ? "#7b8780" : usageColor(remaining),
   } as CSSProperties;
 
   useEffect(() => {
@@ -434,13 +368,13 @@ export function FloatingUsageBubble() {
           t={t}
           tokenUsage={providerStats.tokenUsage}
         /> : <>
-          <span className="floating-bubble-water" aria-hidden="true" />
-          <span className="floating-bubble-weekly" aria-hidden="true">
-            {language === "zh" ? "周" : "W"} {weeklyRemaining === null ? "--" : `${weeklyRemaining}%`}
-          </span>
-          <span className="floating-bubble-value">{remaining === null ? "--" : `${remaining}%`}</span>
-          <BubbleResetLabel timestamp={primary?.resetsAt} language={language} display={resetDisplay} />
-          <span className="floating-glass-ring" aria-hidden="true">
+          {bubbleStyle === "classic" && <ClassicBubbleVisual
+            remaining={remaining}
+            weeklyRemaining={weeklyRemaining}
+            weekLabel={language === "zh" ? "周" : "W"}
+            resetLabel={<BubbleResetLabel timestamp={primary?.resetsAt} language={language} display={resetDisplay} />}
+          />}
+          {bubbleStyle === "glass" && <><span className="floating-glass-ring" aria-hidden="true">
             <span>{remaining === null ? "--" : `${remaining}%`}</span>
             <small>{language === "zh" ? "主用量剩余" : "Primary left"}</small>
           </span>
@@ -467,7 +401,7 @@ export function FloatingUsageBubble() {
                 {status}
               </strong>
             </span>
-          </span>
+          </span></>}
         </>}
       </button>
     </div>

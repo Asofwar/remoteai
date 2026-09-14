@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import { Button, ColorPicker, Modal, Segmented, Switch } from "antd";
 import {
   AppWindow,
@@ -16,15 +15,7 @@ import { LANGUAGE_OPTIONS, type Language } from "../../i18n";
 import type { BubbleResetDisplay } from "../../types";
 import { AutoUpdateSettingsCard } from "./AutoUpdateSettingsCard";
 import type { SettingsPageProps } from "./types";
-
-const CLASSIC_BUBBLE_PREVIEW_STYLE = {
-  "--bubble-progress": "57%",
-  "--bubble-color": "#35ada7",
-  "--bubble-water-level": "65%",
-  "--bubble-water-top": "#20b7ed",
-  "--bubble-water-color": "#0b93d9",
-  "--bubble-water-bottom": "#0873d5",
-} as CSSProperties;
+import { ClassicBubbleVisual } from "../../components/FloatingUsageBubble/ClassicBubbleVisual";
 
 interface BasicSettingsCardsProps {
   bubbleStyleModalOpen: boolean;
@@ -256,16 +247,13 @@ function BubbleStyleModal({
           onClick={() => onBubbleStyleChange("classic")}
         >
           <span className="floating-bubble-style-preview classic" aria-hidden="true">
-            <span className="floating-bubble floating-bubble-demo" style={CLASSIC_BUBBLE_PREVIEW_STYLE}>
-              <span className="floating-bubble-water" />
-              <span className="floating-bubble-weekly">
-                {t("settings.floatingBubble.weekShort")} 57%
-              </span>
-              <span className="floating-bubble-value">65%</span>
-              <small className="floating-bubble-reset floating-bubble-reset-stacked">
-                <span>0{t("settings.floatingBubble.dayShort")}</span>
-                <span>01:28:39</span>
-              </small>
+            <span className="floating-bubble floating-bubble-classic floating-bubble-demo">
+              <ClassicBubbleVisual remaining={46} weeklyRemaining={68}
+                weekLabel={t("settings.floatingBubble.weekShort")}
+                resetLabel={<small className="floating-bubble-reset floating-bubble-reset-stacked">
+                  <span>5{t("settings.floatingBubble.dayShort")}</span>
+                  <span>01:35:12</span>
+                </small>} />
             </span>
           </span>
           <span className="floating-bubble-style-option-copy">

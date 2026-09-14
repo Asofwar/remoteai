@@ -1,0 +1,179 @@
+.visual {
+  --weekly-light: #c1bfff;
+  --weekly-shade: #a3a1f7;
+  position: absolute;
+  inset: 0;
+  color: #f4fdff;
+  font-family: Manrope, "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+
+  &[data-weekly-tone="warning"] { --weekly-light: #ffe2a0; --weekly-shade: #e4b451; }
+  &[data-weekly-tone="danger"] { --weekly-light: #ffb0a6; --weekly-shade: #ef736e; }
+}
+
+.ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 1px 2px rgba(19, 43, 53, .16));
+
+  circle { fill: none; stroke-width: 5.2; }
+  .ringRim { stroke: rgba(235, 250, 255, .36); stroke-width: .3; }
+}
+
+.track { stroke: rgba(213, 233, 240, .32); }
+.ringLight { stop-color: var(--weekly-light); }
+.ringShade { stop-color: var(--weekly-shade); }
+.progress {
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 .4px rgba(238, 238, 255, .95));
+  transition: stroke-dasharray .7s ease;
+}
+
+.sphere {
+  --water-top: #31d0e4;
+  --water-main: #039dbd;
+  --water-bottom: #005575;
+  position: absolute;
+  inset: 8.4%;
+  overflow: hidden;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 22% 10%, rgba(160, 203, 208, .35), transparent 38%),
+    radial-gradient(circle at 40% 22%, #29474a, #163537 56%, #052c30);
+  box-shadow: 0 2px 5px rgba(12, 37, 47, .24), 0 0 0 2px rgba(170, 219, 230, .08);
+
+  &[data-primary-tone="warning"] { --water-top: #ffda81; --water-main: #dca535; --water-bottom: #92641e; }
+  &[data-primary-tone="danger"] { --water-top: #ff9b8f; --water-main: #e76460; --water-bottom: #a43242; }
+
+  &::before {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    left: 9%;
+    top: 15%;
+    width: 25%;
+    height: .8%;
+    border-radius: 50%;
+    background: rgba(238, 255, 255, .75);
+    filter: blur(.45px);
+    transform: rotate(-40deg);
+  }
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(135deg, transparent 12%, rgba(235, 255, 255, .22) 17%, transparent 23%,
+      transparent 75%, rgba(161, 238, 255, .1));
+    box-shadow: inset 0 0 0 .25px rgba(222, 253, 255, .95), inset 0 0 1px rgba(177, 239, 253, .6);
+  }
+}
+
+.liquid {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: var(--liquid-level);
+  transition: height .7s cubic-bezier(.2, .8, .2, 1);
+
+  // Start the body below the wave's trough so no flat edge crosses the moving surface.
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 4px 0 0;
+    background: linear-gradient(var(--water-top), var(--water-main) 38%, var(--water-bottom));
+  }
+
+  &[data-full="true"]::before { top: 0; }
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 4px 0 0;
+    background: radial-gradient(ellipse at 20% 20%, rgba(128, 247, 255, .18), transparent 55%),
+      radial-gradient(ellipse at 85% 70%, rgba(0, 52, 81, .15), transparent 65%);
+  }
+}
+
+.wave {
+  position: absolute;
+  left: 0;
+  top: -4px;
+  width: 200%;
+  height: 8px;
+  fill: var(--water-top);
+  animation: drift 5s linear infinite;
+}
+
+.waterline { fill: none; stroke: rgba(215, 255, 255, .86); stroke-width: .35; }
+
+.weekly {
+  position: absolute;
+  top: -1%;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 24px;
+  height: 9px;
+  padding: 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #67848b, #3b5965);
+  box-shadow: 0 .3px .6px rgba(15, 38, 48, .22), inset 0 0 0 .25px rgba(217, 247, 255, .8),
+    inset 0 0 .8px rgba(235, 253, 255, .36);
+  font-size: 6px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.value {
+  position: absolute;
+  top: 27.5%;
+  inset-inline: 10%;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -.4px;
+  text-align: center;
+  text-shadow: 0 .2px .8px rgba(5, 35, 45, .3);
+}
+
+.reset {
+  position: absolute;
+  top: 61.5%;
+  inset-inline: 14%;
+  display: grid;
+  justify-items: center;
+
+  // Match the shared reset label without carrying over its old dark capsule.
+  :global(.floating-bubble-reset) {
+    position: static;
+    max-width: 100%;
+    padding: 0;
+    border-radius: 0;
+    color: #f2fcff !important;
+    background: none;
+    box-shadow: none;
+    font: 500 7px/1 Manrope, "Segoe UI", sans-serif;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 .1px .3px rgba(4, 33, 48, .4);
+    gap: 1.5px;
+  }
+}
+
+:global(.floating-bubble.is-refreshing) .sphere { animation: refresh 1s ease-in-out infinite alternate; }
+:global(.floating-bubble.is-water-settling) .wave { animation-duration: 2s; }
+
+@keyframes drift { to { transform: translateX(-50%); } }
+@keyframes refresh { to { filter: brightness(1.15); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .wave, :global(.floating-bubble.is-refreshing) .sphere { animation: none; }
+  .liquid, .progress { transition: none; }
+}

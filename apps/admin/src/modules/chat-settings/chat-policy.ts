@@ -2,11 +2,12 @@
 export const CHAT_POLICY_FIELDS = {
   threadPageSize: { min: 1, max: 100, default: 50 },
   historyPageSize: { min: 1, max: 100, default: 10 },
-  imageSourceMaxMb: { min: 1, max: 20, default: 20 },
-  imageMaxEdge: { min: 256, max: 4096, default: 2048 },
-  imageTargetKb: { min: 32, max: 2048, default: 512 },
+  imageSourceMaxMb: { min: 1, max: undefined, default: 20 },
+  imageMaxEdge: { min: 256, max: undefined, default: 2048 },
+  imageTargetKb: { min: 32, max: undefined, default: 512 },
   filePreviewMaxMb: { min: 1, max: 2, default: 2 },
-  imagePreviewMaxMb: { min: 1, max: 20, default: 20 },
+  imagePreviewMaxMb: { min: 1, max: undefined, default: 20 },
+  videoPreviewMaxMb: { min: 1, max: undefined, default: 100 },
   fileDownloadMaxMb: { min: 1, max: 20, default: 20 },
 } as const;
 
@@ -20,8 +21,10 @@ export function parseChatPolicy(value: unknown): ChatPolicy {
   const policy = { ...DEFAULT_CHAT_POLICY };
   for (const key of Object.keys(CHAT_POLICY_FIELDS) as (keyof ChatPolicy)[]) {
     const field = CHAT_POLICY_FIELDS[key];
-    const number = record[key];
-    if (typeof number !== 'number' || !Number.isSafeInteger(number) || number < field.min || number > field.max) {
+    // Previously saved policies and older coordinators predate video playback.
+    const number = key === 'videoPreviewMaxMb' && record[key] === undefined ? field.default : record[key];
+    if (typeof number !== 'number' || !Number.isSafeInteger(number) || number < field.min
+      || (field.max !== undefined && number > field.max)) {
       throw new Error('请在允许范围内填写整数。');
     }
     policy[key] = number;

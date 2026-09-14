@@ -13,6 +13,16 @@ export function base64Bytes(data: string) {
   const encoded = data.slice(data.indexOf(',') + 1);
   return Math.floor(encoded.length * 3 / 4) - (encoded.endsWith('==') ? 2 : Number(encoded.endsWith('=')));
 }
+/** Saturate only at JavaScript's exact byte-offset range, without a product size cap. */
+export function videoByteLimit() {
+  return Math.min(Number.MAX_SAFE_INTEGER, current.videoPreviewMaxMb * MIB);
+}
+export function imagePreviewByteLimit() {
+  return Math.min(Number.MAX_SAFE_INTEGER, current.imagePreviewMaxMb * MIB);
+}
+export function imagePreviewCharLimit() {
+  return Math.min(Number.MAX_SAFE_INTEGER, Math.ceil(imagePreviewByteLimit() / 3) * 4 + 64);
+}
 export class DownloadPolicyError extends Error {}
 export function checkDownloadSize(bytes: number) {
   if (bytes > current.fileDownloadMaxMb * MIB) {

@@ -18,6 +18,15 @@ React Native（Expo）移动端，用已登录的 Codex Switch 云端账号查�
 右下角保存按钮将原图写入系统相册，Android 10 及以上无需读取相册权限，iOS 和旧 Android 按需请求保存权限。
 新增的图片、方向感应和相册模块需要重新构建并安装 APK，单独更新 JS 不会生效。
 
+聊天中的 MP4、M4V、MOV 和 WebM 文件链接可在应用内播放，具体编码支持取决于手机。
+播放器支持暂停、拖动进度和横竖屏切换；视频通过现有加密连接按需读取，每块最多 256 KiB，
+关闭预览或应用进入后台会释放播放连接。电脑只允许读取当前聊天项目内的视频。
+管理后台“聊天设置 → 视频播放上限（MB）”默认 100 MB，可填写任意正整数，不设置业务上限；
+已保存的旧设置会补入默认值，后续视频读取使用最新设置。
+该功能需要配套更新桌面端与管理后台，并重新构建移动端安装包以注册 TCP socket 模块。
+Android 视频回归入口为 `apps/desktop/e2e/android-video-preview.mjs`，使用现有本地 mobile fixture
+和设置了 `ANDROID_CHAT_DISPOSABLE=1` 的只读模拟器；测试视频是仓库自制的 10 秒动画。
+
 `expo-file-system` 必须保留为 native 工作区的直接依赖。仅由 `expo` 间接安装时，原生自动链接可能
 漏掉它，导致相册和相机返回照片时出现 `AppDirectories not found`。`npm test -w @codex-switch/native`
 会检查生成的 Android 模块注册列表，确认文件和图片服务均已注册。

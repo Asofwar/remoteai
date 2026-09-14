@@ -15,7 +15,7 @@ use super::{
     protocol::{thread_params, GuiResponse},
 };
 
-const MAX_IMAGE_BYTES: u64 = 20 * 1024 * 1024;
+const DEFAULT_IMAGE_BYTES: u64 = 20 * 1024 * 1024;
 const MAX_SOURCE_LENGTH: usize = 4096;
 
 pub(super) struct PreviewOptions {
@@ -24,10 +24,7 @@ pub(super) struct PreviewOptions {
 }
 
 fn render_limited(source: String, options: PreviewOptions) -> Result<String> {
-    let limit = options
-        .max_bytes
-        .unwrap_or(MAX_IMAGE_BYTES)
-        .clamp(1, MAX_IMAGE_BYTES);
+    let limit = options.max_bytes.unwrap_or(DEFAULT_IMAGE_BYTES).max(1);
     let encoded = source.split_once(',').ok_or(GuiError::ImagePreview)?.1;
     let padding = encoded
         .chars()
@@ -47,15 +44,16 @@ pub(super) async fn preview(
     options: PreviewOptions,
 ) -> Result<GuiResponse> {
     uuid::Uuid::parse_str(&thread_id).map_err(|_| GuiError::InvalidRequest)?;
+    let limit = options.max_bytes.unwrap_or(DEFAULT_IMAGE_BYTES).max(1);
     let source = if source.starts_with("https://") || source.starts_with("http://") {
-        super::image_download::download(&source).await?
+        super::image_download::download(&source, limit).await?
     } else {
         source
     };
     if source.starts_with("data:image/") {
         // Inline bytes grant no filesystem access; use the same input validation as attachments.
         let data = tauri::async_runtime::spawn_blocking(move || {
-            super::images::input(source.clone())?;
+            super::images::input_limited(source.clone(), limit)?;
             render_limited(source, options)
         })
         .await
@@ -75,7 +73,15 @@ pub(super) async fn preview(
     let generated = client.home.join("generated_images").join(thread_id);
     let data = tauri::async_runtime::spawn_blocking(move || {
         let references = image_references(&response["thread"]);
-        let original = read_image(&source, &workspace, &generated, &references)?;
+        let original = read_image(
+            &source,
+            &workspace,
+            ReadOptions {
+                generated: &generated,
+                references: &references,
+                max_bytes: limit,
+            },
+        )?;
         render_limited(original, options)
     })
     .await
@@ -158,20 +164,21 @@ fn matches_reference(path: &Path, workspace: &Path, references: &[&str]) -> bool
     })
 }
 
-fn read_image(
-    source: &str,
-    workspace: &Path,
-    generated: &Path,
-    references: &[&str],
-) -> Result<String> {
+struct ReadOptions<'a> {
+    generated: &'a Path,
+    references: &'a [&'a str],
+    max_bytes: u64,
+}
+
+fn read_image(source: &str, workspace: &Path, options: ReadOptions<'_>) -> Result<String> {
     let source = source_path(source)?;
     let path = workspace
         .join(source)
         .canonicalize()
         .map_err(|_| GuiError::ImagePreview)?;
     if !within(&path, workspace)
-        && !within(&path, generated)
-        && !matches_reference(&path, workspace, references)
+        && !within(&path, options.generated)
+        && !matches_reference(&path, workspace, options.references)
     {
         return Err(GuiError::ImagePreview);
     }
@@ -183,20 +190,20 @@ fn read_image(
     if !["png", "jpg", "jpeg", "webp", "gif"].contains(&extension.as_str()) {
         return Err(GuiError::ImagePreview);
     }
-    encode_image(&path)
+    encode_image(&path, options.max_bytes)
 }
 
-fn encode_image(path: &Path) -> Result<String> {
+fn encode_image(path: &Path, max_bytes: u64) -> Result<String> {
     let file = File::open(path).map_err(|_| GuiError::ImagePreview)?;
     let metadata = file.metadata().map_err(|_| GuiError::ImagePreview)?;
-    if !metadata.is_file() || metadata.len() == 0 || metadata.len() > MAX_IMAGE_BYTES {
+    if !metadata.is_file() || metadata.len() == 0 || metadata.len() > max_bytes {
         return Err(GuiError::ImagePreview);
     }
     let mut bytes = Vec::new();
-    file.take(MAX_IMAGE_BYTES + 1)
+    file.take(max_bytes.saturating_add(1))
         .read_to_end(&mut bytes)
         .map_err(|_| GuiError::ImagePreview)?;
-    if bytes.len() as u64 > MAX_IMAGE_BYTES {
+    if bytes.len() as u64 > max_bytes {
         return Err(GuiError::ImagePreview);
     }
     let mime = match image::guess_format(&bytes).map_err(|_| GuiError::ImagePreview)? {

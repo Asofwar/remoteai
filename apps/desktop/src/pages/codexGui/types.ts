@@ -189,6 +189,7 @@ export type ApprovalReply = {
   answers?: Record<string, { answers: string[] }>;
 };
 export type Request =
+  | import("../../../../../shared/remote-chat/video").VideoRequest
   | { operation: "textPreview"; threadId: string; path: string; maxBytes?: number }
   | ({ operation: "projectFiles" } & import('../../../../../shared/remote-chat/projectFiles').ProjectFilesRequest)
   | { operation: "projectDirectories"; directory: string }

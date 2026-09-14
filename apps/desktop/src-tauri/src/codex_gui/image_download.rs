@@ -6,8 +6,6 @@ use reqwest::redirect::Policy;
 
 use super::error::{GuiError, Result};
 
-const MAX_IMAGE_BYTES: usize = 20 * 1024 * 1024;
-
 fn public_address(address: IpAddr) -> bool {
     match address {
         IpAddr::V4(ip) => {
@@ -36,7 +34,7 @@ fn public_address(address: IpAddr) -> bool {
     }
 }
 
-pub(super) async fn download(source: &str) -> Result<String> {
+pub(super) async fn download(source: &str, max_bytes: u64) -> Result<String> {
     let url = url::Url::parse(source).map_err(|_| GuiError::ImagePreview)?;
     if source.len() > 4096
         || !["http", "https"].contains(&url.scheme())
@@ -75,20 +73,20 @@ pub(super) async fn download(source: &str) -> Result<String> {
         .send()
         .await
         .map_err(|_| GuiError::ImagePreview)?;
-    encode_response(response).await
+    encode_response(response, max_bytes).await
 }
 
-async fn encode_response(mut response: reqwest::Response) -> Result<String> {
+async fn encode_response(mut response: reqwest::Response, max_bytes: u64) -> Result<String> {
     if !response.status().is_success()
         || response
             .content_length()
-            .is_some_and(|size| size > MAX_IMAGE_BYTES as u64)
+            .is_some_and(|size| size > max_bytes)
     {
         return Err(GuiError::ImagePreview);
     }
     let mut bytes = Vec::new();
     while let Some(chunk) = response.chunk().await.map_err(|_| GuiError::ImagePreview)? {
-        if bytes.len() + chunk.len() > MAX_IMAGE_BYTES {
+        if bytes.len().saturating_add(chunk.len()) as u64 > max_bytes {
             return Err(GuiError::ImagePreview);
         }
         bytes.extend_from_slice(&chunk);

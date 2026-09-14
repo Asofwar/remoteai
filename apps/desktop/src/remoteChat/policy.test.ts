@@ -66,3 +66,11 @@ it('counts base64 padding accurately and applies new download limits at the time
   expect(() => checkDownloadSize(MIB)).not.toThrow();
   expect(() => checkDownloadSize(MIB + 1)).toThrow('1 MB');
 });
+
+it('compresses large configured targets enough to fit the transport without changing the policy', async () => {
+  const policy = { ...DEFAULT_CHAT_POLICY, imageTargetKb: 1000000 };
+  const encode = vi.fn(async (_edge: number, quality: number) => ({ value: quality,
+    bytes: quality > 0.5 ? 5 * MIB : MIB }));
+  expect(await compressChatImage(encode, policy, 2 * MIB)).toBe(0.5);
+  expect(policy.imageTargetKb).toBe(1000000);
+});

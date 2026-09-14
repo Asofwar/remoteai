@@ -35,6 +35,7 @@ mod tests;
 mod text_preview;
 pub(crate) mod undo;
 pub(crate) mod usage;
+mod video_stream;
 pub(crate) mod web;
 mod workspaces;
 
@@ -52,6 +53,7 @@ use protocol::{ApprovalReply, GuiEvent, GuiRequest, GuiResponse};
 #[derive(Default)]
 pub(crate) struct GuiState {
     client: Mutex<Option<Arc<Client>>>,
+    videos: Arc<video_stream::VideoStreams>,
 }
 
 async fn prepare_paths(app: AppHandle) -> Result<(PathBuf, PathBuf)> {
@@ -134,6 +136,14 @@ pub(crate) async fn codex_gui_request(
 /// Share request validation and typed failures with background GUI operations.
 async fn execute_request(state: &GuiState, request: GuiRequest) -> Result<GuiResponse> {
     let client = connected(state).await?;
+    match request {
+        GuiRequest::VideoOpen(options) => {
+            return Arc::clone(&state.videos).open(&client, options).await
+        }
+        GuiRequest::VideoRead(options) => return Arc::clone(&state.videos).read(options).await,
+        GuiRequest::VideoClose(options) => return Arc::clone(&state.videos).close(options).await,
+        _ => {}
+    }
     if let GuiRequest::TextPreview {
         thread_id,
         path,

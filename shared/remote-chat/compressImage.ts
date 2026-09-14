@@ -8,12 +8,15 @@ export class ImagePolicyError extends Error {}
 export async function compressChatImage<T>(
   encode: (edge: number, quality: number) => Promise<{ value: T; bytes: number }>,
   policy: ChatPolicy = getChatPolicy(),
+  transportBytes = Infinity,
 ): Promise<T> {
+  // A larger configured target must still fit a single chat message.
+  const targetBytes = Math.min(policy.imageTargetKb * KIB, transportBytes);
   let edge = policy.imageMaxEdge;
   while (edge >= MIN_EDGE) {
     for (const quality of QUALITIES) {
       const result = await encode(edge, quality);
-      if (result.bytes <= policy.imageTargetKb * KIB) return result.value;
+      if (result.bytes <= targetBytes) return result.value;
     }
     edge = Math.floor(edge / 2);
   }

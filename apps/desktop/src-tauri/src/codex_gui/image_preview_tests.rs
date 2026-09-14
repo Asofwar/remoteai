@@ -36,8 +36,11 @@ impl Fixture {
         read_image(
             source,
             &self.0.join("workspace"),
-            &self.0.join("generated"),
-            references,
+            ReadOptions {
+                generated: &self.0.join("generated"),
+                references,
+                max_bytes: DEFAULT_IMAGE_BYTES,
+            },
         )
     }
 }
@@ -136,7 +139,7 @@ fn rejects_non_images_empty_files_directories_and_oversized_files() {
     std::fs::create_dir(fixture.0.join("workspace/directory.png")).unwrap();
     File::create(fixture.0.join("workspace/large.png"))
         .unwrap()
-        .set_len(MAX_IMAGE_BYTES + 1)
+        .set_len(DEFAULT_IMAGE_BYTES + 1)
         .unwrap();
     for source in [
         "fake.png",
@@ -159,4 +162,25 @@ fn rejects_symlinks_outside_the_allowed_directories() {
     let outside = fixture.write_image("outside/secret.png");
     std::os::unix::fs::symlink(outside, fixture.0.join("workspace/link.png")).unwrap();
     assert!(fixture.read("link.png").is_err());
+}
+
+#[test]
+fn configured_image_limit_can_exceed_the_previous_twenty_megabyte_cap() {
+    let fixture = Fixture::new();
+    let path = fixture.write_image("workspace/large.png");
+    let size = DEFAULT_IMAGE_BYTES + 1;
+    File::options()
+        .write(true)
+        .open(&path)
+        .unwrap()
+        .set_len(size)
+        .unwrap();
+    assert!(encode_image(&path, DEFAULT_IMAGE_BYTES).is_err());
+    let original = encode_image(&path, size).unwrap();
+    super::super::images::input_limited(original.clone(), size).unwrap();
+    let options = PreviewOptions {
+        variant: super::super::image_thumbnail::ImageVariant::Original,
+        max_bytes: Some(size),
+    };
+    assert_eq!(render_limited(original.clone(), options).unwrap(), original);
 }

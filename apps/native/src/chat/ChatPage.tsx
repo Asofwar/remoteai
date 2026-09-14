@@ -145,7 +145,7 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
     <ChatImageContext.Provider value={{ threadId: state.selected?.id ?? null, ready, load: controller.imagePreview }}>
       <ChatImagePreviewProvider key={state.selected?.id ?? 'new'}>
       <ChatFileProvider key={state.selected?.id ?? 'new'} threadId={state.selected?.id ?? null}
-        ready={ready} load={controller.textPreview}>
+        ready={ready} load={controller.textPreview} videos={controller.videos}>
       <ChatMessages key={state.selected?.id ?? 'new'} thread={state.selected}
         loading={state.historyLoading} loadingMore={state.historyLoadingMore} hasMore={state.historyHasMore}
         loadOlder={() => controller.loadOlder()} />

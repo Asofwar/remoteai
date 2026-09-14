@@ -1,4 +1,4 @@
-import { ChatImageError, draftImage, MAX_CHAT_IMAGES,
+import { ChatImageError, draftImage, MAX_CHAT_IMAGES, MAX_CHAT_IMAGE_CHARS,
   validateChatImages, type DraftImage } from '../../../../shared/remote-chat/attachments';
 
 import { base64Bytes, getChatPolicy, MIB } from '../../../../shared/remote-chat/policy';
@@ -17,7 +17,7 @@ async function prepareImage(file: File) {
     const image = new Image();
     image.src = url;
     await image.decode();
-    return await compressChatImage(async (edge, quality) => {
+    const compressed = await compressChatImage(async (edge, quality) => {
       const scale = Math.min(1, edge / Math.max(image.naturalWidth, image.naturalHeight));
       const canvas = document.createElement('canvas');
       canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
@@ -28,8 +28,9 @@ async function prepareImage(file: File) {
       context.fillRect(0, 0, canvas.width, canvas.height);
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       const url = canvas.toDataURL('image/jpeg', quality);
-      return { value: draftImage(url), bytes: base64Bytes(url) };
-    }, policy);
+      return { value: url, bytes: base64Bytes(url) };
+    }, policy, Math.floor((MAX_CHAT_IMAGE_CHARS - 'data:image/jpeg;base64,'.length) / 4) * 3);
+    return draftImage(compressed);
   } catch (error) {
     if (error instanceof ChatImageError || error instanceof ImagePolicyError) throw new ChatImageError(error.message);
     throw new ChatImageError('这张图片暂时无法读取，请换一张 JPG 或 PNG 图片。');

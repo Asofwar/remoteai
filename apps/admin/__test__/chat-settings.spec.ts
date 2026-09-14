@@ -28,9 +28,27 @@ describe('chat settings', () => {
     expect(await service.read()).toEqual(policy);
     expect(save).toHaveBeenCalledTimes(2);
     expect(save.mock.calls[1][1]).toMatchObject({ actorId: actor.id, metadata: policy });
-    await expect(service.update(actor, { ...policy, imageSourceMaxMb: 500 })).rejects.toThrow();
+    await expect(service.update(actor, { ...policy, imageSourceMaxMb: 0 })).rejects.toThrow();
     expect(save).toHaveBeenCalledTimes(2);
   });
+
+  it('accepts positive video limits without an upper cap and defaults older saved settings', () => {
+    const { videoPreviewMaxMb: _video, ...previous } = DEFAULT_CHAT_POLICY;
+    expect(parseChatPolicy(previous).videoPreviewMaxMb).toBe(100);
+    for (const limit of [1, 2048, 1000000]) {
+      expect(parseChatPolicy({ ...DEFAULT_CHAT_POLICY, videoPreviewMaxMb: limit }).videoPreviewMaxMb).toBe(limit);
+    }
+    for (const limit of [0, -1, 0.5, Infinity, '100', Number.MAX_SAFE_INTEGER + 1]) {
+      expect(() => parseChatPolicy({ ...DEFAULT_CHAT_POLICY, videoPreviewMaxMb: limit })).toThrow();
+    }
+  });
+
+  it.each(['imageSourceMaxMb', 'imagePreviewMaxMb', 'imageMaxEdge', 'imageTargetKb'] as const)(
+    'accepts large image settings without an upper cap: %s', (key) => {
+      for (const value of [1000000, Number.MAX_SAFE_INTEGER]) {
+        expect(parseChatPolicy({ ...DEFAULT_CHAT_POLICY, [key]: value })[key]).toBe(value);
+      }
+    });
 
   it('requires distinct read and manage permissions', () => {
     expect(Reflect.getMetadata(REQUIRED_PERMISSIONS, ChatSettingsController.prototype.read))

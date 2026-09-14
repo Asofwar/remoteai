@@ -1,10 +1,10 @@
-import { getChatPolicy } from '../policy';
+import { getChatPolicy, imagePreviewCharLimit } from '../policy';
 import { contentHash } from '../historySync';
 
 type ImageRequest = { operation: 'imagePreview' | 'imageChunk'; threadId: string; source: string; offset?: number };
 interface ImageChunk { data: string; total: number; hash: string }
 const CACHE_CHARS = 32 * 1024 * 1024;
-const MAX_ORIGINAL_CHARS = 28 * 1024 * 1024;
+const CHUNK_CHARS = 256 * 1024;
 
 export class ImageCache {
   private readonly cached = new Map<string, string>();
@@ -40,7 +40,9 @@ export class ImageCache {
     let hash = '';
     while (url.length < total) {
       const chunk = await this.request<ImageChunk>({ operation: 'imageChunk', threadId, source, offset: url.length });
-      if (!Number.isSafeInteger(chunk.total) || chunk.total <= 0 || chunk.total > MAX_ORIGINAL_CHARS
+      if (typeof chunk.data !== 'string' || chunk.data.length > CHUNK_CHARS
+        || url.length + chunk.data.length > chunk.total || !Number.isSafeInteger(chunk.total)
+        || chunk.total <= 0 || chunk.total > imagePreviewCharLimit()
         || !chunk.data || (hash && (chunk.hash !== hash || chunk.total !== total))) {
         throw new Error('原图加载中断，请重试。');
       }

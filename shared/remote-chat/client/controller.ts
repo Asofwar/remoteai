@@ -471,6 +471,12 @@ export class ChatController {
 
   imagePreview = (threadId: string, source: string, original = false) => this.images.load(threadId, source, original);
 
+  videos: import('../video').VideoClient = {
+    open: (threadId, path) => this.connection.request('request', { operation: 'videoOpen', threadId, path }),
+    read: (request) => this.connection.request('request', { operation: 'videoRead', ...request }),
+    close: (threadId, id) => this.connection.request('request', { operation: 'videoClose', threadId, id }),
+  };
+
   textPreview = (threadId: string, path: string) =>
     this.connection.request<import('../textPreview').TextPreview>('request', { operation: 'textPreview', threadId, path });
 

@@ -1,4 +1,4 @@
-import { getChatPolicy, MIB } from '../../../../shared/remote-chat/policy';
+import { getChatPolicy, MIB, videoByteLimit } from '../../../../shared/remote-chat/policy';
 import { guiApi } from '../pages/codexGui/api';
 import type { ApprovalReply, GuiEvent, ListResponse, Request, SkillsResponse, Thread } from '../pages/codexGui/types';
 import { object, type RpcRequest, type RpcResponse } from '../../../../shared/remote-chat/protocol';
@@ -22,6 +22,7 @@ import { TOKEN_SUMMARY_OPERATION } from '../../../../shared/remote-chat/tokenSum
 import { readTokenSummary } from './tokenSummary';
 
 const OPERATIONS = new Set([
+  'videoOpen', 'videoRead', 'videoClose',
   'projectDirectories',
   'models', 'list', 'read', 'start', 'resume', 'send', 'steer', 'interrupt', 'rename', 'archive', 'unarchive',
   'compact', 'skills', 'projectFiles', 'imagePreview', 'textPreview', 'goalGet', 'goalSet', 'goalClear',
@@ -34,6 +35,7 @@ const READ_OPERATIONS = new Set([
   TOKEN_SUMMARY_OPERATION,
   'usageSummary',
   'projectDirectories',
+  'videoOpen', 'videoRead', 'videoClose',
   'textPreview',
   'guiAccountsRead', 'syncHistory', 'imageChunk', 'imagePreview', 'models', 'list', 'read', 'goalGet', 'skills', 'projectFiles', 'queueRead',
 ]);
@@ -73,7 +75,11 @@ export class ChatOperations {
     const readOnly = request.method === 'request' && READ_OPERATIONS.has(operation ?? '');
     const entry: Cached = { fingerprint, result, expires: Date.now() + CACHE_TTL_MS, completed: false, readOnly };
     this.cache.set(request.id, entry);
-    void result.then(() => { entry.completed = true; });
+    void result.then(() => {
+      entry.completed = true;
+      // Video reads are repeatable; retaining their payloads would buffer an entire video in the retry cache.
+      if (operation === 'videoRead') this.cache.delete(request.id);
+    });
     return result;
   }
 
@@ -119,6 +125,9 @@ export class ChatOperations {
     const sidebarVersion = guiSidebar.version();
     if (body.operation === 'list') body.limit = getChatPolicy().threadPageSize;
     if (body.operation === 'textPreview') body.maxBytes = getChatPolicy().filePreviewMaxMb * MIB;
+    if (body.operation === 'videoOpen' || body.operation === 'videoRead') {
+      body.maxBytes = videoByteLimit();
+    }
     const result = await guiApi.request(body as unknown as Request);
     if (body.operation === 'skills') return composerCatalog(result as SkillsResponse, body);
     if (body.operation === 'list') {

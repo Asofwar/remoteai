@@ -19,6 +19,9 @@ const MAX_PAGE_SIZE: u32 = 100;
     rename_all_fields = "camelCase"
 )]
 pub(crate) enum GuiRequest {
+    VideoOpen(super::video_stream::VideoOpen),
+    VideoRead(super::video_stream::VideoRead),
+    VideoClose(super::video_stream::VideoClose),
     TextPreview {
         thread_id: String,
         path: String,
@@ -195,6 +198,9 @@ impl GuiRequest {
     // Only this closed set of methods is exposed to the WebView.
     pub(super) fn into_rpc(self) -> Result<(&'static str, Value)> {
         match self {
+            Self::VideoOpen(_) | Self::VideoRead(_) | Self::VideoClose(_) => {
+                Err(GuiError::InvalidRequest)
+            }
             Self::ProjectFiles(_) => Err(GuiError::InvalidRequest),
             Self::ProjectDirectories { .. } => Err(GuiError::InvalidRequest),
             Self::TextPreview { .. } => Err(GuiError::InvalidRequest),

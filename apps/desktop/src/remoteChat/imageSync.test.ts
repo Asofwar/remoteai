@@ -3,9 +3,10 @@ import { RemoteImages } from './images';
 import { guiApi } from '../pages/codexGui/api';
 import { ImageCache } from '../../../../shared/remote-chat/client/imageCache';
 import { contentHash } from '../../../../shared/remote-chat/historySync';
+import { DEFAULT_CHAT_POLICY, MIB, setChatPolicy } from '../../../../shared/remote-chat/policy';
 
 vi.mock('../pages/codexGui/api', () => ({ guiApi: { request: vi.fn() } }));
-beforeEach(() => vi.resetAllMocks());
+beforeEach(() => { vi.resetAllMocks(); setChatPolicy(DEFAULT_CHAT_POLICY); });
 
 it('replaces inline and generated originals with stable references scoped to the task', async () => {
   const images = new RemoteImages();
@@ -51,4 +52,31 @@ it('rejects original chunks from a changed source', async () => {
     ? { data: 'prefix', total: 100, hash: contentHash('first') }
     : { data: 'changed', total: 100, hash: contentHash('second') }) as T);
   await expect(cache.load('task', 'image.png', true)).rejects.toThrow('原图加载中断');
+});
+
+it('allows originals above the former cap and retains the active original across chunk requests', async () => {
+  setChatPolicy({ ...DEFAULT_CHAT_POLICY, imagePreviewMaxMb: 64 });
+  const original = 'data:image/png;base64,' + 'abcd'.repeat(17 * MIB);
+  const images = new RemoteImages();
+  vi.mocked(guiApi.request).mockResolvedValue({ url: original });
+  const body = { operation: 'imageChunk', threadId: 'task', source: 'large.png' };
+  const first = await images.request(body);
+  expect(first).toMatchObject({ total: original.length });
+  await images.request({ ...body, offset: 256 * 1024 });
+  expect(guiApi.request).toHaveBeenCalledTimes(1);
+  setChatPolicy({ ...DEFAULT_CHAT_POLICY, imagePreviewMaxMb: 20 });
+  await expect(images.request(body)).rejects.toThrow();
+});
+
+it('loads an original above 20 MB using the configured limit and rejects it after the limit decreases', async () => {
+  setChatPolicy({ ...DEFAULT_CHAT_POLICY, imagePreviewMaxMb: 32 });
+  const original = 'data:image/png;base64,' + 'abcd'.repeat(8 * MIB);
+  const hash = contentHash(original);
+  const cache = new ImageCache(async <T>(body: { offset?: number }) => {
+    const offset = body.offset ?? 0;
+    return { data: original.slice(offset, offset + 256 * 1024), total: original.length, hash } as T;
+  });
+  expect(await cache.load('task', 'large.png', true)).toBe(original);
+  setChatPolicy({ ...DEFAULT_CHAT_POLICY, imagePreviewMaxMb: 20 });
+  await expect(cache.load('task', 'large.png', true)).rejects.toThrow('原图加载中断');
 });

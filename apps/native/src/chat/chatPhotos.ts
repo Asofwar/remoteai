@@ -48,7 +48,7 @@ export async function preparePhoto(asset: ImagePicker.ImagePickerAsset): Promise
     if (!photo.base64) throw new ImagePolicyError('照片读取失败，请重新选择。');
     const value = { id: photo.uri, uri: photo.uri, dataUrl: `data:image/jpeg;base64,${photo.base64}` };
     return { value, bytes: base64Bytes(value.dataUrl) };
-  }, policy);
+  }, policy, Math.floor((MAX_PHOTO_DATA_CHARS - 'data:image/jpeg;base64,'.length) / 4) * 3);
 }
 
 export function validatePhotos(photos: ChatPhoto[]) {

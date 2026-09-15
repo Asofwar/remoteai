@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ChatConnection } from '../../../../shared/remote-chat/client/connection';
 import type { LinkOptions } from '../../../../shared/remote-chat/linkOptions';
 import type { RpcMessage } from '../../../../shared/remote-chat/protocol';
+import { getChatPolicy, DEFAULT_CHAT_POLICY } from '../../../../shared/remote-chat/policy';
 
 const state = vi.hoisted(() => ({ options: undefined as LinkOptions | undefined,
   send: vi.fn(async (_message: RpcMessage) => undefined), relay: vi.fn(), close: vi.fn() }));
@@ -47,6 +48,15 @@ beforeEach(async () => {
   state.options!.mode('direct');
 });
 afterEach(() => { connection.stop(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+it('updates client transfer allowances before mode notifications and restores them on stop', () => {
+  expect(getChatPolicy().fileUploadMaxMb).toBe(Number.MAX_SAFE_INTEGER);
+  state.options!.mode('relay');
+  expect(getChatPolicy().fileUploadMaxMb).toBe(DEFAULT_CHAT_POLICY.fileUploadMaxMb);
+  state.options!.mode('direct');
+  connection.stop();
+  expect(getChatPolicy().fileUploadMaxMb).toBe(DEFAULT_CHAT_POLICY.fileUploadMaxMb);
+});
 
 it('retains pending requests, readiness and the same session while resuming a failed coordinator socket', async () => {
   const pending = connection.request('request', { operation: 'send', text: 'once' });

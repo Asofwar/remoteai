@@ -1,4 +1,5 @@
 import { invoke as invokeTauri } from "@tauri-apps/api/core";
+import { hasDirectChatInput } from "../../../../shared/remote-chat/uploadMode";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { exit as exitApp, relaunch } from "@tauri-apps/plugin-process";
@@ -188,6 +189,8 @@ export async function invoke<T = void>(command: string, args: Record<string, unk
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
+      ...(command === 'codex_gui_request' && hasDirectChatInput(args.request)
+        ? { "X-Codex-Chat-Transfer": "direct" } : {}),
       ...(apiKey ? { "X-API-Key": apiKey } : {}),
     },
     cache: "no-store",

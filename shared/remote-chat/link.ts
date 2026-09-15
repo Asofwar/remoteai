@@ -19,6 +19,7 @@ class LegacyChatLink {
   private relay = false;
   private closed = false;
   private readonly outgoing = new SendQueue({ capacity: () => this.waitForCapacity(),
+    mode: () => this.mode,
     send: (part) => {
       if (!this.cipher) throw new Error('正在连接电脑。');
       const payload = this.cipher.encrypt(part);
@@ -44,6 +45,8 @@ class LegacyChatLink {
   async offer() {
     try { await this.peer?.offer(); } catch { this.fallback(); }
   }
+
+  get connectionMode() { return this.mode; }
 
   private signal(message: object) {
     if (!this.closed) this.options.signal({ ...message, sessionId: this.options.sessionId });
@@ -111,7 +114,7 @@ class LegacyChatLink {
     try {
       const text = this.cipher.decrypt(payload);
       if (text === null) return;
-      const message = this.assembler.accept(text);
+      const message = this.assembler.accept(text, this.mode);
       if (message) this.options.message(message);
     } catch {
       this.options.error('连接校验失败，请重新连接电脑。');
@@ -155,6 +158,7 @@ export class ChatLink {
     this.implementation = options.transportVersion === 2 ? new HotLink(options) : new LegacyChatLink(options);
   }
   get resumable() { return this.implementation instanceof HotLink && this.implementation.resumable; }
+  get connectionMode() { return this.implementation.connectionMode; }
   offer() { return this.implementation.offer(); }
   acceptSignal(signal: Signal) { return this.implementation.acceptSignal(signal); }
   enableRelay() { this.implementation.enableRelay(); }

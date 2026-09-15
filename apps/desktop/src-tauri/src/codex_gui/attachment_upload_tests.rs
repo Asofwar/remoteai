@@ -2,6 +2,52 @@ use super::*;
 use serde_json::json;
 
 #[test]
+fn p2p_uploads_bypass_size_caps_without_exempting_relay_messages_in_the_same_batch() {
+    let root = std::env::temp_dir().join(format!("csw-direct-upload-{}", uuid::Uuid::new_v4()));
+    fs::create_dir(&root).unwrap();
+    let root = root.canonicalize().unwrap();
+    let bytes = vec![1; 4 * 1024 * 1024];
+    let input = json!({"text": "", "images": [], "transferMode": "direct", "attachments": [{
+        "kind": "file", "name": "large.txt", "path": "", "data": STANDARD.encode(&bytes)
+    }]});
+    let mut relay = input.clone();
+    relay["transferMode"] = json!("relay");
+    let mut mixed = serde_json::from_value(json!({"operation": "sendBatch", "threadId": "unused",
+        "messages": [input.clone(), relay]}))
+    .unwrap();
+    assert!(prepare_request(&mut mixed, &root, UploadLimits::default()).is_err());
+    assert!(!root.join("attachments").exists());
+    let mut direct = serde_json::from_value(json!({"operation": "sendBatch", "threadId": "unused",
+        "messages": [input.clone(), input]}))
+    .unwrap();
+    prepare_request(&mut direct, &root, UploadLimits::default()).unwrap();
+    let GuiRequest::SendBatch { messages, .. } = direct else {
+        panic!("batch")
+    };
+    for message in messages {
+        let target = Path::new(&message.attachments[0].path)
+            .canonicalize()
+            .unwrap();
+        assert!(target.starts_with(&root));
+        assert_eq!(fs::read(target).unwrap(), bytes);
+    }
+    assert!(root.starts_with(std::env::temp_dir().canonicalize().unwrap()));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn p2p_uploads_still_reject_invalid_data() {
+    let root = std::env::temp_dir().join(format!("csw-direct-invalid-{}", uuid::Uuid::new_v4()));
+    let mut request = serde_json::from_value(json!({"operation": "send", "threadId": "unused",
+    "transferMode": "direct", "text": "", "images": [], "attachments": [{
+        "kind": "file", "name": "invalid.txt", "path": "", "data": "!invalid!"
+    }]}))
+    .unwrap();
+    assert!(prepare_request(&mut request, &root, UploadLimits::default()).is_err());
+    assert!(!root.exists());
+}
+
+#[test]
 fn phone_bytes_are_saved_inside_app_storage_and_not_forwarded_as_phone_paths() {
     let root = std::env::temp_dir().join(format!("csw-upload-test-{}", uuid::Uuid::new_v4()));
     fs::create_dir(&root).unwrap();

@@ -45,6 +45,40 @@ test.afterEach(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
+test('transfers large P2P messages in both directions while the UI heartbeat and other requests keep running',
+  async ({ context }) => {
+    const pc = await context.newPage();
+    const phone = await context.newPage();
+    await pc.goto(`/e2e/hot-chat-harness.html?role=desktop&socket=${encodeURIComponent(endpoint)}`);
+    await expect(pc.locator('#status')).toHaveText('registered');
+    await phone.goto(`/e2e/hot-chat-harness.html?role=mobile&socket=${encodeURIComponent(endpoint)}`);
+    await expect(phone.locator('#status')).toHaveText('direct', { timeout: 12_000 });
+    await expect(pc.locator('#status')).toHaveText('direct');
+    const before = await phone.evaluate(() => window.hotChat.stats().beats);
+    const size = 9 * 1024 * 1024;
+    const upload = phone.evaluate(async (length) => {
+      const result = await window.hotChat.request('x'.repeat(length)) as { text: string };
+      return result.text.length;
+    }, size);
+    const download = pc.evaluate((length) => window.hotChat.stream('y'.repeat(length)), size);
+    expect(await phone.evaluate(() => window.hotChat.request('still responsive')))
+      .toEqual({ text: 'still responsive' });
+    expect(await upload).toBe(size);
+    await download;
+    await expect.poll(() => phone.evaluate(() => (window.hotChat.events[0] as { text: string })?.text.length))
+      .toBe(size);
+    expect(await phone.evaluate(() => window.hotChat.stats().beats)).toBeGreaterThan(before + 1);
+    expect(await phone.evaluate(() => window.hotChat.errors)).toEqual([]);
+    expect(await pc.evaluate(() => window.hotChat.errors)).toEqual([]);
+    await phone.evaluate(() => window.hotChat.blockDirect(true));
+    await expect(phone.locator('#status')).toHaveText('relay', { timeout: 5000 });
+    const rejected = await phone.evaluate(async (length) => {
+      try { await window.hotChat.request('x'.repeat(length)); return false; } catch { return true; }
+    }, size);
+    expect(rejected).toBe(true);
+    expect(await phone.evaluate(() => window.hotChat.request('relay works'))).toEqual({ text: 'relay works' });
+  });
+
 test('keeps a real conversation alive through relay loss, coordinator restart and repeated P2P recovery',
   async ({ context }) => {
     test.setTimeout(75_000);

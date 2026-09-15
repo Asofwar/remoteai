@@ -34,13 +34,17 @@ export class HotLink {
   private readonly lastPong = { direct: 0, relay: 0 };
   private readonly probes = new Map<number, { path: Path; at: number }>();
   private readonly outgoing = new SendQueue({ capacity: () => this.capacity(),
+    mode: () => this.mode,
     send: (part) => this.delivery.enqueue(part) });
   private readonly capacityWaiters = new Set<() => void>();
 
   constructor(private readonly options: LinkOptions) {
     this.delivery = new ReliableDelivery({
       send: (frame) => this.selected ? this.transmit(this.selected, frame) : false,
-      accept: (text) => { const message = this.assembler.accept(text); if (message) options.message(message); },
+      accept: (text, mode) => {
+        const message = this.assembler.accept(text, mode);
+        if (message) options.message(message);
+      },
     });
     if (options.publicKey) this.setKey(options.publicKey);
     this.peer = new HotPeer({ ...options,
@@ -51,6 +55,7 @@ export class HotLink {
   }
 
   get resumable() { return !this.closed && Boolean(this.cipher); }
+  get connectionMode() { return this.mode; }
   offer() { return this.peer.offer(); }
 
   private setKey(key: string) {
@@ -115,7 +120,7 @@ export class HotLink {
         this.transmit(path, { kind: 'pong', id: frame.id });
       } else if (frame.kind === 'pong') this.pong(frame.id, path);
       else {
-        this.delivery.accept(frame, (ack) => { this.transmit(path, ack); });
+        this.delivery.accept(frame, (ack) => { this.transmit(path, ack); }, path);
         if (!this.delivery.full) this.releaseCapacity();
       }
     } catch { this.fail('连接校验失败，请重新连接电脑。'); }

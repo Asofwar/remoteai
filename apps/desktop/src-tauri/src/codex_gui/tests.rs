@@ -6,6 +6,29 @@ fn request(value: serde_json::Value) -> GuiRequest {
 }
 
 #[test]
+fn p2p_prompts_and_images_bypass_size_caps_but_keep_input_validation() {
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    let mut image = vec![0; 21 * 1024 * 1024];
+    image[..8].copy_from_slice(b"\x89PNG\r\n\x1a\n");
+    let url = format!("data:image/png;base64,{}", STANDARD.encode(image));
+    for (text, images) in [("x".repeat(300_000), vec![]), (String::new(), vec![url])] {
+        for operation in ["send", "steer"] {
+            let mut body = json!({"operation": operation, "threadId": "thread-1", "turnId": "turn-1",
+                "text": text, "images": images});
+            assert!(request(body.clone()).into_rpc().is_err());
+            body["transferMode"] = json!("direct");
+            assert!(request(body).into_rpc().is_ok());
+        }
+    }
+    assert!(request(
+        json!({"operation": "send", "threadId": "thread-1", "transferMode": "direct",
+        "text": "", "images": ["data:image/png;base64,invalid"]})
+    )
+    .into_rpc()
+    .is_err());
+}
+
+#[test]
 fn only_supported_operations_cross_the_boundary() {
     assert!(serde_json::from_value::<GuiRequest>(
         json!({"operation": "execute", "command": "whoami"})

@@ -1,4 +1,4 @@
-import { getChatPolicy, KIB, type ChatPolicy } from './policy';
+import { getChatPolicy, isDirectChat, KIB, type ChatPolicy } from './policy';
 
 const QUALITIES = [0.8, 0.65, 0.5];
 const MIN_EDGE = 128;
@@ -12,6 +12,9 @@ export async function compressChatImage<T>(
 ): Promise<T> {
   // A larger configured target must still fit a single chat message.
   const targetBytes = Math.min(policy.imageTargetKb * KIB, transportBytes);
+  if (isDirectChat()) {
+    return (await encode(policy.imageMaxEdge, 1)).value;
+  }
   let edge = policy.imageMaxEdge;
   while (edge >= MIN_EDGE) {
     for (const quality of QUALITIES) {

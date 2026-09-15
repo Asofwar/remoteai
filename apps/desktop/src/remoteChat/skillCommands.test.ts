@@ -55,10 +55,11 @@ it.each(['new', 'existing', 'running'])('delivers structured skill references to
   if (mode !== 'new') await controller.select(remote);
   const skills = [{ name: skill.name, path: skill.path }];
   expect(await controller.send({ text: '$review 检查', images: [], skills, access: 'workspace-write' })).toBe(true);
-  const destination = mode === 'new' ? guiApi.request : remoteQueue.request;
-  expect(destination).toHaveBeenCalledWith(expect.objectContaining({
+  const expected = expect.objectContaining({
     operation: mode === 'new' ? 'send' : 'queueEnqueue', skills,
-  }));
+  });
+  if (mode === 'new') expect(guiApi.request).toHaveBeenCalledWith(expected);
+  else expect(remoteQueue.request).toHaveBeenCalledWith(expected, 'relay');
 });
 
 it('resumes and checks the PC thread before compacting, and waits for completion before sending again', async () => {

@@ -1,4 +1,4 @@
-import { CHAT_POLICY_MESSAGE, setChatPolicy } from '../policy';
+import { CHAT_POLICY_MESSAGE, setChatConnectionMode, setChatPolicy } from '../policy';
 import { keyPair } from '../cipher';
 import { ChatLink } from '../link';
 import { ChatRpc } from '../rpc';
@@ -45,6 +45,7 @@ export class ChatConnection {
   start() {
     if (this.active) return;
     this.active = true;
+    setChatConnectionMode('connecting');
     void this.connect();
   }
 
@@ -175,6 +176,7 @@ export class ChatConnection {
       message: (message) => this.rpc?.receive(message), error: this.options.error,
       mode: (mode) => {
         if (!this.active) return;
+        setChatConnectionMode(mode);
         this.options.mode(mode);
         if (mode === 'offline') { if (this.link) this.disconnected(); return; }
         if (mode !== 'direct' && mode !== 'relay') return;
@@ -217,6 +219,7 @@ export class ChatConnection {
     this.rpc?.close();
     this.rpc = undefined;
     this.options.mode('offline');
+    setChatConnectionMode('offline');
     this.schedule();
   }
 

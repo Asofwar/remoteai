@@ -4,7 +4,7 @@ use super::{
     platform::execution_path,
     prompt::{AttachmentInput, AttachmentKind},
     protocol::GuiRequest,
-    upload_policy::UploadLimits,
+    upload_policy::{TransferMode, UploadLimits},
 };
 use base64::{engine::general_purpose::STANDARD, Engine};
 use std::{fs, io::Write, path::Path};
@@ -14,20 +14,12 @@ pub(super) fn prepare_request(
     root: &Path,
     limits: UploadLimits,
 ) -> Result<()> {
-    let attachments: Vec<&mut AttachmentInput> = match request {
-        GuiRequest::Send { attachments, .. } | GuiRequest::Steer { attachments, .. } => {
-            attachments.iter_mut().collect()
-        }
-        GuiRequest::SendBatch { messages, .. } => messages
-            .iter_mut()
-            .flat_map(|message| message.attachments.iter_mut())
-            .collect(),
-        _ => return Ok(()),
-    };
+    let attachments = request_attachments(request);
     // Bound the complete request before decoding or creating files.
     let total: usize = attachments
         .iter()
-        .filter_map(|item| item.data.as_ref())
+        .filter(|(_, mode)| !mode.is_direct())
+        .filter_map(|(item, _)| item.data.as_ref())
         .map(String::len)
         .fold(0usize, usize::saturating_add);
     if total > limits.encoded_total(attachments.len()) {
@@ -35,20 +27,56 @@ pub(super) fn prepare_request(
     }
     let uploads = attachments
         .into_iter()
-        .filter(|item| item.data.is_some())
-        .map(|item| decode(item, limits.file_bytes).map(|bytes| (item, bytes)))
+        .filter(|(item, _)| item.data.is_some())
+        .map(|(item, mode)| {
+            let max_bytes = if mode.is_direct() {
+                usize::MAX
+            } else {
+                limits.file_bytes
+            };
+            decode(item, max_bytes).map(|bytes| (item, bytes, mode))
+        })
         .collect::<Result<Vec<_>>>()?;
     let decoded_total = uploads
         .iter()
-        .map(|(_, bytes)| bytes.len())
+        .filter(|(_, _, mode)| !mode.is_direct())
+        .map(|(_, bytes, _)| bytes.len())
         .fold(0usize, usize::saturating_add);
     if decoded_total > limits.total_bytes {
         return Err(GuiError::Attachment);
     }
-    for (item, bytes) in uploads {
+    for (item, bytes, _) in uploads {
         save(item, &bytes, root)?;
     }
     Ok(())
+}
+
+fn request_attachments(request: &mut GuiRequest) -> Vec<(&mut AttachmentInput, TransferMode)> {
+    match request {
+        GuiRequest::Send {
+            attachments,
+            transfer_mode,
+            ..
+        }
+        | GuiRequest::Steer {
+            attachments,
+            transfer_mode,
+            ..
+        } => attachments
+            .iter_mut()
+            .map(|item| (item, *transfer_mode))
+            .collect(),
+        GuiRequest::SendBatch { messages, .. } => messages
+            .iter_mut()
+            .flat_map(|message| {
+                message
+                    .attachments
+                    .iter_mut()
+                    .map(|item| (item, message.transfer_mode))
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
 }
 
 fn decode(item: &AttachmentInput, max_bytes: usize) -> Result<Vec<u8>> {

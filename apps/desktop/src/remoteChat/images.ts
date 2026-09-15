@@ -3,6 +3,7 @@ import { guiApi } from '../pages/codexGui/api';
 import type { Thread } from '../pages/codexGui/types';
 import { contentHash } from '../../../../shared/remote-chat/historySync';
 import { isInlineImage } from '../../../../shared/chat/imageSources';
+import type { ConnectionMode } from '../../../../shared/remote-chat/protocol';
 
 const IMAGE_PREFIX = 'chat-image://';
 const CHUNK_CHARS = 256 * 1024;
@@ -62,8 +63,8 @@ export class RemoteImages {
     return original;
   }
 
-  private load(threadId: string, source: string, variant: 'thumbnail' | 'original') {
-    const maxBytes = imagePreviewByteLimit();
+  private load(threadId: string, source: string, variant: 'thumbnail' | 'original', mode: ConnectionMode) {
+    const maxBytes = imagePreviewByteLimit(mode);
     const key = JSON.stringify([threadId, source, variant, maxBytes]);
     const cached = this.images.get(key);
     if (cached) return Promise.resolve(cached);
@@ -72,7 +73,7 @@ export class RemoteImages {
     const request = this.resolve(threadId, source).then(async (resolved) => {
       const { url } = await guiApi.request<{ url: string }>({ operation: 'imagePreview', threadId,
         source: resolved, variant, maxBytes });
-      const limit = variant === 'thumbnail' ? 100_000 : imagePreviewCharLimit();
+      const limit = variant === 'thumbnail' ? 100_000 : imagePreviewCharLimit(mode);
       if (!isInlineImage(url) || url.length > limit) throw new Error('图片暂时无法加载，请重试。');
       this.images.set(key, url);
       this.trim(this.images);
@@ -82,12 +83,12 @@ export class RemoteImages {
     return request;
   }
 
-  async request(body: Record<string, unknown>) {
+  async request(body: Record<string, unknown>, mode: ConnectionMode = 'relay') {
     const { threadId, source, offset = 0 } = body;
     if (typeof threadId !== 'string' || typeof source !== 'string' || !Number.isSafeInteger(offset)
       || Number(offset) < 0) throw new Error('图片请求无效，请重试。');
     const original = body.operation === 'imageChunk';
-    const url = await this.load(threadId, source, original ? 'original' : 'thumbnail');
+    const url = await this.load(threadId, source, original ? 'original' : 'thumbnail', mode);
     if (!original) return { url };
     if (Number(offset) >= url.length) throw new Error('图片请求已失效，请重试。');
     const key = JSON.stringify([threadId, source]);

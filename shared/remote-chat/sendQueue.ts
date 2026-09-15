@@ -1,5 +1,5 @@
 import { chunks } from './framing';
-import type { RpcMessage } from './protocol';
+import type { ConnectionMode, RpcMessage } from './protocol';
 
 const MAX_QUEUED_MESSAGES = 512;
 // The receiver allows eight partial assemblies. Reserve one for ordered events/requests.
@@ -19,7 +19,9 @@ export class SendQueue {
   private running = false;
   private closed = false;
 
-  constructor(private readonly transport: { capacity: () => Promise<void>; send: (part: string) => void }) {}
+  constructor(private readonly transport: {
+    capacity: () => Promise<void>; send: (part: string) => void; mode?: () => ConnectionMode;
+  }) {}
 
   send(message: RpcMessage): Promise<void> {
     if (this.closed) return Promise.reject(new Error('电脑已断开连接。'));
@@ -28,7 +30,7 @@ export class SendQueue {
     }
     const result = new Promise<void>((resolve, reject) => {
       const queue = message.kind === 'response' ? this.responses : this.ordered;
-      queue.push({ parts: chunks(message, String(++this.serial)), resolve, reject });
+      queue.push({ parts: chunks(message, String(++this.serial), this.transport.mode?.()), resolve, reject });
     });
     if (!this.running) void this.drain();
     return result;

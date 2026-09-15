@@ -50,6 +50,10 @@ export function ChatSettingsPage({ api, canManage }: Props) {
         ? '统一管理手机 App 和网页的聊天设置，保存后会自动同步到已连接的设备。'
         : 'Manage chat settings for the mobile app and web. Changes sync to connected devices.'}
       </Typography.Text>
+      <Typography.Text type="secondary">{zh
+        ? '传输大小和图片压缩设置仅用于 Relay，P2P 直连不受这些限制。'
+        : 'Transfer size and image compression settings apply to Relay only. P2P transfers are unrestricted.'}
+      </Typography.Text>
     </div>
     <Form form={form} onFinish={save} disabled={!canManage || saving || !loaded}>
       <ChatSettingsFields zh={zh} loading={loading} />

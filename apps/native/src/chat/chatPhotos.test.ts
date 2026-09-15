@@ -2,16 +2,33 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_CHAT_PHOTOS, MAX_PHOTO_DATA_CHARS, PhotoPermissionError,
   preparePhoto, selectPhotos, validatePhotos } from './chatPhotos';
 import type { ImagePickerAsset } from 'expo-image-picker';
-import { DEFAULT_CHAT_POLICY, setChatPolicy } from '../../../../shared/remote-chat/policy';
+import { DEFAULT_CHAT_POLICY, setChatConnectionMode, setChatPolicy } from '../../../../shared/remote-chat/policy';
 
-const mocks = vi.hoisted(() => ({ library: vi.fn(), camera: vi.fn(), permission: vi.fn(), manipulate: vi.fn() }));
+const mocks = vi.hoisted(() => ({ library: vi.fn(), camera: vi.fn(), permission: vi.fn(),
+  manipulate: vi.fn(), read: vi.fn() }));
 vi.mock('expo-image-picker', () => ({ launchImageLibraryAsync: mocks.library,
   launchCameraAsync: mocks.camera, requestCameraPermissionsAsync: mocks.permission }));
 vi.mock('expo-image-manipulator', () => ({ manipulateAsync: mocks.manipulate, SaveFormat: { JPEG: 'jpeg' } }));
-vi.mock('expo-file-system', () => ({ getInfoAsync: async () => ({ exists: true, size: 100 }) }));
-beforeEach(() => { vi.resetAllMocks(); setChatPolicy(DEFAULT_CHAT_POLICY); });
+vi.mock('expo-file-system', () => ({ getInfoAsync: async () => ({ exists: true, size: 100 }),
+  readAsStringAsync: mocks.read, EncodingType: { Base64: 'base64' } }));
+beforeEach(() => { vi.resetAllMocks(); setChatConnectionMode('offline'); setChatPolicy(DEFAULT_CHAT_POLICY); });
 
 describe('chat photos', () => {
+  it('preserves original P2P photos above source and transport limits and restores Relay validation', async () => {
+    const data = 'YWFh'.repeat(2 * 1024 * 1024);
+    mocks.read.mockResolvedValue(data);
+    setChatPolicy({ ...DEFAULT_CHAT_POLICY, imageSourceMaxMb: 1 });
+    setChatConnectionMode('direct');
+    const asset = { uri: 'content://photos/original', mimeType: 'image/png', width: 4000, height: 3000,
+      fileSize: 6 * 1024 * 1024 };
+    const photo = await preparePhoto(asset);
+    expect(photo.dataUrl).toBe(`data:image/png;base64,${data}`);
+    expect(mocks.manipulate).not.toHaveBeenCalled();
+    expect(() => validatePhotos([photo])).not.toThrow();
+    setChatConnectionMode('relay');
+    expect(() => validatePhotos([photo])).toThrow('总大小');
+    await expect(preparePhoto(asset)).rejects.toThrow('1 MB');
+  });
   it('uses updated source and resize limits before processing a selected photo', async () => {
     setChatPolicy({ ...DEFAULT_CHAT_POLICY, imageSourceMaxMb: 1, imageMaxEdge: 512, imageTargetKb: 32 });
     const asset = { uri: 'content://photos/selected', width: 2000, height: 1000, fileSize: 1024 * 1024 + 1 };

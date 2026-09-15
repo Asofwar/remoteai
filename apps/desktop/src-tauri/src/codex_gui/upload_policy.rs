@@ -16,6 +16,21 @@ const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 const MESSAGE_RESERVE_BYTES: usize = 4 * 1024 * 1024;
 const DEFAULT_MESSAGE_BYTES: usize = 8 * 1024 * 1024;
 
+/// Provenance assigned by the desktop chat host, retained while a message waits in the queue.
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum TransferMode {
+    Direct,
+    #[default]
+    Relay,
+}
+
+impl TransferMode {
+    pub(super) fn is_direct(self) -> bool {
+        self == Self::Direct
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct UploadLimits {
     pub(super) file_bytes: usize,

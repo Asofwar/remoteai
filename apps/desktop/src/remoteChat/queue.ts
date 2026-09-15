@@ -7,6 +7,7 @@ import { remoteAttachments } from '../../../../shared/remote-chat/composerAttach
 import { validateChatImages } from '../../../../shared/remote-chat/attachments';
 import type { QueueEditResult } from '../../../../shared/remote-chat/queue';
 import { chunks } from '../../../../shared/remote-chat/framing';
+import type { ConnectionMode } from '../../../../shared/remote-chat/protocol';
 
 const MAX_TEXT_LENGTH = 100_000;
 const MAX_IMAGES = 12;
@@ -35,17 +36,19 @@ function identifier(value: unknown): string {
   return value;
 }
 
-function messageInput(body: Record<string, unknown>) {
+function messageInput(body: Record<string, unknown>, mode: ConnectionMode) {
   const { text, images = [] } = body;
   const skills = skillInput(body.skills);
-  const attachments = remoteAttachments(body.attachments);
-  if (typeof text !== 'string' || text.length > MAX_TEXT_LENGTH || !Array.isArray(images)
+  const attachments = remoteAttachments(body.attachments, mode);
+  if (typeof text !== 'string' || (mode !== 'direct' && text.length > MAX_TEXT_LENGTH) || !Array.isArray(images)
     || images.length > MAX_IMAGES || images.some((image) => typeof image !== 'string'
-      || image.length > MAX_IMAGE_LENGTH || !/^data:image\/(png|jpeg|webp|gif);base64,/.test(image))
+      || (mode !== 'direct' && image.length > MAX_IMAGE_LENGTH)
+      || !/^data:image\/(png|jpeg|webp|gif);base64,/.test(image))
     || (!text.trim() && !images.length && !skills.length && !attachments.length)) {
     throw new Error('消息内容无效，请检查后重试。');
   }
-  return { text, images: images as string[], skills, ...(attachments.length ? { attachments } : {}) };
+  return { text, images: images as string[], skills, ...(mode === 'direct' ? { transferMode: 'direct' as const } : {}),
+    ...(attachments.length ? { attachments } : {}) };
 }
 
 /** Adapts the PC queue to compact remote snapshots; transport retries are deduplicated by ChatOperations. */
@@ -77,17 +80,17 @@ export class RemoteQueue {
     });
   }
 
-  async request(body: Record<string, unknown>): Promise<QueueSnapshot> {
+  async request(body: Record<string, unknown>, mode: ConnectionMode = 'relay'): Promise<QueueSnapshot> {
     const controller = this.controller();
     if (controller.getSnapshot().connection !== 'ready') await controller.connect({ reuseExisting: true });
     if (controller.getSnapshot().connection !== 'ready') throw new Error('电脑暂未就绪，请稍后重试。');
     if (body.operation === 'queueRead') return this.read();
     const threadId = identifier(body.threadId);
-    if (body.operation === 'queueEnqueue') return this.enqueue(controller, threadId, body);
+    if (body.operation === 'queueEnqueue') return this.enqueue(controller, threadId, body, mode);
     if (body.operation === 'queueFlush') await controller.queue.flush(threadId);
     else {
       const id = identifier(body.id);
-      if (body.operation === 'queueEdit') return this.edit(controller, threadId, id);
+      if (body.operation === 'queueEdit') return this.edit({ controller, threadId, id, mode });
       if (body.operation === 'queueMoveUp' || body.operation === 'queueMoveDown') {
         controller.queue.move(threadId, id, body.operation === 'queueMoveUp' ? 'up' : 'down');
       } else if (body.operation === 'queueRemove') controller.queue.remove(threadId, id);
@@ -99,23 +102,26 @@ export class RemoteQueue {
     return this.read();
   }
 
-  private edit(controller: GuiController, threadId: string, id: string): QueueEditResult {
+  private edit({ controller, threadId, id, mode }: {
+    controller: GuiController; threadId: string; id: string; mode: ConnectionMode;
+  }): QueueEditResult {
     const item = controller.getSnapshot().queued[threadId]?.find((message) => message.id === id);
     if (!item || item.busy) throw new Error('这条消息已开始发送或已被移除。');
     // Validate before removing: a desktop-only or oversized image must not lose the queued message.
-    validateChatImages(item.images);
-    remoteAttachments(item.attachments);
+    validateChatImages(item.images, mode);
+    remoteAttachments(item.attachments, mode);
     const { text, images, skills, attachments } = item;
     chunks({ kind: 'response', id: 'x'.repeat(MAX_REQUEST_ID_LENGTH), data: {
       ...this.read(), draft: { text, images, skills, attachments },
-    } }, 'queue-edit').next();
+    } }, 'queue-edit', mode).next();
     const draft = controller.queue.take(threadId, id);
     if (!draft) throw new Error('这条消息已开始发送或已被移除。');
     return { ...this.read(), draft };
   }
 
-  private async enqueue(controller: GuiController, threadId: string, body: Record<string, unknown>) {
-    const input = messageInput(body);
+  private async enqueue(controller: GuiController, threadId: string,
+    body: Record<string, unknown>, mode: ConnectionMode) {
+    const input = messageInput(body, mode);
     const patch = composerPatch(Object.fromEntries(['model', 'effort', 'access']
       .filter((key) => body[key] !== undefined).map((key) => [key, body[key]])));
     const settings = { ...controller.getSnapshot().settings, ...patch };

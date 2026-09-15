@@ -1,22 +1,22 @@
-import { MAX_MESSAGE_CHARS, parseMessage, type RpcMessage } from './protocol';
+import { MAX_MESSAGE_CHARS, parseMessage, type ConnectionMode, type RpcMessage } from './protocol';
 import { chatAttachmentDataLimit } from './composerAttachments';
 import { MIB } from './policy';
 
 const CHUNK_CHARS = 2400;
 const MESSAGE_RESERVE_CHARS = 2 * MIB;
-export function chatMessageCharLimit() {
+export function chatMessageCharLimit(mode?: ConnectionMode) {
   return Math.min(Number.MAX_SAFE_INTEGER, Math.max(MAX_MESSAGE_CHARS,
-    chatAttachmentDataLimit() + MESSAGE_RESERVE_CHARS));
+    chatAttachmentDataLimit(mode) + MESSAGE_RESERVE_CHARS));
 }
 const MAX_ASSEMBLIES = 8;
 const ASSEMBLY_TTL_MS = 60_000;
 interface Assembly { parts: Map<number, string>; total: number; size: number; updatedAt: number; limit: number }
 
-export function* chunks(message: RpcMessage, id: string) {
+export function* chunks(message: RpcMessage, id: string, mode?: ConnectionMode) {
   // Escape surrogate code units so a chunk boundary cannot split an emoji during UTF-8 encoding.
   const text = JSON.stringify(message).replace(/[\ud800-\udfff]/g,
     (unit) => `\\u${unit.charCodeAt(0).toString(16).padStart(4, '0')}`);
-  if (text.length > chatMessageCharLimit()) throw new Error('对话内容过大，请缩小范围后重试。');
+  if (text.length > chatMessageCharLimit(mode)) throw new Error('对话内容过大，请缩小范围后重试。');
   const total = Math.ceil(text.length / CHUNK_CHARS);
   for (let index = 0; index < total; index += 1) {
     yield JSON.stringify({ id, index, total, text: text.slice(index * CHUNK_CHARS, (index + 1) * CHUNK_CHARS) });
@@ -28,11 +28,11 @@ export class Assembler {
 
   constructor(private readonly expireIncomplete = true) {}
 
-  accept(text: string): RpcMessage | null {
+  accept(text: string, mode?: ConnectionMode): RpcMessage | null {
     const frame = parseMessage(text);
     const { id, index, total, text: part } = frame;
     this.expire();
-    const limit = this.pending.get(String(id))?.limit ?? chatMessageCharLimit();
+    const limit = this.pending.get(String(id))?.limit ?? chatMessageCharLimit(mode);
     if (typeof id !== 'string' || id.length > 128 || typeof index !== 'number' || !Number.isInteger(index)
       || typeof total !== 'number' || !Number.isInteger(total) || total < 1 || total > Math.ceil(limit / CHUNK_CHARS)
       || index < 0 || index >= total || typeof part !== 'string' || part.length > CHUNK_CHARS) {

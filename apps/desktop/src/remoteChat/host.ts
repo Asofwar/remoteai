@@ -147,7 +147,7 @@ export class ChatHost {
       error: () => this.drop(sessionId),
       message: (request) => {
         if (request.kind !== 'request') return;
-        void this.operations.execute(request).then((response) => {
+        void this.operations.execute(request, link.connectionMode).then((response) => {
           // A history response may include buffered fragments. Deliver those first to avoid replaying them afterward.
           this.stream.flush();
           return link.send(response);

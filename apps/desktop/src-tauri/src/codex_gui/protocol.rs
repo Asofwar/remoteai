@@ -82,6 +82,8 @@ pub(crate) enum GuiRequest {
         cwd: Option<String>,
     },
     Send {
+        #[serde(default)]
+        transfer_mode: super::upload_policy::TransferMode,
         thread_id: String,
         access: Option<AccessMode>,
         text: String,
@@ -99,6 +101,8 @@ pub(crate) enum GuiRequest {
         turn_id: String,
     },
     Steer {
+        #[serde(default)]
+        transfer_mode: super::upload_policy::TransferMode,
         thread_id: String,
         turn_id: String,
         text: String,
@@ -274,6 +278,7 @@ impl GuiRequest {
                 Ok(("thread/read", params))
             }
             Self::Send {
+                transfer_mode,
                 thread_id,
                 access,
                 text,
@@ -286,6 +291,7 @@ impl GuiRequest {
             } => send_params(
                 thread_id,
                 PromptInput {
+                    transfer_mode,
                     text,
                     images,
                     skills,
@@ -305,6 +311,7 @@ impl GuiRequest {
                 Ok(("turn/interrupt", params))
             }
             Self::Steer {
+                transfer_mode,
                 thread_id,
                 turn_id,
                 text,
@@ -316,6 +323,7 @@ impl GuiRequest {
                 let (_, mut params) = send_params(
                     thread_id,
                     PromptInput {
+                        transfer_mode,
                         text,
                         images,
                         skills,

@@ -100,7 +100,8 @@ export class MessageQueue {
     try {
       if (!await this.resume(threadId, messages[0])) return;
       const { turn } = await guiApi.request<{ turn: Turn }>({ operation: "sendBatch", threadId,
-        messages: messages.map(({ text, images, skills, attachments }) => ({ text, images, skills,
+        messages: messages.map(({ text, images, skills, attachments, transferMode }) => ({ text, images, skills,
+          ...(transferMode ? { transferMode } : {}),
           ...(attachments?.length ? { attachments: attachments } : {}) })),
         model: messages[0].model || undefined, effort: messages[0].effort || undefined, access: messages[0].access });
       this.host.acceptTurn(threadId, turn);
@@ -123,6 +124,7 @@ export class MessageQueue {
     this.markBusy(threadId, ids, true);
     try {
       await guiApi.request({ operation: "steer", threadId, turnId,
+        ...(item.transferMode ? { transferMode: item.transferMode } : {}),
         text: item.text, images: item.images, skills: item.skills,
         ...(item.attachments?.length ? { attachments: item.attachments } : {}) });
       this.completeSend(threadId, turnId, [item], userMessageIndex);

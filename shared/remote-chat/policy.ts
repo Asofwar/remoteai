@@ -1,12 +1,23 @@
 export { CHAT_POLICY_FIELDS, DEFAULT_CHAT_POLICY, parseChatPolicy, type ChatPolicy }
   from '../../apps/admin/src/modules/chat-settings/chat-policy';
 import { DEFAULT_CHAT_POLICY, parseChatPolicy } from '../../apps/admin/src/modules/chat-settings/chat-policy';
+import type { ConnectionMode } from './protocol';
 
 export const CHAT_POLICY_MESSAGE = 'chat-policy';
 export const KIB = 1024;
 export const MIB = KIB * KIB;
 let current = { ...DEFAULT_CHAT_POLICY };
-export function getChatPolicy() { return current; }
+let clientMode: ConnectionMode = 'offline';
+export function setChatConnectionMode(mode: ConnectionMode) { clientMode = mode; }
+export function isDirectChat(mode: ConnectionMode = clientMode) { return mode === 'direct'; }
+export function getChatPolicy(mode: ConnectionMode = clientMode) {
+  if (!isDirectChat(mode)) return current;
+  return { ...current, imageSourceMaxMb: Number.MAX_SAFE_INTEGER, imageMaxEdge: Number.MAX_SAFE_INTEGER,
+    imageTargetKb: Number.MAX_SAFE_INTEGER, fileUploadMaxMb: Number.MAX_SAFE_INTEGER,
+    fileUploadTotalMaxMb: Number.MAX_SAFE_INTEGER, filePreviewMaxMb: Number.MAX_SAFE_INTEGER,
+    imagePreviewMaxMb: Number.MAX_SAFE_INTEGER, videoPreviewMaxMb: Number.MAX_SAFE_INTEGER,
+    fileDownloadMaxMb: Number.MAX_SAFE_INTEGER };
+}
 /** Only configuration received from the authenticated coordinator may update these limits. */
 export function setChatPolicy(value: unknown) { current = parseChatPolicy(value); }
 export function base64Bytes(data: string) {
@@ -14,32 +25,32 @@ export function base64Bytes(data: string) {
   return Math.floor(encoded.length * 3 / 4) - (encoded.endsWith('==') ? 2 : Number(encoded.endsWith('=')));
 }
 /** Saturate only at JavaScript's exact byte-offset range, without a product size cap. */
-export function videoByteLimit() {
-  return Math.min(Number.MAX_SAFE_INTEGER, current.videoPreviewMaxMb * MIB);
+export function videoByteLimit(mode?: ConnectionMode) {
+  return Math.min(Number.MAX_SAFE_INTEGER, getChatPolicy(mode).videoPreviewMaxMb * MIB);
 }
-export function imagePreviewByteLimit() {
-  return Math.min(Number.MAX_SAFE_INTEGER, current.imagePreviewMaxMb * MIB);
+export function imagePreviewByteLimit(mode?: ConnectionMode) {
+  return Math.min(Number.MAX_SAFE_INTEGER, getChatPolicy(mode).imagePreviewMaxMb * MIB);
 }
-export function imagePreviewCharLimit() {
-  return Math.min(Number.MAX_SAFE_INTEGER, Math.ceil(imagePreviewByteLimit() / 3) * 4 + 64);
+export function imagePreviewCharLimit(mode?: ConnectionMode) {
+  return Math.min(Number.MAX_SAFE_INTEGER, Math.ceil(imagePreviewByteLimit(mode) / 3) * 4 + 64);
 }
-export function textPreviewByteLimit() {
-  return Math.min(Number.MAX_SAFE_INTEGER, current.filePreviewMaxMb * MIB);
+export function textPreviewByteLimit(mode?: ConnectionMode) {
+  return Math.min(Number.MAX_SAFE_INTEGER, getChatPolicy(mode).filePreviewMaxMb * MIB);
 }
-export function fileUploadByteLimit() {
-  return Math.min(Number.MAX_SAFE_INTEGER, current.fileUploadMaxMb * MIB);
+export function fileUploadByteLimit(mode?: ConnectionMode) {
+  return Math.min(Number.MAX_SAFE_INTEGER, getChatPolicy(mode).fileUploadMaxMb * MIB);
 }
-export function fileUploadTotalByteLimit() {
-  return Math.min(Number.MAX_SAFE_INTEGER, current.fileUploadTotalMaxMb * MIB);
+export function fileUploadTotalByteLimit(mode?: ConnectionMode) {
+  return Math.min(Number.MAX_SAFE_INTEGER, getChatPolicy(mode).fileUploadTotalMaxMb * MIB);
 }
-export function checkFileUploadSize(bytes: number) {
-  if (bytes > fileUploadByteLimit()) {
+export function checkFileUploadSize(bytes: number, mode?: ConnectionMode) {
+  if (bytes > fileUploadByteLimit(mode)) {
     throw new Error(`单个文件不能超过 ${current.fileUploadMaxMb} MB，请选择较小的文件。`);
   }
 }
 export class DownloadPolicyError extends Error {}
 export function checkDownloadSize(bytes: number) {
-  if (bytes > current.fileDownloadMaxMb * MIB) {
+  if (bytes > getChatPolicy().fileDownloadMaxMb * MIB) {
     throw new DownloadPolicyError(`文件超过 ${current.fileDownloadMaxMb} MB，无法下载。`);
   }
 }

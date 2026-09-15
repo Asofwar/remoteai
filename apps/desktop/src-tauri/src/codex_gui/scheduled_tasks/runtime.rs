@@ -144,6 +144,7 @@ async fn send_task(
     let response = request(
         app,
         GuiRequest::Send {
+            transfer_mode: Default::default(),
             thread_id,
             text: task.input.prompt.clone(),
             images: Vec::new(),

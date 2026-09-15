@@ -1,4 +1,4 @@
-import { parseMessage } from './protocol';
+import { parseMessage, type ConnectionMode } from './protocol';
 
 const WINDOW_SIZE = 64;
 const RETRY_MS = 800;
@@ -11,11 +11,11 @@ export class ReliableDelivery {
   private sequence = 0;
   private received = 0;
   private readonly pending = new Map<number, Pending>();
-  private readonly incoming = new Map<number, string>();
+  private readonly incoming = new Map<number, { text: string; mode?: ConnectionMode }>();
 
   constructor(private readonly options: {
     send: (frame: object) => boolean;
-    accept: (text: string) => void;
+    accept: (text: string, mode?: ConnectionMode) => void;
   }) {}
 
   get full() { return this.pending.size >= WINDOW_SIZE; }
@@ -26,7 +26,7 @@ export class ReliableDelivery {
     this.flush();
   }
 
-  accept(frame: Record<string, unknown>, reply: (frame: object) => void) {
+  accept(frame: Record<string, unknown>, reply: (frame: object) => void, mode?: ConnectionMode) {
     const sequence = frame.sequence;
     if (!Number.isSafeInteger(sequence) || Number(sequence) < 0) throw new Error('Invalid sequence');
     const value = Number(sequence);
@@ -37,10 +37,11 @@ export class ReliableDelivery {
     }
     if (frame.kind !== 'data' || value < 1 || value > this.received + WINDOW_SIZE
       || typeof frame.text !== 'string' || frame.text.length > MAX_FRAME_CHARS) throw new Error('Invalid delivery');
-    if (value > this.received && !this.incoming.has(value)) this.incoming.set(value, frame.text);
+    if (value > this.received && !this.incoming.has(value)) this.incoming.set(value, { text: frame.text, mode });
     while (this.incoming.has(this.received + 1)) {
       const id = this.received + 1;
-      this.options.accept(this.incoming.get(id)!);
+      const incoming = this.incoming.get(id)!;
+      this.options.accept(incoming.text, incoming.mode);
       this.incoming.delete(id);
       this.received = id;
     }

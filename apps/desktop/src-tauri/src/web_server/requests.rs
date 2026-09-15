@@ -77,9 +77,21 @@ fn handle_invoke_request(app: AppHandle, mut request: Request, security: &WebReq
         return;
     }
     use tauri::Manager;
-    let max_body_bytes = match app.state::<crate::codex_gui::GuiState>().upload_policy.snapshot() {
-        Ok(limits) => limits.message_bytes(),
-        Err(_) => { respond_text(request, StatusCode(503), "Please try again later"); return; }
+    // Authentication above grants access to the desktop host. P2P uploads must also fit through
+    // its hosted HTTP adapter; the GUI worker still validates each message's upload provenance.
+    let direct_upload = request.headers().iter().any(|header| {
+        header.field.equiv("X-Codex-Chat-Transfer") && header.value.as_str() == "direct"
+    });
+    let max_body_bytes = if direct_upload {
+        usize::MAX
+    } else {
+        match app.state::<crate::codex_gui::GuiState>().upload_policy.snapshot() {
+            Ok(limits) => limits.message_bytes(),
+            Err(_) => {
+                respond_text(request, StatusCode(503), "Please try again later");
+                return;
+            }
+        }
     };
     if request
         .body_length()

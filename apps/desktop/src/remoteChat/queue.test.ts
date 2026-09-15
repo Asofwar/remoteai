@@ -33,6 +33,19 @@ beforeEach(async () => {
 });
 afterEach(() => controller.dispose());
 
+it('keeps P2P upload provenance through queuing and rejects a forged Relay exemption', async () => {
+  const attachment = { kind: 'file', name: 'large.txt', path: '', data: 'YWFh'.repeat(1024 * 1024) };
+  const body = { ...input, transferMode: 'direct', attachments: [attachment] };
+  await expect(queue.request(body, 'relay')).rejects.toThrow('2 MB');
+  await queue.request(body, 'direct');
+  expect(controller.getSnapshot().queued.phone[0].transferMode).toBe('direct');
+  thread.turns![0].status = 'completed';
+  receive({ method: 'turn/completed', params: { threadId: thread.id, turn: thread.turns![0] } });
+  await vi.waitFor(() => expect(queue.read().threads.phone).toBeUndefined());
+  expect(guiApi.request).toHaveBeenCalledWith(expect.objectContaining({ operation: 'sendBatch',
+    messages: [expect.objectContaining({ transferMode: 'direct', attachments: [attachment] })] }));
+});
+
 it('shares phone and PC ordering and takes the complete draft for editing', async () => {
   const text = '完整内容'.repeat(400);
   const images = ['data:image/png;base64,aGVsbG8='];

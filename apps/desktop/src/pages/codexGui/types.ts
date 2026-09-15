@@ -205,19 +205,22 @@ export type Request =
   | { operation: "sendBatch"; threadId: string; messages: MessageInput[]; model?: string; effort?: string;
       access: AccessMode }
   | { operation: "steer"; threadId: string; turnId: string; text: string; images: string[];
-      skills: SkillReference[]; attachments?: AttachmentReference[] }
+      skills: SkillReference[]; attachments?: AttachmentReference[]; transferMode?: 'direct' | 'relay' }
   | { operation: "skills"; cwd?: string }
   | { operation: "models"; cursor?: string }
   | { operation: "list"; cursor?: string; archived: boolean; search?: string; limit?: number }
   | { operation: "start"; cwd?: string; model?: string; access: AccessMode }
   | { operation: "resume"; threadId: string; access: AccessMode; cwd?: string }
   | { operation: "send"; threadId: string; text: string; images: string[]; access: AccessMode;
+      transferMode?: 'direct' | 'relay';
       model?: string; effort?: string; cwd?: string; skills?: SkillReference[]; attachments?: AttachmentReference[] }
   | { operation: "read" | "archive" | "unarchive" | "compact"; threadId: string }
   | { operation: "rename"; threadId: string; name: string }
   | { operation: "interrupt"; threadId: string; turnId: string };
 
 export interface MessageInput {
+  /** Assigned by the desktop host when it accepts a remote message. */
+  transferMode?: 'direct' | 'relay';
   text: string; images: string[]; skills: SkillReference[]; attachments?: AttachmentReference[];
 }
 export interface QueuedMessage extends MessageInput {

@@ -1,8 +1,17 @@
-import { ChatImageError, draftImage, MAX_CHAT_IMAGES, MAX_CHAT_IMAGE_CHARS,
+import { ChatImageError, draftImage, MAX_CHAT_IMAGES, chatImageCharLimit,
   validateChatImages, type DraftImage } from '../../../../shared/remote-chat/attachments';
 
-import { base64Bytes, getChatPolicy, MIB } from '../../../../shared/remote-chat/policy';
+import { base64Bytes, getChatPolicy, isDirectChat, MIB } from '../../../../shared/remote-chat/policy';
 import { compressChatImage, ImagePolicyError } from '../../../../shared/remote-chat/compressImage';
+
+function readOriginal(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new ChatImageError('图片读取失败，请重新选择。'));
+    reader.readAsDataURL(file);
+  });
+}
 
 async function prepareImage(file: File) {
   if ((file.type && !file.type.startsWith('image/')) || !file.size) {
@@ -11,6 +20,9 @@ async function prepareImage(file: File) {
   const policy = getChatPolicy();
   if (file.size > policy.imageSourceMaxMb * MIB) {
     throw new ChatImageError(`单张图片不能超过 ${policy.imageSourceMaxMb} MB，请选择较小的图片。`);
+  }
+  if (isDirectChat() && /^image\/(png|jpeg|webp|gif)$/.test(file.type)) {
+    return draftImage(await readOriginal(file));
   }
   const url = URL.createObjectURL(file);
   try {
@@ -29,7 +41,7 @@ async function prepareImage(file: File) {
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       const url = canvas.toDataURL('image/jpeg', quality);
       return { value: url, bytes: base64Bytes(url) };
-    }, policy, Math.floor((MAX_CHAT_IMAGE_CHARS - 'data:image/jpeg;base64,'.length) / 4) * 3);
+    }, policy, Math.floor((chatImageCharLimit() - 'data:image/jpeg;base64,'.length) / 4) * 3);
     return draftImage(compressed);
   } catch (error) {
     if (error instanceof ChatImageError || error instanceof ImagePolicyError) throw new ChatImageError(error.message);

@@ -2,6 +2,7 @@
 use super::error::{GuiError, Result};
 use super::images::{self, MAX_IMAGES};
 use super::protocol::{directory, thread_params, AccessMode};
+use super::upload_policy::TransferMode;
 use serde::Deserialize;
 use serde_json::{json, Value};
 const MAX_PROMPT_BYTES: usize = 256_000;
@@ -14,6 +15,8 @@ pub(crate) struct SkillInput {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct PromptInput {
+    #[serde(default, rename = "transferMode")]
+    pub(super) transfer_mode: TransferMode,
     pub(super) text: String,
     pub(super) images: Vec<String>,
     #[serde(default)]
@@ -40,7 +43,7 @@ pub(crate) struct AttachmentInput {
 }
 
 impl AttachmentInput {
-    fn into_inputs(self) -> Result<Vec<Value>> {
+    fn into_inputs(self, transfer_mode: TransferMode) -> Result<Vec<Value>> {
         if self.data.is_some()
             || self.name.trim().is_empty()
             || self.name.len() > 500
@@ -77,7 +80,7 @@ impl AttachmentInput {
         if matches!(self.kind, AttachmentKind::File)
             && ["png", "jpg", "jpeg", "webp", "gif"].contains(&extension.as_str())
         {
-            return Ok(vec![images::input(self.path)?]);
+            return Ok(vec![image_input(self.path, transfer_mode)?]);
         }
         // Filesystem mentions are not included in model text by the engine; send explicit paths instead.
         let label = if matches!(self.kind, AttachmentKind::Folder) {
@@ -156,6 +159,7 @@ pub(super) fn send_params(
     options: TurnOptions,
 ) -> Result<(&'static str, Value)> {
     let PromptInput {
+        transfer_mode,
         text,
         images,
         skills,
@@ -163,7 +167,7 @@ pub(super) fn send_params(
     } = input;
     const MAX_ATTACHMENTS: usize = 32;
     if (text.trim().is_empty() && images.is_empty() && skills.is_empty() && attachments.is_empty())
-        || text.len() > MAX_PROMPT_BYTES
+        || (!transfer_mode.is_direct() && text.len() > MAX_PROMPT_BYTES)
         || images.len() > MAX_IMAGES
         || attachments.len() > MAX_ATTACHMENTS
     {
@@ -180,13 +184,13 @@ pub(super) fn send_params(
     let mut params = thread_params(thread_id)?;
     let mut content = vec![json!({"type": "text", "text": text, "text_elements": []})];
     for image in images {
-        content.push(images::input(image)?);
+        content.push(image_input(image, transfer_mode)?);
     }
     for skill in skills {
         content.push(skill.into_input()?);
     }
     for attachment in attachments {
-        content.extend(attachment.into_inputs()?);
+        content.extend(attachment.into_inputs(transfer_mode)?);
     }
     if content
         .iter()
@@ -207,4 +211,12 @@ pub(super) fn send_params(
         params["cwd"] = json!(cwd);
     }
     Ok(("turn/start", params))
+}
+
+fn image_input(image: String, mode: TransferMode) -> Result<Value> {
+    if mode.is_direct() {
+        images::input_limited(image, u64::MAX)
+    } else {
+        images::input(image)
+    }
 }

@@ -29,3 +29,14 @@ it('bounds the combined bytes of a batch before creating any files', async () =>
     model: 'test', effort: 'high', messages: [message, message] })).rejects.toThrow('文件合计不能超过 3 MB');
   expect(invoke).not.toHaveBeenCalled();
 });
+
+it('retains P2P upload acceptance in queued batches without exempting Relay messages', async () => {
+  const direct = { text: '', images: [], skills: [], attachments: [attachment], transferMode: 'direct' as const };
+  const request: Request = { operation: 'sendBatch', threadId: 'chat', access: 'read-only',
+    messages: [direct, direct] };
+  await guiApi.request(request);
+  expect(invoke).toHaveBeenCalledTimes(1);
+  request.messages.push({ ...direct, transferMode: 'relay' });
+  await expect(guiApi.request(request)).rejects.toThrow('2 MB');
+  expect(invoke).toHaveBeenCalledTimes(1);
+});

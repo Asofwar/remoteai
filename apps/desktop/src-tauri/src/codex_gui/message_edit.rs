@@ -100,6 +100,7 @@ fn edited_input(thread: &Value, edit: &EditRequest) -> Result<Vec<Value>> {
 
 fn send_request(edit: &EditRequest) -> GuiRequest {
     GuiRequest::Send {
+        transfer_mode: Default::default(),
         thread_id: edit.thread_id.clone(),
         text: edit.text.clone(),
         images: edit.images.clone(),

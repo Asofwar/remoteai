@@ -5,6 +5,11 @@ use std::{
     time::{Duration, Instant},
 };
 
+// Hosted Windows runners can spend over 20 seconds loading the interactive shell.
+#[cfg(windows)]
+const SHELL_STARTUP_TIMEOUT: Duration = Duration::from_secs(120);
+const COMMAND_OUTPUT_TIMEOUT: Duration = Duration::from_secs(30);
+
 #[test]
 fn rejects_invalid_dimensions_paths_ids_and_oversized_input() {
     for size in [
@@ -101,7 +106,7 @@ fn interactive_shell_streams_unicode_resizes_and_closes_independently() {
         &info.id,
         &receiver,
         ">",
-        Duration::from_secs(20),
+        SHELL_STARTUP_TIMEOUT,
     );
     #[cfg(windows)]
     let command = "Write-Output ('codex' + '-terminal-中文'); (Get-Location).Path\r";
@@ -119,7 +124,7 @@ fn interactive_shell_streams_unicode_resizes_and_closes_independently() {
         &info.id,
         &receiver,
         "codex-terminal-中文",
-        Duration::from_secs(20),
+        COMMAND_OUTPUT_TIMEOUT,
     );
     assert!(output.contains("codex-terminal-中文"));
     fixture
@@ -199,8 +204,28 @@ fn wait_output(
                 .expect("cursor reply");
         }
     }
-    panic!(
-        "terminal did not produce {text:?}: {}",
-        String::from_utf8_lossy(&bytes)
+    // The final output can arrive at the deadline or immediately before the sender closes.
+    // Check buffered output before reporting a timeout in either case.
+    let output = String::from_utf8_lossy(&bytes).into_owned();
+    assert!(
+        output.contains(text),
+        "terminal did not produce {text:?}: {output}"
+    );
+    output
+}
+
+#[test]
+fn terminal_output_received_before_disconnect_satisfies_the_wait() {
+    let state = TerminalState::default();
+    let (sender, receiver) = mpsc::channel();
+    sender
+        .send(TerminalEvent::Output {
+            data: b"ready> ".to_vec(),
+        })
+        .expect("send output");
+    drop(sender);
+    assert_eq!(
+        wait_output(&state, "unused", &receiver, ">", COMMAND_OUTPUT_TIMEOUT),
+        "ready> "
     );
 }

@@ -38,7 +38,8 @@ export async function attachmentJourney({ page, request, info, relay }: {
     .toBe(1);
   const sent = (await state(request)).operations.find((item) => item.operation === 'send')!;
   expect(sent.text).toBe('');
-  expect(sent.images).toEqual([expect.stringMatching(/^data:image\/jpeg;base64,/)]);
+  const imageType = relay ? /^data:image\/jpeg;base64,/ : /^data:image\/png;base64,/;
+  expect(sent.images).toEqual([expect.stringMatching(imageType)]);
 
   await settled(page);
   await send(page, 'slow image conversation');

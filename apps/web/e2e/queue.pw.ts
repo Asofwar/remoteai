@@ -9,6 +9,8 @@ test('queues supplements on the PC, sends one immediately and restores the rest 
     await page.getByPlaceholder('输入登录密码').fill('local-test');
     await page.getByRole('button', { name: '登录并查看' }).click();
     await connect(page);
+    await expect(page.getByRole('status').filter({ hasText: /P2P|Relay/ }))
+      .toBeVisible({ timeout: 20_000 });
     await page.getByRole('button', { name: '打开聊天列表' }).click();
     await page.getByRole('button', { name: /移动端聊天体验/ }).click();
     await send(page, 'slow queue test');

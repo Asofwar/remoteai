@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { DASHBOARD_QUERIES } from './dashboard-queries';
+import { buildDailyActiveTrend } from './daily-active-trend';
 import { buildDashboardTrend, platformCounts, InstallationTrendRow } from './dashboard-trend';
 
 interface CountRow {
@@ -39,14 +40,18 @@ export class DashboardService {
     const endDate = this.utcDate(end);
     const start = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
     start.setUTCDate(start.getUTCDate() - days + 1);
+    const until = new Date(start);
+    until.setUTCDate(until.getUTCDate() + days);
 
-    const [summaryRows, userRows, installationRows, platformRows, planRows, dailyActiveRows] = await Promise.all([
+    const [summaryRows, userRows, installationRows, platformRows, planRows, dailyActiveRows, activityRows]
+      = await Promise.all([
       this.dataSource.query<SummaryRow[]>(DASHBOARD_QUERIES.SUMMARY, [start]),
       this.dataSource.query<DatedCountRow[]>(DASHBOARD_QUERIES.USERS, [start]),
       this.dataSource.query<InstallationTrendRow[]>(DASHBOARD_QUERIES.INSTALLATIONS, [start]),
       this.dataSource.query<NamedCountRow[]>(DASHBOARD_QUERIES.PLATFORMS),
       this.dataSource.query<NamedCountRow[]>(DASHBOARD_QUERIES.PLANS),
       this.dataSource.query<NamedCountRow[]>(DASHBOARD_QUERIES.DAILY_ACTIVE),
+      this.dataSource.query<InstallationTrendRow[]>(DASHBOARD_QUERIES.DAILY_ACTIVE_TREND, [start, until]),
     ]);
 
     const summary = summaryRows[0] ?? {
@@ -66,6 +71,7 @@ export class DashboardService {
         Object.entries(summary).map(([key, value]) => [key, Number(value)]),
       ),
       trend,
+      dailyActiveTrend: buildDailyActiveTrend({ start, days, rows: activityRows }),
       dailyActivePlatforms: platformCounts(dailyActiveRows),
       platforms: platformCounts(platformRows),
       accountPlans: planRows.map((row) => ({ name: row.name, value: Number(row.count) })),

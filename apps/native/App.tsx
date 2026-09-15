@@ -60,7 +60,7 @@ import type {
   UsageWindow,
   UserProfile,
 } from './src/types';
-import { reportMobileInstallation } from './src/telemetry';
+import { useMobileTelemetry } from './src/useMobileTelemetry';
 import { earliestExpirationDate } from './src/utils/expiration';
 import { mergeRefreshedUsage, mergeServerAccounts } from './src/utils/accounts';
 import { AdminArea } from './src/admin/AdminArea';
@@ -1726,6 +1726,7 @@ function AppContent() {
   const openChat = useCallback(() => setActivePage('chat'), []);
   const chatNotification = useChatNotificationNavigation(session, openChat);
   const [initializing, setInitializing] = useState(true);
+  useMobileTelemetry(initializing ? null : session?.baseUrl ?? DEFAULT_CLOUD_BASE_URL);
   const [loading, setLoading] = useState(false);
   const [syncingServer, setSyncingServer] = useState(false);
   const [refreshingUsage, setRefreshingUsage] = useState(false);
@@ -1870,7 +1871,6 @@ function AppContent() {
           loadSession(),
           loadGlobalRefreshMinutes(),
         ]);
-        void reportMobileInstallation(stored?.baseUrl ?? DEFAULT_CLOUD_BASE_URL).catch(() => undefined);
         if (!mounted) return;
         setGlobalRefreshMinutes(storedRefreshMinutes);
         setSession(stored);
@@ -2067,7 +2067,6 @@ function AppContent() {
   }, [activePage, session]);
 
   const handleLogin = useCallback((nextSession: AuthSession) => {
-    void reportMobileInstallation(nextSession.baseUrl).catch(() => undefined);
     setSession(nextSession);
     setProfile(nextSession.profile ?? null);
     setActivePage(DEFAULT_APP_PAGE);

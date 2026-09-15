@@ -54,4 +54,12 @@ export const DASHBOARD_QUERIES = {
       AND "createdAt" >= (date_trunc('day', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
     GROUP BY platform
   `,
+  DAILY_ACTIVE_TREND: `
+    SELECT TO_CHAR(("createdAt" AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS date,
+           platform, COUNT(DISTINCT "deviceId")::text AS count
+    FROM device_telemetry_events
+    WHERE "eventType" = 'activity' AND "createdAt" >= $1 AND "createdAt" < $2
+    GROUP BY 1, platform
+    ORDER BY 1, platform
+  `,
 };

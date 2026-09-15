@@ -45,6 +45,10 @@ describe('DashboardService', () => {
       .mockResolvedValueOnce([
         { name: 'windows', count: '4' },
         { name: 'android', count: '2' },
+      ])
+      .mockResolvedValueOnce([
+        { date: '2026-07-18', platform: 'windows', count: '4' },
+        { date: '2026-07-18', platform: 'android', count: '2' },
       ]);
     const service = new DashboardService({ query } as unknown as DataSource);
 
@@ -83,7 +87,15 @@ describe('DashboardService', () => {
       { name: 'ios', value: 0 },
     ]);
     expect(result.feedback).toEqual({ pending: 3, replied: 7 });
-    expect(query).toHaveBeenCalledTimes(6);
+    expect(result.dailyActiveTrend).toHaveLength(7);
+    expect(result.dailyActiveTrend[0].total).toBe(0);
+    expect(result.dailyActiveTrend[6]).toEqual({
+      date: '2026-07-18', total: 6, platforms: result.dailyActivePlatforms,
+    });
+    expect(query).toHaveBeenCalledTimes(7);
+    expect(query.mock.calls[6][1]).toEqual([
+      new Date('2026-07-12T00:00:00Z'), new Date('2026-07-19T00:00:00Z'),
+    ]);
     const activityQuery = query.mock.calls[5][0] as string;
     expect(activityQuery).toContain('COUNT(DISTINCT "deviceId")');
     expect(activityQuery).toContain(`"eventType" = 'activity'`);

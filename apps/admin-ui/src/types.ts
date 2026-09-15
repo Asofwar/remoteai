@@ -282,6 +282,11 @@ export interface TelemetryFilters {
 }
 
 export interface DashboardOverview {
+  dailyActiveTrend: Array<{
+    date: string;
+    total: number;
+    platforms: Array<{ name: TelemetryPlatform; value: number }>;
+  }>;
   range: {
     days: 7 | 30 | 90;
     startDate: string;

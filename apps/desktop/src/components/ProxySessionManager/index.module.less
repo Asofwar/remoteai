@@ -141,6 +141,22 @@
 .sessionTable :global(.ant-table),
 .sessionTable :global(.ant-table-container) { height: 100%; }
 
+.sessionTable > :global(.ant-spin-nested-loading) > :global(.ant-spin-container) {
+  display: flex;
+  flex-direction: column;
+}
+
+.sessionTable :global(.ant-table) {
+  min-height: 0;
+  height: auto;
+  flex: 1;
+}
+
+.sessionTable :global(.ant-table-pagination) {
+  flex-shrink: 0;
+  margin: 8px 12px;
+}
+
 .sessionTable :global(.ant-table-container) {
   display: flex;
   min-height: 0;

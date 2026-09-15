@@ -43,6 +43,8 @@ type ProxySessionColumnKey =
 const ACTIVITY_FILTER_STORAGE_KEY = "codex-switch.proxy-session-activity-filter";
 const HIDDEN_COLUMNS_STORAGE_KEY = "codex-switch:proxy-session-hidden-columns";
 const COLUMN_ORDER_STORAGE_KEY = "codex-switch:proxy-session-column-order";
+const SESSION_DEFAULT_PAGE_SIZE = 10;
+const SESSION_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 const REQUEST_DETAIL_DEFAULT_PAGE_SIZE = 50;
 const REQUEST_DETAIL_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 const REQUEST_DETAIL_TABLE_SCROLL_X = 1_150;
@@ -259,6 +261,9 @@ export function ProxySessionManager({
 }: ProxySessionManagerProps) {
   const [open, setOpen] = useState(false);
   const [sessions, setSessions] = useState<ProxySession[]>([]);
+  const sortedSessions = useMemo(() => [...sessions].sort(
+    (left, right) => right.lastSeenAt - left.lastSeenAt || left.id.localeCompare(right.id),
+  ), [sessions]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter[]>(loadActivityFilter);
@@ -856,8 +861,13 @@ export function ProxySessionManager({
           size="small"
           loading={loading}
           columns={visibleColumns}
-          dataSource={sessions}
-          pagination={false}
+          dataSource={sortedSessions}
+          pagination={{
+            defaultPageSize: SESSION_DEFAULT_PAGE_SIZE,
+            pageSizeOptions: SESSION_PAGE_SIZE_OPTIONS,
+            showSizeChanger: true,
+            size: "small",
+          }}
           onChange={handleTableChange}
           locale={{ emptyText: t("providers.proxy.sessionsEmpty") }}
           scroll={{ x: 1260, y: "calc(80vh - 238px)" }}

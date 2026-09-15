@@ -18,6 +18,6 @@ export function ContextCapacityHint({ threadId, open }: { threadId?: string | nu
   if (settings?.capacity == null) return null;
   return <div className={styles.hint}>
     <div>对话设置：{formatCompactTokenCount(settings.capacity, "zh")} Token</div>
-    <div>可用容量受模型上限和预留空间影响，下次回复后更新。</div>
+    <div>上方用量来自最近一次回复；可用容量会扣除预留空间。</div>
   </div>;
 }

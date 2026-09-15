@@ -33,10 +33,16 @@ export function useContextSettings(threadId: string, api: ContextSettingsApi) {
     if (capacity === undefined) { setError("请输入 1 至 100000 K 之间的上下文容量。"); return false; }
     pending.current = true; setSaving(true); setError("");
     try {
-      await api.write(threadId, { capacity });
+      const result = await api.write(threadId, { capacity });
+      if (result.update === 'resumeFailed' || result.update === 'paused') {
+        if (mounted.current) setError(result.update === 'paused'
+          ? '容量已更新，对话保持暂停。关闭设置后可点击继续。'
+          : '容量已更新，但未能继续回复。关闭设置后可点击继续。');
+        return false;
+      }
       return mounted.current;
     } catch {
-      if (mounted.current) setError("未能保存上下文设置，请重试。");
+      if (mounted.current) setError("未能保存或应用上下文设置，请重试；若对话已暂停，可点击继续。");
       return false;
     } finally {
       pending.current = false;

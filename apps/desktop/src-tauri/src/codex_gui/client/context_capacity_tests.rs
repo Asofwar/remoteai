@@ -59,7 +59,7 @@ async fn each_thread_has_its_own_serialization_guard() {
     let first = state.thread("one").await;
     let same = state.thread("one").await;
     let other = state.thread("two").await;
-    let _guard = first.lock().await;
-    assert!(same.try_lock().is_err());
-    assert!(other.try_lock().is_ok());
+    let _guard = first.applied.lock().await;
+    assert!(same.applied.try_lock().is_err());
+    assert!(other.applied.try_lock().is_ok());
 }

@@ -6,9 +6,12 @@ export const CONTEXT_READ_OPERATION = 'contextSettingsRead';
 export const CONTEXT_WRITE_OPERATION = 'contextSettingsWrite';
 
 export interface ContextSettings { capacity: number | null }
+export interface ContextUpdateResult extends ContextSettings {
+  update?: 'applied' | 'continued' | 'paused' | 'resumeFailed';
+}
 export interface ContextSettingsApi {
   read: (threadId: string) => Promise<ContextSettings>;
-  write: (threadId: string, settings: ContextSettings) => Promise<ContextSettings>;
+  write: (threadId: string, settings: ContextSettings) => Promise<ContextUpdateResult>;
 }
 
 export function parseContextCapacity(value: string): number | null | undefined {

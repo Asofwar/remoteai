@@ -1,5 +1,8 @@
 //! Rejoin only the idle conversation whose capacity changed; keep the app server and phone connected.
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{atomic::AtomicU64, Arc},
+};
 
 use serde_json::{json, Value};
 use tokio::sync::Mutex;
@@ -10,13 +13,20 @@ use crate::codex_gui::{
     error::{GuiError, Result},
 };
 
-type ThreadCapacity = Arc<Mutex<ContextSettings>>;
+#[derive(Default)]
+pub(super) struct ThreadCapacity {
+    pub(super) applied: Mutex<ContextSettings>,
+    pub(super) stops: AtomicU64,
+    pub(super) last_start: Mutex<Option<Value>>,
+}
+
+type SharedCapacity = Arc<ThreadCapacity>;
 
 #[derive(Default)]
-pub(super) struct ContextCapacity(Mutex<HashMap<String, ThreadCapacity>>);
+pub(super) struct ContextCapacity(Mutex<HashMap<String, SharedCapacity>>);
 
 impl ContextCapacity {
-    async fn thread(&self, id: &str) -> ThreadCapacity {
+    pub(super) async fn thread(&self, id: &str) -> SharedCapacity {
         self.0
             .lock()
             .await
@@ -37,7 +47,7 @@ impl Client {
             .ok_or(GuiError::InvalidRequest)?;
         let state = self.context_capacity.thread(id).await;
         // Serialize resume/send for this conversation, including the full rejoin and its acknowledgement.
-        let mut applied = state.lock().await;
+        let mut applied = state.applied.lock().await;
         let settings = context_settings::for_thread(self.app.clone(), id.to_owned())
             .await
             .map_err(|_| GuiError::ContextSettings)?;
@@ -47,10 +57,15 @@ impl Client {
         if method == "thread/resume" {
             context_settings::apply_capacity(&mut params, &applied);
         }
-        self.request_raw(method, params).await
+        let continuation = super::context_change::continuation_overrides(&params);
+        let result = self.request_raw(method, params).await?;
+        if method == "turn/start" {
+            *state.last_start.lock().await = Some(continuation);
+        }
+        Ok(result)
     }
 
-    async fn reload_context(
+    pub(super) async fn reload_context(
         &self,
         id: &str,
         settings: &ContextSettings,
@@ -102,7 +117,7 @@ impl Client {
     }
 }
 
-fn idle_snapshot(id: &str, snapshot: &Value) -> Result<bool> {
+pub(super) fn idle_snapshot(id: &str, snapshot: &Value) -> Result<bool> {
     if snapshot.pointer("/thread/id").and_then(Value::as_str) != Some(id) {
         return Err(GuiError::ContextSettings);
     }

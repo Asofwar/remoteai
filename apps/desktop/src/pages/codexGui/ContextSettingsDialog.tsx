@@ -19,7 +19,7 @@ export function ContextSettingsDialog({ threadId, onClose }: { threadId: string;
         onClick={() => void save()}>保存</Button>
     </>}>
     <div className={styles.settings}>
-      <p className={styles.hint}>仅用于当前对话，下次发送消息时生效，不会中断当前回复。</p>
+      <p className={styles.hint}>仅用于当前对话。保存后立即应用；正在回复时会先暂停，修改后自动继续。</p>
       {editor.loading && <div role="status"><Spin size="small" /> 正在读取设置…</div>}
       {editor.loaded && <>
         <label htmlFor={id}>上下文容量（K Token）</label>

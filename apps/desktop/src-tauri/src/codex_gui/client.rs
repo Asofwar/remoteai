@@ -1,4 +1,5 @@
 mod context_capacity;
+mod context_change;
 mod live_settings;
 mod plugin_refresh;
 
@@ -119,6 +120,9 @@ impl Client {
 
     pub(super) async fn request(&self, method: &str, mut params: Value) -> Result<Value> {
         super::home::scope_thread_request(method, &mut params);
+        if method == "turn/interrupt" {
+            return self.interrupt_with_context(params).await;
+        }
         if method == "turn/start" {
             self.refresh_plugins().await?;
         }

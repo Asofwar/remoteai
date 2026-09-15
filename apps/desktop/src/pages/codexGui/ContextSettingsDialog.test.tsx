@@ -43,7 +43,7 @@ afterEach(async () => {
 it("opens while polling is pending, saves only this conversation and restores defaults", async () => {
   await render(); await openSettings();
   expect(input().value).toBe("128");
-  expect(document.querySelector(".ant-modal")?.textContent).toContain("下次发送消息时生效");
+  expect(document.querySelector(".ant-modal")?.textContent).toContain("正在回复时会先暂停，修改后自动继续");
   await type("256");
   vi.mocked(invoke).mockResolvedValueOnce({ capacity: 256_000 });
   await click(footerButton("保存"));
@@ -152,4 +152,25 @@ it("uses Enter to select a preset without prematurely saving the previous value"
   await click(footerButton("保存"));
   expect(invoke).toHaveBeenLastCalledWith("codex_gui_set_context_settings",
     { threadId: "one", settings: { capacity: 128_000 } });
+});
+
+it("keeps the dialog actionable when capacity is saved but continuing the task fails", async () => {
+  await render(); await openSettings(); await type("384");
+  vi.mocked(invoke).mockResolvedValueOnce({ capacity: 384_000, update: "resumeFailed" });
+  await click(footerButton("保存"));
+  expect(input().value).toBe("384");
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain("容量已更新，但未能继续回复");
+  expect(footerButton("取消").disabled).toBe(false);
+});
+
+it("prevents duplicate saves and closing while the conversation is being paused and resumed", async () => {
+  await render(); await openSettings(); await type("384");
+  let finish!: (result: { capacity: number; update: string }) => void;
+  vi.mocked(invoke).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+  await click(footerButton("保存"));
+  expect(footerButton("取消").disabled).toBe(true);
+  expect(input().disabled).toBe(true);
+  expect(document.querySelector('[aria-label="Close"]')).toBeNull();
+  await act(async () => finish({ capacity: 384_000, update: "continued" }));
+  expect(document.querySelector(".ant-modal")).toBeNull();
 });

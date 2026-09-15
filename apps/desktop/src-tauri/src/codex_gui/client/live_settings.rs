@@ -34,6 +34,8 @@ impl Client {
         thread_id: &str,
         selection: &ModelSelection,
     ) -> LiveModelUpdate {
+        let context = self.context_capacity.thread(thread_id).await;
+        let _guard = context.applied.lock().await;
         let turn_id = self.active_turns.lock().await.get(thread_id).cloned();
         let Some(turn_id) = turn_id else {
             return LiveModelUpdate::NextTurn;

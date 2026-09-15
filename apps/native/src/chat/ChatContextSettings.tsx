@@ -18,7 +18,7 @@ export function ChatContextSettings({ threadId, api, onClose }: {
         disabled: editor.loading || !editor.loaded },
     ]}>
     <SheetScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.settings}>
-      <Text style={styles.subtitle}>仅用于当前对话，下次发送消息时生效，不会中断当前回复。</Text>
+      <Text style={styles.subtitle}>仅用于当前对话。保存后立即应用；正在回复时会先暂停，修改后自动继续。</Text>
       {editor.loading && <ActivityIndicator accessibilityLabel="正在读取上下文设置" />}
       {editor.loaded && <>
         <Text style={styles.title}>上下文容量（K Token）</Text>

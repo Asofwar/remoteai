@@ -16,6 +16,8 @@ export function readDevices(account: string) {
 export function saveDevices(account: string, devices: RemoteDevice[]) {
   return withCache(async (db) => {
     await cacheTransaction(db, async (tx) => {
+      // Discovery returns the complete account list, including offline computers.
+      await tx.runAsync('DELETE FROM devices WHERE account = ?', account);
       for (const device of devices) {
         // Cache display metadata only; never copy account credentials or online state.
         const cached: RemoteDevice = { deviceId: device.deviceId, name: device.name, platform: device.platform,
@@ -29,20 +31,22 @@ export function saveDevices(account: string, devices: RemoteDevice[]) {
   });
 }
 
-export function useOfflineDevices(session: AuthSession, devices: RemoteDevice[]) {
+export function useOfflineDevices(session: AuthSession, devices: RemoteDevice[], loaded: boolean) {
   const account = accountScope(session);
   const [cached, setCached] = useState<{ account: string; devices: RemoteDevice[] }>();
   useEffect(() => {
+    if (loaded) return;
     let active = true;
     void readDevices(account).then((saved) => { if (active) setCached({ account, devices: saved }); })
       .catch(() => { /* Live device discovery remains usable if local storage is unavailable. */ });
     return () => { active = false; };
-  }, [account]);
+  }, [account, loaded]);
   useEffect(() => {
-    if (devices.length) void saveDevices(account, devices).catch(() => {
+    if (loaded) void saveDevices(account, devices).catch(() => {
       /* The chat cache reports storage failures separately without blocking connection. */
     });
-  }, [account, devices]);
+  }, [account, devices, loaded]);
+  if (loaded) return devices;
   const saved = cached?.account === account ? cached.devices : [];
   return [...devices, ...saved.filter((device) => !devices.some((entry) => entry.deviceId === device.deviceId))];
 }

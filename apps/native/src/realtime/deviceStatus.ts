@@ -64,11 +64,7 @@ export function applyDeviceStatusSocketMessage(
   message: DeviceStatusSocketMessage,
 ): RemoteDevice[] {
   if (message.type === 'devices-snapshot') {
-    const snapshotIds = new Set(message.devices.map((device) => device.deviceId));
-    return [
-      ...message.devices,
-      ...current.filter((device) => !snapshotIds.has(device.deviceId)),
-    ];
+    return message.devices;
   }
   if (message.type === 'device-online') {
     return [
@@ -85,6 +81,22 @@ export function applyDeviceStatusSocketMessage(
     { ...offline, online: false, lastSeenAt: message.lastSeenAt },
     ...current.filter((device) => device.deviceId !== message.deviceId),
   ];
+}
+
+/** Replay only this connection's events that arrived while the server queried its snapshot. */
+export function createDeviceStatusReceiver() {
+  let pending: DeviceStatusSocketMessage[] = [];
+  let receivedSnapshot = false;
+  return (message: DeviceStatusSocketMessage) => {
+    if (message.type !== 'devices-snapshot') {
+      if (!receivedSnapshot) pending.push(message);
+      return (current: RemoteDevice[]) => applyDeviceStatusSocketMessage(current, message);
+    }
+    const devices = pending.reduce(applyDeviceStatusSocketMessage, message.devices);
+    pending = [];
+    receivedSnapshot = true;
+    return () => devices;
+  };
 }
 
 function remoteDevice(value: unknown): RemoteDevice | null {

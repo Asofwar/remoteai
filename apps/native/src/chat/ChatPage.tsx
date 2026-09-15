@@ -31,7 +31,7 @@ import type { ChatProject } from './types';
 import { compactUnavailableReason } from '../../../../shared/remote-chat/client/composerCommands';
 
 interface Props {
-  session: AuthSession; devices: RemoteDevice[]; active: boolean;
+  session: AuthSession; devices: RemoteDevice[]; devicesLoaded: boolean; active: boolean;
   notification: ChatNotificationTarget | null; notificationError: string;
   notificationHandled: (id: string) => void;
   tokenSummary: boolean; openTokenSummary: () => void; closeTokenSummary: () => void;
@@ -39,7 +39,7 @@ interface Props {
 
 export function ChatPage(props: Props) {
   const { session, active, notification, notificationError, notificationHandled } = props;
-  const devices = useOfflineDevices(session, props.devices);
+  const devices = useOfflineDevices(session, props.devices, props.devicesLoaded);
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const requestedId = notification?.deviceId ?? deviceId;
   const device = requestedId ? devices.find((entry) => entry.deviceId === requestedId)

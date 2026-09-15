@@ -181,6 +181,44 @@ describe('persistent chat cache using SQLite', () => {
     expect(await readDevices(accountScope({ ...account, email: 'other' }))).toEqual([]);
   });
 
+  it('replaces device metadata without restoring removed computers after reopening', async () => {
+    const device = { deviceId: 'pc', name: 'computer', platform: 'Windows',
+      online: false, localProxyRunning: false, capabilities: [], lastSeenAt: 'today' };
+    const scope = accountScope(account);
+    await saveDevices(scope, [device, { ...device, deviceId: 'deleted' }]);
+    await saveDevices(scope, [device]);
+    const bytes = state.db!.export();
+    state.db!.close(); state.db = new SQL.Database(bytes); state.db.exec('PRAGMA foreign_keys = ON');
+    expect((await readDevices(scope)).map((entry) => entry.deviceId)).toEqual(['pc']);
+  });
+
+  it('clears the final device without deleting another account or cached conversations', async () => {
+    const device = { deviceId: 'pc', name: 'computer', platform: 'Windows',
+      online: false, localProxyRunning: false, capabilities: [], lastSeenAt: 'today' };
+    const scope = accountScope(account);
+    const other = accountScope({ ...account, email: 'other' });
+    await store().save({ thread: history(), page: { hasMore: false }, archived: false });
+    await saveDevices(scope, [device]);
+    await saveDevices(other, [device]);
+    await saveDevices(scope, []);
+    expect(await readDevices(scope)).toEqual([]);
+    expect(await readDevices(other)).toHaveLength(1);
+    expect(await store().read('chat', {})).not.toBeNull();
+  });
+
+  it('rolls back device cache replacement if saving the new list fails', async () => {
+    const device = { deviceId: 'pc', name: 'computer', platform: 'Windows',
+      online: false, localProxyRunning: false, capabilities: [], lastSeenAt: 'today' };
+    const scope = accountScope(account);
+    await saveDevices(scope, [device]);
+    state.db!.exec("CREATE TRIGGER fail_devices BEFORE INSERT ON devices BEGIN SELECT RAISE(ABORT, 'full'); END");
+    await expect(saveDevices(scope, [{ ...device, deviceId: 'new' }])).rejects.toThrow();
+    expect((await readDevices(scope)).map((entry) => entry.deviceId)).toEqual(['pc']);
+    state.db!.exec('DROP TRIGGER fail_devices');
+    await saveDevices(scope, []);
+    expect(await readDevices(scope)).toEqual([]);
+  });
+
   it('enforces the global history budget across computer scopes', async () => {
     for (let index = 0; index < 12; index++) {
       const thread = history('large', 3);

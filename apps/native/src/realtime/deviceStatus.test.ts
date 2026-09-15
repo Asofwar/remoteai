@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { AuthSession, RemoteDevice } from '../types';
 import {
   applyDeviceStatusSocketMessage,
+  createDeviceStatusReceiver,
   deviceStatusSubscriptionMessage,
   deviceStatusWebSocketUrl,
   parseDeviceStatusSocketMessage,
@@ -100,14 +101,41 @@ describe('mobile device status WebSocket protocol', () => {
       .toEqual([{ ...device, online: false }]);
   });
 
-  it('keeps a just-pushed new device if it raced with the initial snapshot query', () => {
+  it('removes devices missing from an authoritative empty snapshot', () => {
     const snapshot = parseDeviceStatusSocketMessage(JSON.stringify({
       type: 'devices-snapshot',
       devices: [],
     }));
 
     expect(snapshot).not.toBeNull();
-    expect(applyDeviceStatusSocketMessage([device], snapshot!)).toEqual([device]);
+    expect(applyDeviceStatusSocketMessage([device], snapshot!)).toEqual([]);
+  });
+
+  it('drops devices deleted while disconnected while retaining registered offline computers', () => {
+    const receive = createDeviceStatusReceiver();
+    const offline = { ...device, deviceId: 'offline', online: false };
+    const update = receive({ type: 'devices-snapshot', devices: [offline] });
+    expect(update([device, offline])).toEqual([offline]);
+  });
+
+  it('preserves a new online event that arrives before the initial snapshot', () => {
+    const receive = createDeviceStatusReceiver();
+    const stale = { ...device, deviceId: 'deleted' };
+    const online = receive({ type: 'device-online', device })([stale]);
+    const update = receive({ type: 'devices-snapshot', devices: [] });
+    expect(update(online)).toEqual([device]);
+    // React may call a state updater again; replaying it must have no side effects.
+    expect(update(online)).toEqual([device]);
+  });
+
+  it('replays removal and offline events over an older initial snapshot', () => {
+    const receive = createDeviceStatusReceiver();
+    const other = { ...device, deviceId: 'other' };
+    receive({ type: 'device-removed', deviceId: device.deviceId });
+    receive({ type: 'device-offline', deviceId: other.deviceId, lastSeenAt: 'later' });
+    const update = receive({ type: 'devices-snapshot', devices: [device, other] });
+    expect(update([])).toEqual([{ ...other, online: false, lastSeenAt: 'later' }]);
+    expect(receive({ type: 'device-removed', deviceId: other.deviceId })(update([]))).toEqual([]);
   });
 
   it('syncs a desktop account change without changing another computer or the login account', () => {

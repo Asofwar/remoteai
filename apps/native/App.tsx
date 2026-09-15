@@ -78,7 +78,7 @@ import { TotpSyncSettings } from './src/totp/TotpSyncSettings';
 import type { TotpManagerState } from './src/totp/types';
 import { useTotpVault } from './src/totp/useTotpVault';
 import {
-  applyDeviceStatusSocketMessage,
+  createDeviceStatusReceiver,
   deviceStatusSubscriptionMessage,
   deviceStatusWebSocketUrl,
   parseDeviceStatusSocketMessage,
@@ -1717,6 +1717,7 @@ function AppContent() {
   const [session, updateSession] = useState<AuthSession | null>(null);
   const sessionRef = useRef(session);
   const setSession = useCallback((next: AuthSession | null) => {
+    setDevicesLoaded(false);
     sessionRef.current = next;
     updateSession(next);
   }, []);
@@ -1733,6 +1734,7 @@ function AppContent() {
   const [accounts, setAccounts] = useState<AccountSummary[]>([]);
   const [providers, setProviders] = useState<RemoteProviderSummary[]>([]);
   const [devices, setDevices] = useState<RemoteDevice[]>([]);
+  const [devicesLoaded, setDevicesLoaded] = useState(false);
   const [deletingDeviceId, setDeletingDeviceId] = useState<string | null>(null);
   const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(null);
   const [switchingProvider, setSwitchingProvider] = useState<{
@@ -1763,6 +1765,7 @@ function AppContent() {
       ]);
       setAccounts((current) => mergeServerAccounts(current, nextAccounts));
       setDevices(nextDevices);
+      setDevicesLoaded(true);
       setProviders(nextProviders);
     } catch (error) {
       if (isSessionExpiredError(error)) {
@@ -1896,7 +1899,10 @@ function AppContent() {
               setAccounts(accountsResult.value);
               lastUsageRefreshAtRef.current = Date.now();
             }
-            if (devicesResult.status === 'fulfilled') setDevices(devicesResult.value);
+            if (devicesResult.status === 'fulfilled') {
+              setDevices(devicesResult.value);
+              setDevicesLoaded(true);
+            }
             if (providersResult.status === 'fulfilled') setProviders(providersResult.value);
             if (profileResult.status === 'fulfilled') setProfile(profileResult.value);
             if (accountsResult.status === 'rejected'
@@ -1971,6 +1977,7 @@ function AppContent() {
         const nextDevices = await fetchRemoteDevices(session);
         if (stopped) return;
         setDevices(nextDevices);
+        setDevicesLoaded(true);
         reconnectAttempt = 0;
       } catch (error) {
         if (isSessionExpiredError(error)) {
@@ -1999,6 +2006,7 @@ function AppContent() {
         return;
       }
       socket = nextSocket;
+      const receiveDeviceStatus = createDeviceStatusReceiver();
       nextSocket.onopen = () => {
         if (stopped || !foreground || socket !== nextSocket) {
           nextSocket.close(1000, 'Connection is no longer needed');
@@ -2011,7 +2019,8 @@ function AppContent() {
         if (stopped || socket !== nextSocket) return;
         const message = parseDeviceStatusSocketMessage(event.data);
         if (!message) return;
-        setDevices((current) => applyDeviceStatusSocketMessage(current, message));
+        setDevices(receiveDeviceStatus(message));
+        if (message.type === 'devices-snapshot') setDevicesLoaded(true);
       };
       nextSocket.onerror = () => undefined;
       nextSocket.onclose = (event) => {
@@ -2071,7 +2080,11 @@ function AppContent() {
       .catch((error) => Toast.fail(`读取账户失败：${errorMessage(error)}`))
       .finally(() => setLoading(false));
     void fetchRemoteDevices(nextSession)
-      .then(setDevices)
+      .then((nextDevices) => {
+        if (sessionRef.current !== nextSession) return;
+        setDevices(nextDevices);
+        setDevicesLoaded(true);
+      })
       .catch((error) => Toast.fail(`读取设备失败：${errorMessage(error)}`));
     void fetchRemoteProviders(nextSession)
       .then(setProviders)
@@ -2284,6 +2297,7 @@ function AppContent() {
   return <SafeAreaView style={[styles.app, activePage === 'chat' && styles.chatCanvas]}>
     <StatusBar style="dark" />
     <ChatPage session={session} devices={devices} active={activePage === 'chat' || activePage === 'token-summary'}
+      devicesLoaded={devicesLoaded}
       tokenSummary={activePage === 'token-summary'} openTokenSummary={() => setActivePage('token-summary')}
       closeTokenSummary={() => setActivePage('chat')}
       notification={chatNotification.target} notificationError={chatNotification.error}

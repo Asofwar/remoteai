@@ -7,6 +7,7 @@ import { ChatSettingsController } from '@/modules/chat-settings/chat-settings.co
 import { ChatSettingsService } from '@/modules/chat-settings/chat-settings.service';
 import { ChatSettingsEntity } from '@/modules/chat-settings/chat-settings.entity';
 import type { AuthUser } from '@/common/decorators/user.decorator';
+import { AdminAuditLogEntity } from '@/modules/admin/entities/admin-audit-log.entity';
 
 describe('chat settings', () => {
   it.each([null, {}, { threadPageSize: '20' }, { historyPageSize: 0 }, { imageTargetKb: 1 },
@@ -18,8 +19,12 @@ describe('chat settings', () => {
   it('defaults only when no configuration has been saved and commits changes with their audit record', async () => {
     let saved: ChatSettingsEntity | null = null;
     const save = vi.fn(async (entity, row) => { if (entity === ChatSettingsEntity) saved = row; });
+    const create = (entity: typeof AdminAuditLogEntity, row: Partial<AdminAuditLogEntity>) =>
+      Object.assign(new entity(), row);
     const repository = { findOneBy: async () => saved,
-      manager: { transaction: async (work: (manager: { save: typeof save }) => Promise<void>) => work({ save }) } };
+      manager: { transaction: async (
+        work: (manager: { save: typeof save; create: typeof create }) => Promise<void>,
+      ) => work({ save, create }) } };
     const service = new ChatSettingsService(repository as unknown as Repository<ChatSettingsEntity>);
     expect(await service.read()).toEqual(DEFAULT_CHAT_POLICY);
     const policy = { ...DEFAULT_CHAT_POLICY, threadPageSize: 7, imageTargetKb: 128,
@@ -29,6 +34,8 @@ describe('chat settings', () => {
     expect(await service.read()).toEqual(policy);
     expect(save).toHaveBeenCalledTimes(2);
     expect(save.mock.calls[1][1]).toMatchObject({ actorId: actor.id, metadata: policy });
+    const auditLog = save.mock.calls[1][1] as AdminAuditLogEntity;
+    expect(auditLog.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
     await expect(service.update(actor, { ...policy, imageSourceMaxMb: 0 })).rejects.toThrow();
     expect(save).toHaveBeenCalledTimes(2);
   });

@@ -22,8 +22,9 @@ export class ChatSettingsService {
     catch { throw new BadRequestException('请在允许范围内填写完整的聊天设置。'); }
     await this.settings.manager.transaction(async (manager) => {
       await manager.save(ChatSettingsEntity, { id: SETTINGS_ID, policy });
-      await manager.save(AdminAuditLogEntity, { actorId: actor.id, actorEmail: actor.email,
+      const auditLog = manager.create(AdminAuditLogEntity, { actorId: actor.id, actorEmail: actor.email,
         action: 'chat-settings.update', targetType: 'chat-settings', targetId: SETTINGS_ID, metadata: policy });
+      await manager.save(AdminAuditLogEntity, auditLog);
     });
     return policy;
   }

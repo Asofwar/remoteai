@@ -63,6 +63,10 @@ fn gui_provider_request_keeps_its_account_while_shared_switches_and_polling_cont
     incoming.recv_timeout(Duration::from_secs(5)).unwrap();
     shared.active_provider_id = Some("another-shared-provider".into());
     write_state(&paths, &shared).unwrap();
+    tauri::async_runtime::block_on(gui_context::record_usage(&json!({
+        "threadId": session_id,
+        "tokenUsage": {"modelContextWindow": 285_000, "last": {"totalTokens": 15_000}}
+    })));
     for _ in 0..3 {
         assert!(active_proxy_session_ids().unwrap().contains(&session_id));
         assert_eq!(
@@ -71,6 +75,10 @@ fn gui_provider_request_keeps_its_account_while_shared_switches_and_polling_cont
                 .len(),
             1
         );
+        let session = proxy_sessions().lock().unwrap()[&session_id].metadata_snapshot();
+        assert_eq!(session.gui_context.unwrap().capacity, Some(285_000));
+        assert_eq!(session.context_tokens, Some(15_000));
+        assert_eq!(session.active_requests, 1);
     }
     release.send(()).unwrap();
     let payload = worker.join().unwrap();

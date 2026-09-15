@@ -175,6 +175,9 @@ impl Client {
             if matches!(method, "turn/started" | "turn/completed") {
                 self.track_live_turn(&event).await;
             }
+            if method == "thread/tokenUsage/updated" {
+                crate::local_proxy::gui_context::record_usage(&event.params).await;
+            }
             if method == "turn/completed" {
                 if let Some(id) = event.params["turn"]["id"].as_str() {
                     self.approvals

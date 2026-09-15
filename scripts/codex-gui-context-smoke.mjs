@@ -7,11 +7,16 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { once } from "node:events";
+import { guiContextCatalog } from "./fixtures/gui-context-catalog.mjs";
 
 assert.ok(process.argv[2], "Pass the Codex executable path");
 const root = await mkdtemp(join(tmpdir(), "gui-context-"));
 const home = join(root, "home");
 await mkdir(home);
+const catalog = join(home, "models.json");
+const accountLimit = process.argv.includes("--account-limit") ? 272000 : null;
+await writeFile(catalog, JSON.stringify(guiContextCatalog(accountLimit)));
+const effectiveCapacity = (capacity) => Math.min(capacity, accountLimit ?? capacity) * 0.95;
 let responses = 0;
 let holdNext = false;
 let heldResponse;
@@ -40,6 +45,7 @@ server.listen(0, "127.0.0.1");
 await once(server, "listening");
 await writeFile(join(home, "config.toml"), `model = "gpt-5.4"
 model_context_window = 200000
+model_catalog_json = ${JSON.stringify(catalog.replaceAll("\\", "/"))}
 model_provider = "fixture"
 approval_policy = "never"
 [model_providers.fixture]
@@ -143,14 +149,14 @@ try {
   assert.ok(active.thread.turns.some((turn) => turn.id === background.id && turn.status === "inProgress"));
   heldResponse();
   await waitFor(client, (event) => event.method === "turn/completed" && event.params.turn.id === background.id);
-  assert.equal(await turnCapacity(client, first.id), 285000);
+  assert.equal(await turnCapacity(client, first.id), effectiveCapacity(300000));
   assert.equal(await turnCapacity(client, second.id), original);
   // Repeated saves and reset all stay on the same app-server connection.
   for (const capacity of [100000, 300000, null]) {
     await rejoin(client, first.id, capacity);
-    assert.equal(await turnCapacity(client, first.id), capacity === null ? original : capacity * 0.95);
+    assert.equal(await turnCapacity(client, first.id), capacity === null ? original : effectiveCapacity(capacity));
   }
-  console.log("PASS: 300 K returns 285 K; scoped rejoin preserves the other active turn; repeated changes and reset work.");
+  console.log(`PASS: 300 K returns ${effectiveCapacity(300000)} tokens; other active turns, repeated saves and reset work.`);
 } finally {
   await client.close(); server.closeAllConnections(); server.close();
 }

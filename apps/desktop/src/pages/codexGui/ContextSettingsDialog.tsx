@@ -32,7 +32,7 @@ export function ContextSettingsDialog({ threadId, onClose }: { threadId: string;
           <span className={styles.hint}>1 K = 1000 Token；留空使用默认容量。</span>
           <Button type="link" size="small" disabled={editor.saving} onClick={() => editor.setValue("")}>恢复默认</Button>
         </div>
-        <p className={styles.hint}>用量会在收到回复后更新。程序会预留部分空间，显示的可用容量可能略小。</p>
+        <p className={styles.hint}>用量会在收到回复后更新。可用容量受模型上限和预留空间影响。</p>
       </>}
       {editor.error && <div role="alert" className={styles.error}>{editor.error}
         {!editor.loaded && <Button type="link" size="small" onClick={editor.retry}>重试</Button>}

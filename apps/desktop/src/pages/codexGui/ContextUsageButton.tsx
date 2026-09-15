@@ -5,10 +5,12 @@ import { formatCompactTokenCount } from "../../utils/tokenContext";
 import type { ThreadTokenUsage } from "./types";
 import { contextUsage, FULL_PERCENT } from "./contextUsage";
 import styles from "./ContextUsageButton.module.less";
+import { ContextCapacityHint } from "./ContextCapacityHint";
 
-export function ContextUsageButton({ usage, open, onOpenChange, onSettings }: {
+export function ContextUsageButton({ usage, open, onOpenChange, onSettings, threadId }: {
   usage?: ThreadTokenUsage; open: boolean; onOpenChange: (open: boolean) => void;
   onSettings?: () => void;
+  threadId?: string | null;
 }) {
   const id = useId();
   const context = contextUsage(usage);
@@ -26,8 +28,9 @@ export function ContextUsageButton({ usage, open, onOpenChange, onSettings }: {
       <div>已用 {formatCompactTokenCount(context.used, "zh")} Token
         {context.capacity !== null && `，共 ${formatCompactTokenCount(context.capacity, "zh")}`}</div>
     </> : <div>暂无上下文用量</div>}
+    <ContextCapacityHint threadId={threadId} open={open} />
   </div>;
-  return <Popover content={content} trigger="click" placement="top" arrow={false}
+  return <Popover content={content} fresh trigger="click" placement="top" arrow={false}
     open={open} onOpenChange={onOpenChange}
     styles={{ root: { maxWidth: "min(400px, calc(100vw - 24px))", visibility: open ? "visible" : "hidden" },
       body: { padding: "6px 10px", borderRadius: 12 } }}>

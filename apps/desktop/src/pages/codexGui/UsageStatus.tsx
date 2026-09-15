@@ -51,7 +51,7 @@ export function UsageStatus({ active, threadId, tokenUsage }: {
     if (event.key === "Escape" && hint) { event.stopPropagation(); setHint(null); }
   }}>
     <span className={styles.usage} role="group" aria-label="今日用量">
-      <ContextUsageButton usage={tokenUsage} open={active && hint === "context"}
+      <ContextUsageButton threadId={threadId} usage={tokenUsage} open={active && hint === "context"}
         onSettings={threadId ? () => { setHint(null); setSettingsThread(threadId); } : undefined}
         onOpenChange={(open) => changeHint("context", open)} />
       <span>今日</span>

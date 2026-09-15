@@ -90,6 +90,7 @@ impl ProxySessionState {
             account_email: self.account_email.clone(),
             model: self.model.clone(),
             context_tokens: self.context_tokens,
+            gui_context: self.gui_context.clone(),
             token_totals: self.token_totals.clone(),
             requests: VecDeque::new(),
         }

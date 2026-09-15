@@ -21,9 +21,16 @@ struct ProxySessionState {
     account_email: Option<String>,
     model: Option<String>,
     context_tokens: Option<u64>,
+    #[serde(default)]
+    gui_context: Option<GuiSessionContext>,
     token_totals: ProxySessionTokenTotals,
     #[serde(skip)]
     requests: VecDeque<ProxySessionRequestState>,
+}
+
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
+struct GuiSessionContext {
+    capacity: Option<u64>,
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]

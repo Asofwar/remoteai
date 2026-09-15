@@ -64,6 +64,7 @@ fn history_test_snapshot(request: ProxySessionRequestState) -> ProxyHistorySnaps
             account_email: Some("test@example.com".to_string()),
             model: Some("image-model".to_string()),
             context_tokens: Some(30),
+            gui_context: None,
             token_totals: ProxySessionTokenTotals {
                 total_tokens: 30,
                 ..Default::default()
@@ -72,6 +73,18 @@ fn history_test_snapshot(request: ProxySessionRequestState) -> ProxyHistorySnaps
         },
         request: Some(request),
     }
+}
+
+#[test]
+fn gui_capacity_survives_metadata_snapshots_and_old_history_remains_readable() {
+    let mut session = history_test_snapshot(history_test_request(1)).session;
+    session.gui_context = Some(GuiSessionContext { capacity: Some(285_000) });
+    let value = serde_json::to_value(session.metadata_snapshot()).unwrap();
+    let restored: ProxySessionState = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(restored.gui_context.unwrap().capacity, Some(285_000));
+    let mut old = value;
+    old.as_object_mut().unwrap().remove("gui_context");
+    assert!(serde_json::from_value::<ProxySessionState>(old).unwrap().gui_context.is_none());
 }
 
 #[test]

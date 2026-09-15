@@ -107,6 +107,7 @@ fn begin_proxy_session_request(
                 account_email: None,
                 model: None,
                 context_tokens: None,
+                gui_context: None,
                 token_totals: ProxySessionTokenTotals::default(),
                 requests: VecDeque::new(),
             });

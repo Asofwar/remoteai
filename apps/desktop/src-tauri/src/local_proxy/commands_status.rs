@@ -362,7 +362,8 @@ fn list_proxy_sessions_blocking<R: Runtime>(
                 account_email: session.account_email.clone(),
                 model: session.model.clone(),
                 context_tokens: session.context_tokens,
-                model_context_window,
+                model_context_window: session.gui_context.as_ref()
+                    .map_or(model_context_window, |context| context.capacity),
                 total_tokens: session.token_totals.total_tokens,
                 input_tokens: session.token_totals.input_tokens,
                 output_tokens: session.token_totals.output_tokens,

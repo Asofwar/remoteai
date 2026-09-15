@@ -16,6 +16,7 @@ pub(crate) mod concurrent_quota;
 pub(crate) mod endpoints;
 mod error_capture;
 mod gui_auto_switch;
+pub(crate) mod gui_context;
 mod gui_forwarding;
 mod gui_routing;
 pub(crate) mod lan_keys;

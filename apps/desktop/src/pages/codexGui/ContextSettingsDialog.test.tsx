@@ -72,9 +72,31 @@ it("validates input and retains edits after a failed save without exposing inter
   expect(document.querySelector(".ant-modal")).toBeNull();
 });
 
+it("shows the saved GUI capacity before the next reply and keeps conversation settings separate", async () => {
+  const capacities = new Map([["one", 128_000], ["two", 400_000]]);
+  vi.mocked(invoke).mockImplementation((command, args) => {
+    const request = args as { threadId: string; settings?: { capacity: number } };
+    if (command === "codex_gui_context_settings") {
+      return Promise.resolve({ capacity: capacities.get(request.threadId) ?? null });
+    }
+    if (command === "codex_gui_set_context_settings") {
+      capacities.set(request.threadId, request.settings!.capacity);
+      return Promise.resolve(request.settings);
+    }
+    return new Promise(() => {});
+  });
+  await render(); await openSettings(); await type("300"); await click(footerButton("保存"));
+  await click(button("查看上下文用量"));
+  expect(document.querySelector(".ant-popover")?.textContent).toContain("对话设置：300K Token");
+  await render("two"); await click(button("查看上下文用量"));
+  expect(document.querySelector(".ant-popover")?.textContent).toContain("对话设置：400K Token");
+  expect(document.querySelector(".ant-popover")?.textContent).not.toContain("300K");
+});
+
 it("discards stale loads when switching conversations and prevents saving before a successful read", async () => {
   await render();
   let resolve!: (value: { capacity: number }) => void;
+  vi.mocked(invoke).mockResolvedValueOnce({ capacity: 128_000 });
   vi.mocked(invoke).mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
   await openSettings(); expect(footerButton("保存").disabled).toBe(true);
   await render("two"); await openSettings(); expect(input().value).toBe("128");
@@ -86,7 +108,9 @@ it("discards stale loads when switching conversations and prevents saving before
 });
 
 it("offers retry after a failed read", async () => {
-  await render(); vi.mocked(invoke).mockRejectedValueOnce(new Error("private")); await openSettings();
+  await render();
+  vi.mocked(invoke).mockResolvedValueOnce({ capacity: 128_000 }).mockRejectedValueOnce(new Error("private"));
+  await openSettings();
   expect(footerButton("保存").disabled).toBe(true);
   await click([...document.querySelectorAll<HTMLButtonElement>(".ant-modal button")]
     .find((element) => element.textContent === "重试")!);

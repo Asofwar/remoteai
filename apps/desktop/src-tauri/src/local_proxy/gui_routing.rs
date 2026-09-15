@@ -40,6 +40,9 @@ pub(super) fn selected_target<R: Runtime>(
 pub(super) fn handle<R: Runtime>(
     request: GuiProxyRequest<'_, R>,
 ) -> Result<UpstreamPayload, String> {
+    if let Some(id) = request.session_id {
+        super::gui_context::mark_session(id);
+    }
     handle_selected(request).map_err(|_| "Codex GUI 请求未完成，请检查所选账户后重试。".to_string())
 }
 
@@ -68,7 +71,9 @@ fn models<R: Runtime>(
 ) -> Result<UpstreamPayload, String> {
     if let ActiveTarget::Provider(provider) = target {
         if !providers::uses_upstream_official_models(provider) {
-            return Ok(provider_models_payload_with_image_route(provider, false));
+            return super::gui_context::model_catalog(provider_models_payload_with_image_route(
+                provider, false,
+            ));
         }
     }
     let payload = forward_active_request(ActiveForwardRequest {
@@ -81,15 +86,7 @@ fn models<R: Runtime>(
         session_id: None,
         account_id_override: account_id,
     })?;
-    if account_id.is_none() {
-        return Ok(payload);
-    }
-    let settings = read_app_settings(request.app)?;
-    override_official_model_context_windows(
-        payload,
-        settings.gpt_5_6_sol_context_window,
-        &settings.official_model_context_windows,
-    )
+    super::gui_context::model_catalog(payload)
 }
 
 #[cfg(test)]

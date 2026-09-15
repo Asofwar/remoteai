@@ -46,9 +46,9 @@ fn forward_chat_bridge(
                 request
             } else {
                 request.bearer_auth(provider.api_key.trim())
-            }
-            .json(&chat_body);
-            apply_forward_headers(request, headers, true)
+            };
+            // JSON supplies a default media type only when the forwarded headers have none.
+            apply_forward_headers(request, headers, true).json(&chat_body)
         },
         "Chat bridge request failed",
     )?;

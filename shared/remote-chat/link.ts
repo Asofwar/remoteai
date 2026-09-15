@@ -1,5 +1,6 @@
 import { SessionCipher } from './cipher';
-import { Assembler, chunks } from './framing';
+import { Assembler } from './framing';
+import { SendQueue } from './sendQueue';
 import {
   DIRECT_TIMEOUT_MS, RELAY_START_GRACE_MS, MAX_BUFFER_BYTES, type Channel, type ConnectionMode,
   type Peer, type RpcMessage, type Signal,
@@ -17,9 +18,13 @@ class LegacyChatLink {
   private mode: ConnectionMode = 'connecting';
   private relay = false;
   private closed = false;
-  private serial = 0;
-  private queued = 0;
-  private outgoing: Promise<void> = Promise.resolve();
+  private readonly outgoing = new SendQueue({ capacity: () => this.waitForCapacity(),
+    send: (part) => {
+      if (!this.cipher) throw new Error('正在连接电脑。');
+      const payload = this.cipher.encrypt(part);
+      if (this.relay) this.signal({ type: 'relay', payload });
+      else this.channel!.send(payload);
+    } });
   private readonly startedAt = Date.now();
   private readonly fallbackTimer: ReturnType<typeof setTimeout>;
 
@@ -115,22 +120,7 @@ class LegacyChatLink {
   }
 
   send(message: RpcMessage): Promise<void> {
-    if (this.closed || this.queued >= 512) return Promise.reject(new Error('连接繁忙，请重新连接。'));
-    this.queued += 1;
-    const id = String(++this.serial);
-    const result = this.outgoing.then(async () => {
-      for (const part of chunks(message, id)) {
-        await this.waitForCapacity();
-        if (!this.cipher) throw new Error('正在连接电脑。');
-        const payload = this.cipher.encrypt(part);
-        if (this.relay) this.signal({ type: 'relay', payload });
-        else this.channel!.send(payload);
-        // Pace large histories and image payloads; do not monopolize the UI or the gateway.
-        await new Promise<void>((resolve) => setTimeout(resolve, 8));
-      }
-    }).finally(() => { this.queued -= 1; });
-    this.outgoing = result.catch(() => undefined);
-    return result;
+    return this.outgoing.send(message);
   }
 
   private async waitForCapacity() {
@@ -148,6 +138,7 @@ class LegacyChatLink {
   close() {
     if (this.closed) return;
     this.closed = true;
+    this.outgoing.close();
     clearTimeout(this.fallbackTimer);
     this.peer?.close();
     this.channel?.close();

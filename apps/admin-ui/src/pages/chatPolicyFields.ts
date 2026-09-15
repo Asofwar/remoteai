@@ -3,6 +3,14 @@ type Copy = [string, string];
 export interface PolicyField { key: keyof ChatPolicy; label: Copy; hint: Copy; unit: Copy }
 export interface PolicySection { key: string; title: Copy; hint: Copy; fields: PolicyField[] }
 export const POLICY_SECTIONS: PolicySection[] = [
+  { key: 'relay', title: ['Relay 传输', 'Relay transfer'],
+    hint: ['默认不限。填 -1 表示不限，填正整数可设置每个连接的上限。',
+      'Unlimited by default. Enter -1 for no limit, or a positive whole number for each connection.'], fields: [
+    { key: 'relayMaxMbPerSecond', label: ['每秒传输量上限', 'Transfer limit per second'],
+      hint: ['-1 表示不限', '-1 means unlimited'], unit: ['MiB/秒', 'MiB/s'] },
+    { key: 'relayMaxFramesPerSecond', label: ['每秒帧数上限', 'Frames per second limit'],
+      hint: ['-1 表示不限', '-1 means unlimited'], unit: ['帧/秒', 'frames/s'] },
+  ] },
   { key: 'images', title: ['图片', 'Images'], hint: ['分别设置添加、查看和压缩图片的限制，数值不设上限。',
     'Set image upload, viewing and compression limits. Values have no upper cap.'], fields: [
     { key: 'imageSourceMaxMb', label: ['添加图片上限', 'Image upload limit'],

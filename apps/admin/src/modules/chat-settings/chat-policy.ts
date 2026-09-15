@@ -1,5 +1,7 @@
 /** Public numeric contract shared by the admin form, chat clients and desktop host. */
 export const CHAT_POLICY_FIELDS = {
+  relayMaxMbPerSecond: { min: -1, max: undefined, default: -1 },
+  relayMaxFramesPerSecond: { min: -1, max: undefined, default: -1 },
   threadPageSize: { min: 1, max: 100, default: 50 },
   historyPageSize: { min: 1, max: 100, default: 10 },
   imageSourceMaxMb: { min: 1, max: undefined, default: 20 },
@@ -24,10 +26,11 @@ export function parseChatPolicy(value: unknown): ChatPolicy {
   for (const key of Object.keys(CHAT_POLICY_FIELDS) as (keyof ChatPolicy)[]) {
     const field = CHAT_POLICY_FIELDS[key];
     // Older saved policies and coordinators do not include these later additions.
-    const optional = key === 'videoPreviewMaxMb' || key === 'fileUploadMaxMb' || key === 'fileUploadTotalMaxMb';
+    const optional = field.default === -1 || key === 'videoPreviewMaxMb'
+      || key === 'fileUploadMaxMb' || key === 'fileUploadTotalMaxMb';
     const number = optional && record[key] === undefined ? field.default : record[key];
     if (typeof number !== 'number' || !Number.isSafeInteger(number) || number < field.min
-      || (field.max !== undefined && number > field.max)) {
+      || (field.default === -1 && number === 0) || (field.max !== undefined && number > field.max)) {
       throw new Error('请在允许范围内填写整数。');
     }
     policy[key] = number;

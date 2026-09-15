@@ -1,6 +1,7 @@
 import { SessionCipher } from './cipher';
 import { ReliableDelivery, deliveryFrame } from './delivery';
-import { Assembler, chunks } from './framing';
+import { Assembler } from './framing';
+import { SendQueue } from './sendQueue';
 import { HotPeer } from './hotPeer';
 import type { LinkOptions } from './linkOptions';
 import { MAX_BUFFER_BYTES, type Channel, type ConnectionMode, type RpcMessage, type Signal } from './protocol';
@@ -11,8 +12,6 @@ const PROBE_MS = 1000;
 const PATH_TIMEOUT_MS = 3000;
 const DIRECT_STABLE_MS = 3000;
 const OUTAGE_TIMEOUT_MS = 60_000;
-const MAX_QUEUE = 512;
-const SEND_PACE_MS = 8;
 
 /** Both paths stay open. Authenticated acknowledgements cover every fragment, including events. */
 export class HotLink {
@@ -34,9 +33,9 @@ export class HotLink {
   private relaySince = Date.now();
   private readonly lastPong = { direct: 0, relay: 0 };
   private readonly probes = new Map<number, { path: Path; at: number }>();
-  private serial = 0;
-  private queued = 0;
-  private outgoing = Promise.resolve();
+  private readonly outgoing = new SendQueue({ capacity: () => this.capacity(),
+    send: (part) => this.delivery.enqueue(part) });
+  private readonly capacityWaiters = new Set<() => void>();
 
   constructor(private readonly options: LinkOptions) {
     this.delivery = new ReliableDelivery({
@@ -115,7 +114,10 @@ export class HotLink {
         if (!Number.isSafeInteger(frame.id)) throw new Error('Invalid probe');
         this.transmit(path, { kind: 'pong', id: frame.id });
       } else if (frame.kind === 'pong') this.pong(frame.id, path);
-      else this.delivery.accept(frame, (ack) => { this.transmit(path, ack); });
+      else {
+        this.delivery.accept(frame, (ack) => { this.transmit(path, ack); });
+        if (!this.delivery.full) this.releaseCapacity();
+      }
     } catch { this.fail('连接校验失败，请重新连接电脑。'); }
   }
 
@@ -183,23 +185,19 @@ export class HotLink {
   }
 
   send(message: RpcMessage): Promise<void> {
-    if (this.closed || this.queued >= MAX_QUEUE) return Promise.reject(new Error('连接繁忙，请稍后重试。'));
-    this.queued += 1;
-    const id = String(++this.serial);
-    const result = this.outgoing.then(async () => {
-      for (const part of chunks(message, id)) {
-        await this.capacity();
-        this.delivery.enqueue(part);
-        await new Promise<void>((resolve) => setTimeout(resolve, SEND_PACE_MS));
-      }
-    }).finally(() => { this.queued -= 1; });
-    this.outgoing = result.catch(() => undefined);
-    return result;
+    return this.outgoing.send(message);
   }
 
   private async capacity() {
-    while (!this.closed && this.delivery.full) await new Promise<void>((resolve) => setTimeout(resolve, TICK_MS));
+    while (!this.closed && this.delivery.full) {
+      await new Promise<void>((resolve) => this.capacityWaiters.add(resolve));
+    }
     if (this.closed) throw new Error('电脑已断开连接。');
+  }
+
+  private releaseCapacity() {
+    for (const resolve of this.capacityWaiters) resolve();
+    this.capacityWaiters.clear();
   }
 
   private fail(message: string) { this.options.error(message); this.close(); }
@@ -208,6 +206,8 @@ export class HotLink {
     if (this.closed) return;
     if (notify) { this.transmit('direct', { kind: 'close' }); this.transmit('relay', { kind: 'close' }); }
     this.closed = true;
+    this.outgoing.close();
+    this.releaseCapacity();
     clearInterval(this.timer);
     this.peer.close();
     this.channel?.close();

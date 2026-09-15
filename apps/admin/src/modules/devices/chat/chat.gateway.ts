@@ -1,4 +1,5 @@
 import { ChatSettingsService } from '../../chat-settings/chat-settings.service';
+import { DEFAULT_CHAT_POLICY } from '../../chat-settings/chat-policy';
 import { OnModuleDestroy } from '@nestjs/common';
 import { OnGatewayConnection, OnGatewayDisconnect, WebSocketGateway } from '@nestjs/websockets';
 import type { RawData } from 'ws';
@@ -9,6 +10,8 @@ import { CHAT_FRAME_LIMIT, record, send, type ChatIdentity } from './protocol';
 import { ChatStunService } from './stun.service';
 
 const POLICY_REFRESH_MS = 5000;
+const RATE_WINDOW_MS = 1000;
+const MIB = 1024 * 1024;
 
 interface Connection {
   identity?: ChatIdentity;
@@ -27,6 +30,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
   private readonly heartbeat = setInterval(() => this.tick(), 25_000);
 
   private refreshingPolicy = false;
+  private policy = { ...DEFAULT_CHAT_POLICY };
   private readonly policyTimer = setInterval(() => { void this.refreshPolicy(); }, POLICY_REFRESH_MS);
 
   constructor(private readonly auth: ChatAuthService, private readonly stun: ChatStunService,
@@ -65,6 +69,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     state.authenticating = true;
     const identity = await this.auth.authenticate(message);
     const policy = await this.settings.read();
+    this.policy = policy;
     if (client.readyState !== WebSocket.OPEN || !this.connections.has(client)) return;
     state.identity = identity;
     clearTimeout(state.authTimer);
@@ -81,6 +86,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     this.refreshingPolicy = true;
     try {
       const policy = await this.settings.read();
+      this.policy = policy;
       for (const [client, state] of this.connections) {
         if (state.identity && state.identity.expiresAt > Date.now()) send(client, { type: 'chat-policy', policy });
       }
@@ -89,14 +95,18 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
   }
 
   private checkRate(state: Connection, size: number) {
-    if (Date.now() - state.windowStart > 1000) {
+    if (Date.now() - state.windowStart >= RATE_WINDOW_MS) {
       state.bytes = 0;
       state.frames = 0;
       state.windowStart = Date.now();
     }
     state.bytes += size;
     state.frames += 1;
-    if (state.bytes > 4 * 1024 * 1024 || state.frames > 400) throw new Error('Rate exceeded');
+    const { relayMaxMbPerSecond, relayMaxFramesPerSecond } = this.policy;
+    if ((relayMaxMbPerSecond !== -1 && state.bytes / MIB > relayMaxMbPerSecond)
+      || (relayMaxFramesPerSecond !== -1 && state.frames > relayMaxFramesPerSecond)) {
+      throw new Error('Rate exceeded');
+    }
   }
 
   private tick() {

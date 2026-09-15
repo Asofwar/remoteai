@@ -10,6 +10,18 @@ import type { AuthUser } from '@/common/decorators/user.decorator';
 import { AdminAuditLogEntity } from '@/modules/admin/entities/admin-audit-log.entity';
 
 describe('chat settings', () => {
+  it.each(['relayMaxMbPerSecond', 'relayMaxFramesPerSecond'] as const)(
+    'defaults missing relay limits to unlimited and validates configured values: %s', (key) => {
+      const previous = { ...DEFAULT_CHAT_POLICY };
+      delete (previous as Partial<typeof previous>)[key];
+      expect(parseChatPolicy(previous)[key]).toBe(-1);
+      for (const value of [-1, 1, 10000]) {
+        expect(parseChatPolicy({ ...DEFAULT_CHAT_POLICY, [key]: value })[key]).toBe(value);
+      }
+      for (const value of [-2, 0, 0.5, Infinity, '-1']) {
+        expect(() => parseChatPolicy({ ...DEFAULT_CHAT_POLICY, [key]: value })).toThrow();
+      }
+    });
   it.each([null, {}, { threadPageSize: '20' }, { historyPageSize: 0 }, { imageTargetKb: 1 },
     { fileDownloadMaxMb: Infinity }, { imageMaxEdge: 300.5 }])('rejects incomplete or invalid limits: %o', (value) => {
     const input = value && Object.keys(value).length ? { ...DEFAULT_CHAT_POLICY, ...value } : value;

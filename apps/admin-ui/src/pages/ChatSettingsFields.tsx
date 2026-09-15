@@ -4,15 +4,21 @@ import { POLICY_SECTIONS, type PolicyField } from './chatPolicyFields';
 
 function SettingField({ field, language }: { field: PolicyField; language: 0 | 1 }) {
   const { min, max } = CHAT_POLICY_FIELDS[field.key];
-  const message = max === undefined
+  const unlimited = min === -1;
+  const numericMessage = max === undefined
     ? (language === 0 ? `请输入不小于 ${min} 的整数` : `Enter a whole number of at least ${min}`)
     : (language === 0 ? `请输入 ${min}–${max} 之间的整数` : `Enter a whole number from ${min} to ${max}`);
+  const unlimitedMessage = language === 0
+    ? '请输入 -1（不限）或正整数' : 'Enter -1 (unlimited) or a positive whole number';
+  const message = unlimited ? unlimitedMessage : numericMessage;
   return <div className="chat-policy-field">
     <div className="chat-policy-field-copy">
       <label htmlFor={field.key}>{field.label[language]}</label>
       <Typography.Text type="secondary">{field.hint[language]}</Typography.Text>
     </div>
-    <Form.Item name={field.key} rules={[{ required: true, type: 'integer', min, max, message }]}>
+    <Form.Item name={field.key} rules={[{ required: true, type: 'integer', min, max, message },
+      { validator: (_, value: unknown) => unlimited && value === 0
+        ? Promise.reject(new Error(message)) : Promise.resolve() }]}>
       <InputNumber id={field.key} aria-label={field.label[language]} min={min} max={max}
         precision={0} addonAfter={field.unit[language]} controls={false} />
     </Form.Item>

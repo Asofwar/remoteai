@@ -6,6 +6,20 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(100_000); harness = hotL
 afterEach(() => { harness.close(); vi.useRealTimers(); });
 const advance = (milliseconds = 4500) => vi.advanceTimersByTimeAsync(milliseconds);
 
+it('streams an interleaved small reply over relay without a delay per fragment', async () => {
+  harness.paths.direct = false;
+  await advance();
+  expect(harness.modes.pc.at(-1)).toBe('relay');
+  const history = { kind: 'response' as const, id: 'old-history', data: 'x'.repeat(1024 * 1024) };
+  const reply = { kind: 'response' as const, id: 'new-chat', data: 'ready' };
+  const sent = harness.links.pc.send(history);
+  const replied = harness.links.pc.send(reply);
+  await advance(1);
+  await Promise.all([sent, replied]);
+  expect(harness.messages.phone).toEqual([reply, history]);
+  expect(harness.error).not.toHaveBeenCalled();
+});
+
 it('keeps both paths warm, sends data only on P2P and recovers from a silent one-way black hole', async () => {
   await advance();
   expect(harness.modes.phone.at(-1)).toBe('direct');

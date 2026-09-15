@@ -11,6 +11,7 @@ import { RbacService } from '@/modules/rbac/rbac.service';
 import { UserService } from '@/modules/user/user.service';
 import { UserEntity } from '@/modules/user/entities/user.entity';
 import { RefreshTokenEntity } from './entities/refresh-token.entity';
+import { REFRESH_RECOVERY_SECONDS, RefreshRecoveryService } from './refresh-recovery.service';
 import {
   EmailVerificationService,
   REGISTRATION_CODE_TTL_SECONDS,
@@ -35,6 +36,7 @@ export class AuthService {
     private readonly rbac: RbacService,
     @Inject(MODULE_OPTIONS_TOKEN)
     private readonly config: ConfigModuleOptions,
+    private readonly recovery: RefreshRecoveryService,
   ) {}
 
   async requestRegistrationCode(email: string) {
@@ -106,7 +108,6 @@ export class AuthService {
           id: payload.tokenId,
           userId: payload.sub,
           tokenHash: this.hashToken(refreshToken),
-          revokedAt: IsNull(),
         },
         lock: { mode: 'pessimistic_write' },
       });
@@ -117,20 +118,37 @@ export class AuthService {
       const user = await manager.findOne(UserEntity, { where: { id: token.userId } });
       if (!user || user.disabled) throw new UnauthorizedException('Refresh token expired');
 
+      if (token.revokedAt) return this.recoverRefresh({ refreshToken, token, user, refreshTokens });
+
       // Keep issuance and consumption in one transaction. If signing or saving
       // the replacement fails, the current refresh token remains usable.
       const tokens = await this.issueTokens(user, refreshTokens);
       token.revokedAt = now;
       await refreshTokens.save(token);
+      // Save recovery before commit: a cache failure must leave the old token usable.
+      await this.recovery.remember(refreshToken, tokens.refreshToken);
       return tokens;
     });
   }
 
   async logout(refreshToken: string) {
-    await this.refreshTokens.update(
-      { tokenHash: this.hashToken(refreshToken), revokedAt: IsNull() },
-      { revokedAt: new Date() },
-    );
+    await this.dataSource.transaction(async (manager) => {
+      const repository = manager.getRepository(RefreshTokenEntity);
+      const token = await repository.findOne({
+        where: { tokenHash: this.hashToken(refreshToken) },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!token) return;
+      const replacement = token.revokedAt ? await this.recovery.recall(refreshToken) : null;
+      await repository.update(
+        { tokenHash: this.hashToken(refreshToken), revokedAt: IsNull() }, { revokedAt: new Date() },
+      );
+      // Signing out with a response-lost token must also revoke its replacement.
+      if (replacement) await repository.update(
+        { userId: token.userId, tokenHash: this.hashToken(replacement), revokedAt: IsNull() },
+        { revokedAt: new Date() },
+      );
+    });
     return { ok: true };
   }
 
@@ -148,10 +166,31 @@ export class AuthService {
     };
   }
 
-  private async issueTokens(
-    user: UserEntity,
-    refreshTokens: Repository<RefreshTokenEntity> = this.refreshTokens,
-  ) {
+  private async recoverRefresh(options: {
+    refreshToken: string;
+    token: RefreshTokenEntity;
+    user: UserEntity;
+    refreshTokens: Repository<RefreshTokenEntity>;
+  }) {
+    const { refreshToken, token, user, refreshTokens } = options;
+    const revokedAt = token.revokedAt?.getTime() ?? 0;
+    if (Date.now() - revokedAt >= REFRESH_RECOVERY_SECONDS * 1000) {
+      throw new UnauthorizedException('Refresh token expired');
+    }
+    const replacement = await this.recovery.recall(refreshToken);
+    if (!replacement) throw new UnauthorizedException('Refresh token expired');
+    const successor = await refreshTokens.findOne({
+      where: { userId: user.id, tokenHash: this.hashToken(replacement), revokedAt: IsNull() },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!successor || successor.expiresAt <= new Date()) {
+      throw new UnauthorizedException('Refresh token expired');
+    }
+    // Reuse exactly one live replacement; never extend the grace period or revive a revoked session.
+    return { ...await this.issueAccess(user), refreshToken: replacement };
+  }
+
+  private async issueAccess(user: UserEntity) {
     const access = await this.rbac.accessForRole(user.role);
     if (!access) throw new UnauthorizedException('User role is no longer available');
     const accessToken = await this.jwt.signAsync(
@@ -166,6 +205,20 @@ export class AuthService {
         expiresIn: (this.config.JWT_ACCESS_EXPIRES ?? '15m') as JwtSignOptions['expiresIn'],
       },
     );
+    return {
+      accessToken,
+      user: {
+        id: user.id, email: user.email, role: user.role,
+        roleName: access.roleName, permissions: access.permissions,
+      },
+    };
+  }
+
+  private async issueTokens(
+    user: UserEntity,
+    refreshTokens: Repository<RefreshTokenEntity> = this.refreshTokens,
+  ) {
+    const access = await this.issueAccess(user);
     const tokenEntity = refreshTokens.create({
       userId: user.id,
       expiresAt: new Date(Date.now() + this.refreshTtlSeconds * 1000),
@@ -176,17 +229,7 @@ export class AuthService {
     );
     tokenEntity.tokenHash = this.hashToken(refreshToken);
     await refreshTokens.save(tokenEntity);
-    return {
-      accessToken,
-      refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        roleName: access.roleName,
-        permissions: access.permissions,
-      },
-    };
+    return { ...access, refreshToken };
   }
 
   private get refreshSecret() {

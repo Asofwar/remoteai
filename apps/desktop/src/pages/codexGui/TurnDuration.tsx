@@ -3,7 +3,9 @@ import type { Turn } from "./types";
 import { formatTurnDuration, SECOND_MS, turnElapsedMs } from "./turnTiming";
 import styles from "./styles.module.less";
 
-export function TurnDuration({ turn, running, active }: { turn: Turn; running: boolean; active: boolean }) {
+export function TurnDuration({ turn, running, active, fallback, inline = false }: {
+  turn: Turn; running: boolean; active: boolean; fallback?: string; inline?: boolean;
+}) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (!running || !active) return;
@@ -12,8 +14,12 @@ export function TurnDuration({ turn, running, active }: { turn: Turn; running: b
     return () => clearInterval(timer);
   }, [turn.id, running, active]);
   const elapsed = turnElapsedMs(turn, now);
-  if (elapsed == null || (turn.status === "inProgress" && !running)) return null;
-  return <div className={styles.turnDuration}>
+  const Element = inline ? "span" : "div";
+  if (turn.status === "interrupted") return <Element className={styles.turnDuration}>
+    已停止生成{elapsed != null && ` · 用时 ${formatTurnDuration(elapsed)}`}
+  </Element>;
+  if (elapsed == null || (turn.status === "inProgress" && !running)) return fallback ? <span>{fallback}</span> : null;
+  return <Element className={styles.turnDuration}>
     {running ? "已处理" : "用时"} {formatTurnDuration(elapsed)}
-  </div>;
+  </Element>;
 }

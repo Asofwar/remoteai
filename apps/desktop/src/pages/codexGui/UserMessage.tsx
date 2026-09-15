@@ -21,21 +21,26 @@ export function UserMessage({ item, startedAt, onEdit, editDisabled = false }: {
 }) {
   const [editing, setEditing] = useState(false);
   const parts = (item.content ?? []) as Content[];
+  const images = parts.filter(isMessageImage);
+  const mentions = parts.filter((part) => part.type === "mention");
   const text = parts.filter((part) => part.type === "text").map((part) => part.text).join("\n");
   const message = quotedMessage(text);
   const date = startedAt == null ? null : new Date(startedAt * MILLISECONDS_PER_SECOND);
   const sentAt = date && Number.isFinite(date.getTime()) ? date : null;
+  const showBubble = editing || Boolean(message.text || message.quotes.length || mentions.length);
   return <article className={`${styles.userMessage} ${editing ? userStyles.editingMessage : ""}`}>
-    <div className={`${styles.userBubble} ${userStyles.bubble}`}>
-      {!editing && parts.filter(isMessageImage).map((part, index) =>
+    {!editing && images.length > 0 && <div className={userStyles.attachments}>
+      {images.map((part, index) =>
         <MessageImage key={index} src={part.url || part.path} alt={`图片附件 ${index + 1}`} />)}
-      {parts.filter((part) => part.type === "mention").map((part, index) =>
+    </div>}
+    {showBubble && <div className={`${styles.userBubble} ${userStyles.bubble}`}>
+      {mentions.map((part, index) =>
         part.path && isFileReference(part.path)
           ? <FileMenu path={part.path} key={`reference-${index}`}>{part.name || part.path}</FileMenu>
           : <span className={styles.imageLabel} key={`reference-${index}`}>
           {part.path?.startsWith("plugin://") ? "插件" : "附件"}：{part.name || part.path}
         </span>)}
-      {editing && onEdit ? <UserMessageEditor text={text} images={parts.filter(isMessageImage)}
+      {editing && onEdit ? <UserMessageEditor text={text} images={images}
         skills={parts.flatMap((part) => part.type === "skill" && part.path
           ? [{ name: part.name ?? "", path: part.path }] : [])}
         disabled={editDisabled} onSubmit={onEdit}
@@ -43,7 +48,7 @@ export function UserMessage({ item, startedAt, onEdit, editDisabled = false }: {
         <MessageQuotes key={text} quotes={message.quotes} />
         {message.text && <div>{message.text}</div>}
       </>}
-    </div>
+    </div>}
     {!editing && <div className={styles.userMessageActions}>
       {sentAt && <time dateTime={sentAt.toISOString()} title={sentAt.toLocaleString("zh-CN")}>
         {timeFormatter.format(sentAt)}

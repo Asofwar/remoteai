@@ -1,7 +1,16 @@
 .bubble {
-  --message-image-max-width: 96px;
-  --message-image-max-height: 96px;
   font-size: 14px;
+}
+
+.attachments {
+  --message-image-max-width: 80px;
+  --message-image-max-height: 80px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 8px;
+  > button, > span { margin: 0; }
 }
 
 .editingMessage.editingMessage {

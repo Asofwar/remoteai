@@ -142,7 +142,7 @@ it("shows the question and full activity count without mounting thousands of col
     ...Array.from({ length: 2_000 }, (_, index): Item => ({ ...item(index), phase: "commentary" })),
     { ...item(2_000), id: "answer" }];
   await render(value);
-  expect(container.querySelector("summary")?.textContent).toContain("2000 项活动");
+  expect(container.querySelector("summary")?.getAttribute("aria-label")).toBe("处理过程，2000 项活动");
   expect(container.querySelector("details")?.open).toBe(false);
   expect(count()).toBe(2);
   expect(container.querySelector('[data-message-id="question"]')).not.toBeNull();

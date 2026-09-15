@@ -135,3 +135,13 @@ it("does not quote user messages, the composer, or archived conversations", asyn
   await render(); await select();
   expect(button("引用选中文字并回复")).toBeNull();
 });
+
+it("does not reopen a dismissed quote menu when a queued selection event arrives", async () => {
+  await select();
+  await act(async () => window.dispatchEvent(new Event("scroll")));
+  await act(async () => document.dispatchEvent(new Event("selectionchange")));
+  expect(button("引用选中文字并回复")).toBeNull();
+  expect(window.getSelection()?.toString()).toBe("默认方块");
+  await select();
+  expect(button("引用选中文字并回复")).not.toBeNull();
+});

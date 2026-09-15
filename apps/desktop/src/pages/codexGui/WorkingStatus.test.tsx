@@ -19,29 +19,26 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-it("updates elapsed seconds locally, pauses when hidden, and catches up on return", async () => {
+it("shows a single phase label without an additional ticking timer", async () => {
   const render = (active: boolean) => act(async () => root.render(
-    <WorkingStatus phase="command" startedAtMs={100_000} active={active} />));
+    <WorkingStatus phase="command" active={active} />));
   await render(true);
-  expect(host.textContent).toBe("正在执行命令 · 0秒");
+  expect(host.textContent).toBe("正在执行命令");
   await act(async () => { vi.advanceTimersByTime(12_000); });
-  expect(host.textContent).toBe("正在执行命令 · 12秒");
-  expect(vi.getTimerCount()).toBe(1);
+  expect(host.textContent).toBe("正在执行命令");
+  expect(vi.getTimerCount()).toBe(0);
   await render(false);
   expect(vi.getTimerCount()).toBe(0);
   vi.advanceTimersByTime(50_000);
   await render(true);
-  expect(host.textContent).toBe("正在执行命令 · 1分2秒");
+  expect(host.textContent).toBe("正在执行命令");
   await act(async () => root.render(null));
   expect(vi.getTimerCount()).toBe(0);
 });
 
-it("resets the displayed phase time and never renders a negative duration", async () => {
-  await act(async () => root.render(<WorkingStatus phase="request" startedAtMs={90_000} active />));
-  expect(host.textContent).toBe("等待响应 · 10秒");
-  vi.setSystemTime(120_000);
-  await act(async () => root.render(<WorkingStatus phase="response" startedAtMs={120_000} active />));
-  expect(host.textContent).toBe("正在生成回复 · 0秒");
-  await act(async () => root.render(<WorkingStatus phase="response" startedAtMs={125_000} active />));
-  expect(host.textContent).toBe("正在生成回复 · 0秒");
+it("updates the live status when the next phase arrives", async () => {
+  await act(async () => root.render(<WorkingStatus phase="request" active />));
+  expect(host.querySelector('[role="status"]')?.textContent).toBe("等待响应");
+  await act(async () => root.render(<WorkingStatus phase="response" active />));
+  expect(host.querySelector('[role="status"]')?.textContent).toBe("正在生成回复");
 });

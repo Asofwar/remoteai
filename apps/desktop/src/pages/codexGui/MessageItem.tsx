@@ -16,7 +16,8 @@ function AgentMessage({ item, streaming }: { item: Item; streaming: boolean }) {
   return <article className={styles.agentMessage} data-phase={item.phase ?? "final_answer"}
     data-streaming={streaming || undefined}>
     <div data-quote-source={item.id} className={streaming ? activeStyles.response : undefined}>
-      <RichText text={visible} trailing={!streaming && <CopyButton text={text} />} /></div>
+      <RichText text={visible} trailing={!streaming && item.phase !== "commentary" && text.trim()
+        ? <CopyButton text={text} /> : undefined} /></div>
   </article>;
 }
 

@@ -5,7 +5,7 @@ test("a short conversation shows its question and full activity count immediatel
   await page.goto("/e2e/desktop-history-harness.html?compact");
   const viewport = page.getByLabel("对话消息");
   const group = viewport.locator("summary");
-  await expect(group).toContainText("30 项活动");
+  await expect(group).toHaveAttribute("aria-label", "处理过程，30 项活动");
   await expect(page.locator('[data-message-id="message-0"]')).toBeInViewport();
   await expect(page.locator('[data-message-id^="activity-"]')).toHaveCount(0);
   expect(await viewport.evaluate((node) => node.scrollHeight - node.clientHeight)).toBe(0);
@@ -13,7 +13,7 @@ test("a short conversation shows its question and full activity count immediatel
   await page.mouse.wheel(0, 200);
   await page.mouse.wheel(0, -200);
   await expect(page.locator('[data-message-id="message-0"]')).toBeInViewport();
-  await expect(group).toContainText("30 项活动");
+  await expect(group).toHaveAttribute("aria-label", "处理过程，30 项活动");
   await expect(viewport.locator("details")).not.toHaveAttribute("open");
   await expect(page.getByRole("button", { name: "加载更早的消息" })).toHaveCount(0);
   await expect(page.getByText("最新回复已完成。", { exact: true })).toBeInViewport();
@@ -24,7 +24,7 @@ async function collapsedHistory(page: Page, height = 1200) {
   await page.setViewportSize({ width: 1440, height });
   await page.goto("/e2e/desktop-history-harness.html?activity-history");
   const viewport = page.getByLabel("对话消息");
-  await expect(viewport.locator("summary")).toHaveText(Array(3).fill("查看处理过程120 项活动"));
+  await expect(viewport.locator("summary")).toHaveText(Array(3).fill("处理过程"));
   await expect(page.locator("[data-message-id]")).toHaveCount(7);
   await expect(page.locator('[data-message-id="question-3"]')).toHaveCount(0);
   const anchor = viewport.locator('[data-turn-id="history-3"] summary');
@@ -46,7 +46,7 @@ for (const trigger of ["wheel", "button"] as const) {
     }
     await expect(page.locator("[data-message-id]")).toHaveCount(14);
     await expect(page.locator('[data-message-id="question-3"]')).toBeInViewport();
-    await expect(viewport.locator("summary")).toHaveText(Array(6).fill("查看处理过程120 项活动"));
+    await expect(viewport.locator("summary")).toHaveText(Array(6).fill("处理过程"));
     await expect(viewport.locator("details[open]")).toHaveCount(0);
     await expect(page.locator('[data-message-id^="history-activity-"]')).toHaveCount(0);
     await expect(anchor).toHaveAttribute("data-test-original", "true");
@@ -59,7 +59,7 @@ test("paging a scrollable activity history preserves its collapsed summary as th
   expect(await viewport.evaluate((node) => node.scrollHeight - node.clientHeight)).toBeGreaterThan(0);
   await older(page, 14, "[data-history-anchor]");
   await expect(anchor).toHaveAttribute("data-test-original", "true");
-  await expect(viewport.locator("summary")).toHaveText(Array(6).fill("查看处理过程120 项活动"));
+  await expect(viewport.locator("summary")).toHaveText(Array(6).fill("处理过程"));
   await expect(viewport.locator("details[open]")).toHaveCount(0);
   await expect(page.locator('[data-message-id^="history-activity-"]')).toHaveCount(0);
 });

@@ -8,6 +8,7 @@ import { formatTurnDuration } from "./turnTiming";
 import { DeferredDetails } from "./DeferredDetails";
 import { collaborationSummary, isCollaborationActivity } from "./collaborationActivity";
 import styles from "./ActivityRow.module.less";
+import { commandPreview } from "./commandPreview";
 
 const TOOL_ACTIVITIES: Record<string, { label: string; icon: LucideIcon }> = {
   fileChange: { label: "文件修改", icon: FilePenLine },
@@ -35,6 +36,7 @@ function commandLabel(status: Item["status"]) {
   if (status === "completed") return "已运行";
   if (status === "failed") return "运行失败";
   if (status === "declined") return "已拒绝";
+  if (status === "interrupted") return "已停止";
   return "执行命令";
 }
 
@@ -46,7 +48,7 @@ function activitySummary(item: Item, text: string) {
     const action = item.commandActions?.find((entry) => entry.type !== "unknown");
     const labels: Record<string, string> = { read: "读取文件", listFiles: "浏览文件", search: "搜索代码" };
     const preview = action ? `${labels[action.type] || "执行命令"} · ${action.name || action.query || action.path || ""}`
-      : `${commandLabel(item.status)} ${item.command ?? ""}`;
+      : `${commandLabel(item.status)} ${commandPreview(item.command ?? "")}`;
     return { icon: SquareTerminal, preview };
   }
   if (item.type === "sleep") return { icon: Clock,

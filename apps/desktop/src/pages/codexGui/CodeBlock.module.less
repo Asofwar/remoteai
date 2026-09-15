@@ -1,9 +1,13 @@
-.block { border: 1px solid var(--gui-border); border-radius: 10px; overflow: hidden; margin: 12px 0;
+.block { border: 1px solid var(--gui-border); border-radius: 20px; overflow: hidden; margin: 16px 0;
+  background: var(--bg, #f4f6f5);
   pre { border-radius: 0; margin: 0; max-height: 600px; } }
-.toolbar { display: flex; align-items: center; gap: 8px; background: var(--bg, #f4f6f5); padding: 5px 12px;
-  border-bottom: 1px solid var(--gui-border); color: var(--gui-muted); font-size: 12px;
-  > span { flex: 1; }
-  > button { border: 0; background: transparent; color: inherit; cursor: pointer; }
+.toolbar { display: flex; align-items: center; gap: 8px; padding: 10px 16px 0;
+  color: var(--ink); font-size: 12px;
+  > span { display: flex; align-items: center; gap: 8px; flex: 1; font-weight: 500; }
+  > button { display: grid; place-items: center; width: 26px; height: 26px;
+    border: 0; border-radius: 5px; background: transparent; color: inherit; cursor: pointer; }
+  > button:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+  > button:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
   > button[aria-pressed='true'] { color: var(--green-dark); } }
 .wrapped { white-space: pre-wrap; overflow-wrap: anywhere; }
 .highlight {

@@ -120,9 +120,17 @@
   border-radius: 20px; background: var(--panel); box-shadow: 0 3px 12px #0001; color: var(--ink); cursor: pointer;
   font-size: 12px; white-space: nowrap; }
 .workGroup { min-width: 0; font-size: 12px; color: var(--gui-muted);
-  > summary { cursor: pointer; padding: 5px 0; span { margin-left: 10px; } } }
+  > summary { display: flex; align-items: center; gap: 6px; list-style: none; cursor: pointer;
+    padding: 8px 0 12px; border-bottom: 1px solid var(--gui-border);
+    &::-webkit-details-marker { display: none; }
+    &:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
+    .turnDuration { border: 0; padding: 0; }
+    > svg { flex-shrink: 0; transition: transform .12s ease; }
+  }
+  &[open] > summary > svg { transform: rotate(90deg); }
+}
 .workItems { display: flex; flex-direction: column; gap: 14px; padding: 12px 0 4px;
-  .agentMessage { font-size: 13px; color: var(--gui-muted); line-height: 1.7; } }
+  .agentMessage { color: var(--ink); } }
 .messageContent { flex: 1 0 auto; width: 100%; max-width: 900px; margin: 0 auto; padding: 28px 32px; }
 .welcome { display: flex; flex-direction: column; justify-content: center; align-items: center;
   min-height: clamp(210px, 35vh, 400px); text-align: center;
@@ -135,10 +143,10 @@
 .turn { display: flex; flex-direction: column; gap: 18px; padding-bottom: 26px; }
 .turnDuration { color: var(--gui-muted); font-size: 12px; padding: 8px 0 12px;
   border-bottom: 1px solid var(--gui-border); font-variant-numeric: tabular-nums; }
-.userMessage { align-self: flex-end; max-width: 90%; min-width: 0;
+.userMessage { align-self: flex-end; max-width: 70%; min-width: 0;
   &:hover .userMessageActions, &:focus-within .userMessageActions { opacity: 1; pointer-events: auto; } }
-.userBubble { background: var(--green-soft); border-radius: 16px 16px 4px 16px;
-  padding: 15px 19px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.75; }
+.userBubble { background: color-mix(in srgb, var(--ink) 5%, var(--panel)); border-radius: 22px;
+  padding: 12px 16px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.75; }
 .userMessageActions { display: flex; justify-content: flex-end; align-items: center; gap: 10px;
   min-height: 28px; padding: 3px 2px 0; opacity: 0; pointer-events: none;
   color: var(--gui-muted); font-size: 12px;
@@ -147,17 +155,15 @@
 .agentMessage { min-width: 0; line-height: 1.8; font-size: 14px; }
 [data-quote-source] { user-select: text; }
 [data-quote-exclude] { user-select: none; }
-.markdown { overflow-wrap: anywhere; p { margin: 10px 0; } ul, ol { padding-left: 24px; }
+.markdown { overflow-wrap: anywhere; p { margin: 12px 0; } ul, ol { padding-left: 24px; }
+  h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.4; margin: 20px 0 8px; }
+  h1 { font-size: 1.5em; } h2 { font-size: 1.25em; } h3, h4, h5, h6 { font-size: 1.1em; }
   pre { padding: 16px; border-radius: 10px; background: var(--bg, #f4f6f5); overflow: auto; line-height: 1.6; }
   code { font-family: Consolas, monospace; font-size: 12px; }
   :not(pre) > code { background: var(--bg, #edf1ef); padding: 2px 5px; border-radius: 4px; }
-  table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; }
-  th, td { border: 1px solid var(--gui-border); padding: 6px 12px; }
   blockquote { border-left: 3px solid var(--gui-border); padding-left: 16px; margin-left: 0; color: var(--gui-muted); }
   a { color: var(--green-dark); text-decoration: underline; } }
-.markdown:has(> .messageCopy) { margin-block: 10px;
-  > p:has(+ .messageCopy) { display: inline; } }
-.messageCopy { display: inline-block; margin-left: 6px; vertical-align: middle;
+.messageCopy { display: flex; align-items: center; margin-top: 6px; margin-left: -4px;
   line-height: 1; > button { color: var(--gui-muted); } }
 .imageLabel { display: block; font-size: 12px; color: var(--gui-muted); }
 .working { display: flex; align-items: center; gap: 10px; padding: 8px 0; color: var(--gui-muted); font-size: 12px; }

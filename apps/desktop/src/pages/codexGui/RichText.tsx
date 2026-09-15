@@ -8,11 +8,13 @@ import { MessageLink, isFileReference } from "./MessageLink";
 import styles from "./styles.module.less";
 import { CodeReviewComment } from "./CodeReviewComment";
 import { messageSections } from "./messageDirectives";
+import { MarkdownTable } from "./MarkdownTable";
 
 const COMPONENTS: Components = {
   a: ({ href, children }) => <MessageLink href={href}>{children}</MessageLink>,
   img: ({ src, alt, title }) => <MessageImage key={src} src={src} alt={alt} title={title} />,
   pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
+  table: ({ children }) => <MarkdownTable>{children}</MarkdownTable>,
 };
 const PLUGINS = [remarkGfm];
 
@@ -26,6 +28,6 @@ export const RichText = memo(function RichText({ text, trailing }: { text: strin
       if (key === "href" && (isFileReference(url) || localImageSource(url))) return url;
       return defaultUrlTransform(url);
     }}>{section.text}</Markdown>)}
-    {trailing && <span className={styles.messageCopy} data-quote-exclude>{trailing}</span>}
+    {trailing && <div className={styles.messageCopy} data-quote-exclude>{trailing}</div>}
   </div>;
 });

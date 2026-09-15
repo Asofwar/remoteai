@@ -9,6 +9,7 @@ import type { RefreshTokenEntity } from '@/modules/auth/entities/refresh-token.e
 import type { UserService } from '@/modules/user/user.service';
 import type { EmailVerificationService } from '@/modules/auth/email-verification.service';
 import type { RbacService } from '@/modules/rbac/rbac.service';
+import type { RefreshRecoveryService } from '@/modules/auth/refresh-recovery.service';
 import { makeUser } from './fixtures';
 import { Permission, USER_ROLE_PERMISSIONS } from '@/common/rbac/permissions';
 
@@ -101,6 +102,7 @@ describe('AuthService', () => {
         JWT_REFRESH_SECRET: 'refresh-secret',
         REFRESH_TOKEN_TTL_SECONDS: '120',
       },
+      { remember: vi.fn(), recall: vi.fn() } as unknown as RefreshRecoveryService,
     );
   });
 
@@ -259,7 +261,7 @@ describe('AuthService', () => {
     expect(jwt.verifyAsync).toHaveBeenCalledWith('old-refresh', { secret: 'refresh-secret' });
     expect(tokens.findOne).toHaveBeenCalledWith({
       where: expect.objectContaining({
-        id: oldToken.id, userId: user.id, tokenHash: hash('old-refresh'), revokedAt: expect.anything(),
+        id: oldToken.id, userId: user.id, tokenHash: hash('old-refresh'),
       }),
       lock: { mode: 'pessimistic_write' },
     });
@@ -320,6 +322,7 @@ describe('AuthService', () => {
   });
 
   it('revokes matching live tokens on logout without exposing storage details', async () => {
+    tokens.findOne.mockResolvedValue({ userId: 'user-1', revokedAt: null });
     await expect(service.logout('logout-token')).resolves.toEqual({ ok: true });
     expect(tokens.update).toHaveBeenCalledWith(
       { tokenHash: hash('logout-token'), revokedAt: expect.anything() },
@@ -355,6 +358,7 @@ describe('AuthService', () => {
       emailVerification as unknown as EmailVerificationService,
       rbac as unknown as RbacService,
       {},
+      { remember: vi.fn(), recall: vi.fn() } as unknown as RefreshRecoveryService,
     );
     users.createUser.mockResolvedValue(user);
     prepareIssuance();

@@ -8,6 +8,7 @@ import { AuthService } from './auth.service';
 import { EmailVerificationService } from './email-verification.service';
 import { RefreshTokenEntity } from './entities/refresh-token.entity';
 import { RbacModule } from '@/common/rbac/rbac.module';
+import { RefreshRecoveryService } from './refresh-recovery.service';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { RbacModule } from '@/common/rbac/rbac.module';
     RbacModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, EmailVerificationService],
+  providers: [AuthService, EmailVerificationService, RefreshRecoveryService],
   exports: [AuthService],
 })
 export class AuthModule {}

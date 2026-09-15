@@ -3,6 +3,8 @@ import { ReliableDelivery, deliveryFrame } from './delivery';
 import { Assembler } from './framing';
 import { SendQueue } from './sendQueue';
 import { HotPeer } from './hotPeer';
+import { Acknowledgements } from './acknowledgements';
+import { DirectPackets, directPackets } from './directPackets';
 import type { LinkOptions } from './linkOptions';
 import { MAX_BUFFER_BYTES, type Channel, type ConnectionMode, type RpcMessage, type Signal } from './protocol';
 
@@ -17,11 +19,19 @@ const OUTAGE_TIMEOUT_MS = 60_000;
 export class HotLink {
   private readonly peer: HotPeer;
   private readonly delivery: ReliableDelivery;
+  private readonly acknowledgements = new Acknowledgements();
   // Reliable ordered fragments have already been acknowledged. Keep them until completion or session close.
   private readonly assembler = new Assembler(false);
   private readonly timer: ReturnType<typeof setInterval>;
   private cipher?: SessionCipher;
   private channel?: Channel;
+  private readonly directPackets = new DirectPackets({
+    send: (payload) => {
+      if (this.channel?.readyState !== 'open') throw new Error('Direct path unavailable');
+      this.channel.send(payload);
+    },
+    failed: () => this.fallback(),
+  });
   private relay = true;
   private closed = false;
   private mode: ConnectionMode = 'connecting';
@@ -78,6 +88,7 @@ export class HotLink {
   private attach(channel: Channel) {
     if (this.closed) { channel.close(); return; }
     const previous = this.channel;
+    this.directPackets.clear();
     this.channel = channel;
     previous?.close();
     this.lastPong.direct = 0;
@@ -90,14 +101,15 @@ export class HotLink {
 
   private transmit(path: Path, frame: object): boolean {
     if (!this.cipher || this.closed) return false;
-    const buffered = path === 'relay' ? this.options.relayBuffered() : this.channel?.bufferedAmount;
+    const buffered = path === 'relay' ? this.options.relayBuffered()
+      : (this.channel?.bufferedAmount ?? MAX_BUFFER_BYTES) + this.directPackets.bufferedAmount;
     if (buffered === undefined || buffered >= MAX_BUFFER_BYTES) return false;
     if (path === 'direct' && this.channel?.readyState !== 'open') return false;
     if (path === 'relay' && !this.relay) return false;
     const payload = this.cipher.encrypt(JSON.stringify(frame));
     try {
       if (path === 'relay') return this.signal({ type: 'relay', payload });
-      this.channel!.send(payload);
+      this.directPackets.send(payload, 'kind' in frame && frame.kind === 'data');
       return true;
     } catch { this.lastPong[path] = 0; return false; }
   }
@@ -105,25 +117,36 @@ export class HotLink {
   private probe(path: Path) {
     const id = ++this.probeId;
     this.probes.set(id, { path, at: Date.now() });
-    if (!this.transmit(path, { kind: 'ping', id })) this.probes.delete(id);
+    if (!this.transmit(path, { kind: 'ping', id, packetBatching: true })) this.probes.delete(id);
   }
 
   receive(payload: string, path: Path = 'relay') {
     if (this.closed || !this.cipher) return;
     try {
-      const text = this.cipher.decrypt(payload);
-      if (text === null) return;
-      const frame = deliveryFrame(text);
-      if (frame.kind === 'close') { this.close(false); return; }
-      if (frame.kind === 'ping') {
-        if (!Number.isSafeInteger(frame.id)) throw new Error('Invalid probe');
-        this.transmit(path, { kind: 'pong', id: frame.id });
-      } else if (frame.kind === 'pong') this.pong(frame.id, path);
-      else {
-        this.delivery.accept(frame, (ack) => { this.transmit(path, ack); }, path);
-        if (!this.delivery.full) this.releaseCapacity();
-      }
+      const packets = path === 'direct' ? directPackets(payload) : [payload];
+      for (const packet of packets) this.receivePacket(packet, path);
     } catch { this.fail('连接校验失败，请重新连接电脑。'); }
+  }
+
+  private receivePacket(payload: string, path: Path) {
+    if (this.closed || !this.cipher) return;
+    const text = this.cipher.decrypt(payload);
+    if (text === null) return;
+    const frame = deliveryFrame(text);
+    if (frame.kind === 'close') { this.close(false); return; }
+    if (frame.kind === 'ping') {
+      if (!Number.isSafeInteger(frame.id)) throw new Error('Invalid probe');
+      if (path === 'direct' && frame.packetBatching === true) this.directPackets.enable();
+      this.transmit(path, { kind: 'pong', id: frame.id, packetBatching: true });
+    } else if (frame.kind === 'pong') {
+      if (path === 'direct' && frame.packetBatching === true) this.directPackets.enable();
+      this.pong(frame.id, path);
+    } else {
+      this.delivery.accept(frame, (ack) => {
+        this.acknowledgements.schedule(ack, (latest) => { this.transmit(path, latest); });
+      }, path);
+      if (!this.delivery.full) this.releaseCapacity();
+    }
   }
 
   private pong(id: unknown, path: Path) {
@@ -149,6 +172,7 @@ export class HotLink {
     if (direct && (stable || this.selected === 'direct' || !relay)) path = 'direct';
     else if (relay) path = 'relay';
     const changed = path !== this.selected;
+    if (changed) this.directPackets.clear();
     this.selected = path;
     if (path) this.outageSince = Date.now();
     const mode = path ?? 'connecting';
@@ -212,12 +236,14 @@ export class HotLink {
     if (notify) { this.transmit('direct', { kind: 'close' }); this.transmit('relay', { kind: 'close' }); }
     this.closed = true;
     this.outgoing.close();
+    this.directPackets.clear();
     this.releaseCapacity();
     clearInterval(this.timer);
     this.peer.close();
     this.channel?.close();
     this.cipher?.destroy();
     this.delivery.clear();
+    this.acknowledgements.clear();
     this.assembler.clear();
     this.probes.clear();
     this.options.mode('offline');

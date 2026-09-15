@@ -3,7 +3,10 @@ import { bytesToHex } from '@noble/hashes/utils';
 import { downloadFile, type FileClient, type FileRequest } from '../../../shared/remote-chat/fileDownload';
 import type { ChatRpc } from '../../../shared/remote-chat/rpc';
 
-const sizes: Record<string, number> = { 'large.apk': 21 * 1024 * 1024 + 17, 'small.zip': 1024 * 1024 + 3, 'empty': 0 };
+const sizes: Record<string, number> = {
+  'large.apk': 21 * 1024 * 1024 + 17, 'lan-100mb.bin': 100 * 1024 * 1024 + 17,
+  'small.zip': 1024 * 1024 + 3, 'empty': 0,
+};
 const handles = new Map<string, number>();
 export function fileDownloadResponse(body: unknown): unknown {
   const request = body as FileRequest;
@@ -21,7 +24,7 @@ export function fileDownloadResponse(body: unknown): unknown {
   if (request.operation === 'fileClose') { handles.delete(request.id); return null; }
   return body;
 }
-export async function downloadFixture(rpc: ChatRpc, path: string) {
+export async function downloadFixture(rpc: Pick<ChatRpc, 'request'>, path: string) {
   const hash = sha256.create();
   let size = 0;
   const client: FileClient = {

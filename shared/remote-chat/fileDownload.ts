@@ -1,6 +1,8 @@
-import { base64Bytes, checkDownloadSize } from './policy';
+import { base64Bytes, checkDownloadSize, isDirectChat } from './policy';
 
 export const FILE_CHUNK_BYTES = 256 * 1024;
+// Reserve RPC/assembly capacity for chat and video, and bound read-ahead to 1 MiB of original bytes per download.
+const DIRECT_READ_AHEAD = 4;
 export interface FileInfo { id: string; size: number; name: string; mimeType: string }
 export interface FileRead { threadId: string; id: string; offset: number; length: number }
 export interface FileChunk { offset: number; data: string }
@@ -43,24 +45,44 @@ function validateChunk(chunk: FileChunk, offset: number, length: number) {
     || !/^[A-Za-z0-9+/]*={0,2}$/.test(chunk.data)
     || base64Bytes(chunk.data) !== length) throw new Error('文件下载不完整，请重试。');
 }
+type ReadResult = { chunk: FileChunk } | { error: unknown };
+interface PendingRead { offset: number; length: number; result: Promise<ReadResult> }
+function readAhead(client: FileClient, request: FileRead): PendingRead {
+  const result = client.read(request).then((chunk): ReadResult => ({ chunk }),
+    (error: unknown): ReadResult => ({ error }));
+  return { offset: request.offset, length: request.length, result };
+}
 async function transfer(options: DownloadOptions, info: FileInfo, target: DownloadTarget) {
   const { client, threadId, signal, progress } = options;
-  progress(0, info.size);
-  for (let offset = 0; offset < info.size;) {
+  const pending: PendingRead[] = [];
+  let nextOffset = 0;
+  const fill = () => {
     checkCancelled(signal);
     checkDownloadSize(info.size);
-    const length = Math.min(FILE_CHUNK_BYTES, info.size - offset);
-    const chunk = await client.read({ threadId, id: info.id, offset, length });
+    const window = isDirectChat() ? DIRECT_READ_AHEAD : 1;
+    while (pending.length < window && nextOffset < info.size) {
+      const length = Math.min(FILE_CHUNK_BYTES, info.size - nextOffset);
+      pending.push(readAhead(client, { threadId, id: info.id, offset: nextOffset, length }));
+      nextOffset += length;
+    }
+  };
+  progress(0, info.size);
+  fill();
+  while (pending.length) {
+    const read = pending.shift()!;
+    const result = await read.result;
     checkCancelled(signal);
-    validateChunk(chunk, offset, length);
-    await target.write(chunk.data);
-    offset += length;
-    progress(offset, info.size);
+    checkDownloadSize(info.size);
+    if ('error' in result) throw result.error;
+    validateChunk(result.chunk, read.offset, read.length);
+    await target.write(result.chunk.data);
+    progress(read.offset + read.length, info.size);
+    fill();
   }
   checkCancelled(signal);
   await target.finish();
 }
-/** Await each disk write before requesting more bytes; always release both local and remote resources. */
+/** Pipeline bounded P2P reads, keep disk writes ordered, and always release local and remote resources. */
 export async function downloadFile(options: DownloadOptions) {
   checkCancelled(options.signal);
   const info = await options.client.open(options.threadId, options.path);

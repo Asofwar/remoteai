@@ -3,6 +3,7 @@ import { ChatLink } from '../../../shared/remote-chat/link';
 import { keyPair } from '../../../shared/remote-chat/cipher';
 import { RtcPeer } from '../../../shared/remote-chat/rtcPeer';
 import type { PeerOptions, RpcMessage, Signal } from '../../../shared/remote-chat/protocol';
+import { downloadFixture, fileDownloadResponse } from './file-download-fixture';
 
 const query = new URLSearchParams(location.search);
 const desktop = query.get('role') === 'desktop';
@@ -16,6 +17,8 @@ let blocked = false;
 let beats = 0;
 let readyCount = 0;
 let executions = 0;
+let packets = 0;
+let batches = 0;
 let link: ChatLink | undefined;
 let resume: { sessionId: string; resumeToken: string } | undefined;
 let socket: WebSocket | undefined;
@@ -25,7 +28,15 @@ setInterval(() => { beats += 1; }, 20);
 function mode(value: string) { modes.push(value); document.querySelector('#status')!.textContent = value; }
 function createPeer(options: PeerOptions) {
   if (blocked) throw new Error('Test network unavailable');
-  return new RtcPeer(options, () => {
+  return new RtcPeer({ ...options, channel: (channel) => options.channel({
+    get readyState() { return channel.readyState; },
+    get bufferedAmount() { return channel.bufferedAmount; },
+    send: (data) => channel.send(data), close: () => channel.close(),
+    onOpen: (callback) => channel.onOpen(callback), onClose: (callback) => channel.onClose(callback),
+    onMessage: (callback) => channel.onMessage((data) => {
+      packets += 1; if (data.startsWith('[')) batches += 1; callback(data);
+    }),
+  }) }, () => {
     const peer = new RTCPeerConnection({ iceServers: options.iceServers });
     rtc.add(peer);
     return peer;
@@ -84,7 +95,8 @@ async function receive(frame: Record<string, unknown>) {
 function respond(message: RpcMessage) {
   if (message.kind !== 'request') return;
   executions += 1;
-  void link?.send({ kind: 'response', id: message.id, data: message.body });
+  void link?.send({ kind: 'response', id: message.id,
+    data: query.has('download') ? fileDownloadResponse(message.body) : message.body });
 }
 
 if (desktop) connectPc();
@@ -94,11 +106,17 @@ declare global {
   interface Window {
     hotChat: { events: unknown[]; modes: string[]; errors: string[];
       request: (text: string) => Promise<unknown>; stream: (text: string) => Promise<void>;
-      blockDirect: (value: boolean) => void; stats: () => { beats: number; readyCount: number; executions: number };
+      blockDirect: (value: boolean) => void;
+      stats: () => { beats: number; readyCount: number; executions: number; packets: number; batches: number };
       disconnect: () => void };
+    hotDownload: (path: string) => Promise<{ size: number; hash: string; elapsedMs: number }>;
   }
 }
 window.hotChat = { events, modes, errors, request: (text) => phone.request('request', { text }),
   stream: async (text) => { await link?.send({ kind: 'event', event: { text } }); },
   blockDirect: (value) => { blocked = value; if (value) { for (const peer of rtc) peer.close(); rtc.clear(); } },
-  stats: () => ({ beats, readyCount, executions }), disconnect: () => phone.stop() };
+  stats: () => ({ beats, readyCount, executions, packets, batches }), disconnect: () => phone.stop() };
+window.hotDownload = async (path) => {
+  const started = performance.now();
+  return { ...await downloadFixture(phone, path), elapsedMs: performance.now() - started };
+};

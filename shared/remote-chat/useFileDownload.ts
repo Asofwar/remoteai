@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { DownloadPolicyError } from './policy';
 import { DownloadCancelled, downloadFile, type DownloadOptions } from './fileDownload';
+import { DownloadProgress } from './downloadProgress';
 
 interface Options {
   client: DownloadOptions['client']; threadId: string | null; path: string; ready: boolean;
@@ -11,7 +12,7 @@ export function useFileDownload(options: Options) {
   const active = useRef<AbortController | undefined>(undefined);
   const mounted = useRef(true);
   const [busy, setBusy] = useState(false);
-  const [percent, setPercent] = useState(0);
+  const [progress, setProgress] = useState({ percent: 0, detail: '' });
   const [message, setMessage] = useState('');
   useEffect(() => {
     mounted.current = true;
@@ -23,13 +24,15 @@ export function useFileDownload(options: Options) {
     if (!options.ready || !options.threadId || active.current) return;
     const controller = new AbortController();
     active.current = controller;
-    setBusy(true); setPercent(0); setMessage('');
+    const meter = new DownloadProgress();
+    setBusy(true); setProgress({ percent: 0, detail: '' }); setMessage('');
     try {
       const target = options.prepare ? await options.prepare() : options.target;
       await downloadFile({ ...options, threadId: options.threadId, signal: controller.signal,
         target,
         progress: (received, total) => {
-          if (mounted.current) setPercent(total ? Math.floor(received / total * 100) : 100);
+          const update = meter.update(received, total);
+          if (mounted.current && update) setProgress(update);
         } });
       if (mounted.current) setMessage(options.success);
     } catch (error) {
@@ -40,5 +43,5 @@ export function useFileDownload(options: Options) {
       if (mounted.current) setBusy(false);
     }
   };
-  return { busy, percent, message, start, cancel, label: busy ? `取消下载 · ${percent}%` : '下载' };
+  return { busy, ...progress, message, start, cancel, label: busy ? `取消下载 · ${progress.percent}%` : '下载' };
 }

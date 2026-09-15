@@ -79,7 +79,8 @@ it('keeps input and retry available while a mobile save fails, without overlappi
   await act(async () => { expect(await editor.save()).toBe(false); });
   expect(invoke).toHaveBeenCalledTimes(2);
   await act(async () => { fail(new Error('private host path')); expect(await saving).toBe(false); });
-  expect(editor.value).toBe('512'); expect(editor.error).toBe('未能保存上下文设置，请重试。');
+  expect(editor.value).toBe('512');
+  expect(editor.error).toBe('未能保存或应用上下文设置，请重试；若对话已暂停，可点击继续。');
   vi.mocked(invoke).mockResolvedValueOnce({ capacity: 512_000 });
   await act(async () => { expect(await editor.save()).toBe(true); });
 });

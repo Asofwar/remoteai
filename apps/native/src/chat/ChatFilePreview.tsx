@@ -52,6 +52,8 @@ function FilePreview({ file, threadId, ready, load, files, close }: Omit<Props, 
       {!ready && !result && <Text style={styles.subtitle}>请连接电脑后查看文件。</Text>}
       {binary && <Text style={styles.subtitle}>下载后即可用相应的应用打开。</Text>}
       {ready && !binary && !result && !error && <ActivityIndicator accessibilityLabel="正在读取文件" />}
+      {download.busy && !!download.detail && <Text style={[styles.subtitle, { maxWidth: 400 }]}>
+        {download.detail}</Text>}
       {!!download.message && <Text accessibilityLiveRegion="polite" style={[styles.subtitle,
         { maxWidth: 400 }]}>{download.message}</Text>}
       {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}

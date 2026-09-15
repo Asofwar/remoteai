@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import { HotLink } from '../../../../shared/remote-chat/hotLink';
 import { keyPair, SessionCipher } from '../../../../shared/remote-chat/cipher';
+import { directPackets } from '../../../../shared/remote-chat/directPackets';
 import type { Channel, PeerOptions, RpcMessage } from '../../../../shared/remote-chat/protocol';
 
 type Side = 'phone' | 'pc';
@@ -29,10 +30,12 @@ export function hotLinkHarness() {
     else links[target].receive(packet.payload);
   };
   const send = (side: Side, path: Path, payload: string) => {
-    const frame = JSON.parse(inspectors[side].decrypt(payload)!) as Record<string, unknown>;
-    const packet = { side, path, payload, frame };
-    packets.push(packet);
-    if (paths[path] && filter(packet)) queueMicrotask(() => deliver(packet));
+    for (const part of path === 'direct' ? directPackets(payload) : [payload]) {
+      const frame = JSON.parse(inspectors[side].decrypt(part)!) as Record<string, unknown>;
+      const packet = { side, path, payload: part, frame };
+      packets.push(packet);
+      if (paths[path] && filter(packet)) queueMicrotask(() => deliver(packet));
+    }
   };
   for (const side of ['phone', 'pc'] as const) {
     const other = opposite(side);

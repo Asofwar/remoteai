@@ -3,6 +3,9 @@ import { chacha20poly1305 } from '@noble/ciphers/chacha';
 import { hkdf } from '@noble/hashes/hkdf';
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils';
+import { decodeChatUtf8 } from './utf8';
+
+const REPLAY_WINDOW = 1024;
 
 export function keyPair(random: (length: number) => Uint8Array) {
   const secret = random(32);
@@ -15,7 +18,7 @@ export class SessionCipher {
   private readonly context: Uint8Array;
   private sequence = 0;
   private highestReceived = 0;
-  private readonly received = new Set<number>();
+  private readonly received = new Uint32Array(REPLAY_WINDOW);
 
   constructor(options: { secret: Uint8Array; publicKey: string; sessionId: string; desktop: boolean }) {
     const shared = x25519.getSharedSecret(options.secret, hexToBytes(options.publicKey));
@@ -47,14 +50,14 @@ export class SessionCipher {
     if (view.getUint32(0) !== (this.direction === 1 ? 2 : 1) || view.getUint32(4) !== 0 || sequence === 0) {
       throw new Error('Invalid nonce');
     }
-    if (this.received.has(sequence) || sequence <= this.highestReceived - 1024) return null;
+    const slot = sequence % REPLAY_WINDOW;
+    if (this.received[slot] === sequence || sequence <= this.highestReceived - REPLAY_WINDOW) return null;
     const plain = chacha20poly1305(this.key, nonce, this.context).decrypt(bytes.subarray(12));
-    this.received.add(sequence);
+    // Only authenticated packets enter the ring. Sequences sharing a slot cannot both be inside the replay window.
+    this.received[slot] = sequence;
     this.highestReceived = Math.max(this.highestReceived, sequence);
-    for (const seen of this.received) if (seen <= this.highestReceived - 1024) this.received.delete(seen);
-    // URI decoding also works on Hermes versions that do not provide TextDecoder.
-    return decodeURIComponent(Array.from(plain, (byte) => `%${byte.toString(16).padStart(2, '0')}`).join(''));
+    return decodeChatUtf8(plain);
   }
 
-  destroy() { this.key.fill(0); this.received.clear(); }
+  destroy() { this.key.fill(0); this.received.fill(0); }
 }

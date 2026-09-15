@@ -14,6 +14,7 @@ function DownloadLink({ path, children }: { path: string; children: ReactNode })
     <span>{children}</span>{' '}
     <button type="button" className="chat-button" disabled={!download.busy && !context.ready}
       onClick={download.busy ? download.cancel : download.start}>{download.label}</button>
+    {download.busy && !!download.detail && <span style={{ display: 'block', maxWidth: 400 }}>{download.detail}</span>}
     {!!download.message && <span role="status" style={{ display: 'block', maxWidth: 400 }}>{download.message}</span>}
   </span>;
 }

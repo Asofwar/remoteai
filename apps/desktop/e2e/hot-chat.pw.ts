@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import { once } from 'node:events';
+import { createHash } from 'node:crypto';
 import { test, expect } from '@playwright/test';
 import type { WebSocketServer as Server } from 'ws';
 import type { AddressInfo } from 'node:net';
@@ -44,6 +45,37 @@ test.afterEach(async () => {
   for (const client of server.clients) client.terminate();
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
+
+for (const [path, mib] of [['large.apk', 21], ['lan-100mb.bin', 100]] as const) {
+  test(`downloads ${mib} MiB over transport v2 while messages remain responsive`, async ({ context }) => {
+    test.setTimeout(120_000);
+    // Exercise the same decoder fallback used by Hermes versions without TextDecoder.
+    await context.addInitScript(() => Object.defineProperty(globalThis, 'TextDecoder', { value: undefined }));
+    const pc = await context.newPage();
+    const phone = await context.newPage();
+    await pc.goto(`/e2e/hot-chat-harness.html?role=desktop&download=true&socket=${encodeURIComponent(endpoint)}`);
+    await expect(pc.locator('#status')).toHaveText('registered');
+    await phone.goto(`/e2e/hot-chat-harness.html?role=mobile&socket=${encodeURIComponent(endpoint)}`);
+    await expect(phone.locator('#status')).toHaveText('direct', { timeout: 12_000 });
+    await expect(pc.locator('#status')).toHaveText('direct');
+    const before = await phone.evaluate(() => window.hotChat.stats().beats);
+    const downloading = phone.evaluate((path) => window.hotDownload(path), path);
+    expect(await phone.evaluate(() => window.hotChat.request('during download'))).toEqual({ text: 'during download' });
+    const result = await downloading;
+    const expected = Buffer.alloc(mib * 1024 * 1024 + 17);
+    for (let index = 0; index < expected.length; index++) expected[index] = index % 251;
+    expect(result.hash).toBe(createHash('sha256').update(expected).digest('hex'));
+    expect(result.size).toBe(expected.length);
+    const stats = await phone.evaluate(() => window.hotChat.stats());
+    console.log(JSON.stringify({ benchmark: 'P2P download without TextDecoder', mib,
+      elapsedMs: Math.round(result.elapsedMs),
+      mibPerSecond: Number((result.size / 1024 / 1024 / (result.elapsedMs / 1000)).toFixed(2)),
+      packets: stats.packets, batches: stats.batches }));
+    expect(stats.batches).toBeGreaterThan(0);
+    expect(await phone.evaluate(() => window.hotChat.stats().beats)).toBeGreaterThan(before + 2);
+    expect(await phone.evaluate(() => window.hotChat.errors)).toEqual([]);
+  });
+}
 
 test('transfers large P2P messages in both directions while the UI heartbeat and other requests keep running',
   async ({ context }) => {

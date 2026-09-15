@@ -62,6 +62,7 @@ export function VideoViewer({ close, ...options }: Props) {
             : <Text style={styles.status}>请连接电脑后播放视频。</Text>}
         </View>}
         {!!orientation.error && <Text style={styles.status}>{orientation.error}</Text>}
+        {download.busy && !!download.detail && <Text style={styles.status}>{download.detail}</Text>}
         {!!download.message && <Text accessibilityLiveRegion="polite" style={styles.status}>{download.message}</Text>}
       </SafeAreaView>
     </SafeAreaProvider>

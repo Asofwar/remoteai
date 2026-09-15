@@ -1,5 +1,26 @@
 use super::*;
 
+#[test]
+fn coordinator_updates_upload_limits_and_owner_changes_reset_them() {
+    let mut runtime = connected_identity();
+    runtime
+        .receive(
+            &json!({"type": "chat-policy", "policy": {
+                "fileUploadMaxMb": 20, "fileUploadTotalMaxMb": 50
+            }})
+            .to_string(),
+        )
+        .unwrap();
+    assert!(runtime.upload_policy.snapshot().unwrap().message_bytes() > 50 * 1024 * 1024);
+    runtime.disconnect();
+    assert!(runtime.upload_policy.snapshot().unwrap().message_bytes() > 50 * 1024 * 1024);
+    runtime.configure(None);
+    assert_eq!(
+        runtime.upload_policy.snapshot().unwrap().message_bytes(),
+        8 * 1024 * 1024
+    );
+}
+
 fn connected_identity() -> Runtime {
     let mut runtime = Runtime::default();
     runtime.command(Command::Attach {

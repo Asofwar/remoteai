@@ -6,7 +6,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::codex_gui::upload_policy::UploadPolicyStore;
 use serde_json::json;
+use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
 use tungstenite::{stream::MaybeTlsStream, Error as SocketError, Message, WebSocket};
 
@@ -33,8 +35,12 @@ const COMMANDS_PER_TICK: usize = 64;
 pub(super) fn run(
     mut commands: mpsc::Receiver<Command>,
     mut configs: watch::Receiver<Option<Config>>,
+    upload_policy: Arc<UploadPolicyStore>,
 ) {
-    let mut runtime = Runtime::default();
+    let mut runtime = Runtime {
+        upload_policy,
+        ..Runtime::default()
+    };
     loop {
         for _ in 0..COMMANDS_PER_TICK {
             match commands.try_recv() {
@@ -60,6 +66,7 @@ struct ConnectionTimes {
 }
 
 pub(super) struct Runtime {
+    upload_policy: Arc<UploadPolicyStore>,
     config: Option<Config>,
     bridge: Option<Bridge>,
     socket: Option<Socket>,
@@ -75,6 +82,7 @@ impl Default for Runtime {
     fn default() -> Self {
         let now = Instant::now();
         Self {
+            upload_policy: Arc::default(),
             config: None,
             bridge: None,
             socket: None,
@@ -143,6 +151,9 @@ impl Runtime {
             self.disconnect();
         } else {
             self.reset();
+            if self.upload_policy.update(&json!({})).is_err() {
+                eprintln!("remote chat: could not reset upload policy");
+            }
         }
         self.retry_at = Instant::now();
     }
@@ -313,7 +324,13 @@ impl Runtime {
         if text.len() > FRAME_LIMIT {
             return Err(ChatError::InvalidFrame);
         }
-        let message = serde_json::from_str(text).map_err(|_| ChatError::InvalidFrame)?;
+        let message: serde_json::Value =
+            serde_json::from_str(text).map_err(|_| ChatError::InvalidFrame)?;
+        if message["type"] == "chat-policy" {
+            self.upload_policy
+                .update(&message["policy"])
+                .map_err(|_| ChatError::InvalidFrame)?;
+        }
         self.sessions.receive(&message)?;
         if message["type"] == "registered" {
             self.registered = true;

@@ -1,5 +1,16 @@
 import { REQUEST_TIMEOUT_MS, type RpcMessage, type RpcRequest } from './protocol';
 import { CONNECTION_ERRORS } from './connectionErrors';
+import { chatMessageCharLimit } from './framing';
+
+const TRANSFER_CHARS_PER_SECOND = 128 * 1024;
+const SMALL_REQUEST_CHARS = 1024 * 1024;
+const MAX_TIMER_MS = 2_147_483_647;
+function requestTimeout(body: unknown) {
+  const operation = (body as { operation?: unknown } | null)?.operation;
+  const chars = operation === 'queueEdit' ? chatMessageCharLimit() : (JSON.stringify(body)?.length ?? 0);
+  const transferMs = Math.ceil(Math.max(0, chars - SMALL_REQUEST_CHARS) / TRANSFER_CHARS_PER_SECOND) * 1000;
+  return Math.min(MAX_TIMER_MS, REQUEST_TIMEOUT_MS + transferMs);
+}
 
 interface Pending {
   request: RpcRequest;
@@ -26,7 +37,7 @@ export class ChatRpc {
         this.pending.delete(id);
         reject(new Error(method === 'connect' ? CONNECTION_ERRORS.guiTimeout
           : '电脑暂未确认结果，请刷新对话后再试，避免重复发送。'));
-      }, REQUEST_TIMEOUT_MS);
+      }, requestTimeout(body));
       this.pending.set(id, { request, resolve: (value) => resolve(value as T), reject, timer });
       void this.options.send(request).catch((error: unknown) => this.fail(id, error));
     });

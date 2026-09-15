@@ -21,7 +21,7 @@ import { ComposerProjectFiles } from './ComposerProjectFiles';
 import { useComposerAttachments } from './useComposerAttachments';
 import type { RemoteComposerCatalog } from '../../../../shared/remote-chat/composerCatalog';
 import type { ProjectFilesRequest, ProjectFilesResponse } from '../../../../shared/remote-chat/projectFiles';
-import { MAX_CHAT_ATTACHMENT_DATA } from '../../../../shared/remote-chat/composerAttachments';
+import { chatAttachmentDataLimit, validateUploadedFiles } from '../../../../shared/remote-chat/composerAttachments';
 import { composerAction, CONTINUE_MESSAGE } from '../../../../shared/remote-chat/composerAction';
 import { ChatPhotoPicker } from './ChatPhotoPicker';
 import { useChatPhotos } from './useChatPhotos';
@@ -128,7 +128,9 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
     const submittedQuotes = quoteDraft?.quotes ?? [];
     const size = submittedPhotos.reduce((total, photo) => total + photo.dataUrl.length, 0)
       + submittedAttachments.reduce((total, item) => total + (item.data?.length ?? 0), 0);
-    if (size > MAX_CHAT_ATTACHMENT_DATA) { setAttachmentError('附件总大小过大，请减少照片或文件后再试。'); return; }
+    try { validateUploadedFiles(submittedAttachments); }
+    catch (cause) { setAttachmentError(cause instanceof Error ? cause.message : '文件无法发送，请重新选择。'); return; }
+    if (size > chatAttachmentDataLimit()) { setAttachmentError('附件总大小过大，请减少照片或文件后再试。'); return; }
     setAttachmentError('');
     const text = replyWithQuotes(action === 'continue' ? CONTINUE_MESSAGE : draft.text, submittedQuotes);
     const sent = await draft.submit({ text, goalMode: goalMode.enabled,

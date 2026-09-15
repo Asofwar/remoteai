@@ -85,6 +85,15 @@ it('counts base64 padding accurately and applies new download limits at the time
   expect(() => checkDownloadSize(MIB + 1)).toThrow('1 MB');
 });
 
+it.each(['send', 'steer'])('checks uploads against host settings for direct %s requests', async (operation) => {
+  const body = { operation, threadId: 'chat', turnId: 'turn', text: '', images: [], fileUploadMaxMb: 100,
+    attachments: [{ kind: 'file', name: 'notes.txt', path: '', data: Buffer.alloc(MIB + 1).toString('base64') }] };
+  setChatPolicy({ ...DEFAULT_CHAT_POLICY, fileUploadMaxMb: 1 });
+  const result = await new ChatOperations().execute({ kind: 'request', id: operation, method: 'request', body });
+  expect(result.error).toContain('1 MB');
+  expect(guiApi.request).not.toHaveBeenCalled();
+});
+
 it('compresses large configured targets enough to fit the transport without changing the policy', async () => {
   const policy = { ...DEFAULT_CHAT_POLICY, imageTargetKb: 1000000 };
   const encode = vi.fn(async (_edge: number, quality: number) => ({ value: quality,

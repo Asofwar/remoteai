@@ -1,17 +1,36 @@
 import type { AttachmentReference } from '../../apps/desktop/src/pages/codexGui/attachmentTypes';
+import { base64Bytes, checkFileUploadSize, fileUploadTotalByteLimit, getChatPolicy, MIB } from './policy';
 
 export const MAX_CHAT_FILES = 8;
-export const MAX_CHAT_FILE_BYTES = 2 * 1024 * 1024;
-export const MAX_CHAT_FILE_DATA = 4 * 1024 * 1024;
-export const MAX_CHAT_ATTACHMENT_DATA = 6 * 1024 * 1024;
+const DEFAULT_ATTACHMENT_DATA = 6 * MIB;
+const IMAGE_RESERVE_CHARS = 2 * MIB;
 const MAX_NAME_LENGTH = 200;
 const MAX_PLUGIN_PATH_LENGTH = 310;
+
+// Keep the existing image allowance and grow the mixed payload allowance with file uploads.
+export function chatAttachmentDataLimit() {
+  return Math.min(Number.MAX_SAFE_INTEGER, Math.max(DEFAULT_ATTACHMENT_DATA,
+    Math.ceil(fileUploadTotalByteLimit() / 3) * 4 + IMAGE_RESERVE_CHARS));
+}
+
+/** Recheck at submission so queued uploads follow the latest administrator settings. */
+export function validateUploadedFiles(attachments: readonly AttachmentReference[]) {
+  let total = 0;
+  for (const item of attachments) {
+    if (item.data === undefined) continue;
+    const bytes = base64Bytes(item.data);
+    checkFileUploadSize(bytes);
+    total += bytes;
+    if (total > fileUploadTotalByteLimit()) {
+      throw new Error(`每次发送的文件合计不能超过 ${getChatPolicy().fileUploadTotalMaxMb} MB，请减少文件。`);
+    }
+  }
+}
 
 export function remoteAttachments(value: unknown): AttachmentReference[] {
   if (value === undefined) return [];
   if (!Array.isArray(value) || value.length > MAX_CHAT_FILES) throw new Error('每条消息最多添加 8 个文件或插件。');
-  let total = 0;
-  return value.map((entry: unknown) => {
+  const attachments = value.map((entry: unknown): AttachmentReference => {
     const item = entry && typeof entry === 'object' ? entry as Record<string, unknown> : {};
     if (typeof item.name !== 'string' || !item.name.trim() || item.name.length > MAX_NAME_LENGTH
       || /[\x00-\x1f\x7f]/u.test(item.name)) throw new Error('附件名称无效，请重新选择。');
@@ -23,12 +42,11 @@ export function remoteAttachments(value: unknown): AttachmentReference[] {
       && item.path.length <= 4096 && /^(?:[A-Za-z]:[\\/]|\/(?!\/))/.test(item.path)
       && !/[\x00-\x1f\x7f]/u.test(item.path)) return { kind: 'file', name: item.name, path: item.path };
     if (item.kind !== 'file' || item.path !== '' || typeof item.data !== 'string' || !item.data
-      || item.data.length > Math.ceil(MAX_CHAT_FILE_BYTES / 3) * 4
       || item.data.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(item.data)) {
-      throw new Error('文件无法添加，请选择不超过 2 MB 的文件。');
+      throw new Error('文件无法读取，请重新选择。');
     }
-    total += item.data.length;
-    if (total > MAX_CHAT_FILE_DATA) throw new Error('文件总大小过大，请减少文件后再试。');
     return { kind: 'file', name: item.name, path: '', data: item.data };
   });
+  validateUploadedFiles(attachments);
+  return attachments;
 }

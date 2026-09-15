@@ -26,7 +26,6 @@ const WEB_CONTENT_SECURITY_POLICY: &str = concat!(
 );
 const WEB_INVOKE_PATH: &str = "/__codex_switch__/api/invoke";
 const HOSTED_RUNTIME_MARKER: &str = r#"<meta name="codex-switch-runtime" content="hosted">"#;
-const MAX_INVOKE_BODY_BYTES: usize = 8 * 1024 * 1024;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]

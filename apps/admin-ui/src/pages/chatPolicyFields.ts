@@ -26,8 +26,15 @@ export const POLICY_SECTIONS: PolicySection[] = [
     { key: 'historyPageSize', label: ['历史消息数量', 'History messages per page'],
       hint: ['每次加载 1–100 条历史消息', 'Load 1–100 older messages at a time'], unit: ['条', 'items'] },
   ] },
-  { key: 'files', title: ['文件', 'Files'], hint: ['设置文本预览和文件下载的大小限制，数值不设上限。',
-    'Set size limits for text previews and downloads. Values have no upper cap.'], fields: [
+  { key: 'files', title: ['文件', 'Files'], hint: ['设置文件上传、文本预览和下载的大小限制。',
+    'Set size limits for file uploads, text previews and downloads.'], fields: [
+    { key: 'fileUploadMaxMb', label: ['单个文件上传上限', 'File upload limit'],
+      hint: ['从手机添加文件时，单个文件不能超过此大小', 'Maximum size of each file added from a phone'],
+      unit: ['MB', 'MB'] },
+    { key: 'fileUploadTotalMaxMb', label: ['文件合计上传上限', 'Total file upload limit'],
+      hint: ['每次发送的文件合计大小，包括一起发送的待发消息',
+        'Maximum combined file size per send, including queued messages sent together'],
+      unit: ['MB', 'MB'] },
     { key: 'filePreviewMaxMb', label: ['文本查看上限', 'Text preview limit'],
       hint: ['允许查看的最大文本文件大小', 'Maximum text file size for preview'], unit: ['MB', 'MB'] },
     { key: 'fileDownloadMaxMb', label: ['文件下载上限', 'File download limit'],

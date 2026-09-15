@@ -28,7 +28,7 @@ describe('chat settings', () => {
     const service = new ChatSettingsService(repository as unknown as Repository<ChatSettingsEntity>);
     expect(await service.read()).toEqual(DEFAULT_CHAT_POLICY);
     const policy = { ...DEFAULT_CHAT_POLICY, threadPageSize: 7, imageTargetKb: 128,
-      filePreviewMaxMb: 100, fileDownloadMaxMb: 1000 };
+      fileUploadMaxMb: 20, fileUploadTotalMaxMb: 50, filePreviewMaxMb: 100, fileDownloadMaxMb: 1000 };
     const actor = { id: 'owner', email: 'owner@example.test' } as AuthUser;
     expect(await service.update(actor, policy)).toEqual(policy);
     expect(await service.read()).toEqual(policy);
@@ -65,7 +65,14 @@ describe('chat settings', () => {
       .toEqual([Permission.ChatSettingsManage]);
   });
 
-  it.each(['filePreviewMaxMb', 'fileDownloadMaxMb'] as const)(
+  it('keeps older saved policies readable with the original upload limit', () => {
+    const { fileUploadMaxMb: _upload, fileUploadTotalMaxMb: _total,
+      videoPreviewMaxMb: _video, ...previous } = DEFAULT_CHAT_POLICY;
+    expect(parseChatPolicy(previous)).toEqual(DEFAULT_CHAT_POLICY);
+    expect(() => parseChatPolicy({ ...previous, fileUploadMaxMb: null })).toThrow();
+  });
+
+  it.each(['fileUploadMaxMb', 'fileUploadTotalMaxMb', 'filePreviewMaxMb', 'fileDownloadMaxMb'] as const)(
     'accepts file limits above the old cap while rejecting invalid values: %s', (key) => {
       for (const value of [1, 21, 1000000, Number.MAX_SAFE_INTEGER]) {
         expect(parseChatPolicy({ ...DEFAULT_CHAT_POLICY, [key]: value })[key]).toBe(value);

@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { insertPluginTrigger, nativeComposerTrigger } from './composerTrigger';
-import { MAX_CHAT_FILE_BYTES, remoteAttachments } from '../../../../shared/remote-chat/composerAttachments';
+import { remoteAttachments } from '../../../../shared/remote-chat/composerAttachments';
+import { fileUploadByteLimit } from '../../../../shared/remote-chat/policy';
 import { remotePlugins } from '../../../../shared/remote-chat/composerCatalog';
 
 it('opens plugin search at the caret and leaves emails and slash commands intact', () => {
@@ -19,7 +20,7 @@ it('retains phone bytes, project references and plugins without accepting malfor
   expect(remoteAttachments([phone, project, plugin])).toEqual([phone, project, plugin]);
   for (const item of [{ ...phone, data: '?' }, { ...phone, path: project.path },
     { ...plugin, data: phone.data }, { ...plugin, path: 'plugin://../../bad' },
-    { ...phone, data: 'A'.repeat(Math.ceil(MAX_CHAT_FILE_BYTES / 3) * 4 + 4) }]) {
+    { ...phone, data: 'A'.repeat(Math.ceil(fileUploadByteLimit() / 3) * 4 + 4) }]) {
     expect(() => remoteAttachments([item])).toThrow();
   }
 });

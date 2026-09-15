@@ -76,9 +76,14 @@ fn handle_invoke_request(app: AppHandle, mut request: Request, security: &WebReq
         );
         return;
     }
+    use tauri::Manager;
+    let max_body_bytes = match app.state::<crate::codex_gui::GuiState>().upload_policy.snapshot() {
+        Ok(limits) => limits.message_bytes(),
+        Err(_) => { respond_text(request, StatusCode(503), "Please try again later"); return; }
+    };
     if request
         .body_length()
-        .is_some_and(|length| length > MAX_INVOKE_BODY_BYTES)
+        .is_some_and(|length| length > max_body_bytes)
     {
         respond_text(request, StatusCode(413), "Request body is too large");
         return;
@@ -87,9 +92,9 @@ fn handle_invoke_request(app: AppHandle, mut request: Request, security: &WebReq
     let mut body = String::new();
     let read_result = request
         .as_reader()
-        .take((MAX_INVOKE_BODY_BYTES + 1) as u64)
+        .take(max_body_bytes.saturating_add(1) as u64)
         .read_to_string(&mut body);
-    if read_result.is_err() || body.len() > MAX_INVOKE_BODY_BYTES {
+    if read_result.is_err() || body.len() > max_body_bytes {
         respond_text(request, StatusCode(400), "Could not read the request body");
         return;
     }

@@ -1,4 +1,5 @@
 import { getChatPolicy, textPreviewByteLimit, videoByteLimit } from '../../../../shared/remote-chat/policy';
+import { remoteAttachments } from '../../../../shared/remote-chat/composerAttachments';
 import { guiApi } from '../pages/codexGui/api';
 import type { ApprovalReply, GuiEvent, ListResponse, Request, SkillsResponse, Thread } from '../pages/codexGui/types';
 import { object, type RpcRequest, type RpcResponse } from '../../../../shared/remote-chat/protocol';
@@ -135,6 +136,9 @@ export class ChatOperations {
     }
     // The existing typed Rust boundary validates directories, thread ids, inputs and approval replies.
     const sidebarVersion = guiSidebar.version();
+    if ((body.operation === 'send' || body.operation === 'steer') && body.attachments !== undefined) {
+      body.attachments = remoteAttachments(body.attachments);
+    }
     if (body.operation === 'list') body.limit = getChatPolicy().threadPageSize;
     if (body.operation === 'textPreview') body.maxBytes = textPreviewByteLimit();
     if (body.operation === 'videoOpen' || body.operation === 'videoRead') {

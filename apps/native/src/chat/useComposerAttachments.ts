@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import * as DocumentPicker from 'expo-document-picker';
 import { readAsStringAsync, EncodingType } from 'expo-file-system';
 import type { AttachmentReference, ComposerPlugin } from '../../../desktop/src/pages/codexGui/attachmentTypes';
-import { MAX_CHAT_FILE_BYTES, remoteAttachments } from '../../../../shared/remote-chat/composerAttachments';
+import { remoteAttachments } from '../../../../shared/remote-chat/composerAttachments';
+import { checkFileUploadSize } from '../../../../shared/remote-chat/policy';
 
 export function useComposerAttachments({ threadId, sending }: { threadId: string | null; sending: boolean }) {
   const [items, setItems] = useState<AttachmentReference[]>([]);
@@ -31,9 +32,7 @@ export function useComposerAttachments({ threadId, sending }: { threadId: string
       const additions: AttachmentReference[] = [];
       for (const asset of result.assets) {
         if (current !== generation.current) return;
-        if (asset.size !== undefined && asset.size > MAX_CHAT_FILE_BYTES) {
-          throw new Error('单个文件不能超过 2 MB，请选择较小的文件。');
-        }
+        if (asset.size !== undefined) checkFileUploadSize(asset.size);
         const data = await readAsStringAsync(asset.uri, { encoding: EncodingType.Base64 });
         additions.push({ kind: 'file', name: asset.name, path: '', data });
         remoteAttachments([...items, ...additions]);

@@ -38,6 +38,7 @@ pub(crate) mod scheduled_tasks;
 mod tests;
 mod text_preview;
 pub(crate) mod undo;
+pub(crate) mod upload_policy;
 pub(crate) mod usage;
 mod video_stream;
 pub(crate) mod web;
@@ -56,6 +57,7 @@ use protocol::{ApprovalReply, GuiEvent, GuiRequest, GuiResponse};
 
 #[derive(Default)]
 pub(crate) struct GuiState {
+    pub(crate) upload_policy: Arc<upload_policy::UploadPolicyStore>,
     client: Mutex<Option<Arc<Client>>>,
     videos: Arc<video_stream::VideoStreams>,
 }
@@ -182,9 +184,16 @@ async fn execute_request(state: &GuiState, request: GuiRequest) -> Result<GuiRes
     }
     let projectless_root = client.projectless_root.clone();
     let response_root = projectless_root.clone();
+    let upload_policy = Arc::clone(&state.upload_policy);
     let (method, params) = tauri::async_runtime::spawn_blocking(move || {
         let mut request = request;
-        workspaces::prepare_request(&mut request, &projectless_root)?;
+        workspaces::prepare_request_with_upload_policy(
+            &mut request,
+            &projectless_root,
+            upload_policy
+                .snapshot()
+                .map_err(|_| GuiError::InvalidRequest)?,
+        )?;
         request.into_rpc()
     })
     .await

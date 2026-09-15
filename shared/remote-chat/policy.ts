@@ -26,6 +26,17 @@ export function imagePreviewCharLimit() {
 export function textPreviewByteLimit() {
   return Math.min(Number.MAX_SAFE_INTEGER, current.filePreviewMaxMb * MIB);
 }
+export function fileUploadByteLimit() {
+  return Math.min(Number.MAX_SAFE_INTEGER, current.fileUploadMaxMb * MIB);
+}
+export function fileUploadTotalByteLimit() {
+  return Math.min(Number.MAX_SAFE_INTEGER, current.fileUploadTotalMaxMb * MIB);
+}
+export function checkFileUploadSize(bytes: number) {
+  if (bytes > fileUploadByteLimit()) {
+    throw new Error(`单个文件不能超过 ${current.fileUploadMaxMb} MB，请选择较小的文件。`);
+  }
+}
 export class DownloadPolicyError extends Error {}
 export function checkDownloadSize(bytes: number) {
   if (bytes > current.fileDownloadMaxMb * MIB) {

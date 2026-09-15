@@ -5,6 +5,8 @@ export const CHAT_POLICY_FIELDS = {
   imageSourceMaxMb: { min: 1, max: undefined, default: 20 },
   imageMaxEdge: { min: 256, max: undefined, default: 2048 },
   imageTargetKb: { min: 32, max: undefined, default: 512 },
+  fileUploadMaxMb: { min: 1, max: undefined, default: 2 },
+  fileUploadTotalMaxMb: { min: 1, max: undefined, default: 3 },
   filePreviewMaxMb: { min: 1, max: undefined, default: 2 },
   imagePreviewMaxMb: { min: 1, max: undefined, default: 20 },
   videoPreviewMaxMb: { min: 1, max: undefined, default: 100 },
@@ -21,8 +23,9 @@ export function parseChatPolicy(value: unknown): ChatPolicy {
   const policy = { ...DEFAULT_CHAT_POLICY };
   for (const key of Object.keys(CHAT_POLICY_FIELDS) as (keyof ChatPolicy)[]) {
     const field = CHAT_POLICY_FIELDS[key];
-    // Previously saved policies and older coordinators predate video playback.
-    const number = key === 'videoPreviewMaxMb' && record[key] === undefined ? field.default : record[key];
+    // Older saved policies and coordinators do not include these later additions.
+    const optional = key === 'videoPreviewMaxMb' || key === 'fileUploadMaxMb' || key === 'fileUploadTotalMaxMb';
+    const number = optional && record[key] === undefined ? field.default : record[key];
     if (typeof number !== 'number' || !Number.isSafeInteger(number) || number < field.min
       || (field.max !== undefined && number > field.max)) {
       throw new Error('请在允许范围内填写整数。');

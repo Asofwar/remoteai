@@ -125,6 +125,8 @@ pub(crate) async fn remote_chat_detach(
 pub(crate) fn start<R: tauri::Runtime>(app: tauri::AppHandle<R>) {
     let (sender, receiver) = mpsc::channel(protocol::COMMAND_LIMIT);
     app.manage(ChatState(sender));
+    let upload_policy =
+        std::sync::Arc::clone(&app.state::<crate::codex_gui::GuiState>().upload_policy);
     let configs = config::watch(app);
-    std::thread::spawn(move || runtime::run(receiver, configs));
+    std::thread::spawn(move || runtime::run(receiver, configs, upload_policy));
 }

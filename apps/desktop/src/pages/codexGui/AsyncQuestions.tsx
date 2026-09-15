@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { Input, Radio } from "antd";
+import { Button, Input, Radio } from "antd";
+import { X } from "lucide-react";
 import { pendingAsyncQuestions } from "./asyncQuestionState";
 import type { Conversation, Item } from "./types";
 import { submitQuestionOnEnter } from "./questionKeyboard";
@@ -13,13 +14,23 @@ export interface AsyncQuestionsProps {
 }
 
 export function AsyncQuestions({ value, ...props }: AsyncQuestionsProps) {
+  const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
   return <div className={layout.questionWrap}>
-    {pendingAsyncQuestions(value).map((item) => <QuestionCard key={`${value?.thread.id}:${item.id}`}
-      item={item} {...props} />)}
+    {pendingAsyncQuestions(value).map((item) => {
+      const key = JSON.stringify([value?.thread.id, item.id]);
+      if (dismissed.has(key)) return null;
+      return <QuestionCard key={key} item={item} {...props}
+        onClose={() => setDismissed((previous) => new Set(previous).add(key))} />;
+    })}
   </div>;
 }
 
-function QuestionCard({ item, disabled, onAnswer }: Omit<AsyncQuestionsProps, "value"> & { item: Item }) {
+interface QuestionCardProps extends Omit<AsyncQuestionsProps, "value"> {
+  item: Item;
+  onClose: () => void;
+}
+
+function QuestionCard({ item, disabled, onAnswer, onClose }: QuestionCardProps) {
   const questions = item.questions ?? [];
   const [answers, setAnswers] = useState(() => questions.map((question) => question.options?.[0] ?? ""));
   const [busy, setBusy] = useState(false);
@@ -37,7 +48,11 @@ function QuestionCard({ item, disabled, onAnswer }: Omit<AsyncQuestionsProps, "v
   if (submitted) return null;
   return <section className={styles.card} aria-label="需要你的补充" aria-busy={busy}
     onKeyDown={(event) => submitQuestionOnEnter(event, submit)}>
-    <strong>需要你的补充</strong>
+    <div className={styles.header}>
+      <strong>需要你的补充</strong>
+      <Button type="text" size="small" aria-label="关闭补充信息" icon={<X size={16} />}
+        onClick={onClose} onKeyDown={(event) => event.stopPropagation()} />
+    </div>
     {questions.map((question, index) => <fieldset key={index} disabled={disabled || busy}>
       <legend>{question.title}</legend>
       {Boolean(question.options?.length) && <Radio.Group value={answers[index]} disabled={disabled || busy}

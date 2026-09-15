@@ -23,7 +23,7 @@ test("async questions show choices during work, preserve failed answers, and fit
   await expect(card.getByRole("radio")).toHaveCount(3);
   await expect(card.getByRole("radio", { name: options[0], exact: true })).toBeChecked();
   expect(replies).toHaveLength(0);
-  await expect(card.getByRole("button")).toHaveCount(0);
+  await expect(card.getByRole("button", { name: "关闭补充信息" })).toBeVisible();
   const answer = card.getByRole("textbox", { name: "还有哪些现象？" });
   await answer.press("Enter");
   expect(replies).toHaveLength(0);

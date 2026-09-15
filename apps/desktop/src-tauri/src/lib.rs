@@ -357,6 +357,7 @@ pub fn run() {
             conversation_hub::inspect_codex_thread_import,
             conversation_hub::unpack_codex_threads,
             conversation_hub::migrate_codex_threads,
+            conversation_hub::home_migration::migrate_codex_threads_to_home,
             conversation_hub::reconcile_codex_thread_visibility,
             conversation_hub::rebuild_codex_thread_index,
             conversation_hub::open_codex_thread_file,

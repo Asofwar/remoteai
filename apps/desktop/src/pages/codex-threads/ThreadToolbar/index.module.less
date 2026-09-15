@@ -1,6 +1,6 @@
 .codexThreadToolbar {
   display: grid;
-  grid-template-columns: minmax(180px, 280px) minmax(210px, 1fr) 130px 160px;
+  grid-template-columns: minmax(160px, 280px) minmax(160px, 1fr) 130px max-content max-content;
   gap: 10px;
 
   :global(.ant-input-affix-wrapper),
@@ -30,6 +30,6 @@
 
 :global(:root[data-theme="dark"]) .threadInputClear:hover { background: #292d32; }
 
-@media (max-width: 1050px) {
+@media (max-width: 1250px) {
   .codexThreadToolbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }

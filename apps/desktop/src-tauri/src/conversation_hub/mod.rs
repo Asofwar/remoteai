@@ -1,3 +1,6 @@
+pub(crate) mod home_migration;
+pub(crate) use home_migration::migrate_codex_threads_to_home;
+
 mod context;
 pub(crate) use context::ThreadContext;
 

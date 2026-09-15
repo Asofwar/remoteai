@@ -19,8 +19,8 @@ fn relocated_bin_manifest(codex_home: &Path, original: &BinManifest) -> Result<B
         // Catalog host IDs and scan paths belong to the source installation. The target
         // rebuilds its own catalog from the restored thread row and rollout files.
         backup.tables.retain(|table| !table.database.starts_with(CATALOG_PREFIX));
-        for row in backup.tables.iter_mut().flat_map(|snapshot| &mut snapshot.rows) {
-            relocate_bin_row(row, &target);
+        for snapshot in &mut backup.tables {
+            relocate_bin_table(snapshot, &target);
         }
     }
     Ok(manifest)
@@ -30,6 +30,25 @@ fn relocate_bin_row(row: &mut SqliteRowSnapshot, target: &Path) {
     for (column, cell) in row.columns.iter().zip(&mut row.values) {
         if column == "rollout_path" {
             *cell = SqliteCell::Text(target.to_string_lossy().into_owned());
+        }
+    }
+}
+
+fn reset_relocated_log_id(row: &mut SqliteRowSnapshot) {
+    // Log IDs are local SQLite counters. Let the destination allocate a new ID
+    // so INSERT OR REPLACE cannot delete a different conversation's log entry.
+    for (column, cell) in row.columns.iter().zip(&mut row.values) {
+        if column == "id" {
+            *cell = SqliteCell::Null;
+        }
+    }
+}
+
+fn relocate_bin_table(snapshot: &mut SqliteTableSnapshot, target: &Path) {
+    for row in &mut snapshot.rows {
+        relocate_bin_row(row, target);
+        if snapshot.table == "logs" {
+            reset_relocated_log_id(row);
         }
     }
 }

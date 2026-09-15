@@ -1,5 +1,5 @@
 import { Button, Input, Select } from "antd";
-import { Search, Trash2, X } from "lucide-react";
+import { FolderInput, Search, Trash2, X } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import { CodexHomeSelect } from "../../../components/CodexHomeScope";
 import type { CodexThreadKind } from "../../../types";
@@ -19,6 +19,7 @@ interface ThreadToolbarProps {
   selectedCount: number;
   busy: boolean;
   confirmTrash: () => void;
+  migrateToHome: () => void;
 }
 
 export function ThreadToolbar(props: ThreadToolbarProps) {
@@ -56,6 +57,9 @@ export function ThreadToolbar(props: ThreadToolbarProps) {
         onClick={confirmTrash}
       >
         {text.moveToBin} ({selectedCount})
+      </Button>
+      <Button icon={<FolderInput size={16} />} disabled={!selectedCount || busy} onClick={props.migrateToHome}>
+        {text.moveToHome}
       </Button>
     </div>
   );

@@ -1824,6 +1824,14 @@ export function copyWebProxyLanApiKey(): Promise<void> {
   return invoke<void>("copy_web_proxy_lan_api_key");
 }
 
+export function migrateCodexThreadsToHome(request: {
+  homeId: string;
+  targetHomeId: string;
+  sessionIds: string[];
+}): Promise<CodexThreadMigrationReport> {
+  return invoke<CodexThreadMigrationReport>("migrate_codex_threads_to_home", { request });
+}
+
 export async function migrateCodexThreads(sessionIds: string[], homeId?: string): Promise<CodexThreadMigrationReport> {
   if (!hasLocalBackend) throw new Error("会话迁移需要桌面版 Codex Switch");
   return invoke<CodexThreadMigrationReport>("migrate_codex_threads", { homeId, sessionIds });

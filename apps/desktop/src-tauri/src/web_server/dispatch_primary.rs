@@ -309,6 +309,9 @@ fn dispatch_command(app: AppHandle, command: &str, args: Value) -> Result<Value,
                 argument(&args, "sessionIds")?,
             ))
         }
+        "migrate_codex_threads_to_home" => serialize(block_on(
+            crate::conversation_hub::migrate_codex_threads_to_home(app, argument(&args, "request")?),
+        )),
         "migrate_codex_threads" => serialize(
             crate::conversation_hub::migrate_codex_threads_blocking(
                 crate::conversation_hub::ThreadContext::new(app, argument(&args, "homeId")?)?,

@@ -7,6 +7,9 @@ use support::*;
 #[path = "bin_recovery_tests.rs"]
 mod recovery;
 
+#[path = "home_migration_tests.rs"]
+mod home_migration;
+
 #[test]
 fn selected_home_cannot_list_or_purge_another_homes_bin_entries() {
     let fixture = Fixture::new();

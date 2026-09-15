@@ -10,6 +10,8 @@ import { RepairModal, TransferModal, TrashModal } from "../codex-threads/ThreadM
 import { ThreadToolbar } from "../codex-threads/ThreadToolbar";
 import { ThreadTopbar } from "../codex-threads/ThreadTopbar";
 import { useRepair } from "../codex-threads/useRepair";
+import { HomeMigrationModal } from "../codex-threads/ThreadModals/HomeMigrationModal";
+import { useHomeMigration } from "../codex-threads/useHomeMigration";
 import { useMigration } from "../codex-threads/useMigration";
 import { useThreadList } from "../codex-threads/useThreadList";
 import { useTransfer } from "../codex-threads/useTransfer";
@@ -48,6 +50,10 @@ function CodexThreadsContent({ language, notify }: CodexThreadsPageProps) {
     reportError,
     refresh,
     setBusy,
+  });
+  const homeMigration = useHomeMigration({
+    selected: list.selected, clearSelection: () => list.setSelected(new Set()),
+    notify, reportError, refresh, setBusy,
   });
   const repair = useRepair({ selected: list.selected, text, notify, reportError, refresh });
   const migrate = useMigration({
@@ -130,7 +136,7 @@ function CodexThreadsContent({ language, notify }: CodexThreadsPageProps) {
       <div className={styles.codexThreadManager}>
         <ThreadToolbar
           homeSelectDisabled={busy || confirming || trash.confirming || repair.busy
-            || trash.open || transfer.open || repair.open}
+            || trash.open || transfer.open || repair.open || homeMigration.open}
           text={text}
           query={list.query}
           setQuery={list.setQuery}
@@ -142,6 +148,7 @@ function CodexThreadsContent({ language, notify }: CodexThreadsPageProps) {
           selectedCount={list.selected.size}
           busy={busy}
           confirmTrash={trash.confirmMove}
+          migrateToHome={homeMigration.show}
         />
         <ThreadList
           language={language}
@@ -163,6 +170,7 @@ function CodexThreadsContent({ language, notify }: CodexThreadsPageProps) {
           reportError={reportError}
           migrate={(id) => confirmMigration([id])}
         />
+        <HomeMigrationModal migration={homeMigration} busy={busy} text={text} />
         <TrashModal
           open={trash.open}
           setOpen={trash.setOpen}

@@ -6,6 +6,8 @@ import { parseMessage, type IceServer, type RpcMessage, type Signal } from '../.
 import { demoResponse, demoState, changeDemoSidebar } from './demo-conversation';
 import { changeDemoComposer } from './demo-composer';
 import { demoSkillsDelay, setDemoSkills } from './demo-skills';
+import { downloadFixture, fileDownloadResponse } from './file-download-fixture';
+import { setChatConnectionMode } from '../../../shared/remote-chat/policy';
 
 const query = new URLSearchParams(location.search);
 const desktop = query.get('role') === 'desktop';
@@ -47,7 +49,9 @@ async function receive({ data }: MessageEvent<string>) {
       createPeer: (options) => blocked ? { offer: async () => undefined, accept: async () => undefined, close() {} }
         : new RtcPeer(options, () => new RTCPeerConnection({ iceServers: options.iceServers })),
       signal: (signal) => socket.send(JSON.stringify(signal)), relayBuffered: () => socket.bufferedAmount,
-      mode: (mode) => { modes.push(mode); document.querySelector('#status')!.textContent = mode; rpc.retry(); },
+      mode: (mode) => {
+        setChatConnectionMode(mode); modes.push(mode); document.querySelector('#status')!.textContent = mode; rpc.retry();
+      },
       error: (message) => errors.push(message), message: (message) => {
         if (!desktop) { rpc.receive(message); return; }
         if (message.kind !== 'request') return;
@@ -58,12 +62,13 @@ async function receive({ data }: MessageEvent<string>) {
             response = legacyHistory && (message.body as { operation?: string })?.operation === 'syncHistory'
               ? { kind: 'response', id: message.id, error: '当前手机端暂不支持此操作。' }
               : { kind: 'response', id: message.id,
-                data: query.has('demo') ? structuredClone(demoResponse(message, link)) : message.body };
+                data: query.has('download') ? fileDownloadResponse(message.body)
+                  : query.has('demo') ? structuredClone(demoResponse(message, link)) : message.body };
           } catch {
             // Match the desktop boundary: a failed operation must not tear down the encrypted connection.
             response = { kind: 'response', id: message.id, error: '暂时无法完成此操作，请重试。' };
           }
-          requests.set(message.id, response);
+          if ((message.body as { operation?: string })?.operation !== 'fileRead') requests.set(message.id, response);
         }
         const target = link;
         const isSettings = (message.body as { operation?: string } | undefined)?.operation === 'composerSet';
@@ -98,6 +103,7 @@ declare global {
       setSkills: typeof setDemoSkills;
       setTokenSummaryDelay: (milliseconds: number) => void;
       setLegacyHistory: (enabled: boolean) => void };
+    downloadFixture: (path: string) => ReturnType<typeof downloadFixture>;
   }
 }
 window.chatTest = { modes, errors, events, request: (text) => rpc.request('request', { text }),
@@ -110,3 +116,4 @@ window.chatTest = { modes, errors, events, request: (text) => rpc.request('reque
   setHistoryDelay: (milliseconds) => { historyDelay = Math.max(0, Math.min(5000, milliseconds)); },
   setLegacyHistory: (enabled) => { legacyHistory = enabled; },
   setSidebar: (action) => { changeDemoSidebar(action, link); } };
+window.downloadFixture = (path) => downloadFixture(rpc, path);

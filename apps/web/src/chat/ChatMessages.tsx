@@ -5,6 +5,8 @@ import type { Item } from './types';
 import type { ChatMessagesProps } from '../../../../shared/remote-chat/client/messageProps';
 import { useHistoryScroll } from './useHistoryScroll';
 import { ChatImage } from './ChatImage';
+import { ChatFileLink } from './ChatFileLink';
+import { parseFileReference } from '../../../../shared/chat/fileReference';
 import { itemImageSources, isInlineImage, localImageSource } from '../../../../shared/chat/imageSources';
 
 const toolLabels: Record<string, string> = {
@@ -13,7 +15,7 @@ const toolLabels: Record<string, string> = {
 };
 // Stable renderers keep an open image viewer mounted while history or live text updates.
 const markdownComponents: Components = {
-  a: ({ children, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer">{children}</a>,
+  a: ({ children, href }) => <ChatFileLink href={href}>{children}</ChatFileLink>,
   img: ({ src, alt }) => <ChatImage source={src} description={alt || '图片'} />,
 };
 function content(item: Item) {
@@ -29,6 +31,7 @@ const ChatMessage = memo(function ChatMessage({ item }: { item: Item }) {
     <strong className="chat-speaker">Codex</strong>
     <div className="chat-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={(url, key) => {
       if (/^https?:\/\//i.test(url)) return url;
+      if (key === 'href' && parseFileReference(url)) return url;
       return key === 'src' && (isInlineImage(url) || localImageSource(url)) ? url : '';
     }} components={markdownComponents}>{content(item)}</ReactMarkdown></div>
   </article>;

@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import { once } from 'node:events';
+import { createHash } from 'node:crypto';
 import { test, expect } from '@playwright/test';
 import type { WebSocketServer as Server } from 'ws';
 import type { AddressInfo } from 'node:net';
@@ -78,4 +79,30 @@ test('waits for unsuccessful direct discovery before using encrypted admin relay
   expect(await phone.evaluate(() => window.chatTest.request('中转聊天'))).toEqual({ text: '中转聊天' });
   expect(relayPackets).toBeGreaterThan(0);
   expect(await phone.evaluate(() => window.chatTest.modes)).not.toContain('direct');
+});
+
+test('downloads binary files above relay limits over real P2P and keeps relay downloads compatible', async ({ context }) => {
+  test.setTimeout(120_000);
+  const pc = await context.newPage();
+  const phone = await context.newPage();
+  await pc.goto(`/e2e/chat-harness.html?role=desktop&download=true&socket=${encodeURIComponent(endpoint)}`);
+  await expect(pc.locator('#status')).toHaveText('registered');
+  await phone.goto(`/e2e/chat-harness.html?role=mobile&socket=${encodeURIComponent(endpoint)}`);
+  await expect(phone.locator('#status')).toHaveText('direct', { timeout: 12_000 });
+  const before = await phone.evaluate(() => window.chatTest.beats());
+  const result = await phone.evaluate(() => window.downloadFixture('large.apk'));
+  const expected = Buffer.alloc(21 * 1024 * 1024 + 17);
+  for (let index = 0; index < expected.length; index++) expected[index] = index % 251;
+  expect(result).toEqual({ size: expected.length, hash: createHash('sha256').update(expected).digest('hex') });
+  expect(await phone.evaluate(() => window.chatTest.beats())).toBeGreaterThan(before + 2);
+  expect(relayPackets).toBe(0);
+  expect(await phone.evaluate(() => window.downloadFixture('empty'))).toEqual({ size: 0,
+    hash: createHash('sha256').digest('hex') });
+  await phone.evaluate(() => window.chatTest.fallback());
+  await expect(phone.locator('#status')).toHaveText('relay');
+  const small = await phone.evaluate(() => window.downloadFixture('small.zip'));
+  expect(small).toEqual({ size: 1024 * 1024 + 3,
+    hash: createHash('sha256').update(expected.subarray(0, 1024 * 1024 + 3)).digest('hex') });
+  expect(relayPackets).toBeGreaterThan(0);
+  expect(await phone.evaluate(() => window.chatTest.errors)).toEqual([]);
 });

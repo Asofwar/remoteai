@@ -37,6 +37,7 @@ futures-util = "0.3"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 json5 = "0.4"
 md-5 = "0.10"
+mime_guess = "2"
 keyring = "4.1.5"
 portable-pty = "0.9"
 rand = "0.9"

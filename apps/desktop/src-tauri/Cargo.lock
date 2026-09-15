@@ -899,6 +899,7 @@ dependencies = [
  "json5",
  "keyring",
  "md-5",
+ "mime_guess",
  "portable-pty",
  "qrcode",
  "rand",

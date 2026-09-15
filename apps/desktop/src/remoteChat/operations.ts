@@ -1,4 +1,5 @@
-import { getChatPolicy, textPreviewByteLimit, videoByteLimit } from '../../../../shared/remote-chat/policy';
+import { fileDownloadByteLimit, getChatPolicy, textPreviewByteLimit, videoByteLimit }
+  from '../../../../shared/remote-chat/policy';
 import { remoteAttachments } from '../../../../shared/remote-chat/composerAttachments';
 import { guiApi } from '../pages/codexGui/api';
 import type { ApprovalReply, GuiEvent, ListResponse, Request, SkillsResponse, Thread } from '../pages/codexGui/types';
@@ -27,6 +28,7 @@ import { CONTEXT_READ_OPERATION, CONTEXT_WRITE_OPERATION } from '../../../../sha
 import { contextSettingsRequest } from './contextSettings';
 
 const OPERATIONS = new Set([
+  'fileOpen', 'fileRead', 'fileClose',
   'videoOpen', 'videoRead', 'videoClose',
   'projectDirectories',
   'models', 'list', 'read', 'start', 'resume', 'send', 'steer', 'interrupt', 'rename', 'archive', 'unarchive',
@@ -37,6 +39,7 @@ interface Cached {
   fingerprint: string; result: Promise<RpcResponse>; expires: number; completed: boolean; readOnly: boolean;
 }
 const READ_OPERATIONS = new Set([
+  'fileOpen', 'fileRead', 'fileClose',
   CONTEXT_READ_OPERATION,
   TOKEN_SUMMARY_OPERATION,
   'usageSummary',
@@ -85,8 +88,8 @@ export class ChatOperations {
     this.cache.set(request.id, entry);
     void result.then(() => {
       entry.completed = true;
-      // Video reads are repeatable; retaining their payloads would buffer an entire video in the retry cache.
-      if (operation === 'videoRead') this.cache.delete(request.id);
+      // Range reads are repeatable; caching their payloads would retain an entire file in memory.
+      if (operation === 'videoRead' || operation === 'fileRead') this.cache.delete(request.id);
     });
     return result;
   }
@@ -144,6 +147,9 @@ export class ChatOperations {
     }
     if (body.operation === 'list') body.limit = getChatPolicy().threadPageSize;
     if (body.operation === 'textPreview') body.maxBytes = textPreviewByteLimit(mode);
+    if (body.operation === 'fileOpen' || body.operation === 'fileRead') {
+      body.maxBytes = fileDownloadByteLimit(mode);
+    }
     if (body.operation === 'videoOpen' || body.operation === 'videoRead') {
       body.maxBytes = videoByteLimit(mode);
     }

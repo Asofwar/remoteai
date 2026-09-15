@@ -49,8 +49,11 @@ export function checkFileUploadSize(bytes: number, mode?: ConnectionMode) {
   }
 }
 export class DownloadPolicyError extends Error {}
+export function fileDownloadByteLimit(mode?: ConnectionMode) {
+  return Math.min(Number.MAX_SAFE_INTEGER, getChatPolicy(mode).fileDownloadMaxMb * MIB);
+}
 export function checkDownloadSize(bytes: number) {
-  if (bytes > getChatPolicy().fileDownloadMaxMb * MIB) {
+  if (bytes > fileDownloadByteLimit()) {
     throw new DownloadPolicyError(`文件超过 ${current.fileDownloadMaxMb} MB，无法下载。`);
   }
 }

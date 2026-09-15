@@ -16,11 +16,11 @@ impl Fixture {
     fn root(&self) -> PathBuf {
         self.0.join("project")
     }
-    fn open(&self, streams: &VideoStreams) -> VideoInfo {
+    fn open(&self, streams: &FileStreams) -> StreamInfo {
         streams
             .insert(
                 self.root(),
-                VideoOpen {
+                StreamOpen {
                     thread_id: "thread".into(),
                     path: "test.mp4".into(),
                     max_bytes: u64::MAX,
@@ -35,8 +35,8 @@ impl Drop for Fixture {
         fs::remove_dir_all(&self.0).unwrap();
     }
 }
-fn request(info: &VideoInfo, offset: u64, length: u64) -> VideoRead {
-    VideoRead {
+fn request(info: &StreamInfo, offset: u64, length: u64) -> StreamRead {
+    StreamRead {
         thread_id: "thread".into(),
         id: info.id.clone(),
         offset,
@@ -48,7 +48,7 @@ fn request(info: &VideoInfo, offset: u64, length: u64) -> VideoRead {
 #[test]
 fn reads_bounded_ranges_and_seeks_without_buffering_whole_file() {
     let fixture = Fixture::new();
-    let streams = VideoStreams::default();
+    let streams = FileStreams::default();
     let info = fixture.open(&streams);
     assert_eq!(info.mime_type, "video/mp4");
     for (offset, length) in [(CHUNK_BYTES, 25), (0, 12), (info.size - 4, 20)] {
@@ -71,24 +71,24 @@ fn reads_bounded_ranges_and_seeks_without_buffering_whole_file() {
 #[test]
 fn applies_current_limit_to_open_and_each_chunk() {
     let fixture = Fixture::new();
-    let streams = VideoStreams::default();
+    let streams = FileStreams::default();
     let info = fixture.open(&streams);
     assert!(matches!(
         streams.insert(
             fixture.root(),
-            VideoOpen {
+            StreamOpen {
                 thread_id: "thread".into(),
                 path: "test.mp4".into(),
                 max_bytes: info.size - 1,
             }
         ),
-        Err(GuiError::VideoTooLarge)
+        Err(GuiError::FileTooLarge)
     ));
     let mut chunk = request(&info, 0, 12);
     chunk.max_bytes = info.size - 1;
     assert!(matches!(
         streams.read_chunk(chunk),
-        Err(GuiError::VideoTooLarge)
+        Err(GuiError::FileTooLarge)
     ));
     let mut chunk = request(&info, 0, 12);
     chunk.max_bytes = info.size;
@@ -98,19 +98,19 @@ fn applies_current_limit_to_open_and_each_chunk() {
 #[test]
 fn isolates_threads_closes_and_expires_sessions() {
     let fixture = Fixture::new();
-    let streams = VideoStreams::default();
+    let streams = FileStreams::default();
     let info = fixture.open(&streams);
     let mut chunk = request(&info, 0, 12);
     chunk.thread_id = "other".into();
     assert!(streams.read_chunk(chunk).is_err());
     assert!(streams
-        .remove(VideoClose {
+        .remove(StreamClose {
             thread_id: "other".into(),
             id: info.id.clone()
         })
         .is_err());
     streams
-        .remove(VideoClose {
+        .remove(StreamClose {
             thread_id: "thread".into(),
             id: info.id.clone(),
         })
@@ -126,14 +126,14 @@ fn isolates_threads_closes_and_expires_sessions() {
         .touched = Instant::now() - IDLE_TIMEOUT;
     assert!(matches!(
         streams.read_chunk(request(&info, 0, 12)),
-        Err(GuiError::VideoExpired)
+        Err(GuiError::FileExpired)
     ));
 }
 
 #[test]
 fn rejects_changed_files_and_limits_open_handles() {
     let fixture = Fixture::new();
-    let streams = VideoStreams::default();
+    let streams = FileStreams::default();
     let info = fixture.open(&streams);
     fs::OpenOptions::new()
         .write(true)
@@ -143,7 +143,7 @@ fn rejects_changed_files_and_limits_open_handles() {
         .unwrap();
     assert!(matches!(
         streams.read_chunk(request(&info, 0, 12)),
-        Err(GuiError::VideoChanged)
+        Err(GuiError::FileChanged)
     ));
     for _ in 1..MAX_SESSIONS {
         fixture.open(&streams);
@@ -151,13 +151,13 @@ fn rejects_changed_files_and_limits_open_handles() {
     assert!(matches!(
         streams.insert(
             fixture.root(),
-            VideoOpen {
+            StreamOpen {
                 thread_id: "thread".into(),
                 path: "test.mp4".into(),
                 max_bytes: u64::MAX,
             }
         ),
-        Err(GuiError::VideoBusy)
+        Err(GuiError::FileBusy)
     ));
 }
 
@@ -177,13 +177,17 @@ fn rejects_workspace_escapes_device_paths_and_fake_videos() {
         "test.mp4:stream",
         "file://test.mp4",
     ] {
-        assert!(VideoFile::open(&root, path, u64::MAX).is_err(), "{path}");
+        assert!(
+            StreamFile::open(&root, path, u64::MAX, StreamKind::Video).is_err(),
+            "{path}"
+        );
     }
-    assert!(VideoFile::open(Path::new("."), "test.mp4", u64::MAX).is_err());
-    assert!(VideoFile::open(
+    assert!(StreamFile::open(Path::new("."), "test.mp4", u64::MAX, StreamKind::Video).is_err());
+    assert!(StreamFile::open(
         &root,
         fixture.0.join("outside.mp4").to_str().unwrap(),
-        u64::MAX
+        u64::MAX,
+        StreamKind::Video
     )
     .is_err());
 }
@@ -191,7 +195,7 @@ fn rejects_workspace_escapes_device_paths_and_fake_videos() {
 #[test]
 fn allows_large_configured_sizes_without_a_product_cap() {
     let fixture = Fixture::new();
-    let streams = VideoStreams::default();
+    let streams = FileStreams::default();
     let file = fs::OpenOptions::new()
         .write(true)
         .open(fixture.root().join("test.mp4"))

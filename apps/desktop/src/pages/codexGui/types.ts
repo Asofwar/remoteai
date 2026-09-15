@@ -192,6 +192,7 @@ export type ApprovalReply = {
 };
 export type Request =
   | import("../../../../../shared/remote-chat/video").VideoRequest
+  | import("../../../../../shared/remote-chat/fileDownload").FileRequest
   | { operation: "textPreview"; threadId: string; path: string; maxBytes?: number }
   | ({ operation: "projectFiles" } & import('../../../../../shared/remote-chat/projectFiles').ProjectFilesRequest)
   | { operation: "projectDirectories"; directory: string }

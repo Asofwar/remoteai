@@ -548,6 +548,12 @@ export class ChatController {
     close: (threadId, id) => this.connection.request('request', { operation: 'videoClose', threadId, id }),
   };
 
+  files: import('../fileDownload').FileClient = {
+    open: (threadId, path) => this.connection.request('request', { operation: 'fileOpen', threadId, path }),
+    read: (request) => this.connection.request('request', { operation: 'fileRead', ...request }),
+    close: (threadId, id) => this.connection.request('request', { operation: 'fileClose', threadId, id }),
+  };
+
   textPreview = (threadId: string, path: string) =>
     this.connection.request<import('../textPreview').TextPreview>('request', { operation: 'textPreview', threadId, path });
 

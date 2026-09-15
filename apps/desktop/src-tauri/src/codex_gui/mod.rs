@@ -13,6 +13,7 @@ pub(crate) mod context_settings;
 pub(crate) mod deletion;
 mod error;
 pub(crate) mod file_actions;
+mod file_stream;
 pub(crate) mod git;
 mod goals;
 mod home;
@@ -40,7 +41,6 @@ mod text_preview;
 pub(crate) mod undo;
 pub(crate) mod upload_policy;
 pub(crate) mod usage;
-mod video_stream;
 pub(crate) mod web;
 mod workspaces;
 
@@ -59,7 +59,15 @@ use protocol::{ApprovalReply, GuiEvent, GuiRequest, GuiResponse};
 pub(crate) struct GuiState {
     pub(crate) upload_policy: Arc<upload_policy::UploadPolicyStore>,
     client: Mutex<Option<Arc<Client>>>,
-    videos: Arc<video_stream::VideoStreams>,
+    videos: Arc<file_stream::FileStreams>,
+    downloads: DownloadStreams,
+}
+
+struct DownloadStreams(Arc<file_stream::FileStreams>);
+impl Default for DownloadStreams {
+    fn default() -> Self {
+        Self(Arc::new(file_stream::FileStreams::downloads()))
+    }
 }
 
 async fn prepare_paths(app: AppHandle) -> Result<(PathBuf, PathBuf)> {
@@ -143,6 +151,13 @@ pub(crate) async fn codex_gui_request(
 async fn execute_request(state: &GuiState, request: GuiRequest) -> Result<GuiResponse> {
     let client = connected(state).await?;
     match request {
+        GuiRequest::FileOpen(options) => {
+            return Arc::clone(&state.downloads.0).open(&client, options).await
+        }
+        GuiRequest::FileRead(options) => return Arc::clone(&state.downloads.0).read(options).await,
+        GuiRequest::FileClose(options) => {
+            return Arc::clone(&state.downloads.0).close(options).await
+        }
         GuiRequest::VideoOpen(options) => {
             return Arc::clone(&state.videos).open(&client, options).await
         }

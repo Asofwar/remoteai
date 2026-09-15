@@ -36,7 +36,7 @@ export function ImageViewer({ thumbnail, description, load, close }: Props) {
                 disabled={orientation.rotating} onPress={orientation.rotate} style={styles.rotate}>
                 <MaterialCommunityIcons name="screen-rotation" size={28} color="#fff" />
               </Pressable>}
-              <Pressable accessibilityRole="button" accessibilityLabel="保存到相册"
+              <Pressable accessibilityRole="button" accessibilityLabel="下载图片到相册"
                 accessibilityState={{ disabled: !image.url || image.error || saving.saving, busy: saving.saving }}
                 disabled={!image.url || image.error || saving.saving} onPress={saving.save}
                 style={[styles.save, (!image.url || image.error) && styles.disabled]}>

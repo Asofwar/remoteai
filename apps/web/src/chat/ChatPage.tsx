@@ -8,6 +8,7 @@ import { queueProps } from '../../../../shared/remote-chat/client/queueProps';
 import { ChatMessages } from './ChatMessages';
 import { ChatProcessing } from './ChatProcessing';
 import { ChatImageContext } from './ChatImage';
+import { ChatFileContext } from './ChatFileLink';
 import { ChatThreads } from './ChatThreads';
 import { ChatDevices } from './ChatDevices';
 import { ChatConnectionInfo } from './ChatConnectionInfo';
@@ -58,9 +59,11 @@ function ConnectedChat({ session, device, devices, active, chooseDevice }: Props
     </header>
     {!!state.error && <p role="alert" className="chat-error">{state.error}</p>}
     <ChatImageContext.Provider value={{ threadId: state.selected?.id ?? null, ready, load: controller.imagePreview }}>
+      <ChatFileContext.Provider value={{ threadId: state.selected?.id ?? null, ready, client: controller.files }}>
       <ChatMessages key={state.selected?.id ?? 'new'} thread={state.selected}
         loading={state.historyLoading} loadingMore={state.historyLoadingMore} hasMore={state.historyHasMore}
         loadOlder={() => controller.loadOlder()} />
+      </ChatFileContext.Provider>
     </ChatImageContext.Provider>
     {runningTurn && <ChatProcessing key={runningTurn.id} turn={runningTurn}
       processing={state.processing} active={active && ready} />}

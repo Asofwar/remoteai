@@ -7,12 +7,18 @@ import type { VideoClient } from '../../../../../shared/remote-chat/video';
 import { useImageOrientation } from '../useImageOrientation';
 import { useVideoStream } from './useVideoStream';
 import { videoPlayerHtml } from './videoPlayerHtml';
+import type { FileClient } from '../../../../../shared/remote-chat/fileDownload';
+import { useFileDownload } from '../../../../../shared/remote-chat/useFileDownload';
+import { nativeDownloadTarget } from '../fileDownloadTarget';
 
 interface Props {
   path: string; threadId: string | null; ready: boolean; client: VideoClient; close: () => void;
+  files: FileClient;
 }
 export function VideoViewer({ close, ...options }: Props) {
   const video = useVideoStream(options);
+  const download = useFileDownload({ ...options, client: options.files,
+    target: nativeDownloadTarget, success: '视频已保存到下载文件夹' });
   const orientation = useImageOrientation();
   const [failedUrl, setFailedUrl] = useState('');
   const error = video.error || (video.url && video.url === failedUrl
@@ -26,6 +32,11 @@ export function VideoViewer({ close, ...options }: Props) {
       <SafeAreaView style={styles.overlay}>
         <View style={styles.toolbar}>
           <Text numberOfLines={1} style={styles.title}>{options.path.split(/[\\/]/).pop()}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel={download.label}
+            disabled={!download.busy && !options.ready}
+            onPress={download.busy ? download.cancel : download.start} style={styles.download}>
+            <Text style={styles.status}>{download.label}</Text>
+          </Pressable>
           {orientation.suggested && <Pressable accessibilityRole="button" accessibilityLabel="旋转视频"
             disabled={orientation.rotating} onPress={orientation.rotate} style={styles.button}>
             <MaterialCommunityIcons name="screen-rotation" size={26} color="#fff" />
@@ -51,6 +62,7 @@ export function VideoViewer({ close, ...options }: Props) {
             : <Text style={styles.status}>请连接电脑后播放视频。</Text>}
         </View>}
         {!!orientation.error && <Text style={styles.status}>{orientation.error}</Text>}
+        {!!download.message && <Text accessibilityLiveRegion="polite" style={styles.status}>{download.message}</Text>}
       </SafeAreaView>
     </SafeAreaProvider>
   </Modal>;
@@ -60,6 +72,7 @@ const styles = StyleSheet.create({
   toolbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 },
   title: { flex: 1, color: '#ddd', fontSize: 14 },
   button: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+  download: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 8 },
   player: { flex: 1, backgroundColor: '#000' },
   notice: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 },
   status: { color: '#ddd', fontSize: 14, textAlign: 'center', maxWidth: 400 },

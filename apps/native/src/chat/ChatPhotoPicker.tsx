@@ -22,7 +22,7 @@ export function ChatPhotoPicker({ photos, disabled, active }: Props) {
       showsHorizontalScrollIndicator={false} contentContainerStyle={photoStyles.previews}>
       {photos.photos.map((photo, index) => <View key={photo.id} style={photoStyles.card}>
         <Pressable accessibilityRole="button" accessibilityLabel={`放大查看：照片 ${index + 1}`}
-          style={styles.fill} onPress={() => setPreviewId(photo.id)}>
+          style={photoStyles.previewButton} onPress={() => setPreviewId(photo.id)}>
           <Image source={{ uri: photo.uri }} style={photoStyles.preview} resizeMode="cover"
             accessibilityLabel={`照片 ${index + 1}`} />
         </Pressable>
@@ -54,12 +54,15 @@ export function ChatPhotoPicker({ photos, disabled, active }: Props) {
 const photoStyles = StyleSheet.create({
   container: { gap: 8 },
   previews: { gap: 10, padding: 4 },
-  card: { position: 'relative', width: 96, height: 72 },
-  preview: { width: '100%', height: '100%', borderRadius: 12, backgroundColor: palette.pale },
-  edit: { position: 'absolute', bottom: 0, left: 0, flexDirection: 'row', gap: 4,
-    alignItems: 'center', justifyContent: 'center', minHeight: 32, width: '100%',
+  card: { position: 'relative', width: 144, flexShrink: 0 },
+  previewButton: { height: 144, flexShrink: 0 },
+  preview: { width: '100%', height: '100%', borderTopLeftRadius: 12,
+    borderTopRightRadius: 12, backgroundColor: palette.pale },
+  edit: { flexDirection: 'row', gap: 4, paddingHorizontal: 8, paddingVertical: 8,
+    alignItems: 'center', justifyContent: 'center', minHeight: 40, width: '100%',
     borderBottomLeftRadius: 12, borderBottomRightRadius: 12, backgroundColor: '#0009' },
-  editText: { color: '#fff', fontSize: 12 },
+  // Explicit leading accommodates Android's Chinese fallback font without clipping the label.
+  editText: { color: '#fff', fontSize: 12, lineHeight: 20, includeFontPadding: true, textAlignVertical: 'center' },
   remove: { position: 'absolute', top: 4, right: 4, width: 28, height: 28, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center', backgroundColor: palette.background,
     borderWidth: StyleSheet.hairlineWidth, borderColor: palette.border },

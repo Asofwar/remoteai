@@ -26,10 +26,10 @@ export function ChatPhotoPicker({ photos, disabled, active }: Props) {
           <Image source={{ uri: photo.uri }} style={photoStyles.preview} resizeMode="cover"
             accessibilityLabel={`照片 ${index + 1}`} />
         </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel={`标注照片 ${index + 1}`} disabled={busy}
+        <Pressable accessibilityRole="button" accessibilityLabel={`编辑照片 ${index + 1}`} disabled={busy}
           style={[photoStyles.edit, busy && styles.disabled]}
           onPress={() => { Keyboard.dismiss(); setEditingId(photo.id); }}>
-          <Feather name="edit-2" size={12} color="#fff" /><Text style={photoStyles.editText}>标注</Text>
+          <Feather name="edit-2" size={12} color="#fff" /><Text style={photoStyles.editText}>编辑</Text>
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel={`移除照片 ${index + 1}`} disabled={busy}
           accessibilityState={{ disabled: busy }} hitSlop={6} onPress={() => photos.remove(photo.id)}
@@ -54,8 +54,8 @@ export function ChatPhotoPicker({ photos, disabled, active }: Props) {
 const photoStyles = StyleSheet.create({
   container: { gap: 8 },
   previews: { gap: 10, padding: 4 },
-  card: { position: 'relative', width: 144, flexShrink: 0 },
-  previewButton: { height: 144, flexShrink: 0 },
+  card: { position: 'relative', width: 96, flexShrink: 0 },
+  previewButton: { height: 96, flexShrink: 0 },
   preview: { width: '100%', height: '100%', borderTopLeftRadius: 12,
     borderTopRightRadius: 12, backgroundColor: palette.pale },
   edit: { flexDirection: 'row', gap: 4, paddingHorizontal: 8, paddingVertical: 8,

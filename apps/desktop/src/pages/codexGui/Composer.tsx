@@ -89,9 +89,9 @@ export const Composer = forwardRef<ComposerHandle, {
       onBusyChange={controller.setWorkspaceBusy}
       onChange={controller.setProject} onError={controller.report} />}
     <div ref={composer} className={`${styles.composer} ${attachedQueue ? styles.composerAttached : ""}`}>
-      <ImageAttachments key={key} images={draft.images} active={active}
+      <ImageAttachments key={`images:${key}`} images={draft.images} active={active}
         disabled={state.sending} onRemove={removeImage} />
-      <ComposerReferences key={key} items={draft.attachments ?? []} disabled={disabled}
+      <ComposerReferences key={`references:${key}`} items={draft.attachments ?? []} disabled={disabled}
         active={active} onRemove={removeAttachment} />
       <ComposerQuotes quotes={draft.quotes ?? []} draftKey={key} active={active} disabled={disabled}
         onRemove={removeQuote} onClear={() => { clearQuotes(); skillInput.current?.focus(); }} />

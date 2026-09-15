@@ -1,10 +1,14 @@
-import { useId } from "react";
-import { Button, Input, Modal, Spin } from "antd";
+import { useId, useState } from "react";
+import { AutoComplete, Button, Input, Modal, Spin } from "antd";
+import { CONTEXT_CAPACITY_PRESETS_K } from "../../../../../shared/remote-chat/contextSettings";
 import { useContextSettings } from "./useContextSettings";
 import styles from "./ContextUsageButton.module.less";
 
+const capacityOptions = CONTEXT_CAPACITY_PRESETS_K.map((value) => ({ value: String(value), label: `${value}K` }));
+
 export function ContextSettingsDialog({ threadId, onClose }: { threadId: string; onClose: () => void }) {
   const editor = useContextSettings(threadId);
+  const [presetsOpen, setPresetsOpen] = useState(false);
   const id = useId();
   const save = async () => { if (await editor.save()) onClose(); };
   return <Modal open centered width={360} title="对话上下文设置" onCancel={onClose}
@@ -19,9 +23,11 @@ export function ContextSettingsDialog({ threadId, onClose }: { threadId: string;
       {editor.loading && <div role="status"><Spin size="small" /> 正在读取设置…</div>}
       {editor.loaded && <>
         <label htmlFor={id}>上下文容量（K Token）</label>
-        <Input id={id} aria-label="上下文容量（K Token）" inputMode="decimal" value={editor.value}
-          disabled={editor.saving} placeholder="使用默认容量" onChange={(event) => editor.setValue(event.target.value)}
-          onPressEnter={() => void save()} />
+        <AutoComplete id={id} value={editor.value} options={capacityOptions} disabled={editor.saving}
+          onChange={editor.setValue} onOpenChange={setPresetsOpen} defaultActiveFirstOption={false}>
+          <Input aria-label="上下文容量（K Token）" inputMode="decimal" placeholder="选择或输入容量，留空使用默认值"
+            onPressEnter={(event) => { if (!presetsOpen && !event.nativeEvent.isComposing) void save(); }} />
+        </AutoComplete>
         <div className={styles.settingHelp}>
           <span className={styles.hint}>1 K = 1000 Token；留空使用默认容量。</span>
           <Button type="link" size="small" disabled={editor.saving} onClick={() => editor.setValue("")}>恢复默认</Button>

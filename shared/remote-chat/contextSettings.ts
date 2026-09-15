@@ -1,4 +1,5 @@
 export const TOKENS_PER_K = 1_000;
+export const CONTEXT_CAPACITY_PRESETS_K = [128, 272, 384, 400, 1000] as const;
 export const MIN_CONTEXT_K = 1;
 export const MAX_CONTEXT_K = 100_000;
 export const CONTEXT_READ_OPERATION = 'contextSettingsRead';

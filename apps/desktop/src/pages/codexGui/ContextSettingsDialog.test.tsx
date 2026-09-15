@@ -98,3 +98,34 @@ it.each([["", null], [" ", null], ["128", 128_000], ["1.001", 1_001], ["0", unde
   ["1.0001", undefined]])("parses capacity %j", (value, expected) => {
   expect(parseContextCapacity(value as string)).toBe(expected);
 });
+
+it("selects every preset without saving until confirmed while polling is pending", async () => {
+  await render(); await openSettings();
+  for (const capacity of [128, 272, 384, 400, 1000]) {
+    await act(async () => input().dispatchEvent(new MouseEvent("mousedown", { bubbles: true })));
+    const option = [...document.querySelectorAll<HTMLElement>(".ant-select-item-option")]
+      .find((element) => element.textContent === `${capacity}K`)!;
+    expect(option).toBeTruthy();
+    await click(option);
+    expect(input().value).toBe(String(capacity));
+    expect(invoke).not.toHaveBeenCalledWith("codex_gui_set_context_settings", expect.anything());
+  }
+  vi.mocked(invoke).mockResolvedValueOnce({ capacity: 1_000_000 });
+  await click(footerButton("保存"));
+  expect(invoke).toHaveBeenLastCalledWith("codex_gui_set_context_settings",
+    { threadId: "one", settings: { capacity: 1_000_000 } });
+});
+
+it("uses Enter to select a preset without prematurely saving the previous value", async () => {
+  await render(); await openSettings(); await type("256");
+  await act(async () => input().dispatchEvent(new KeyboardEvent("keydown",
+    { key: "ArrowDown", keyCode: 40, bubbles: true })));
+  await act(async () => input().dispatchEvent(new KeyboardEvent("keydown",
+    { key: "Enter", keyCode: 13, bubbles: true })));
+  expect(input().value).toBe("128");
+  expect(invoke).not.toHaveBeenCalledWith("codex_gui_set_context_settings", expect.anything());
+  vi.mocked(invoke).mockResolvedValueOnce({ capacity: 128_000 });
+  await click(footerButton("保存"));
+  expect(invoke).toHaveBeenLastCalledWith("codex_gui_set_context_settings",
+    { threadId: "one", settings: { capacity: 128_000 } });
+});

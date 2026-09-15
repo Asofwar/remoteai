@@ -32,7 +32,7 @@ impl Fixture {
         self.read_with_references(source, &[])
     }
 
-    fn read_with_references(&self, source: &str, references: &[&str]) -> Result<String> {
+    fn read_with_references(&self, source: &str, references: &[String]) -> Result<String> {
         read_image(
             source,
             &self.0.join("workspace"),
@@ -183,4 +183,68 @@ fn configured_image_limit_can_exceed_the_previous_twenty_megabyte_cap() {
         max_bytes: Some(size),
     };
     assert_eq!(render_limited(original.clone(), options).unwrap(), original);
+}
+
+#[test]
+fn previews_tool_screenshots_outside_workspace_without_granting_sibling_access() {
+    let fixture = Fixture::new();
+    let screenshot = fixture.write_image("outside/tool screenshot.png");
+    let sibling = fixture.write_image("outside/unrelated.png");
+    let result = json!({"structuredContent": {"screenshot_path": screenshot}});
+    for item in [
+        json!({"type": "mcpToolCall", "result": result}),
+        json!({"type": "dynamicToolCall", "success": true, "contentItems": [
+            {"type": "inputText", "text": result.to_string()}
+        ]}),
+        json!({"type": "functionCallOutput", "output": result.to_string()}),
+        json!({"type": "mcpToolCall", "result": {"content": [
+            {"type": "resource_link", "uri": url::Url::from_file_path(&screenshot).unwrap()}
+        ]}}),
+    ] {
+        let thread = json!({"turns": [{"items": [item]}]});
+        let references = image_references(&thread);
+        assert!(fixture
+            .read_with_references(screenshot.to_str().unwrap(), &references)
+            .is_ok());
+        assert!(fixture
+            .read_with_references(sibling.to_str().unwrap(), &references)
+            .is_err());
+    }
+}
+
+#[test]
+fn failed_tools_and_unstructured_text_do_not_authorize_image_reads() {
+    let thread = json!({"turns": [{"items": [
+        {"type": "mcpToolCall", "arguments": {"path": "input.png"}},
+        {"type": "mcpToolCall", "result": {"isError": true, "path": "failed.png"}},
+        {"type": "dynamicToolCall", "success": false, "contentItems": [{"path": "failed.png"}]},
+        {"type": "mcpToolCall", "result": {"content": [
+            {"type": "text", "text": "Screenshot: unstructured.png"}
+        ]}},
+        {"type": "mcpToolCall", "result": {"path": "//server/share/image.png"}},
+        {"type": "mcpToolCall", "result": {"path": "config.toml"}}
+    ]}]});
+    assert!(image_references(&thread).is_empty());
+}
+
+#[cfg(windows)]
+#[test]
+fn previews_canonical_windows_paths_returned_by_computer_use() {
+    let fixture = Fixture::new();
+    let screenshot = fixture.write_image("outside/computer-use.png");
+    let canonical = screenshot.canonicalize().unwrap();
+    let result = json!({"structuredContent": {"screenshot_file_path": canonical}});
+    let thread = json!({"turns": [{"items": [{
+        "type": "dynamicToolCall", "success": true,
+        "contentItems": [{"type": "inputText", "text": result.to_string()}]
+    }]}]});
+    let references = image_references(&thread);
+    assert!(fixture.read(screenshot.to_str().unwrap()).is_err());
+    assert!(fixture
+        .read_with_references(screenshot.to_str().unwrap(), &references)
+        .is_ok());
+    let forbidden = json!({"turns": [{"items": [{"type": "mcpToolCall", "result": {
+        "screenshot_file_path": r"\\?\UNC\server\share\image.png"
+    }}]}]});
+    assert!(image_references(&forbidden).is_empty());
 }

@@ -7,13 +7,17 @@ use std::{
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use image::ImageFormat;
-use serde_json::{json, Value};
+use serde_json::json;
 
 use super::{
     client::Client,
     error::{GuiError, Result},
     protocol::{thread_params, GuiResponse},
 };
+
+#[path = "image_references.rs"]
+mod references;
+use references::image_references;
 
 const DEFAULT_IMAGE_BYTES: u64 = 20 * 1024 * 1024;
 const MAX_SOURCE_LENGTH: usize = 4096;
@@ -122,35 +126,7 @@ fn within(path: &Path, root: &Path) -> bool {
     root.canonicalize().is_ok_and(|root| path.starts_with(root))
 }
 
-fn image_references(thread: &Value) -> Vec<&str> {
-    thread["turns"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .flat_map(|turn| turn["items"].as_array().into_iter().flatten())
-        .flat_map(item_image_references)
-        .collect()
-}
-
-fn item_image_references(item: &Value) -> Vec<&str> {
-    match item["type"].as_str() {
-        Some("imageView") => item["path"].as_str().into_iter().collect(),
-        Some("imageGeneration") => ["savedPath", "path", "result"]
-            .into_iter()
-            .filter_map(|key| item[key].as_str())
-            .collect(),
-        Some("userMessage") => item["content"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter(|content| content["type"] == "localImage")
-            .filter_map(|content| content["path"].as_str())
-            .collect(),
-        _ => Vec::new(),
-    }
-}
-
-fn matches_reference(path: &Path, workspace: &Path, references: &[&str]) -> bool {
+fn matches_reference(path: &Path, workspace: &Path, references: &[String]) -> bool {
     // Grant only the recorded file, never its parent directory or arbitrary message text.
     references.iter().any(|source| {
         source_path(source)
@@ -166,7 +142,7 @@ fn matches_reference(path: &Path, workspace: &Path, references: &[&str]) -> bool
 
 struct ReadOptions<'a> {
     generated: &'a Path,
-    references: &'a [&'a str],
+    references: &'a [String],
     max_bytes: u64,
 }
 

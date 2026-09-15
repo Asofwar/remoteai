@@ -5,6 +5,8 @@ import type { Content, Item } from "./types";
 import { UserMessageEditor } from "./UserMessageEditor";
 import { CopyButton } from "./CopyButton";
 import { MessageImage } from "./MessageImage";
+import { MessageQuotes } from "./MessageQuotes";
+import { quotedMessage } from "../../../../../shared/chat/quotedMessage";
 import { FileMenu } from "./FileMenu";
 import { isFileReference } from "./fileReference";
 import { isMessageImage, type SubmitMessageEdit } from "./messageEditContent";
@@ -20,6 +22,7 @@ export function UserMessage({ item, startedAt, onEdit, editDisabled = false }: {
   const [editing, setEditing] = useState(false);
   const parts = (item.content ?? []) as Content[];
   const text = parts.filter((part) => part.type === "text").map((part) => part.text).join("\n");
+  const message = quotedMessage(text);
   const date = startedAt == null ? null : new Date(startedAt * MILLISECONDS_PER_SECOND);
   const sentAt = date && Number.isFinite(date.getTime()) ? date : null;
   return <article className={`${styles.userMessage} ${editing ? userStyles.editingMessage : ""}`}>
@@ -36,7 +39,10 @@ export function UserMessage({ item, startedAt, onEdit, editDisabled = false }: {
         skills={parts.flatMap((part) => part.type === "skill" && part.path
           ? [{ name: part.name ?? "", path: part.path }] : [])}
         disabled={editDisabled} onSubmit={onEdit}
-        onCancel={() => setEditing(false)} /> : <div>{text}</div>}
+        onCancel={() => setEditing(false)} /> : <>
+        <MessageQuotes key={text} quotes={message.quotes} />
+        {message.text && <div>{message.text}</div>}
+      </>}
     </div>
     {!editing && <div className={styles.userMessageActions}>
       {sentAt && <time dateTime={sentAt.toISOString()} title={sentAt.toLocaleString("zh-CN")}>

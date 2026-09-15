@@ -69,3 +69,30 @@ it("allows retrying a sent local image when the first read fails", async () => {
   await act(async () => container.querySelector<HTMLButtonElement>('[role="status"] button')?.click());
   expect(container.querySelector("img")?.getAttribute("src")).toBe(thumbnail);
 });
+
+it("restores historical quoted replies as a capsule with a compact preview", async () => {
+  const text = "引用 AI 回答：\n> 下架异常上报\n\n下架异常上报使用上架异常上报的接口";
+  await act(async () => root.render(<UserMessage item={{ id: "quote", type: "userMessage",
+    content: [{ type: "text", text }] }} />));
+  expect(container.textContent).not.toContain("引用 AI 回答：");
+  expect(container.textContent).toContain("下架异常上报使用上架异常上报的接口");
+  const chip = container.querySelector<HTMLButtonElement>('[aria-label="查看 1 条引用"]');
+  expect(chip?.getAttribute("aria-expanded")).toBe("false");
+  await act(async () => chip?.click());
+  expect(document.querySelector("blockquote")?.textContent).toBe("下架异常上报");
+  expect(chip?.getAttribute("aria-expanded")).toBe("true");
+  await act(async () => document.querySelector("blockquote")?.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+  expect(chip?.getAttribute("aria-expanded")).toBe("false");
+});
+
+it("keeps ordinary blockquotes as text and handles quote-only messages", async () => {
+  await act(async () => root.render(<UserMessage item={{ id: "plain", type: "userMessage",
+    content: [{ type: "text", text: "普通消息\n> 保留原文" }] }} />));
+  expect(container.textContent).toContain("普通消息\n> 保留原文");
+  expect(container.querySelector('[aria-label="查看 1 条引用"]')).toBeNull();
+  await act(async () => root.render(<UserMessage item={{ id: "quote", type: "userMessage",
+    content: [{ type: "text", text: "引用对话内容：\n> 仅引用" }] }} />));
+  expect(container.querySelector('[aria-label="查看 1 条引用"]')).not.toBeNull();
+  expect(container.textContent).not.toContain("引用对话内容：");
+});

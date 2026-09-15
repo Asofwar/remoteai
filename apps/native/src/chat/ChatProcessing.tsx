@@ -1,12 +1,11 @@
 import { ActivityIndicator, Text, View } from 'react-native';
-import type { Turn } from './types';
 import { styles } from './styles';
-import { useProcessingSeconds } from '../../../../shared/remote-chat/client/useProcessingSeconds';
+import { useProcessingStatus, type ChatProcessingProps } from '../../../../shared/remote-chat/client/useProcessingStatus';
 
-export function ChatProcessing({ turn, active }: { turn: Turn; active: boolean }) {
-  const seconds = useProcessingSeconds(turn, active);
+export function ChatProcessing(props: ChatProcessingProps) {
+  const { label } = useProcessingStatus(props);
   return <View style={styles.historyStatus}>
     <ActivityIndicator size="small" />
-    <Text style={styles.status}>正在处理 · {seconds}秒</Text>
+    <Text style={[styles.status, { flexShrink: 1, maxWidth: 400 }]}>{label}</Text>
   </View>;
 }

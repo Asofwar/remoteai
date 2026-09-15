@@ -2,6 +2,7 @@ import type { ChatConnection, ConnectionEvents } from './connection';
 import type { RemoteComposerCatalog } from '../composerCatalog';
 import type { ProjectFilesRequest, ProjectFilesResponse } from '../projectFiles';
 import { applyChatEvent } from './events';
+import { syncChatProcessing } from './processing';
 import { mergeHistory } from './history';
 import { contentHash, HISTORY_CHANGED } from '../historySync';
 import type { HistoryPage } from '../historyPage';
@@ -107,7 +108,10 @@ export class ChatController {
     }
     for (const listener of this.listeners) listener();
   }
-  private update(patch: Partial<ChatState>) { this.state = { ...this.state, ...patch }; this.emit(); }
+  private update(patch: Partial<ChatState>) {
+    this.state = syncChatProcessing({ ...this.state, ...patch }, this.state);
+    this.emit();
+  }
   private request<T>(body: Request) { return this.connection.request<T>('request', body); }
   private failure(error: unknown) {
     this.update({ error: error instanceof Error ? error.message : '操作未完成，请稍后重试。' });

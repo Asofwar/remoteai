@@ -1,9 +1,8 @@
-import type { Turn } from './types';
-import { useProcessingSeconds } from '../../../../shared/remote-chat/client/useProcessingSeconds';
+import { useProcessingStatus, type ChatProcessingProps } from '../../../../shared/remote-chat/client/useProcessingStatus';
 
-export function ChatProcessing({ turn, active }: { turn: Turn; active: boolean }) {
-  const seconds = useProcessingSeconds(turn, active);
-  return <p role="status" className="chat-processing chat-processing-status chat-muted">
-    <span className="chat-spinner" aria-hidden="true" />正在处理 · {seconds}秒
+export function ChatProcessing(props: ChatProcessingProps) {
+  const { label, phase } = useProcessingStatus(props);
+  return <p role="status" data-processing-phase={phase} className="chat-processing chat-processing-status chat-muted">
+    <span className="chat-spinner" aria-hidden="true" />{label}
   </p>;
 }

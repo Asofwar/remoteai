@@ -157,7 +157,8 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
       </ChatFileProvider>
       </ChatImagePreviewProvider>
     </ChatImageContext.Provider>
-    {runningTurn && <ChatProcessing key={runningTurn.id} turn={runningTurn} active={active && ready} />}
+    {runningTurn && <ChatProcessing key={runningTurn.id} turn={runningTurn}
+      processing={state.processing} active={active && ready && foreground} />}
     {ready && state.approvals.some((event) => event.params.threadId === state.selected?.id) &&
       <ScrollView style={{ maxHeight: 280 }} contentContainerStyle={styles.padded} keyboardShouldPersistTaps="handled">
         {state.approvals.filter((event) => event.params.threadId === state.selected?.id).map((event) =>

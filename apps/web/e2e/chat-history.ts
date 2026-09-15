@@ -34,8 +34,9 @@ export async function historyJourney({ page, request, info, relay }: {
   await page.locator('.chat-messages').evaluate((node) => { node.scrollTop = node.scrollHeight; });
   await request.post(`${fixtureUrl}/test/sidebar`, { data: { action: 'start' } });
   await expect(page.getByRole('button', { name: '暂停生成' })).toBeVisible();
-  const processing = page.getByRole('status').filter({ hasText: '正在处理' });
-  await expect(processing).toContainText(/正在处理 · [2-9]秒/, { timeout: 10_000 });
+  const processing = page.locator('.chat-processing-status');
+  await expect(processing).toHaveAttribute('data-processing-phase', 'response');
+  await expect(processing).toContainText(/正在生成回复 · [2-9]秒/, { timeout: 10_000 });
   const response = items.last();
   await expect(response).toContainText('处理中…');
   const firstText = await response.textContent();

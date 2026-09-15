@@ -62,7 +62,8 @@ function ConnectedChat({ session, device, devices, active, chooseDevice }: Props
         loading={state.historyLoading} loadingMore={state.historyLoadingMore} hasMore={state.historyHasMore}
         loadOlder={() => controller.loadOlder()} />
     </ChatImageContext.Provider>
-    {runningTurn && <ChatProcessing key={runningTurn.id} turn={runningTurn} active={active && ready} />}
+    {runningTurn && <ChatProcessing key={runningTurn.id} turn={runningTurn}
+      processing={state.processing} active={active && ready} />}
     {!!approvals.length && <div className="chat-approvals chat-scroll">
       {approvals.map((event) => <ChatApproval key={String(event.id)} event={event}
         ready={ready} respond={(reply) => controller.respond(reply)} />)}

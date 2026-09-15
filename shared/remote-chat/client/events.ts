@@ -1,6 +1,7 @@
 import type { ChatState, GuiEvent, Item, Thread, Turn } from './types';
 import { restoreTurnTiming } from '../../../apps/desktop/src/pages/codexGui/turnTiming';
 import { acknowledgeMessage, MESSAGE_ACKNOWLEDGED } from '../../chat/acknowledgedMessages';
+import { syncChatProcessing } from './processing';
 
 function mergeItems(previous: Item[], incoming: Item[]) {
   const items = [...previous];
@@ -54,6 +55,10 @@ function applyDelta(turn: Turn, event: GuiEvent): Turn {
 
 export function applyChatEvent(state: ChatState, event: GuiEvent): ChatState {
   if (!event || typeof event.method !== 'string' || !event.params) return state;
+  return syncChatProcessing(reduceChatEvent(state, event), state, event);
+}
+
+function reduceChatEvent(state: ChatState, event: GuiEvent): ChatState {
   const { method, params } = event;
   if (event.id != null) return { ...state,
     approvals: [...state.approvals.filter((entry) => entry.id !== event.id), event] };

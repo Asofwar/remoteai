@@ -35,7 +35,6 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
-  Wifi,
   Zap,
 } from "lucide-react";
 import {
@@ -69,6 +68,7 @@ import type { AccountSummary, AppPage, RemoteDevice, ResetCredit, UsageWindow } 
 import { AdaptiveSheet } from "./components/AdaptiveSheet";
 import { AccountDetailsSheet } from "./components/AccountDetailsSheet";
 import { AddAccountSheet } from "./components/AddAccountSheet";
+import { DeviceManagementList } from './devices/DeviceManagementList';
 import { RemoteModelSwitchSheet } from "./components/RemoteModelSwitchSheet";
 import { TotpPage } from "./components/TotpPage";
 
@@ -433,13 +433,13 @@ function DevicesPage() {
   const modelDevice = devices.find((item) => item.deviceId === modelDeviceId) ?? null;
   const sorted = useMemo(() => [...devices].sort((left, right) => Number(right.online) - Number(left.online)
     || Date.parse(right.lastSeenAt) - Date.parse(left.lastSeenAt)), [devices]);
-  const onlineCount = devices.filter((item) => item.online).length;
   const performRefresh = useCallback(async () => {
     try { await dispatch(refreshAll()).unwrap(); }
     catch { /* The global error toast reports the failure. */ }
   }, [dispatch]);
 
   const deleteDevice = async (device: RemoteDevice) => {
+    if (device.online || deletingDeviceId) return;
     const confirmed = await Dialog.confirm({
       title: "删除这台设备？",
       content: `“${device.name}”再次登录桌面端后仍会重新出现在这里。`,
@@ -493,61 +493,12 @@ function DevicesPage() {
 
   return <>
     <PullToRefresh onRefresh={performRefresh} renderText={(status) => PULL_REFRESH_TEXT[status]}>
-      <div className="page-body devices-page">
-        <header className="page-heading"><div><span>实时连接</span><h1>设备管理</h1></div>
-          <button className="icon-button" type="button" onClick={() => void dispatch(refreshAll())}
-            aria-label="刷新设备">
-            <RefreshCw size={19} className={refreshing ? "spin" : ""} />
-          </button>
-        </header>
-        <section className="device-summary">
-          <div className="summary-icon"><Wifi size={24} /></div>
-          <div><strong>{onlineCount}</strong><span>台设备当前在线</span></div>
-          <div className="live-pill"><i /> 实时更新</div>
-        </section>
-        <div className="section-toolbar"><div><h2>已登录设备</h2><span>共 {devices.length} 台 PC</span></div></div>
-        {!devices.length ? <Empty className="page-empty" description="登录桌面端后，设备会出现在这里" />
-          : <div className="device-grid">{sorted.map((device) => {
-            const activeAccount = accounts.find((item) => item.id === device.activeAccountId);
-            const activeProvider = providers.find((item) => item.id === device.activeProviderId);
-            const authAccount = accounts.find((item) => item.id === device.openaiAuthAccountId);
-            const currentModel = device.activeProviderGroup
-              ? `分组 · ${device.activeProviderGroup}`
-              : device.activeProviderId
-                ? `${activeProvider?.name || "第三方 Provider"}${
-                  activeProvider?.model ? ` · ${activeProvider.model}` : ""
-                }`
-                : activeAccount ? `官方 · ${activeAccount.email}` : "未选择";
-            return <Card key={device.deviceId} className={`device-card ${device.online ? "online" : "offline"}`}>
-              <div className="device-card-header"><span className="device-platform"><Laptop size={22} /></span>
-                <div><h3>{device.name}</h3>
-                  <p>{platformName(device.platform)}{device.appVersion ? ` · v${device.appVersion}` : ""}</p></div>
-                <span className="status-badge"><i />{device.online ? "在线" : "离线"}</span></div>
-              <div className="device-data">
-                <div><span>当前模型</span><strong>{currentModel}</strong></div>
-                <div><span>官方账号</span><strong>{activeAccount?.email || "未选择"}</strong></div>
-                <div><span>代理登录态</span><strong>{authAccount?.email || "未选择"}</strong></div>
-                <div><span>最后在线</span>
-                  <strong>{device.online ? "当前在线" : formatDate(device.lastSeenAt, true)}</strong></div>
-              </div>
-              <Button block size="small" color="primary" className="device-model-action"
-                disabled={!device.online} onClick={() => setModelDeviceId(device.deviceId)}>
-                切换模型
-              </Button>
-              <div className="device-actions">
-                <Button block size="small" disabled={device.online}
-                  loading={deletingDeviceId === device.deviceId} onClick={() => void deleteDevice(device)}>
-                  {device.online ? "在线不可删除" : "删除设备"}
-                </Button>
-                <Button block size="small" disabled={!device.online}
-                  loading={switchingOpenAiAuth?.deviceId === device.deviceId}
-                  onClick={() => setAuthDeviceId(device.deviceId)}>
-                  代理登录态
-                </Button>
-              </div>
-            </Card>;
-          })}</div>}
-      </div>
+      <DeviceManagementList devices={sorted} accounts={accounts} providers={providers}
+        refreshing={refreshing} onRefresh={performRefresh} deletingDeviceId={deletingDeviceId}
+        switchingModelDeviceId={switchingProvider?.deviceId ?? (switchingAccountId ? modelDeviceId : null)}
+        switchingAuthDeviceId={switchingOpenAiAuth?.deviceId ?? null}
+        onSwitchModel={setModelDeviceId} onSelectAuthAccount={setAuthDeviceId}
+        onDelete={(device) => void deleteDevice(device)} />
     </PullToRefresh>
     <RemoteModelSwitchSheet
       device={modelDevice}

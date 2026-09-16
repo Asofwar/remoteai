@@ -1,0 +1,34 @@
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { formatTurnDuration, turnElapsedMs } from '../../../desktop/src/pages/codexGui/turnTiming';
+import type { WorkEntry } from './turnPresentation';
+import { palette, styles } from './styles';
+
+export function ChatProcessSummary({ entry, onOpen, onInline }: {
+  entry: WorkEntry; onOpen: () => void; onInline: (turnId: string, inline: boolean) => void;
+}) {
+  const running = entry.turn.status === 'inProgress';
+  const elapsed = entry.timed ? turnElapsedMs(entry.turn, 0) : null;
+  const label = elapsed == null ? (running ? '正在处理' : '处理过程') : `用时 ${formatTurnDuration(elapsed)}`;
+  const toggle = entry.inline || ['inProgress', 'interrupted', 'failed'].includes(entry.turn.status);
+  return <View style={processStyles.row}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`查看处理过程，${entry.items.length} 项活动`}
+      style={processStyles.open} onPress={onOpen}>
+      <Text style={styles.subtitle}>{label}</Text>
+      <Ionicons name="chevron-forward" size={14} color={palette.muted} />
+    </Pressable>
+    {toggle && <Pressable accessibilityRole="button"
+      accessibilityLabel={entry.inline ? '收起处理过程' : '展开处理过程'}
+      accessibilityState={{ expanded: entry.inline }} hitSlop={6}
+      style={processStyles.toggle} onPress={() => onInline(entry.turn.id, !entry.inline)}>
+      <Text style={styles.subtitle}>{entry.inline ? '收起' : '展开'}</Text>
+      <Ionicons name={entry.inline ? 'chevron-up' : 'chevron-down'} size={14} color={palette.muted} />
+    </Pressable>}
+  </View>;
+}
+
+const processStyles = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  open: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36 },
+  toggle: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, paddingHorizontal: 4 },
+});

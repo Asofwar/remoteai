@@ -9,7 +9,13 @@ it("shows the script inside a known PowerShell command wrapper", () => {
 });
 
 it.each(['npm test', 'echo "powershell -Command hello"', 'app -Command "hello"',
-  'powershell -File script.ps1', 'powershell -EncodedCommand aGVsbG8=', 'powershell -Command "unclosed'])
+  'powershell -File script.ps1', 'powershell -EncodedCommand aGVsbG8='])
   ("preserves commands it cannot safely abbreviate: %s", (command) => {
     expect(commandPreview(command)).toBe(command);
   });
+
+it("keeps mixed legacy script quoting intact while omitting the known launcher", () => {
+  expect(commandPreview('powershell -Command "unclosed')).toBe('"unclosed');
+  const script = '\'Write-Output "legacy"';
+  expect(commandPreview('"C:\\\\WINDOWS\\\\System32\\\\powershell.exe" -Command ' + script)).toBe(script);
+});

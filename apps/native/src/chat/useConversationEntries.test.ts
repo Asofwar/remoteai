@@ -2,12 +2,18 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { useConversationEntries } from './useConversationEntries';
 import type { Turn } from './types';
 
-const state = vi.hoisted(() => ({ turns: new Set<string>() as ReadonlySet<string> }));
+const state = vi.hoisted(() => ({ turns: new Map<string, boolean>() as ReadonlyMap<string, boolean>,
+  observed: { current: false } }));
 vi.mock('react', () => ({
   useMemo: <T>(compute: () => T) => compute(),
-  useState: () => [state.turns, (turns: ReadonlySet<string>) => { state.turns = turns; }],
+  useCallback: <T>(callback: T) => callback,
+  useRef: () => state.observed,
+  useState: () => [state.turns,
+    (update: (previous: ReadonlyMap<string, boolean>) => ReadonlyMap<string, boolean>) => {
+      state.turns = update(state.turns);
+    }],
 }));
-beforeEach(() => { state.turns = new Set(); });
+beforeEach(() => { state.turns = new Map(); state.observed = { current: false }; });
 
 const live: Turn = { id: 'live', status: 'inProgress', items: [
   { id: 'question', type: 'userMessage', text: 'Explain this without tools.' },
@@ -38,4 +44,14 @@ it('still waits for the initial scroll position when reopening completed history
   const history = useConversationEntries([{ ...live, status: 'completed' }]);
   expect(history.hasObservedLiveTurn).toBe(false);
   expect(history.entries).toHaveLength(1);
+});
+
+it('keeps explicit collapse and expansion through streaming updates and completion', () => {
+  const turn: Turn = { ...live, items: [...live.items, { id: 'tool', type: 'commandExecution' }] };
+  useConversationEntries([turn]).setInline(turn.id, false);
+  expect(useConversationEntries([turn]).entries.some((entry) => entry.kind === 'process')).toBe(false);
+  useConversationEntries([turn]).setInline(turn.id, true);
+  const completed = useConversationEntries([{ ...turn, status: 'completed' }]);
+  expect(completed.entries.some((entry) => entry.kind === 'process')).toBe(true);
+  expect(completed.hasObservedLiveTurn).toBe(true);
 });

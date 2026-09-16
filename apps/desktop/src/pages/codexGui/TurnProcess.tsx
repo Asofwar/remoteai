@@ -5,13 +5,7 @@ import { TurnDuration } from "./TurnDuration";
 import { WorkItems } from "./WorkItems";
 import styles from "./styles.module.less";
 
-/** Empty reasoning events carry no displayable summary and must not create an empty disclosure. */
-export function hasVisibleProcessContent(item: Item) {
-  if (item.type === "agentMessage") return Boolean(item.text?.trim());
-  if (item.type !== "reasoning") return true;
-  return [...(item.summary ?? []), ...(item.content ?? [])]
-    .some((part) => typeof part === "string" && Boolean(part.trim()));
-}
+export { hasVisibleProcessContent } from "../../../../../shared/chat/processContent";
 
 export function TurnProcess({ turn, items, running, active, timed }: {
   turn: Turn; items: Item[]; running: boolean; active: boolean; timed: boolean;

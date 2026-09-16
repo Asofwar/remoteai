@@ -104,7 +104,7 @@ export function BottomSheet({
     transparent
     animationType="slide"
     statusBarTranslucent
-    onRequestClose={close}
+    onRequestClose={() => { if (dismissible) (onBack ?? onClose)(); }}
   >
     <KeyboardAvoidingView
       style={styles.root}

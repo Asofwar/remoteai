@@ -9,6 +9,7 @@ import { UserMessageText } from './UserMessageText';
 import { questionMessageText } from '../../../../shared/remote-chat/client/asyncQuestions';
 import { messageContent, messageLabel } from '../../../../shared/chat/messageDetails';
 import { itemImageSources } from '../../../../shared/chat/imageSources';
+import { commandPreview } from '../../../../shared/chat/commandPreview';
 import {
   collaborationSummary, isCollaborationActivity,
 } from '../../../desktop/src/pages/codexGui/collaborationActivity';
@@ -43,7 +44,7 @@ function commandSummary(item: Item) {
   const status: Record<string, string> = {
     inProgress: '正在运行', completed: '已运行', failed: '运行失败', declined: '已拒绝',
   };
-  return `${status[item.status ?? ''] || '执行命令'} ${item.command ?? ''}`;
+  return `${status[item.status ?? ''] || '执行命令'} ${commandPreview(item.command ?? '')}`;
 }
 
 function fileName(path: string): string {

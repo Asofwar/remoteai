@@ -12,6 +12,7 @@ export function useChromePlugin(homeId: string, active: boolean) {
   const loading = useRef(false);
   const pendingRefresh = useRef<(() => void) | null>(null);
   const changing = useRef(false);
+  const attemptedInstall = useRef(false);
   const revision = useRef(0);
   const actionError = useRef(false);
   const mounted = useRef(true);
@@ -22,7 +23,24 @@ export function useChromePlugin(homeId: string, active: boolean) {
     loading.current = true;
     const started = revision.current;
     try {
-      const result = await chromePluginStatus(homeId);
+      let result = await chromePluginStatus(homeId);
+      if (mounted.current && started === revision.current && result.supported
+        && !result.installed && !attemptedInstall.current) {
+        attemptedInstall.current = true;
+        changing.current = true;
+        setStatus(result);
+        setBusy(true);
+        try {
+          result = await chromePluginAction(homeId, "ensureInstalled");
+        } catch (caught) {
+          actionError.current = true;
+          if (mounted.current && started === revision.current) setError(String(caught));
+          throw caught;
+        } finally {
+          changing.current = false;
+          if (mounted.current) setBusy(false);
+        }
+      }
       if (mounted.current && started === revision.current) {
         setStatus(result);
         if (!actionError.current) setError("");

@@ -3,12 +3,14 @@ import { execute } from './operations.js';
 import { invalidate } from './snapshot.js';
 import { stopDebugging } from './driver.js';
 import { clearControlledTabs } from './tab-indicator.js';
+import { createBundleUpdater, UPDATE_ALARM } from './auto-update.js';
 
 const HOST = 'dev.codex_switch.chrome';
 const running = new Map();
 let port;
 let connectionError = '';
 const initialized = permissions.initializePermissions();
+const updater = createBundleUpdater({ busy: () => running.size > 0, beforeReload: stopDebugging });
 
 async function connect() {
   await initialized;
@@ -21,7 +23,7 @@ async function connect() {
     const reason = chrome.runtime.lastError?.message;
     if (port !== next) return;
     port = undefined;
-    connectionError = reason ? '请先在 Codex Switch 中安装浏览器插件，再点击重新连接。' : '连接已断开，请重新连接。';
+    connectionError = reason ? '请先在 Codex Switch 中启用浏览器助手，再点击重新连接。' : '连接已断开，请重新连接。';
     for (const controller of running.values()) controller.abort();
     void stopDebugging();
     chrome.alarms.create('reconnect', { delayInMinutes: 0.5 });
@@ -40,6 +42,7 @@ async function handleRequest(source, message) {
   running.set(message.id, controller);
   let reply;
   try {
+    if (updater.isReloading()) throw new Error('浏览器助手正在更新，请稍后重试。');
     const result = await execute({ clientId: message.clientId, signal: controller.signal }, message.request);
     reply = { result, error: null };
   } catch (error) {
@@ -110,5 +113,9 @@ chrome.permissions.onRemoved.addListener(({ origins }) => {
 });
 chrome.runtime.onInstalled.addListener(() => { void connect(); });
 chrome.runtime.onStartup.addListener(() => { void connect(); });
-chrome.alarms.onAlarm.addListener((alarm) => { if (alarm.name === 'reconnect') void connect(); });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'reconnect') void connect();
+  if (alarm.name === UPDATE_ALARM) void updater.check();
+});
+updater.start();
 void connect();

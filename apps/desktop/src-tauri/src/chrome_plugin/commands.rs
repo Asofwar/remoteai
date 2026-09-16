@@ -1,11 +1,12 @@
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{path::Path, sync::Mutex};
+use std::path::Path;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
-use super::{config, extension, install, native, protocol::*, registration, BrowserError, Result};
-
-static INSTALL_CHANGES: Mutex<()> = Mutex::new(());
+use super::{
+    config, extension, install, native, protocol::*, registration, BrowserError, Result,
+    INSTALL_CHANGES,
+};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,6 +25,7 @@ pub(crate) struct ChromePluginStatus {
 #[serde(rename_all = "camelCase")]
 pub(crate) enum ChromePluginAction {
     Install,
+    EnsureInstalled,
     Enable,
     Disable,
     Remove,
@@ -60,6 +62,9 @@ pub(crate) async fn chrome_plugin_action(
         let executable = std::env::current_exe().map_err(|_| BrowserError::Storage)?;
         match action {
             ChromePluginAction::Install => install::install(&root, &home, &executable)?,
+            ChromePluginAction::EnsureInstalled => {
+                install::ensure_installed(&root, &home, &executable)?;
+            }
             ChromePluginAction::Enable => install::install(&root, &home, &executable)?,
             ChromePluginAction::Disable => install::disable(&root, &home, &executable)?,
             ChromePluginAction::Remove => install::remove(&root, &home)?,
@@ -97,7 +102,9 @@ fn status(root: &Path, home: &Path) -> Result<ChromePluginStatus> {
     let mut connected_browsers = 0;
     let mut active_browsers = 0;
     let needs_repair = match record.as_ref() {
-        Some(record) => !install::configured(home, record.enabled)?,
+        Some(record) => {
+            !install::configured(home, record.enabled)? || !extension::is_current(root)?
+        }
         None => false,
     };
     let enabled = record.as_ref().is_some_and(|record| record.enabled) && !needs_repair;

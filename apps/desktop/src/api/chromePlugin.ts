@@ -11,7 +11,8 @@ export interface ChromePluginStatus {
   extensionDirectory: string;
 }
 
-export type ChromePluginAction = "install" | "enable" | "disable" | "remove" | "openFolder" | "openExtensions";
+export type ChromePluginAction =
+  | "install" | "ensureInstalled" | "enable" | "disable" | "remove" | "openFolder" | "openExtensions";
 
 export function chromePluginStatus(homeId: string) {
   return invoke<ChromePluginStatus>("chrome_plugin_status", { homeId });

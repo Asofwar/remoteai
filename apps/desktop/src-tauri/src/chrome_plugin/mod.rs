@@ -1,4 +1,5 @@
 //! Independent Chrome automation: install lifecycle, native messaging, and STDIO MCP.
+mod automatic;
 pub(crate) mod commands;
 mod config;
 mod extension;
@@ -11,10 +12,13 @@ mod protocol;
 mod registration;
 mod transport;
 
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Mutex};
+
+pub(crate) use automatic::refresh_on_startup;
+static INSTALL_CHANGES: Mutex<()> = Mutex::new(());
 
 const HOST_NAME: &str = "dev.codex_switch.chrome";
-const PLUGIN_VERSION: &str = "1.2.0";
+const PLUGIN_VERSION: &str = "1.2.1";
 const MCP_SERVER: &str = "codex_switch_chrome";
 
 #[derive(Debug, thiserror::Error)]
@@ -36,7 +40,7 @@ enum BrowserError {
     Timeout,
     #[error("浏览器请求无效，请刷新页面后重试。")]
     InvalidRequest,
-    #[error("连接验证失败，请重新安装浏览器插件。")]
+    #[error("连接验证失败，请停用后重新启用浏览器助手。")]
     Unauthorized,
     #[error("当前系统暂不支持浏览器插件。")]
     Unsupported,

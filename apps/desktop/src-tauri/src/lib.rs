@@ -161,6 +161,7 @@ pub fn run() {
                 main_window::restore_or_set_default(app)?;
             }
             commands::initialize_local_state(app.handle());
+            chrome_plugin::refresh_on_startup();
             #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
             if let Err(error) = app.deep_link().register_all() {
                 eprintln!("failed to register desktop import links: {error}");

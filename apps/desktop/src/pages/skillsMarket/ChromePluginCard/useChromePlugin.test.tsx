@@ -26,6 +26,43 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); vi.useRealTimers(); });
 
+it("prepares a missing built-in plugin once, including StrictMode and subsequent polling", async () => {
+  api.chromePluginStatus.mockResolvedValue({ ...installed, installed: false, enabled: false });
+  api.chromePluginAction.mockResolvedValue(installed);
+  await act(async () => root.render(<StrictMode><Harness /></StrictMode>));
+  expect(api.chromePluginAction).toHaveBeenCalledExactlyOnceWith("first", "ensureInstalled");
+  expect(hook.status).toEqual(installed);
+  await act(async () => vi.advanceTimersByTimeAsync(15000));
+  expect(api.chromePluginAction).toHaveBeenCalledTimes(1);
+});
+
+it("keeps a stopped plugin disabled when visiting the card", async () => {
+  api.chromePluginStatus.mockResolvedValue({ ...installed, enabled: false });
+  await act(async () => root.render(<Harness />));
+  await act(async () => vi.advanceTimersByTimeAsync(5000));
+  expect(hook.status?.enabled).toBe(false);
+  expect(api.chromePluginAction).not.toHaveBeenCalled();
+});
+
+it("does not repeat failed automatic setup and allows an explicit retry", async () => {
+  api.chromePluginStatus.mockResolvedValue({ ...installed, installed: false, enabled: false });
+  api.chromePluginAction.mockRejectedValueOnce("设置未完成").mockResolvedValue(installed);
+  await act(async () => root.render(<Harness />));
+  await act(async () => vi.advanceTimersByTimeAsync(15000));
+  expect(api.chromePluginAction).toHaveBeenCalledTimes(1);
+  expect(hook.error).toBe("设置未完成");
+  expect(hook.busy).toBe(false);
+  await act(async () => { await hook.run("enable"); });
+  expect(hook.status).toEqual(installed);
+  expect(hook.error).toBe("");
+});
+
+it("does not prepare a missing plugin on an unsupported platform", async () => {
+  api.chromePluginStatus.mockResolvedValue({ ...installed, installed: false, supported: false });
+  await act(async () => root.render(<Harness />));
+  expect(api.chromePluginAction).not.toHaveBeenCalled();
+});
+
 it("never overlaps status polling and stops when the card is inactive", async () => {
   let finish!: (status: ChromePluginStatus) => void;
   api.chromePluginStatus.mockReturnValue(new Promise<ChromePluginStatus>((resolve) => { finish = resolve; }));

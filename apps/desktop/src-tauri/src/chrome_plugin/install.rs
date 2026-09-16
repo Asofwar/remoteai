@@ -39,6 +39,30 @@ pub(super) fn install(root: &Path, home: &Path, executable: &Path) -> Result<()>
     })
 }
 
+/// Prepare the built-in plugin once without re-enabling an existing disabled installation.
+pub(super) fn ensure_installed(root: &Path, home: &Path, executable: &Path) -> Result<()> {
+    ensure_home(root, home, || install(root, home, executable))
+}
+
+/// Refresh owned configuration without changing credentials or the user's enabled preference.
+pub(super) fn refresh_home(root: &Path, home: &Path, executable: &Path) -> Result<()> {
+    let id = config::client_id(home);
+    let record = config::load(root, &id)?;
+    update_config(home, &id, Some(mcp_entry(executable, &id, record.enabled)))?;
+    if record.enabled {
+        extension::skill(home)?;
+    }
+    Ok(())
+}
+
+fn ensure_home(root: &Path, home: &Path, prepare: impl FnOnce() -> Result<()>) -> Result<()> {
+    match config::load(root, &config::client_id(home)) {
+        Ok(_) => Ok(()),
+        Err(BrowserError::Disabled) => prepare(),
+        Err(error) => Err(error),
+    }
+}
+
 fn install_home(
     root: &Path,
     home: &Path,

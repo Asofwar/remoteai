@@ -1,6 +1,9 @@
+use sha2::{Digest, Sha256};
 use std::{
+    borrow::Cow,
     fs,
     path::{Path, PathBuf},
+    sync::OnceLock,
 };
 
 use super::{BrowserError, Result};
@@ -14,6 +17,8 @@ macro_rules! assets {
 const ASSETS: &[(&str, &[u8])] = assets![
     "manifest.json",
     "background.js",
+    "auto-update.js",
+    "bundle-version.js",
     "validation.js",
     "permissions.js",
     "site-access.js",
@@ -32,6 +37,33 @@ const ASSETS: &[(&str, &[u8])] = assets![
     "icon.png",
 ];
 
+const BUNDLE_PLACEHOLDER: &str = "__CODEX_SWITCH_CHROME_BUNDLE__";
+const READY_FILE: &str = "bundle-ready.json";
+
+fn bundle_revision() -> &'static str {
+    static REVISION: OnceLock<String> = OnceLock::new();
+    REVISION.get_or_init(|| {
+        let mut hash = Sha256::new();
+        for (name, bytes) in ASSETS {
+            hash.update(name.as_bytes());
+            hash.update([0]);
+            hash.update(bytes);
+            hash.update([0]);
+        }
+        format!("{:x}", hash.finalize())
+    })
+}
+
+pub(super) fn is_current(root: &Path) -> Result<bool> {
+    let bytes = match fs::read(directory(root).join(READY_FILE)) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(_) => return Err(BrowserError::Storage),
+    };
+    Ok(serde_json::from_slice::<serde_json::Value>(&bytes)
+        .is_ok_and(|value| value["revision"] == bundle_revision()))
+}
+
 pub(super) fn directory(root: &Path) -> PathBuf {
     root.join("extension")
 }
@@ -39,14 +71,39 @@ pub(super) fn directory(root: &Path) -> PathBuf {
 pub(super) fn export(root: &Path) -> Result<PathBuf> {
     let path = directory(root);
     fs::create_dir_all(&path).map_err(|_| BrowserError::Storage)?;
-    for (name, bytes) in ASSETS {
-        let target = path.join(name);
-        if fs::read(&target).ok().as_deref() == Some(bytes) {
-            continue;
-        }
-        fs::write(target, bytes).map_err(|_| BrowserError::Storage)?;
+    // Publish the marker only after every file is replaced, so Chrome cannot reload a partial bundle.
+    match fs::remove_file(path.join(READY_FILE)) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => return Err(BrowserError::Storage),
     }
+    for (name, bytes) in ASSETS {
+        let bytes = if *name == "bundle-version.js" {
+            Cow::Owned(
+                String::from_utf8_lossy(bytes)
+                    .replace(BUNDLE_PLACEHOLDER, bundle_revision())
+                    .into_bytes(),
+            )
+        } else {
+            Cow::Borrowed(*bytes)
+        };
+        write_asset(&path.join(name), &bytes)?;
+    }
+    crate::storage::write_json_atomic(
+        &path.join(READY_FILE),
+        &serde_json::json!({"revision": bundle_revision()}),
+    )
+    .map_err(|_| BrowserError::Storage)?;
     Ok(path)
+}
+
+fn write_asset(target: &Path, bytes: &[u8]) -> Result<()> {
+    if fs::read(target).ok().as_deref() == Some(bytes) {
+        return Ok(());
+    }
+    let temporary = target.with_extension(format!("{}.tmp", uuid::Uuid::new_v4()));
+    fs::write(&temporary, bytes).map_err(|_| BrowserError::Storage)?;
+    crate::storage::replace_file(&temporary, target).map_err(|_| BrowserError::Storage)
 }
 
 pub(super) fn skill(home: &Path) -> Result<()> {
@@ -80,3 +137,7 @@ pub(super) fn remove_skill(home: &Path) -> Result<()> {
     }
     fs::remove_file(path).map_err(|_| BrowserError::Storage)
 }
+
+#[cfg(test)]
+#[path = "extension_tests.rs"]
+mod tests;

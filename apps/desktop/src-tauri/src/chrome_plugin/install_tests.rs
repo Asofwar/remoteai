@@ -22,6 +22,42 @@ impl Drop for Fixture {
 }
 
 #[test]
+fn default_installation_is_idempotent_and_preserves_explicit_disable() {
+    let fixture = Fixture::new();
+    let home = fixture.home("home");
+    let executable = std::env::current_exe().unwrap();
+    ensure_home(&fixture.0, &home, || {
+        install_home(&fixture.0, &home, &executable, || Ok(()))
+    })
+    .unwrap();
+    assert!(configured(&home, true).unwrap());
+    let client_path = config::client_path(&fixture.0, &config::client_id(&home)).unwrap();
+    let original_record = fs::read(&client_path).unwrap();
+    ensure_home(&fixture.0, &home, || panic!("must not reinstall")).unwrap();
+    assert_eq!(fs::read(&client_path).unwrap(), original_record);
+    disable(&fixture.0, &home, &executable).unwrap();
+    let disabled_config = fs::read(home.join("config.toml")).unwrap();
+    ensure_home(&fixture.0, &home, || panic!("must not re-enable")).unwrap();
+    assert!(configured(&home, false).unwrap());
+    assert_eq!(fs::read(home.join("config.toml")).unwrap(), disabled_config);
+    assert!(!home.join("skills/codex-switch-chrome/SKILL.md").exists());
+}
+
+#[test]
+fn default_installation_preserves_damaged_records_for_explicit_repair() {
+    let fixture = Fixture::new();
+    let home = fixture.home("home");
+    let client_path = config::client_path(&fixture.0, &config::client_id(&home)).unwrap();
+    fs::create_dir_all(client_path.parent().unwrap()).unwrap();
+    fs::write(&client_path, "invalid").unwrap();
+    assert!(matches!(
+        ensure_home(&fixture.0, &home, || panic!("must not replace a record")),
+        Err(BrowserError::Storage)
+    ));
+    assert_eq!(fs::read_to_string(&client_path).unwrap(), "invalid");
+}
+
+#[test]
 fn install_disable_repair_and_remove_preserve_other_homes_and_settings() {
     let fixture = Fixture::new();
     let first = fixture.home("first");

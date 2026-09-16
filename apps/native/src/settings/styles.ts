@@ -8,8 +8,6 @@ export const settingsColors = {
 export const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: settingsColors.canvas },
   scroll: { flexGrow: 1 },
-  header: { backgroundColor: '#fff', paddingHorizontal: 22, paddingTop: 14, paddingBottom: 18 },
-  title: { color: settingsColors.ink, fontSize: 27, fontWeight: '700' },
   group: { backgroundColor: '#fff', marginBottom: 12 },
   profile: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 22, paddingVertical: 24, gap: 18 },
   avatar: {

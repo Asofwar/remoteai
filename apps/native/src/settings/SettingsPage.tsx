@@ -41,7 +41,6 @@ export function SettingsPage({ session, profile, globalRefreshMinutes, onGlobalR
 
   return <View style={styles.page}>
     <ScrollView contentContainerStyle={styles.scroll}>
-      <View style={styles.header}><Text style={styles.title}>设置</Text></View>
       <View style={styles.group}>
         <Pressable accessibilityRole="button" accessibilityLabel={`查看用户信息，${username}`}
           onPress={() => setPanel('profile')} style={({ pressed }) => [styles.profile, pressed && styles.pressed]}>

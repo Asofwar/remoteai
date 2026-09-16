@@ -26,6 +26,7 @@ const referenceStyles = StyleSheet.create({
   list: { gap: 8, padding: 4 },
   item: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 12, paddingVertical: 6,
     borderRadius: 12, backgroundColor: '#f3f3f3', maxWidth: 260 },
-  name: { color: '#222', fontSize: 13, flexShrink: 1 },
+  name: { color: '#222', fontSize: 13, lineHeight: 20, paddingVertical: 2,
+    includeFontPadding: true, textAlignVertical: 'center', flexShrink: 1 },
   remove: { minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center' },
 });

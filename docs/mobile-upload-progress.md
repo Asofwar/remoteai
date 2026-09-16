@@ -30,3 +30,10 @@ APK 为 `CodexSwitch-upload-progress.apk`，SHA-256：
 - 新增手机控制器准备/上传/确认阶段、禁止重复发送、成功/失败后清除进度测试。
 - 手机 TypeScript 检查和测试、桌面 TypeScript/Vite 生产构建与测试通过。
 - `cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、Rust 测试通过。
+
+## 上传文字裁切修复
+
+为上传提示和附件文件名补充明确的行高、字体留白和上下内边距；加载图标使用独立尺寸。
+Android 真机覆盖安装后，使用 `VID_20260913_120644.mp4`（8,937,633 字节）上传至 ZH2，
+检查键盘展开和收起时的文字、下划线及加载图标，显示完整，上传正常完成。
+截图保存在 `.codex-tmp/upload-text-layout/upload-1.png`（键盘展开）和 `upload-3.png`（键盘收起）。

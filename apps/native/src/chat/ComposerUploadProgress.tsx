@@ -11,7 +11,7 @@ export function ComposerUploadProgress({ progress, reconnecting }: {
   }[progress.phase];
   return <View style={styles.container}>
     <View style={styles.heading}>
-      <ActivityIndicator size="small" color="#238578" />
+      <ActivityIndicator size="small" color="#238578" style={styles.spinner} />
       <Text style={styles.label}>{label}</Text>
     </View>
     <View accessibilityRole="progressbar" accessibilityLabel={label}
@@ -24,7 +24,10 @@ export function ComposerUploadProgress({ progress, reconnecting }: {
 const styles = StyleSheet.create({
   container: { width: '100%', maxWidth: 400, alignSelf: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 7 },
   heading: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  label: { color: '#28766c', fontSize: 13, flexShrink: 1 },
+  spinner: { width: 24, height: 24, flexShrink: 0 },
+  // Android fonts need baseline room for low glyphs and filename underscores.
+  label: { color: '#28766c', fontSize: 13, lineHeight: 20, paddingVertical: 2,
+    includeFontPadding: true, textAlignVertical: 'center', flexShrink: 1 },
   track: { height: 4, borderRadius: 2, backgroundColor: '#e1eeeb', overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 2, backgroundColor: '#238578' },
 });

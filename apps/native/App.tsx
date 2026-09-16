@@ -1,6 +1,7 @@
 import 'react-native-gesture-handler';
 import './src/chat/backgroundConnection';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import { Component, useCallback, useEffect, useMemo, useRef, useState, type ErrorInfo, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -22,7 +23,6 @@ import {
 } from 'react-native';
 import { initialWindowMetrics, SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import {
-  changePassword,
   clearSession,
   consumeResetCredit,
   DEFAULT_GLOBAL_REFRESH_MINUTES,
@@ -74,8 +74,7 @@ import { TotpPage } from './src/totp/TotpPage';
 import { ChatPage } from './src/chat/ChatPage';
 import { palette as chatPalette } from './src/chat/styles';
 import { useChatNotificationNavigation } from './src/chat/useChatNotificationNavigation';
-import { TotpSyncSettings } from './src/totp/TotpSyncSettings';
-import type { TotpManagerState } from './src/totp/types';
+import { SettingsPage } from './src/settings/SettingsPage';
 import { useTotpVault } from './src/totp/useTotpVault';
 import {
   createDeviceStatusReceiver,
@@ -536,14 +535,6 @@ function Dashboard({
       onConfirm={onConsumeQuota}
     />
   </>;
-}
-
-function identityLabel(profile?: UserProfile | null) {
-  if (!profile) return '加载中…';
-  if (profile.roleName) return profile.roleName;
-  if (profile.role === 'admin') return '管理员';
-  if (profile.role === 'user') return '用户';
-  return profile.role;
 }
 
 function useAndroidUpdateDownloadState() {
@@ -1133,225 +1124,6 @@ function DeviceManagementPage({
   </>;
 }
 
-function SettingsPage({ session, profile, globalRefreshMinutes, onGlobalRefreshMinutesChange,
-  onOpenAbout, onOpenAdmin, onLogout, totpManager }: {
-  session: AuthSession;
-  profile: UserProfile | null;
-  globalRefreshMinutes: number;
-  onGlobalRefreshMinutesChange: (minutes: number) => Promise<void>;
-  onOpenAbout: () => void;
-  onOpenAdmin: () => void;
-  onLogout: () => void;
-  totpManager: TotpManagerState;
-}) {
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
-  const [logoutDrawerVisible, setLogoutDrawerVisible] = useState(false);
-  const [refreshMinutesInput, setRefreshMinutesInput] = useState(String(globalRefreshMinutes));
-  const [savingRefreshInterval, setSavingRefreshInterval] = useState(false);
-  const activeProfile = profile ?? session.profile;
-  const username = activeProfile?.email ?? session.email;
-
-  const closePasswordModal = useCallback(() => {
-    if (saving) return;
-    setPasswordModalVisible(false);
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-  }, [saving]);
-
-  useEffect(() => setRefreshMinutesInput(String(globalRefreshMinutes)), [globalRefreshMinutes]);
-
-  const saveRefreshInterval = useCallback(async () => {
-    const minutes = Number(refreshMinutesInput);
-    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) {
-      Toast.fail('请输入 1 到 1440 之间的整数分钟');
-      return;
-    }
-    setSavingRefreshInterval(true);
-    try {
-      await onGlobalRefreshMinutesChange(minutes);
-      Toast.success(`已设置为每 ${minutes} 分钟自动刷新用量`);
-    } catch (error) {
-      Toast.fail(errorMessage(error));
-    } finally {
-      setSavingRefreshInterval(false);
-    }
-  }, [onGlobalRefreshMinutesChange, refreshMinutesInput]);
-
-  const submitPassword = useCallback(async () => {
-    if (currentPassword.length < 6) {
-      Toast.fail('当前密码至少需要 6 位');
-      return;
-    }
-    if (newPassword.length < 8) {
-      Toast.fail('新密码至少需要 8 位');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      Toast.fail('两次输入的新密码不一致');
-      return;
-    }
-    setSaving(true);
-    try {
-      await changePassword(session, currentPassword, newPassword);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setPasswordModalVisible(false);
-      Toast.success('密码已修改，下次登录请使用新密码');
-    } catch (error) {
-      Toast.fail(errorMessage(error));
-    } finally {
-      setSaving(false);
-    }
-  }, [confirmPassword, currentPassword, newPassword, session]);
-
-  return <KeyboardAvoidingView style={styles.flex} behavior={Platform.select({ ios: 'padding', android: undefined })}>
-    <ScrollView style={styles.flex} contentContainerStyle={styles.settingsScroll} keyboardShouldPersistTaps="handled">
-      <View style={styles.settingsHeader}>
-        <Text style={styles.settingsTitle}>设置</Text>
-        <Text style={styles.settingsSubtitle}>账号与安全</Text>
-      </View>
-
-      <Text style={styles.sectionLabel}>用户信息</Text>
-      <View style={styles.settingsCard}>
-        <View style={styles.profileSummary}>
-          <View style={styles.profileAvatar}><Text style={styles.profileAvatarText}>{initials(username)}</Text></View>
-          <View style={styles.profileSummaryText}>
-            <Text style={styles.profileName} numberOfLines={1}>{username}</Text>
-            <Text style={styles.profileCaption}>Codex Switch 云端账号</Text>
-          </View>
-        </View>
-        <View style={styles.settingsDivider} />
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>用户名</Text>
-          <Text selectable style={styles.infoValue} numberOfLines={1}>{username}</Text>
-        </View>
-        <View style={styles.rowDivider} />
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>身份信息</Text>
-          <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>{identityLabel(activeProfile)}</Text></View>
-        </View>
-      </View>
-
-      <Text style={styles.sectionLabel}>刷新设置</Text>
-      <View style={styles.settingsCard}>
-        <Text style={styles.refreshSettingsTitle}>自动刷新用量</Text>
-        <Text style={styles.passwordHint}>按设定间隔刷新账号管理页中所有账号的用量。</Text>
-        <View style={styles.refreshIntervalRow}>
-          <TextInput value={refreshMinutesInput} onChangeText={(value) => setRefreshMinutesInput(value.replace(/\D/g, '').slice(0, 4))}
-            keyboardType="number-pad" placeholder="30" placeholderTextColor="#98a9a0" style={styles.refreshIntervalInput}
-            editable={!savingRefreshInterval} onSubmitEditing={() => void saveRefreshInterval()} />
-          <Text style={styles.refreshIntervalUnit}>分钟</Text>
-          <Pressable accessibilityRole="button" disabled={savingRefreshInterval}
-            onPress={() => void saveRefreshInterval()} style={({ pressed }) => [styles.saveIntervalButton, pressed && styles.pressed, savingRefreshInterval && styles.disabled]}>
-            {savingRefreshInterval ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveIntervalText}>保存</Text>}
-          </Pressable>
-        </View>
-        <Text style={styles.refreshSettingsHint}>默认 30 分钟；“刷新用量”按钮可随时手动刷新。</Text>
-      </View>
-
-      <TotpSyncSettings manager={totpManager} />
-
-      {activeProfile?.role === 'admin' ? <>
-        <Text style={styles.sectionLabel}>管理员</Text>
-        <Pressable accessibilityRole="button" accessibilityHint="打开管理控制台"
-          onPress={onOpenAdmin}
-          style={({ pressed }) => [
-            styles.settingsCard,
-            styles.passwordEntry,
-            pressed && styles.pressed,
-          ]}>
-          <View style={styles.adminSettingsIcon}><Text style={styles.adminSettingsIconText}>管</Text></View>
-          <View style={styles.passwordEntryText}>
-            <Text style={styles.refreshSettingsTitle}>管理控制台</Text>
-            <Text style={styles.passwordHint}>数据仪表盘、账号池与用户管理</Text>
-          </View>
-          <Text style={styles.passwordEntryArrow}>›</Text>
-        </Pressable>
-      </> : null}
-
-      <Text style={styles.sectionLabel}>修改密码</Text>
-      <Pressable accessibilityRole="button" accessibilityHint="打开修改密码抽屉"
-        onPress={() => setPasswordModalVisible(true)} style={({ pressed }) => [styles.settingsCard, styles.passwordEntry, pressed && styles.pressed]}>
-        <View style={styles.passwordEntryText}>
-          <Text style={styles.refreshSettingsTitle}>登录密码</Text>
-          <Text style={styles.passwordHint}>验证当前密码后设置新密码</Text>
-        </View>
-        <Text style={styles.passwordEntryArrow}>›</Text>
-      </Pressable>
-
-      <Text style={styles.sectionLabel}>关于</Text>
-      <Pressable accessibilityRole="button" accessibilityHint="打开软件信息与版本更新页面"
-        onPress={onOpenAbout} style={({ pressed }) => [styles.settingsCard, styles.passwordEntry, pressed && styles.pressed]}>
-        <View style={styles.aboutSettingsIcon}><Text style={styles.aboutSettingsIconText}>i</Text></View>
-        <View style={styles.passwordEntryText}>
-          <Text style={styles.refreshSettingsTitle}>关于 Codex Switch</Text>
-          <Text style={styles.passwordHint}>软件信息、版本号与检查更新</Text>
-        </View>
-        <View style={styles.aboutSettingsVersion}>
-          <Text style={styles.aboutSettingsVersionText}>v{CURRENT_APP_VERSION}</Text>
-        </View>
-        <Text style={styles.passwordEntryArrow}>›</Text>
-      </Pressable>
-
-      <Pressable accessibilityRole="button" onPress={() => setLogoutDrawerVisible(true)}
-        style={({ pressed }) => [styles.settingsLogoutButton, pressed && styles.pressed]}>
-        <Text style={styles.settingsLogoutText}>退出登录</Text>
-      </Pressable>
-      <Text style={styles.securityNote}>登录令牌与账号信息保存在本机系统安全存储中。</Text>
-    </ScrollView>
-    <BottomSheet
-      visible={passwordModalVisible}
-      title="修改密码"
-      subtitle="验证当前密码后设置新的登录密码"
-      onClose={closePasswordModal}
-      dismissible={!saving}
-      tall
-      actions={[
-        { label: '取消', onPress: closePasswordModal, disabled: saving },
-        { label: '确认修改', tone: 'primary', onPress: submitPassword, loading: saving },
-      ]}
-    >
-      <ScrollView style={styles.passwordDrawerBody} keyboardShouldPersistTaps="handled">
-        <Text style={styles.passwordHint}>修改密码前需要验证当前密码，新密码至少 8 位。</Text>
-        <Text style={styles.fieldLabel}>当前密码</Text>
-        <TextInput value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry
-          autoComplete="current-password" placeholder="输入当前密码" placeholderTextColor="#98a9a0"
-          style={styles.input} editable={!saving} />
-        <Text style={styles.fieldLabel}>新密码</Text>
-        <TextInput value={newPassword} onChangeText={setNewPassword} secureTextEntry
-          autoComplete="new-password" placeholder="至少 8 位" placeholderTextColor="#98a9a0"
-          style={styles.input} editable={!saving} />
-        <Text style={styles.fieldLabel}>确认新密码</Text>
-        <TextInput value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry
-          autoComplete="new-password" placeholder="再次输入新密码" placeholderTextColor="#98a9a0"
-          style={styles.input} editable={!saving} onSubmitEditing={() => void submitPassword()} />
-      </ScrollView>
-    </BottomSheet>
-    <BottomSheet
-      visible={logoutDrawerVisible}
-      title="退出登录"
-      subtitle="退出后需要重新输入服务器地址、邮箱和密码"
-      onClose={() => setLogoutDrawerVisible(false)}
-      actions={[
-        { label: '继续使用', onPress: () => setLogoutDrawerVisible(false) },
-        { label: '退出登录', tone: 'danger', onPress: () => { setLogoutDrawerVisible(false); onLogout(); } },
-      ]}
-    >
-      <View style={styles.logoutConfirmBox}>
-        <View style={styles.logoutConfirmIcon}><Text style={styles.logoutConfirmIconText}>↪</Text></View>
-        <Text style={styles.logoutConfirmTitle}>确定要退出当前账号吗？</Text>
-        <Text style={styles.logoutConfirmText}>本机保存的登录会话将被清除，云端数据不会受到影响。</Text>
-      </View>
-    </BottomSheet>
-  </KeyboardAvoidingView>;
-}
-
 type AppPage = 'accounts' | 'devices' | 'chat' | 'totp' | 'admin' | 'settings' | 'about' | 'token-summary';
 const DEFAULT_APP_PAGE: AppPage = 'chat';
 
@@ -1363,27 +1135,27 @@ function BottomNavigation({ activePage, onChange }: {
   return <View style={styles.bottomNavigation} accessibilityRole="tablist">
     <Pressable accessibilityRole="tab" accessibilityState={{ selected: activePage === 'chat' }}
       onPress={() => onChange('chat')} style={styles.navItem}>
-      <Text style={[styles.navIcon, activePage === 'chat' && styles.navTextActive]}>☷</Text>
+      <Ionicons name="chatbubble-outline" size={23} color={activePage === 'chat' ? '#00c98b' : '#858991'} />
       <Text style={[styles.navText, activePage === 'chat' && styles.navTextActive]}>聊天</Text>
     </Pressable>
     <Pressable accessibilityRole="tab" accessibilityState={{ selected: activePage === 'accounts' }}
       onPress={() => onChange('accounts')} style={styles.navItem}>
-      <Text style={[styles.navIcon, activePage === 'accounts' && styles.navTextActive]}>▦</Text>
+      <Ionicons name="grid-outline" size={23} color={activePage === 'accounts' ? '#00c98b' : '#858991'} />
       <Text style={[styles.navText, activePage === 'accounts' && styles.navTextActive]}>账号</Text>
     </Pressable>
     <Pressable accessibilityRole="tab" accessibilityState={{ selected: activePage === 'devices' }}
       onPress={() => onChange('devices')} style={styles.navItem}>
-      <Text style={[styles.navIcon, activePage === 'devices' && styles.navTextActive]}>▤</Text>
+      <Ionicons name="server-outline" size={23} color={activePage === 'devices' ? '#00c98b' : '#858991'} />
       <Text style={[styles.navText, activePage === 'devices' && styles.navTextActive]}>设备</Text>
     </Pressable>
     <Pressable accessibilityRole="tab" accessibilityState={{ selected: activePage === 'totp' }}
       onPress={() => onChange('totp')} style={styles.navItem}>
-      <Text style={[styles.navIcon, activePage === 'totp' && styles.navTextActive]}>2F</Text>
+      <Ionicons name="shield-checkmark-outline" size={23} color={activePage === 'totp' ? '#00c98b' : '#858991'} />
       <Text style={[styles.navText, activePage === 'totp' && styles.navTextActive]}>2FA</Text>
     </Pressable>
     <Pressable accessibilityRole="tab" accessibilityState={{ selected: settingsActive }}
       onPress={() => onChange('settings')} style={styles.navItem}>
-      <Text style={[styles.navIcon, settingsActive && styles.navTextActive]}>⚙</Text>
+      <Ionicons name="settings" size={23} color={settingsActive ? '#00c98b' : '#858991'} />
       <Text style={[styles.navText, settingsActive && styles.navTextActive]}>设置</Text>
     </Pressable>
   </View>;
@@ -2293,7 +2065,8 @@ function AppContent() {
   if (!session) return <View style={styles.app}>
     <LoginScreen initialBaseUrl={DEFAULT_CLOUD_BASE_URL} onLoggedIn={handleLogin} />
   </View>;
-  return <SafeAreaView style={[styles.app, activePage === 'chat' && styles.chatCanvas]}>
+  return <SafeAreaView style={[styles.app, activePage === 'chat' && styles.chatCanvas,
+    activePage === 'settings' && styles.settingsCanvas]}>
     <StatusBar style="dark" />
     <ChatPage session={session} devices={devices} active={activePage === 'chat' || activePage === 'token-summary'}
       devicesLoaded={devicesLoaded}
@@ -2346,6 +2119,7 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  settingsCanvas: { backgroundColor: '#fff' },
   chatCanvas: { backgroundColor: chatPalette.background },
   flex: { flex: 1 }, app: { flex: 1, backgroundColor: COLORS.canvas }, boot: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.canvas, gap: 12 }, bootText: { color: COLORS.ink, fontSize: 18, fontWeight: '700' }, startupError: { flex: 1, padding: 28, justifyContent: 'center', backgroundColor: COLORS.canvas }, startupErrorTitle: { color: COLORS.ink, fontSize: 22, fontWeight: '800' }, startupErrorMessage: { color: COLORS.muted, fontSize: 15, lineHeight: 22, marginTop: 12 }, startupErrorDetail: { color: COLORS.danger, fontSize: 12, marginTop: 20 },
   loginScroll: { flexGrow: 1, backgroundColor: COLORS.canvas, padding: 28, justifyContent: 'center' }, logoMark: { width: 58, height: 58, borderRadius: 18, backgroundColor: '#a7e733', justifyContent: 'center', alignItems: 'center', alignSelf: 'center', marginBottom: 18, shadowColor: '#4f7915', shadowOpacity: 0.18, shadowRadius: 14, elevation: 4 }, logoGlyph: { color: '#184122', fontSize: 34, fontWeight: '900' }, loginTitle: { color: COLORS.ink, fontSize: 30, fontWeight: '800', textAlign: 'center' }, loginSubtitle: { color: COLORS.muted, fontSize: 15, textAlign: 'center', marginTop: 8, marginBottom: 30 }, loginCard: { backgroundColor: COLORS.card, borderColor: COLORS.border, borderWidth: 1, borderRadius: 18, padding: 20, shadowColor: '#314c3d', shadowOpacity: 0.06, shadowRadius: 18, elevation: 2 }, fieldLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 36 }, fieldLabel: { color: COLORS.ink, fontSize: 14, fontWeight: '700', marginBottom: 8, marginTop: 14 }, officialServerButton: { paddingVertical: 6, paddingHorizontal: 9, borderRadius: 8, backgroundColor: COLORS.paleBlue, marginTop: 6 }, officialServerButtonText: { color: '#168da2', fontWeight: '700', fontSize: 12 }, fieldHint: { color: COLORS.muted, fontSize: 12, marginTop: 8 }, input: { height: 48, borderColor: '#cbdcd0', borderWidth: 1, borderRadius: 10, paddingHorizontal: 13, color: COLORS.ink, fontSize: 16, backgroundColor: '#fbfdfb' }, primaryButton: { height: 50, justifyContent: 'center', alignItems: 'center', borderRadius: 11, backgroundColor: COLORS.cyan, marginTop: 24, shadowColor: COLORS.cyan, shadowOpacity: 0.22, shadowRadius: 10, elevation: 3 }, primaryButtonText: { color: '#fff', fontWeight: '800', fontSize: 16 }, pressed: { opacity: 0.82 }, disabled: { opacity: 0.6 }, securityNote: { color: COLORS.muted, fontSize: 12, textAlign: 'center', marginTop: 18 },
@@ -2518,23 +2292,7 @@ const styles = StyleSheet.create({
   switchDeviceEmpty: { minHeight: 150, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border, borderRadius: 14, backgroundColor: COLORS.canvas, padding: 20 },
   switchDeviceEmptyTitle: { color: COLORS.ink, fontSize: 16, fontWeight: '800' },
   switchDeviceEmptyText: { color: COLORS.muted, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 7 },
-  settingsScroll: { padding: 18, paddingBottom: 30 }, settingsHeader: { marginBottom: 24 }, settingsTitle: { color: COLORS.ink, fontSize: 28, fontWeight: '800' }, settingsSubtitle: { color: COLORS.muted, fontSize: 13, marginTop: 4 }, sectionLabel: { color: COLORS.muted, fontSize: 13, fontWeight: '700', marginLeft: 3, marginBottom: 9, marginTop: 2 }, settingsCard: { backgroundColor: COLORS.card, borderColor: COLORS.border, borderWidth: 1, borderRadius: 16, padding: 17, marginBottom: 22, shadowColor: '#456152', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }, profileSummary: { flexDirection: 'row', alignItems: 'center' }, profileAvatar: { width: 50, height: 50, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#c9f0e7' }, profileAvatarText: { color: '#14806f', fontSize: 16, fontWeight: '800' }, profileSummaryText: { flex: 1, minWidth: 0, marginLeft: 12 }, profileName: { color: COLORS.ink, fontSize: 16, fontWeight: '800' }, profileCaption: { color: COLORS.muted, fontSize: 12, marginTop: 4 }, settingsDivider: { height: 1, backgroundColor: '#e4ede6', marginVertical: 16 }, infoRow: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 }, infoLabel: { color: COLORS.muted, fontSize: 14 }, infoValue: { color: COLORS.ink, fontSize: 14, fontWeight: '700', flex: 1, textAlign: 'right' }, rowDivider: { height: 1, backgroundColor: '#eef3ef', marginVertical: 7 }, roleBadge: { backgroundColor: COLORS.paleBlue, borderRadius: 8, paddingVertical: 5, paddingHorizontal: 10 }, roleBadgeText: { color: '#168da2', fontWeight: '800', fontSize: 12 }, passwordHint: { color: COLORS.muted, fontSize: 12, lineHeight: 18, marginBottom: 2 }, settingsLogoutButton: { height: 48, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e9b7b2', borderRadius: 12, backgroundColor: '#fffafa' }, settingsLogoutText: { color: '#bd3c35', fontWeight: '800', fontSize: 15 },
-  refreshSettingsTitle: { color: COLORS.ink, fontSize: 16, fontWeight: '800', marginBottom: 6 }, refreshIntervalRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 16 }, refreshIntervalInput: { width: 88, height: 44, borderWidth: 1, borderColor: '#cbdcd0', borderRadius: 9, backgroundColor: '#fbfdfb', color: COLORS.ink, fontSize: 16, textAlign: 'center' }, refreshIntervalUnit: { color: COLORS.muted, fontSize: 14, flex: 1 }, saveIntervalButton: { minWidth: 72, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: COLORS.cyan, paddingHorizontal: 14 }, saveIntervalText: { color: '#fff', fontWeight: '800', fontSize: 14 }, refreshSettingsHint: { color: COLORS.muted, fontSize: 11, lineHeight: 17, marginTop: 12 },
-  passwordEntry: { flexDirection: 'row', alignItems: 'center', minHeight: 76 }, passwordEntryText: { flex: 1 }, passwordEntryArrow: { color: '#91a198', fontSize: 30, lineHeight: 32, marginLeft: 12 }, passwordDrawerBody: { maxHeight: 500, paddingTop: 2, paddingBottom: 6 },
-  aboutSettingsIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: COLORS.paleBlue, marginRight: 12 },
-  aboutSettingsIconText: { color: '#168da2', fontSize: 20, fontWeight: '900', fontStyle: 'italic' },
-  adminSettingsIcon: {
-    width: 38,
-    height: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    backgroundColor: COLORS.paleGreen,
-    marginRight: 12,
-  },
-  adminSettingsIconText: { color: '#14806f', fontSize: 14, fontWeight: '900' },
-  aboutSettingsVersion: { borderRadius: 8, backgroundColor: COLORS.paleGreen, paddingHorizontal: 8, paddingVertical: 5 },
-  aboutSettingsVersionText: { color: '#14806f', fontSize: 11, fontWeight: '800' },
+  settingsTitle: { color: COLORS.ink, fontSize: 28, fontWeight: '800' }, settingsSubtitle: { color: COLORS.muted, fontSize: 13, marginTop: 4 }, sectionLabel: { color: COLORS.muted, fontSize: 13, fontWeight: '700', marginLeft: 3, marginBottom: 9, marginTop: 2 }, settingsCard: { backgroundColor: COLORS.card, borderColor: COLORS.border, borderWidth: 1, borderRadius: 16, padding: 17, marginBottom: 22, shadowColor: '#456152', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }, infoRow: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 }, infoLabel: { color: COLORS.muted, fontSize: 14 }, infoValue: { color: COLORS.ink, fontSize: 14, fontWeight: '700', flex: 1, textAlign: 'right' }, rowDivider: { height: 1, backgroundColor: '#eef3ef', marginVertical: 7 }, passwordHint: { color: COLORS.muted, fontSize: 12, lineHeight: 18, marginBottom: 2 }, refreshSettingsTitle: { color: COLORS.ink, fontSize: 16, fontWeight: '800', marginBottom: 6 },
   aboutScroll: { padding: 18, paddingBottom: 36 },
   aboutHeader: { flexDirection: 'row', alignItems: 'center', gap: 13, marginBottom: 22 },
   aboutBackButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 13, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.card },
@@ -2568,6 +2326,5 @@ const styles = StyleSheet.create({
   aboutLinkButton: { minHeight: 55, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: COLORS.border, borderRadius: 14, backgroundColor: COLORS.card, paddingHorizontal: 16 },
   aboutLinkText: { flex: 1, color: COLORS.ink, fontSize: 13, fontWeight: '700' },
   aboutLinkArrow: { color: '#91a198', fontSize: 27 },
-  logoutConfirmBox: { alignItems: 'center', borderRadius: 17, backgroundColor: COLORS.canvas, padding: 20 }, logoutConfirmIcon: { width: 50, height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fbe8e6', marginBottom: 13 }, logoutConfirmIconText: { color: COLORS.danger, fontSize: 23, fontWeight: '900' }, logoutConfirmTitle: { color: COLORS.ink, fontSize: 16, fontWeight: '900', textAlign: 'center' }, logoutConfirmText: { color: COLORS.muted, fontSize: 12, lineHeight: 19, textAlign: 'center', marginTop: 7 },
-  bottomNavigation: { flexDirection: 'row', backgroundColor: COLORS.card, borderTopWidth: 1, borderTopColor: COLORS.border, shadowColor: '#314c3d', shadowOpacity: 0.08, shadowRadius: 8, elevation: 10 }, navItem: { flex: 1, minHeight: 58, alignItems: 'center', justifyContent: 'center', gap: 2 }, navIcon: { color: '#8a9b91', fontSize: 20, lineHeight: 23 }, navText: { color: '#7b8c82', fontSize: 11, fontWeight: '700' }, navTextActive: { color: COLORS.green },
+  bottomNavigation: { flexDirection: 'row', backgroundColor: COLORS.card, borderTopWidth: 1, borderTopColor: COLORS.border, shadowColor: '#314c3d', shadowOpacity: 0.08, shadowRadius: 8, elevation: 10 }, navItem: { flex: 1, minHeight: 58, alignItems: 'center', justifyContent: 'center', gap: 2 }, navText: { color: '#7b8c82', fontSize: 11, fontWeight: '700' }, navTextActive: { color: COLORS.green },
 });

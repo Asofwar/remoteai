@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Switch, Text, View } from 'react-native';
-import { Toast } from '../components/AppToast';
 import type { TotpManagerState } from './types';
 
 export function TotpSyncSettings({ manager }: { manager: TotpManagerState }) {
   const [changing, setChanging] = useState(false);
+  const [feedback, setFeedback] = useState<{ message: string; error: boolean } | null>(null);
   const change = async (enabled: boolean) => {
     setChanging(true);
+    setFeedback(null);
     try {
       await manager.setCloudSyncEnabled(enabled);
-      Toast.success(enabled ? '已开启 2FA 云同步' : '已关闭 2FA 云同步');
+      setFeedback({ message: enabled ? '已开启 2FA 云同步' : '已关闭 2FA 云同步', error: false });
     } catch {
-      Toast.fail(enabled ? '已开启同步，但首次上传失败，请稍后重试' : '关闭 2FA 云同步失败');
+      setFeedback({ message: enabled ? '同步未完成，请稍后重试' : '关闭 2FA 云同步失败，请重试', error: true });
     } finally {
       setChanging(false);
     }
@@ -34,6 +35,9 @@ export function TotpSyncSettings({ manager }: { manager: TotpManagerState }) {
       <Text style={styles.warning}>
         默认关闭。开启后，手机上的敏感密钥会上传并保存到你的云端服务器。
       </Text>
+      {feedback ? <Text accessibilityRole="alert" style={[styles.feedback, feedback.error && styles.error]}>
+        {feedback.message}
+      </Text> : null}
     </View>
   </>;
 }
@@ -60,4 +64,6 @@ const styles = StyleSheet.create({
   title: { color: '#13231c', fontSize: 16, fontWeight: '800' },
   description: { color: '#6f8177', fontSize: 12, lineHeight: 18, marginTop: 6 },
   warning: { color: '#9a6c17', fontSize: 11, lineHeight: 17, marginTop: 13 },
+  feedback: { color: '#14806f', fontSize: 12, lineHeight: 18, marginTop: 12 },
+  error: { color: '#dc5c55' },
 });

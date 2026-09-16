@@ -1,0 +1,28 @@
+import { Ionicons } from '@expo/vector-icons';
+import type { ComponentProps } from 'react';
+import { Pressable, Text, View } from 'react-native';
+import { settingsColors, styles } from './styles';
+
+interface SettingsRowProps {
+  icon: ComponentProps<typeof Ionicons>['name'];
+  color: string;
+  background: string;
+  label: string;
+  value?: string;
+  divider?: boolean;
+  onPress: () => void;
+}
+
+export function SettingsRow({ icon, color, background, label, value, divider, onPress }: SettingsRowProps) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={value ? `${label}，${value}` : label}
+    onPress={onPress} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+    <View style={[styles.icon, { backgroundColor: background }]}>
+      <Ionicons name={icon} size={22} color={color} />
+    </View>
+    <View style={[styles.rowContent, divider && styles.divider]}>
+      <Text style={styles.label}>{label}</Text>
+      {value ? <Text style={styles.value} numberOfLines={1}>{value}</Text> : <View style={styles.spacer} />}
+      <Ionicons name="chevron-forward" size={19} color={settingsColors.muted} />
+    </View>
+  </Pressable>;
+}

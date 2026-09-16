@@ -17,6 +17,13 @@ The plugin is available in the desktop application's community marketplace for t
 
 Controlled webpages display a green cursor favicon. Pausing control, revoking access or navigating
 restores the website's icon. Focusing a minimized Chrome window also restores the window.
+Unless the user explicitly requests an already-open page, the browser instructions require opening
+a new background tab in the dedicated Codex group and continuing in task-created tabs. New tabs
+automatically join a group belonging to the requesting home in their window; existing user tabs and
+same-named user groups are left in place. Opening returns the tab, window and group IDs. A grouping
+failure closes only the newly created tab and reports an error. Bringing a page forward requires
+an explicit user request in the browser instructions. This is an agent instruction, not an access
+restriction on existing tabs; users can still request operations on their own open pages.
 GUI conversations support the upstream MCP tool confirmation form with single-use allow/deny choices;
 site access and tool approval remain separate controls. Chrome webpage tasks prefer the Chrome skill,
 which explicitly checks tool availability instead of assuming that an installed skill provides tools.
@@ -74,6 +81,14 @@ webpage content as untrusted, preserve user tabs and respect permission decision
 are masked in accessible snapshots; screenshots can still contain visible page content.
 
 ## Verification
+
+### 2026-09-16 default grouped pages
+
+The skill, MCP initialization instructions and tool descriptions now require new grouped background
+tabs unless the user explicitly requests an already-open page. Extension tests cover default grouping,
+concurrent opens, separate homes/windows, worker restart, closed/moved groups, foreground requests,
+failure cleanup, cancellation, denied website access and preserving an existing page's group.
+These checks use mocked Chrome APIs; this change has not been verified in a live Chrome session.
 
 ### 2026-09-14 extension setup launch regression
 
@@ -169,6 +184,8 @@ cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
 cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --test codex_switch_lib_tests
 node --test scripts/chrome-plugin.test.mjs scripts/chrome-plugin-snapshot.test.mjs scripts/chrome-plugin-frames.test.mjs
+node scripts/chrome-plugin-tab-groups.test.mjs
+node scripts/chrome-plugin-tab-indicator.test.mjs
 cargo build --manifest-path apps/desktop/src-tauri/Cargo.toml --bin csw
 node --test scripts/chrome-plugin-protocol.test.mjs
 ```

@@ -19,6 +19,7 @@ const ASSETS: &[(&str, &[u8])] = assets![
     "site-access.js",
     "driver.js",
     "tab-indicator.js",
+    "tab-groups.js",
     "frame-sessions.js",
     "snapshot.js",
     "actions.js",

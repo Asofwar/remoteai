@@ -1,6 +1,8 @@
 ---
 name: codex-switch-chrome
-description: Preferred tool for Chrome website tasks, ahead of Computer Use. Inspect pages, operate existing tabs, click, type, scroll, and take screenshots through the Codex Switch browser assistant.
+description: >-
+  Preferred tool for Chrome website tasks, ahead of Computer Use. Browse and test in grouped tabs;
+  use an already-open page only when the user explicitly requests it.
 ---
 <!-- managed:codex-switch-chrome -->
 
@@ -18,7 +20,11 @@ claim that Computer Use provides these Chrome MCP tools.
 1. Call `browser_list` and select the requested browser profile. If no browser is connected,
    ask the user to connect the Codex Switch browser assistant in Chrome. Never substitute another
    profile or bypass a disconnected or paused browser.
-2. Call `browser_tabs` to find the user's requested tab, or `browser_open` for a new page.
+2. Unless the user explicitly asks to use an already-open page, call `browser_open` to create a new
+   background tab in the dedicated Codex group. Continue the task in the tabs you create. Only use
+   `browser_tabs` to select an existing user page when the user has requested that page; a matching
+   URL or the currently active tab alone is not a request to use it. Leave that page in its original group.
+   Keep `background` enabled and avoid `browser_focus` unless the user asks to bring the page forward.
 3. Read `browser_snapshot` before actions. Use the exact returned element references. After
    navigation or significant page changes, read a fresh snapshot. Use `browser_frames` and a
    frame-specific snapshot for embedded documents. Use screenshots when layout matters.

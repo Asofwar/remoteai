@@ -1,6 +1,7 @@
 import { authorize, assertRunning, status } from './permissions.js';
 import { validate, website } from './validation.js';
 import { withTab } from './driver.js';
+import { groupNewTab } from './tab-groups.js';
 import { snapshot, frames, invalidate } from './snapshot.js';
 import * as actions from './actions.js';
 
@@ -18,14 +19,26 @@ export async function execute(context, request) {
 
 async function listTabs() {
   const tabs = await chrome.tabs.query({});
-  return { tabs: tabs.map(({ id, windowId, url, title, active }) => ({ tabId: id, windowId, url, title, active })) };
+  return { tabs: tabs.map(({ id, windowId, groupId, url, title, active }) =>
+    ({ tabId: id, windowId, groupId, url, title, active })) };
 }
 
 async function open(context, args) {
   const url = website(args.url).href;
   await authorize(url, context.clientId, context.signal);
-  const tab = await chrome.tabs.create({ url, active: args.background === false });
-  return { tabId: tab.id, url };
+  const tab = await chrome.tabs.create({ url, active: false });
+  try {
+    const groupId = await groupNewTab(context.clientId, tab);
+    assertRunning(context.signal);
+    if (args.background === false) await chrome.tabs.update(tab.id, { active: true });
+    return { tabId: tab.id, windowId: tab.windowId, groupId, url };
+  } catch {
+    // A failed open must not leave an ungrouped task tab mixed in with the user's pages.
+    try { await chrome.tabs.remove(tab.id); }
+    catch { throw new Error('未能完成标签分组，请检查新打开的标签页后重试。'); }
+    assertRunning(context.signal);
+    throw new Error('未能打开分组标签页，请重试。');
+  }
 }
 
 async function tabAction(context, operation, args) {

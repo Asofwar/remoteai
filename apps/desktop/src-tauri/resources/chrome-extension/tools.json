@@ -17,7 +17,7 @@
     },
     {
       "name": "browser_tabs",
-      "description": "List existing tabs in the selected Chrome profile.",
+      "description": "List tabs and groups. Use an existing user page only when requested; otherwise use browser_open.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -39,7 +39,7 @@
     },
     {
       "name": "browser_open",
-      "description": "Open an HTTP(S) page in Chrome within the user's granted website access.",
+      "description": "Open a background page in the Codex group. Use unless the user requests an already-open page.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -53,6 +53,7 @@
           },
           "background": {
             "type": "boolean",
+            "description": "Keep true unless the user asks to bring the page forward.",
             "default": true
           }
         },
@@ -215,7 +216,7 @@
     },
     {
       "name": "browser_focus",
-      "description": "focus the explicitly selected Chrome tab.",
+      "description": "Bring a tab and window forward, only when the user explicitly asks.",
       "inputSchema": {
         "type": "object",
         "properties": {

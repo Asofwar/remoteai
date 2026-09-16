@@ -1,14 +1,10 @@
 import {
-  Download,
-  Github,
-  MessageSquareText,
-  RotateCcw,
-  Server,
-  ShieldCheck,
-  X,
+  ArrowRight, Download, Github, Heart, MessageSquareText, RotateCcw, Scale, Server, ShieldCheck, X,
 } from "lucide-react";
 import type { Translate } from "../../../i18n";
 import type { HelpVersionState } from "../HelpModal";
+import { AboutHero } from "./AboutHero";
+import { AboutVersionPanel } from "./AboutVersionPanel";
 import styles from "./index.module.less";
 
 interface AboutModalProps {
@@ -22,116 +18,64 @@ interface AboutModalProps {
   t: Translate;
 }
 
-function versionStatusLabel(state: HelpVersionState, t: Translate) {
-  if (state.status === "latest") return t("help.version.latest");
-  if (state.status === "available") return t("help.version.available", { version: state.latestVersion });
-  if (state.status === "error") return t("help.version.error");
-  return t("help.version.checking");
+function AboutPrinciples({ t }: { t: Translate }) {
+  const principles = [
+    { name: "local", icon: ShieldCheck, title: t("about.local.title"), description: t("about.local.description") },
+    { name: "workflow", icon: RotateCcw,
+      title: t("about.workflow.title"), description: t("about.workflow.description") },
+    { name: "ecosystem", icon: Server,
+      title: t("about.ecosystem.title"), description: t("about.ecosystem.description") },
+  ];
+  return <div className="about-principles">
+    {principles.map(({ name, icon: Icon, title, description }) => (
+      <article key={name} className={`about-principle about-principle-${name}`}>
+        <div className="about-principle-icon"><Icon aria-hidden="true" strokeWidth={1.9} /></div>
+        <div className="about-principle-copy"><h3>{title}</h3><p>{description}</p></div>
+      </article>
+    ))}
+  </div>;
 }
 
-export function AboutModal({
-  logoUrl,
-  onClose,
-  onFeedback,
-  onOpenRepository,
-  onUpdate,
-  version,
-  versionState,
-  t,
-}: AboutModalProps) {
-  const principles = [
-    {
-      icon: <ShieldCheck size={18} />,
-      title: t("about.local.title"),
-      description: t("about.local.description"),
-    },
-    {
-      icon: <RotateCcw size={18} />,
-      title: t("about.workflow.title"),
-      description: t("about.workflow.description"),
-    },
-    {
-      icon: <Server size={18} />,
-      title: t("about.ecosystem.title"),
-      description: t("about.ecosystem.description"),
-    },
-  ];
+function AboutLegal({ t }: { t: Translate }) {
+  return <footer className="about-legal">
+    <Scale className="about-license-icon" aria-hidden="true" strokeWidth={1.7} />
+    <div className="about-legal-copy">
+      <strong>{t("about.license")}</strong>
+      <p>{t("about.disclaimer")}</p>
+    </div>
+    <div className="about-signoff">
+      <span>Made with</span><Heart aria-label={t("about.madeWithLove")} /><span>for a more open AI future.</span>
+    </div>
+  </footer>;
+}
 
+export function AboutModal({ logoUrl, onClose, onFeedback, onOpenRepository, onUpdate,
+  version, versionState, t }: AboutModalProps) {
   return (
     <div className={`${styles.styleScope} modal-backdrop`} onClick={onClose}>
-      <section
-        className="modal about-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="about-modal-title"
-        onClick={(event) => event.stopPropagation()}
-      >
+      <section className="modal about-modal" role="dialog" aria-modal="true"
+        aria-labelledby="about-modal-title" onClick={(event) => event.stopPropagation()}>
         <button type="button" className="modal-close" aria-label={t("about.close")} onClick={onClose}>
-          <X size={19} />
+          <X aria-hidden="true" strokeWidth={1.5} />
         </button>
-
-        <header className="about-hero">
-          <div className="about-brand-mark">
-            <img src={logoUrl} alt="" />
-          </div>
-          <div className="about-brand-copy">
-            <span>{t("about.eyebrow")}</span>
-            <h2 id="about-modal-title">Codex Switch</h2>
-            <p>{t("about.tagline")}</p>
-          </div>
-          <div className="about-badges" aria-label={t("about.badges")}>
-            <span>{t("about.badge.local")}</span>
-            <span>{t("about.badge.desktop")}</span>
-            <span>Apache-2.0</span>
-          </div>
-        </header>
-
+        <AboutHero logoUrl={logoUrl} t={t} />
         <div className="about-body">
-          <p className="about-introduction">{t("about.description")}</p>
-
-          <div className="about-principles">
-            {principles.map((principle) => (
-              <article key={principle.title}>
-                <div>{principle.icon}</div>
-                <span>
-                  <b>{principle.title}</b>
-                  <small>{principle.description}</small>
-                </span>
-              </article>
-            ))}
-          </div>
-
-          <div className="about-version-panel">
-            <div>
-              <span>{t("about.currentVersion")}</span>
-              <b>v{version}</b>
-            </div>
-            <span className={`help-version-status ${versionState.status}`} role="status" aria-live="polite">
-              {versionStatusLabel(versionState, t)}
-            </span>
-          </div>
-
+          <AboutPrinciples t={t} />
+          <AboutVersionPanel version={version} state={versionState} t={t} />
           <div className="about-actions">
-            <button type="button" onClick={onOpenRepository}>
-              <Github size={15} />
-              {t("about.repository")}
+            <button type="button" className="about-repository" onClick={onOpenRepository}>
+              <Github aria-hidden="true" />{t("about.repository")}<ArrowRight aria-hidden="true" />
             </button>
             <button type="button" onClick={onFeedback}>
-              <MessageSquareText size={15} />
-              {t("help.feedback")}
+              <MessageSquareText aria-hidden="true" />{t("help.feedback")}<ArrowRight aria-hidden="true" />
             </button>
             {versionState.status === "available" && (
-              <button type="button" className="primary" onClick={onUpdate}>
-                <Download size={15} />
-                {t("update.download")}
+              <button type="button" className="about-update" onClick={onUpdate}>
+                <Download aria-hidden="true" />{t("update.download")}
               </button>
             )}
           </div>
-
-          <footer className="about-legal">
-            <span>{t("about.license")}</span>
-            <p>{t("about.disclaimer")}</p>
-          </footer>
+          <AboutLegal t={t} />
         </div>
       </section>
     </div>

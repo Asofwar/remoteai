@@ -1,13 +1,13 @@
 use super::super::home_migration::{migrate_between_homes, HomeMigrationError};
 use super::*;
 
-fn source_fixture() -> Fixture {
+pub(super) fn source_fixture() -> Fixture {
     let fixture = Fixture::new();
     fixture.sql(STATE, "DELETE FROM thread_spawn_edges");
     fixture
 }
 
-fn migrate(
+pub(super) fn migrate(
     source: &Fixture,
     target: &Fixture,
     ids: &[&str],
@@ -96,16 +96,15 @@ fn same_home_alias_and_empty_selection_are_rejected_without_writes() {
 }
 
 #[test]
-fn unselected_dependent_conversation_blocks_migration() {
+fn stale_spawn_edge_does_not_block_migration() {
     let source = Fixture::new();
     let target = source_fixture();
     target.discard();
-    let before = source.dump(THREAD);
-    assert!(matches!(
-        migrate(&source, &target, &[THREAD]),
-        Err(HomeMigrationError::Dependencies)
-    ));
-    assert_eq!(source.dump(THREAD), before);
+    assert_eq!(
+        migrate(&source, &target, &[THREAD]).unwrap().migrated_count,
+        1
+    );
+    source.assert_removed();
 }
 
 #[test]

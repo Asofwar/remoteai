@@ -16,8 +16,8 @@ pub(super) enum HomeMigrationError {
     EmptySelection,
     #[error("Codex Home 暂不可用，请确认目录存在后重试")]
     Unavailable,
-    #[error("请将有关联的会话一起选择后迁移")]
-    Dependencies,
+    #[error("关联会话的历史记录不完整，请先恢复缺失的会话后重试")]
+    MissingHistory,
     #[error("已迁移 {completed} 条会话，其余未完成。请关闭相关会话后重试；未完成的会话可在原目录或回收站中找到")]
     Incomplete { completed: usize },
 }
@@ -53,39 +53,17 @@ fn migration_candidates(
     target: &Path,
     requested: &HashSet<String>,
 ) -> Result<Vec<RolloutSnapshot>, HomeMigrationError> {
-    let failed = |detail: String| {
+    super::home_migration_plan::plan_home_migration(source, target, requested).map_err(|detail| {
         eprintln!("Could not prepare home migration: {detail}");
-        HomeMigrationError::Incomplete { completed: 0 }
-    };
-    let all = merge_bin_snapshots(gather_snapshots(source).map_err(failed)?);
-    let existing = live_bin_thread_ids(target).map_err(failed)?;
-    let state = latest_state_db(target);
-    let mut candidates = Vec::new();
-    for snapshot in all
-        .iter()
-        .filter(|item| requested.contains(&item.session_id))
-    {
-        if existing.contains(&snapshot.session_id)
-            || snapshot_thread_row(state.as_deref(), &snapshot.session_id)
-                .map_err(failed)?
-                .is_some()
-        {
-            continue;
+        match detail {
+            super::home_migration_plan::MigrationPlanError::MissingHistory => {
+                HomeMigrationError::MissingHistory
+            }
+            super::home_migration_plan::MigrationPlanError::Storage(_) => {
+                HomeMigrationError::Incomplete { completed: 0 }
+            }
         }
-        if !snapshot.physical_paths.iter().any(|path| {
-            bin_rollout_relative(path, source).is_ok_and(|relative| target.join(relative).exists())
-        }) {
-            candidates.push(snapshot.clone());
-        }
-    }
-    let moving = candidates
-        .iter()
-        .map(|item| item.session_id.clone())
-        .collect();
-    ensure_threads_are_not_referenced(&all, &moving, latest_state_db(source).as_deref())
-        .map_err(|_| HomeMigrationError::Dependencies)?;
-    ensure_export_dependencies(&candidates).map_err(|_| HomeMigrationError::Dependencies)?;
-    Ok(candidates)
+    })
 }
 
 pub(super) fn migrate_between_homes(
@@ -100,55 +78,28 @@ pub(super) fn migrate_between_homes(
         return Err(HomeMigrationError::EmptySelection);
     }
     let snapshots = migration_candidates(source, target, &requested)?;
+    let completed = snapshots.len();
+    let selected_count = snapshots
+        .iter()
+        .filter(|item| requested.contains(&item.session_id))
+        .count();
+    let skipped = requested.len() - selected_count;
     let batch = bin.join(format!("home-migration-{}", Uuid::new_v4()));
-    let mut completed = 0;
-    for snapshot in snapshots {
-        if let Err(error) = migrate_home_snapshot(source, target, &batch, snapshot) {
-            eprintln!("Home migration stopped after {completed} sessions: {error}");
-            return Err(HomeMigrationError::Incomplete { completed });
+    if !snapshots.is_empty() {
+        if let Err(error) =
+            super::home_migration_batch::migrate_home_batch(source, target, &batch, snapshots)
+        {
+            eprintln!("Home migration batch failed: {error}");
+            return Err(HomeMigrationError::Incomplete { completed: 0 });
         }
-        completed += 1;
     }
     Ok(MigrationReport {
         requested_count: requested.len(),
         migrated_count: completed,
-        skipped_count: requested.len() - completed,
+        skipped_count: skipped,
         message: format!(
-            "已迁移 {completed} 条会话，跳过 {} 条",
-            requested.len() - completed
+            "已迁移 {completed} 条会话（含 {} 条关联会话），跳过 {skipped} 条所选会话",
+            completed - selected_count
         ),
     })
-}
-
-fn migrate_home_snapshot(
-    source: &Path,
-    target: &Path,
-    batch: &Path,
-    snapshot: RolloutSnapshot,
-) -> Result<(), String> {
-    let id = snapshot.session_id.clone();
-    discard_thread_snapshot(source, batch, snapshot)?;
-    let root = batch
-        .parent()
-        .ok_or_else(|| "迁移备份位置无效".to_string())?;
-    let item = collect_bin_entries_at(root)?
-        .into_iter()
-        .find(|item| item.folder.parent() == Some(batch) && item.manifest.session_id == id)
-        .ok_or_else(|| "无法读取迁移备份".to_string())?;
-    match recover_bin_snapshot(target, &item) {
-        Ok(true) => Ok(()),
-        result => {
-            // Recovery rolls target writes back before returning an error. Restore
-            // the source too; if either rollback fails the durable bin remains available.
-            let error = result
-                .err()
-                .unwrap_or_else(|| "目标已有相同会话".to_string());
-            let rollback = recover_bin_snapshot(source, &item).and_then(|restored| {
-                restored
-                    .then_some(())
-                    .ok_or_else(|| "原目录已有相同会话，备份已保留".to_string())
-            });
-            Err(with_bin_rollback_error(error, rollback))
-        }
-    }
 }

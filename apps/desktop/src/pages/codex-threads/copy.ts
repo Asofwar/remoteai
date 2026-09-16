@@ -15,7 +15,7 @@ export const threadCopy = {
     moveToHome: "迁移到 Codex Home",
     homeMigrationTarget: "选择目标 Codex Home",
     homeMigrationHint: "将所选 {count} 条会话移至另一个 Codex Home，保留对话记录和项目路径。"
-      + "已有相同会话时会跳过。请先结束这些会话中正在进行的任务。",
+      + "关联会话会一并迁移，目标已有的会话会跳过，原目录仍需使用的历史记录会保留。请先结束相关任务。",
     startHomeMigration: "开始迁移",
     noMigrationHome: "请先在设置中添加另一个 Codex Home。",
     sync: "同步会话",
@@ -101,7 +101,7 @@ export const threadCopy = {
     moveToHome: "Move to Codex Home",
     homeMigrationTarget: "Choose a destination Codex Home",
     homeMigrationHint: "Move {count} selected sessions to another Codex Home, keeping their history and project paths. "
-      + "Existing sessions are skipped. Finish any tasks running in these sessions first.",
+      + "Related sessions are included. Existing sessions and required source history are kept. Finish related tasks first.",
     startHomeMigration: "Start migration",
     noMigrationHome: "Add another Codex Home in Settings first.",
     sync: "Sync sessions",

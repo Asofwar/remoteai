@@ -10,6 +10,9 @@ mod recovery;
 #[path = "home_migration_tests.rs"]
 mod home_migration;
 
+#[path = "home_migration_relation_tests.rs"]
+mod home_migration_relations;
+
 #[test]
 fn selected_home_cannot_list_or_purge_another_homes_bin_entries() {
     let fixture = Fixture::new();

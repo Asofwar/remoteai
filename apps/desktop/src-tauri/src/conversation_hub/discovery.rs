@@ -204,7 +204,13 @@ fn gather_snapshots(codex_home: &Path) -> Result<Vec<RolloutSnapshot>, String> {
             .sum();
         let history_base_thread_id = snapshot_reference_id(&meta, "history_base");
         let parent_thread_id = snapshot_reference_id(&meta, "parent_thread_id")
-            .or_else(|| snapshot_reference_id(&meta, "parent_thread"));
+            .or_else(|| snapshot_reference_id(&meta, "parent_thread"))
+            .or_else(|| snapshot_reference_id(&meta, "forked_from_id"))
+            .or_else(|| {
+                meta.pointer("/payload/source/subagent/thread_spawn/parent_thread_id")
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+            });
         snapshots.push(RolloutSnapshot {
             session_id,
             title,

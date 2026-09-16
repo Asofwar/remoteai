@@ -1,6 +1,7 @@
 import { SessionCipher } from './cipher';
 import { Assembler } from './framing';
 import { SendQueue } from './sendQueue';
+import type { TransferProgress } from './uploadProgress';
 import {
   DIRECT_TIMEOUT_MS, RELAY_START_GRACE_MS, MAX_BUFFER_BYTES, type Channel, type ConnectionMode,
   type Peer, type RpcMessage, type Signal,
@@ -20,11 +21,12 @@ class LegacyChatLink {
   private closed = false;
   private readonly outgoing = new SendQueue({ capacity: () => this.waitForCapacity(),
     mode: () => this.mode,
-    send: (part) => {
+    send: (part, delivered) => {
       if (!this.cipher) throw new Error('正在连接电脑。');
       const payload = this.cipher.encrypt(part);
       if (this.relay) this.signal({ type: 'relay', payload });
       else this.channel!.send(payload);
+      delivered?.();
     } });
   private readonly startedAt = Date.now();
   private readonly fallbackTimer: ReturnType<typeof setTimeout>;
@@ -122,8 +124,8 @@ class LegacyChatLink {
     }
   }
 
-  send(message: RpcMessage): Promise<void> {
-    return this.outgoing.send(message);
+  send(message: RpcMessage, progress?: TransferProgress): Promise<void> {
+    return this.outgoing.send(message, progress);
   }
 
   private async waitForCapacity() {
@@ -164,7 +166,7 @@ export class ChatLink {
   enableRelay() { this.implementation.enableRelay(); }
   fallback() { this.implementation.fallback(); }
   receive(payload: string) { this.implementation.receive(payload); }
-  send(message: RpcMessage) { return this.implementation.send(message); }
+  send(message: RpcMessage, progress?: TransferProgress) { return this.implementation.send(message, progress); }
   setRelayAvailable(available: boolean) {
     if (this.implementation instanceof HotLink) this.implementation.setRelayAvailable(available);
     else if (!available) this.implementation.close();

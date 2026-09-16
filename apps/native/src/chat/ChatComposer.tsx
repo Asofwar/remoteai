@@ -14,6 +14,8 @@ import { ComposerAddMenu, type ComposerAddAction } from './ComposerAddMenu';
 import { ComposerPopover } from './ComposerPopover';
 import { ComposerPluginMenu } from './ComposerPluginMenu';
 import { ComposerReferences } from './ComposerReferences';
+import { ComposerUploadProgress } from './ComposerUploadProgress';
+import type { UploadProgress } from '../../../../shared/remote-chat/uploadProgress';
 import { ComposerQuotes } from './ComposerQuotes';
 import { useChatQuotes } from './ChatQuotes';
 import { replyWithQuotes } from './replyQuotes';
@@ -37,6 +39,8 @@ import type { QueueProps } from '../../../../shared/remote-chat/client/queueProp
 import { useQueueEditor } from '../../../../shared/remote-chat/client/useQueueEditor';
 
 interface Props {
+  upload?: UploadProgress;
+  reconnecting?: boolean;
   goals?: RemoteGoals;
   goal?: ThreadGoal | null;
   goalBusy?: boolean;
@@ -69,7 +73,7 @@ interface Props {
 
 export function ChatComposer({ models, selection, settingsBusy, settingsError, updateSettings,
   readUsage, usageActive, tokenUsage, contextSettings, queue, goals, goal, goalBusy,
-  threadId, active, ready, sending, running, interrupted = false, send, interrupt,
+  threadId, active, ready, sending, running, upload, reconnecting = false, interrupted = false, send, interrupt,
   catalog, cwd, compactReason, compacting, compact, loadCatalog, loadFiles }: Props) {
   const [settings, setSettings] = useState(false);
   const goalMode = useGoalMode(threadId, sending);
@@ -168,6 +172,7 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
     {!!(attachmentError || attachments.error) && <Text accessibilityRole="alert" style={styles.error}>
       {attachmentError || attachments.error}</Text>}
     {attachments.busy && <Text style={styles.status}>正在读取文件…</Text>}
+    <ComposerUploadProgress progress={sending ? upload : undefined} reconnecting={reconnecting} />
     {(adding || menu.open) && <ComposerPopover anchor={anchor} anchorHeight={anchorHeight} wide={!adding}
       close={() => { setAdding(false); menu.close(); }}>
       {menuContent()}

@@ -32,6 +32,31 @@ async function connectedController() {
 }
 
 describe('mobile chat actions', () => {
+  it.each([true, false])('clears upload progress after sending finishes (success=%s)', async (success) => {
+    const controller = await connectedController();
+    mocks.request.mockResolvedValue({ thread });
+    await controller.select(thread);
+    let finish: () => void = () => {};
+    mocks.request.mockImplementation(() => new Promise((resolve, reject) => {
+      finish = () => success ? resolve(undefined) : reject(new Error('上传失败'));
+    }));
+    const sending = controller.send({ text: 'file', access: 'read-only',
+      attachments: [{ kind: 'file', name: 'test.txt', path: '', data: 'YWJj' }] });
+    expect(controller.snapshot().upload).toEqual({ phase: 'preparing', percent: 0 });
+    mocks.events?.upload?.({ phase: 'uploading', percent: 45 });
+    expect(controller.snapshot().upload?.percent).toBe(45);
+    expect(await controller.send({ text: 'duplicate', access: 'read-only' })).toBe(false);
+    mocks.events?.upload?.({ phase: 'confirming', percent: 100 });
+    expect(controller.snapshot().sending).toBe(true);
+    finish();
+    expect(await sending).toBe(success);
+    expect(controller.snapshot().upload).toBeUndefined();
+    expect(controller.snapshot().sending).toBe(false);
+    mocks.events?.upload?.({ phase: 'uploading', percent: 60 });
+    expect(controller.snapshot().upload).toBeUndefined();
+    controller.stop();
+  });
+
   it('reopens expanded history at the latest page and can still load earlier messages', async () => {
     const controller = await connectedController();
     const history: Thread = { ...thread, turns: [{ id: 'long-turn', status: 'completed',

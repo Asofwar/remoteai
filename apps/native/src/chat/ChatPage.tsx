@@ -180,6 +180,7 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
       settingsBusy={state.settingsBusy} settingsError={state.settingsError}
       updateSettings={(settings) => controller.setSettings(settings)}
       active={active} ready={ready} sending={state.sending} running={running}
+      upload={state.upload} reconnecting={state.mode === 'connecting' || state.mode === 'offline'}
       send={(input) => controller.send(input)} interrupted={state.selected?.turns?.at(-1)?.status === 'interrupted'}
       interrupt={() => controller.interrupt()} />
     {pickingDevice && <ChatDevices devices={devices} onClose={() => setPickingDevice(false)}

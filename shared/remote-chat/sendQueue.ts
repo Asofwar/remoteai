@@ -1,11 +1,13 @@
 import { chunks } from './framing';
 import type { ConnectionMode, RpcMessage } from './protocol';
+import type { TransferProgress } from './uploadProgress';
 
 const MAX_QUEUED_MESSAGES = 512;
 // The receiver allows eight partial assemblies. Reserve one for ordered events/requests.
 const INTERLEAVED_RESPONSES = 4;
 const UI_WORK_SLICE_MS = 8;
 interface Pending {
+  progress?: TransferProgress;
   parts: Generator<string>;
   resolve: () => void;
   reject: (error: unknown) => void;
@@ -20,17 +22,18 @@ export class SendQueue {
   private closed = false;
 
   constructor(private readonly transport: {
-    capacity: () => Promise<void>; send: (part: string) => void; mode?: () => ConnectionMode;
+    capacity: () => Promise<void>; send: (part: string, delivered?: () => void) => void;
+    mode?: () => ConnectionMode;
   }) {}
 
-  send(message: RpcMessage): Promise<void> {
+  send(message: RpcMessage, progress?: TransferProgress): Promise<void> {
     if (this.closed) return Promise.reject(new Error('电脑已断开连接。'));
     if (this.ordered.length + this.responses.length >= MAX_QUEUED_MESSAGES) {
       return Promise.reject(new Error('连接繁忙，请稍后重试。'));
     }
     const result = new Promise<void>((resolve, reject) => {
       const queue = message.kind === 'response' ? this.responses : this.ordered;
-      queue.push({ parts: chunks(message, String(++this.serial), this.transport.mode?.()), resolve, reject });
+      queue.push({ parts: chunks(message, String(++this.serial), this.transport.mode?.()), resolve, reject, progress });
     });
     if (!this.running) void this.drain();
     return result;
@@ -61,12 +64,18 @@ export class SendQueue {
     try {
       const part = pending.parts.next();
       if (part.done) { queue.shift(); pending.resolve(); return; }
-      this.transport.send(part.value);
+      this.transport.send(part.value, this.deliveryProgress(part.value, pending.progress));
       if (queue === this.responses) {
         queue.shift();
         queue.splice(Math.min(INTERLEAVED_RESPONSES - 1, queue.length), 0, pending);
       }
     } catch (error) { queue.shift(); pending.reject(error); }
+  }
+
+  private deliveryProgress(part: string, progress?: TransferProgress) {
+    if (!progress) return undefined;
+    const { index, total } = JSON.parse(part) as { index: number; total: number };
+    return () => progress((index + 1) / total);
   }
 
   private rejectPending(error: unknown) {

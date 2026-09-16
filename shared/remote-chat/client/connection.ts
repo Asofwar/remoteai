@@ -2,12 +2,14 @@ import { CHAT_POLICY_MESSAGE, setChatConnectionMode, setChatPolicy } from '../po
 import { keyPair } from '../cipher';
 import { ChatLink } from '../link';
 import { ChatRpc } from '../rpc';
+import { hasUpload, uploadProgress, type UploadProgress } from '../uploadProgress';
 import { authorizationError, CONNECTION_ERRORS, socketConnectionError } from '../connectionErrors';
 import {
   chatSocketUrl, parseMessage, type ConnectionMode, type IceServer, type RpcRequest, type Signal,
 } from '../protocol';
 
 export interface ConnectionEvents {
+  upload?: (progress: UploadProgress) => void;
   mode: (mode: ConnectionMode) => void;
   ready: () => void;
   event: (event: unknown) => void;
@@ -163,7 +165,7 @@ export class ChatConnection {
   }) {
     if (this.link) throw new Error('Already paired');
     this.rpc = new ChatRpc({ prefix: input.keys.publicKey.slice(0, 24),
-      send: (message) => this.link!.send(message), event: this.options.event });
+      send: (message, progress) => this.link!.send(message, progress), event: this.options.event });
     this.link = new ChatLink({
       sessionId: input.id, desktop: false, secret: input.keys.secret, iceServers: input.iceServers,
       transportVersion: input.transportVersion, reconnectRelay: () => this.fail(CONNECTION_ERRORS.network, true),
@@ -194,7 +196,13 @@ export class ChatConnection {
 
   request<T>(method: RpcRequest['method'], body?: unknown): Promise<T> {
     if (!this.rpc) return Promise.reject(new Error('请先连接电脑。'));
-    return this.rpc.request<T>(method, body);
+    let lastPercent = -1;
+    return this.rpc.request<T>(method, body, method === 'request' && hasUpload(body) ? (fraction) => {
+      const progress = uploadProgress(fraction);
+      if (progress.percent === lastPercent) return;
+      lastPercent = progress.percent;
+      this.options.upload?.(progress);
+    } : undefined);
   }
 
   private disconnected() {

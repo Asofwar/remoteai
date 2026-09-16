@@ -4,7 +4,7 @@ const WINDOW_SIZE = 64;
 const RETRY_MS = 800;
 const DELIVERY_TIMEOUT_MS = 60_000;
 const MAX_FRAME_CHARS = 16_000;
-interface Pending { text: string; created: number; sent: number }
+interface Pending { text: string; created: number; sent: number; delivered?: () => void }
 
 /** An ordered, bounded stream independent of the path and encryption nonce sequence. */
 export class ReliableDelivery {
@@ -20,9 +20,9 @@ export class ReliableDelivery {
 
   get full() { return this.pending.size >= WINDOW_SIZE; }
 
-  enqueue(text: string) {
+  enqueue(text: string, delivered?: () => void) {
     if (this.full || text.length > MAX_FRAME_CHARS) throw new Error('连接繁忙，请稍后重试。');
-    this.pending.set(++this.sequence, { text, created: Date.now(), sent: 0 });
+    this.pending.set(++this.sequence, { text, created: Date.now(), sent: 0, delivered });
     this.flush();
   }
 
@@ -32,7 +32,11 @@ export class ReliableDelivery {
     const value = Number(sequence);
     if (frame.kind === 'ack') {
       if (value > this.sequence) throw new Error('Invalid acknowledgement');
-      for (const id of this.pending.keys()) if (id <= value) this.pending.delete(id);
+      for (const [id, entry] of this.pending) {
+        if (id > value) break;
+        this.pending.delete(id);
+        entry.delivered?.();
+      }
       return;
     }
     if (frame.kind !== 'data' || value < 1 || value > this.received + WINDOW_SIZE

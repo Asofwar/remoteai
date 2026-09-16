@@ -12,6 +12,7 @@ import { ImageCache } from './imageCache';
 import { OfflineWriter, type OfflineHistoryStore } from './offline';
 import { offlineImage } from './offlineImages';
 import { validateChatImages } from '../attachments';
+import { hasUpload } from '../uploadProgress';
 import { compactUnavailableReason } from './composerCommands';
 import type { ConnectionMode } from '../protocol';
 import { chatApprovals, chatHandshake } from '../handshake';
@@ -86,6 +87,7 @@ export class ChatController {
       // Resuming the coordinator socket must not replace a pending GUI initialization deadline.
       retryAt: (retryAt) => { if (!this.transportConnected) this.update({ retryAt }); },
       event: (event) => this.receive(event as GuiEvent),
+      upload: (upload) => { if (this.state.sending) this.update({ upload }); },
     });
   }
 
@@ -505,7 +507,8 @@ export class ChatController {
       effort: input.effort ?? this.state.settings.effort, access: input.access };
     const message = { ...input, ...(selection.model ? { model: selection.model } : {}),
       ...(selection.effort ? { effort: selection.effort } : {}) };
-    this.update({ sending: true, error: '' });
+    this.update({ sending: true, error: '',
+      upload: hasUpload(input) ? { phase: 'preparing', percent: 0 } : undefined });
     try {
       let thread = this.state.selected;
       const created = !thread;
@@ -528,7 +531,7 @@ export class ChatController {
       void this.refreshSelected();
       return true;
     } catch (error) { this.failure(error); return false; }
-    finally { this.update({ sending: false }); }
+    finally { this.update({ sending: false, upload: undefined }); }
   }
 
   answerAsyncQuestion = (item: import('./types').Item, answers: string[]) => this.asyncAnswers.submit(item, answers);

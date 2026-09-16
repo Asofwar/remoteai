@@ -2,6 +2,7 @@ import { SessionCipher } from './cipher';
 import { ReliableDelivery, deliveryFrame } from './delivery';
 import { Assembler } from './framing';
 import { SendQueue } from './sendQueue';
+import type { TransferProgress } from './uploadProgress';
 import { HotPeer } from './hotPeer';
 import { Acknowledgements } from './acknowledgements';
 import { DirectPackets, directPackets } from './directPackets';
@@ -45,7 +46,7 @@ export class HotLink {
   private readonly probes = new Map<number, { path: Path; at: number }>();
   private readonly outgoing = new SendQueue({ capacity: () => this.capacity(),
     mode: () => this.mode,
-    send: (part) => this.delivery.enqueue(part) });
+    send: (part, delivered) => this.delivery.enqueue(part, delivered) });
   private readonly capacityWaiters = new Set<() => void>();
 
   constructor(private readonly options: LinkOptions) {
@@ -213,8 +214,8 @@ export class HotLink {
     this.choose();
   }
 
-  send(message: RpcMessage): Promise<void> {
-    return this.outgoing.send(message);
+  send(message: RpcMessage, progress?: TransferProgress): Promise<void> {
+    return this.outgoing.send(message, progress);
   }
 
   private async capacity() {

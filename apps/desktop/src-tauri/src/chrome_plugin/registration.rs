@@ -1,4 +1,4 @@
-use super::{BrowserError, Result, EXTENSION_ID, HOST_NAME};
+use super::{identity, BrowserError, Result, HOST_NAME};
 use serde_json::json;
 use std::{
     fs,
@@ -12,7 +12,7 @@ fn manifest(root: &Path) -> PathBuf {
 pub(super) fn register(root: &Path, executable: &Path) -> Result<()> {
     let path = manifest(root);
     let content = json!({"name":HOST_NAME,"description":"Codex Switch browser assistant",
-        "path":executable,"type":"stdio","allowed_origins":[format!("chrome-extension://{}/",EXTENSION_ID.trim())]});
+        "path":executable,"type":"stdio","allowed_origins":identity::allowed_origins()});
     crate::storage::write_json_atomic(&path, &content).map_err(|_| BrowserError::Storage)?;
     platform::register(&path)
 }

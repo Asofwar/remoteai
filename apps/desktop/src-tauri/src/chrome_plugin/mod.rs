@@ -2,6 +2,7 @@
 pub(crate) mod commands;
 mod config;
 mod extension;
+mod identity;
 mod install;
 mod mcp;
 mod native;
@@ -13,7 +14,6 @@ mod transport;
 use std::path::PathBuf;
 
 const HOST_NAME: &str = "dev.codex_switch.chrome";
-const EXTENSION_ID: &str = include_str!("../../resources/chrome-extension/extension-id.txt");
 const PLUGIN_VERSION: &str = "1.2.0";
 const MCP_SERVER: &str = "codex_switch_chrome";
 
@@ -65,11 +65,13 @@ fn bridge_root() -> Result<PathBuf> {
 /// Native Messaging and MCP are separate process modes and never initialize a WebView.
 pub(crate) fn run_helper() -> bool {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
-    let expected_origin = format!("chrome-extension://{}/", EXTENSION_ID.trim());
+    let is_native = args
+        .first()
+        .is_some_and(|arg| identity::is_allowed_origin(arg));
     #[cfg(windows)]
     if args
         .first()
-        .is_some_and(|arg| arg == &expected_origin || arg.starts_with("--chrome-mcp="))
+        .is_some_and(|arg| is_native || arg.starts_with("--chrome-mcp="))
     {
         // STDIO helpers have no message loop and can be blocked waiting for their client.
         if let Err(error) = crate::installer_lifecycle::watch(|| std::process::exit(0)) {
@@ -77,7 +79,7 @@ pub(crate) fn run_helper() -> bool {
             return true;
         }
     }
-    let result = if args.first() == Some(&expected_origin) {
+    let result = if is_native {
         bridge_root().and_then(native::run)
     } else if let Some(client_id) = args
         .first()

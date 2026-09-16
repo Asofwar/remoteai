@@ -81,10 +81,14 @@ it("keeps navigation local and pins community and built-in plugin operations to 
   expect(backend.invoke).toHaveBeenCalledWith("computer_use_status", { homeId: GUI_CODEX_HOME_ID });
   await act(async () => card(community.title).querySelector<HTMLButtonElement>(".skill-install-button")!.click());
   expect(backend.installMarketSkill).toHaveBeenCalledWith(community, GUI_CODEX_HOME_ID);
-  const builtinCards = [...container.querySelectorAll<HTMLElement>(".skill-card")].slice(0, 2);
-  await act(async () => builtinCards[0].querySelector<HTMLButtonElement>(".skill-install-button")!.click());
-  await act(async () => builtinCards[1].querySelector<HTMLButtonElement>(".skill-install-button")!.click());
-  expect(backend.invoke).toHaveBeenCalledWith("chrome_plugin_action", { homeId: GUI_CODEX_HOME_ID, action: "install" });
+  expect(backend.invoke).toHaveBeenCalledWith("chrome_plugin_action", {
+    homeId: GUI_CODEX_HOME_ID, action: "ensureInstalled",
+  });
+  await act(async () => card("Chrome 浏览器助手")
+    .querySelector<HTMLButtonElement>(".official-plugin-toggle")!.click());
+  await act(async () => card("Computer Use 电脑助手")
+    .querySelector<HTMLButtonElement>(".skill-install-button")!.click());
+  expect(backend.invoke).toHaveBeenCalledWith("chrome_plugin_action", { homeId: GUI_CODEX_HOME_ID, action: "enable" });
   expect(backend.invoke).toHaveBeenCalledWith("computer_use_action", { homeId: GUI_CODEX_HOME_ID, action: "install" });
 });
 

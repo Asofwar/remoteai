@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FlatList, LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent, ViewToken } from 'react-native';
 import type { ChatMessagesProps } from '../../../../shared/remote-chat/client/messageProps';
 import type { Item } from './types';
+import { useNativeChatScroll } from './useNativeChatScroll';
 
 const SCROLL_EDGE_DISTANCE = 100;
 const SCROLL_OFFSET_TOLERANCE = 1;
@@ -16,6 +17,7 @@ export function useChatScroll<Entry extends { id: string } = Item>(
   { hasMore, loading, loadingMore, loadOlder, latestItemId, bottomPadding }: Options,
 ) {
   const list = useRef<FlatList<Entry>>(null);
+  const nativeScroll = useNativeChatScroll(list, SCROLL_EDGE_DISTANCE);
   const following = useRef(true);
   const scrolling = useRef(false);
   const loadingOlder = useRef(false);
@@ -73,9 +75,11 @@ export function useChatScroll<Entry extends { id: string } = Item>(
   };
   const followLatest = () => {
     if (followFrame.current !== undefined) cancelAnimationFrame(followFrame.current);
+    if (nativeScroll.attached.current) return;
     // Coalesce native layout and content updates, using the final viewport instead of overscrolling.
     followFrame.current = requestAnimationFrame(() => {
       followFrame.current = undefined;
+      if (nativeScroll.attached.current) return;
       if (!following.current || scrolling.current || viewportHeight.current <= 0) return;
       const offset = Math.max(0, contentHeight.current - viewportHeight.current);
       if (Math.abs(offset - position.current) <= SCROLL_OFFSET_TOLERANCE || !list.current) return;
@@ -95,6 +99,7 @@ export function useChatScroll<Entry extends { id: string } = Item>(
   };
   const scrollToBottom = () => {
     following.current = true;
+    nativeScroll.setFollowing(true);
     scrolling.current = false;
     setPreservePosition(false);
     setHistoryBottomSpace(0);
@@ -106,12 +111,13 @@ export function useChatScroll<Entry extends { id: string } = Item>(
     loadingOlder.current = true;
     if (latest.current) {
       following.current = false;
+      nativeScroll.setFollowing(false);
       setPreservePosition(true);
       // Native scroll offsets are clamped to the content height; retain a short conversation's empty tail.
       setHistoryBottomSpace((space) => Math.max(space, viewportHeight.current - contentHeight.current + space));
     }
     try { await loadOlder(); }
-    finally { loadingOlder.current = false; }
+    finally { loadingOlder.current = false; nativeScroll.finishLoadingOlder(); }
   };
   const finishScroll = (event: ScrollEvent) => {
     updateFollowing(event);
@@ -133,6 +139,7 @@ export function useChatScroll<Entry extends { id: string } = Item>(
     presentLatest();
   };
   const onLayout = ({ nativeEvent: { layout } }: LayoutChangeEvent) => {
+    nativeScroll.attach();
     if (viewportHeight.current === layout.height) return;
     viewportHeight.current = layout.height;
     updateScrollButton();
@@ -140,6 +147,7 @@ export function useChatScroll<Entry extends { id: string } = Item>(
     presentLatest();
   };
   const onContentSizeChange = (_width: number, height: number) => {
+    nativeScroll.attach();
     if (contentHeight.current === height) return;
     contentHeight.current = height;
     updateScrollButton();
@@ -147,7 +155,8 @@ export function useChatScroll<Entry extends { id: string } = Item>(
     presentLatest();
   };
   const beginScroll = () => { scrolling.current = true; };
-  return { list, more, preservePosition, historyBottomSpace, initializing: Boolean(latestItemId) && !initialPositionReady,
+  return { list, more, preservePosition: nativeScroll.available || preservePosition, historyBottomSpace,
+    initializing: Boolean(latestItemId) && !initialPositionReady,
     showScrollToBottom, scrollToBottom, onItemLayout, onFooterLayout, onLayout, onContentSizeChange, onScroll,
     onViewableItemsChanged, viewabilityConfig: VIEWABILITY_CONFIG,
     onScrollBeginDrag: beginScroll, onScrollEndDrag: finishScroll,

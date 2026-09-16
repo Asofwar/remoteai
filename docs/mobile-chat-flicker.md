@@ -61,3 +61,62 @@
 
 修复包：`.codex-tmp/phone-history-flicker/CodexSwitch-1.5.10-history-fix.apk`。
 SHA-256：`6c38448389bcf45f6e1b2d3ead914030e0073a8c59fdc37a29b7bf66c295cc28`。
+
+## 实时输出与文件卡片：2026-09-17
+
+本次录屏中的问题发生在任务运行中：连续文字插入到「已编辑 55 个文件」卡片前，
+原生列表先显示变高后的布局，JavaScript 下一帧才滚回底部，卡片因此短暂下移再复位。
+这与上次的图片尺寸变化、键盘裁剪及历史加载遮罩不同。
+
+Android 现在在原生布局更新时保持底部，并在 Fabric 完成整批布局调整后再次校准，
+不再等待 JavaScript 的内容高度回调。手指拖动、惯性滚动及加载旧记录时暂停跟随；
+点击「回到底部」后恢复。原生消息锚点始终启用，避免动态启用时替换被锚定的视图；
+展开的处理分组使用实际消息作为锚点，避免旧页扩展分组时丢失阅读位置。
+iOS 和缺少新原生模块的旧安装包沿用原有滚动逻辑。
+
+### 实机与模拟器证据
+
+使用真实 `ChatMessages`、90 条命令记录、55 个文件差异及每 100ms 追加一次的文字构造独立测试应用。
+它不连接账号或模型，包名为 `com.codexswitch.mobile.scrolltest`，与正式应用分别安装。
+
+- Pixel 9 模拟器：旧逻辑的 414 个可匹配帧中，19 帧发生卡片位移，半分辨率录屏最大变化 29px；
+  初版修复的 431 个可匹配帧位置变化为 0px。
+- 最终版本的完整模拟器回归通过，395 帧中没有卡片位移；上翻阅读期间开关键盘、
+  手动回到底部、纯文字输出以及短处理记录向前分页均通过。
+- Android 14 实体机 2109119BC：最终版本录屏的 562 个可匹配帧位置变化为 0px。
+- 本地证据在 `.codex-tmp/android-flicker-0917/`，包括原录屏抽帧、修复前后视频、位置测量及检查日志。
+  视频不随代码提交。
+
+Android TypeScript 检查、64 个测试文件中的 339 项测试、桌面 TypeScript/Vite 生产构建通过。
+Rust 格式、严格 Clippy 及 1,223 项测试通过（5 项忽略）。Android arm64 Release APK 构建成功，
+正式应用尚未覆盖安装；实体机验证结束后移除了独立测试应用。
+
+修复包：`.codex-tmp/android-flicker-0917/CodexSwitch-1.5.26-android-scroll-fix.apk`。
+SHA-256：`06abf84e3b3075130d9ed5c2da3617191a138113206413aa21a42c759c8fce07`。
+
+### 可重复回归
+
+先配置 JDK 17、Android SDK、`adb` 与 `ffmpeg`，启动 1080×2424 的 Pixel 9 模拟器。
+在 `apps/native` 目录运行以下命令，生成分别安装的测试 APK：
+
+```powershell
+node scripts/expo.cjs prebuild --platform android --no-install
+$env:NODE_ENV = 'production'
+$env:NODE_PATH = "$PWD/node_modules"
+Push-Location android
+.\gradlew.bat assembleRelease -PreactNativeArchitectures=x86_64 --init-script ../e2e/chat-scroll.init.gradle
+Pop-Location
+```
+
+然后在仓库根目录运行：
+
+```powershell
+$env:ANDROID_SERIAL = 'emulator-5580'
+$env:ANDROID_CHAT_OUTPUT = 'android-stream-scroll-regression'
+node apps/desktop/e2e/android-stream-scroll-regression.mjs
+```
+
+测试逐帧检查持续输出时的文件卡片，验证底部和上翻阅读时开关键盘、手动回到底部、
+不带文件卡片的纯文字输出，以及短处理记录的向前分页。
+分析只容忍一物理像素的字体栅格舍入；整行文字跳动会失败。
+结果与视频保存在所选输出目录。正式 APK 应重新运行不带测试 `--init-script` 的构建命令。

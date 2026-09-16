@@ -50,6 +50,8 @@ export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder,
     = useChatScroll<TurnEntry>({ hasMore, loading, loadingMore, loadOlder,
       latestItemId: entries.at(-1)?.id, bottomPadding: styles.messages.padding });
   const refresh = useHistoryRefresh(more, loadingMore);
+  // Expanded group headers can be replaced when an older page extends the group; anchor a message instead.
+  const firstMessageIndex = entries[0]?.kind === 'work' && entries[0].inline ? 1 : 0;
   // Keep live messages visible through completion, including replies that never call tools.
   const showInitialLoading = (!hasObservedLiveTurn && initializing) || (loading && !loadingMore && !entries.length);
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -76,8 +78,8 @@ export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder,
     alwaysBounceVertical
     refreshControl={<RefreshControl {...refresh} colors={[palette.green]} tintColor={palette.green}
       progressBackgroundColor={palette.background} />}
-    // FlatList accounts for the header itself; anchor the first message even in a one-message conversation.
-    maintainVisibleContentPosition={preservePosition ? { minIndexForVisible: 0 } : undefined}
+    // FlatList accounts for the list header itself, including in one-message conversations.
+    maintainVisibleContentPosition={preservePosition ? { minIndexForVisible: firstMessageIndex } : undefined}
     {...scrollHandlers} scrollEventThrottle={100}
     ListHeaderComponent={<View style={hasMore && [styles.historyStatus, styles.messageHeader]}>
       {hasMore && (loadingMore ? <>

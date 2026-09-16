@@ -1,5 +1,5 @@
 .bubble {
-  font-size: 14px;
+  font-size: var(--gui-font-size, 14px);
 }
 
 .attachments {
@@ -53,7 +53,8 @@
   }
 }
 
-.editorError { margin: 0; max-width: 400px; color: #b74b2b; font-size: 12px; white-space: normal; }
+.editorError { margin: 0; max-width: 400px; color: #b74b2b; font-size: calc(var(--gui-font-size, 14px) - 2px);
+  white-space: normal; }
 
 .editorActions {
   display: flex;

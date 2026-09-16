@@ -7,6 +7,7 @@ export function useGuiAutoSwitchSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [dirty, setDirty] = useState(false);
   const revision = useRef(0);
   const pendingSave = useRef(false);
   const load = useCallback(async () => {
@@ -15,7 +16,7 @@ export function useGuiAutoSwitchSettings() {
     setError("");
     try {
       const saved = await loadGuiAutoSwitchSettings();
-      if (request === revision.current) setSettings(saved);
+      if (request === revision.current) { setSettings(saved); setDirty(false); }
     } catch {
       if (request === revision.current) setError("暂时无法读取设置，请重试。");
     } finally {
@@ -38,6 +39,7 @@ export function useGuiAutoSwitchSettings() {
         accounts: settings.accounts.filter((rule) => available.has(rule.accountId)) });
       if (request !== revision.current) return false;
       setSettings(saved);
+      setDirty(false);
       return true;
     } catch {
       if (request === revision.current) setError("设置未保存，请重试。");
@@ -47,9 +49,13 @@ export function useGuiAutoSwitchSettings() {
       if (request === revision.current) setSaving(false);
     }
   };
-  const update = (patch: Partial<GuiAutoSwitchSettings>) =>
+  const update = (patch: Partial<GuiAutoSwitchSettings>) => {
+    setDirty(true);
     setSettings((current) => current ? { ...current, ...patch } : current);
-  const updateAccount = (rule: GuiAutoSwitchAccountRule) =>
+  };
+  const updateAccount = (rule: GuiAutoSwitchAccountRule) => {
+    setDirty(true);
     setSettings((current) => current ? updateGuiAccountRule(current, rule) : current);
-  return { settings, loading, saving, error, load, save, update, updateAccount };
+  };
+  return { settings, loading, saving, dirty, error, load, save, update, updateAccount };
 }

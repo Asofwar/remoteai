@@ -14,7 +14,18 @@ reply. Shared automatic fallback and concurrent account routing do not change th
 The GUI's remaining quota and Provider model choices follow its own selection. All connected GUI browsers
 share this selection, and upstream Codex Switch Providers continue to use the live Codex model catalog.
 
-The gear at the top right of the account list opens **GUI 自动切号设置**. Automatic switching is off by
+The gear at the top right of the account list opens **Codex GUI 设置**, with top tabs for **自动切号**
+and **界面**. The appearance tab changes the conversation font size from 12–24 px (14 px by default),
+with an immediate preview and a reset button. Messages, the composer, code, tool output, and file diffs
+follow the saved size; other Codex Switch pages keep their own typography. Font changes are saved locally
+as soon as they are made, independently of account settings.
+
+Successful GUI turns send a native desktop completion notification, including when another conversation
+is selected or the app is minimized. On Windows, these appear in the system notification area at the
+bottom right, subject to the user's system notification settings. Failed, interrupted, and duplicate
+completion events do not send notifications. Delivery runs outside the UI and protocol reader threads.
+
+Automatic switching is off by
 default and has its own account membership, priorities, quota thresholds, exhaustion toggle, fallback
 Provider, and sequential/concurrent mode. New accounts participate by default after it is enabled;
 these choices never edit the account manager's rules. The list follows the width of the account bar below.

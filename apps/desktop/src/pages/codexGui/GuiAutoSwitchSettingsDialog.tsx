@@ -1,4 +1,5 @@
-import { Button, InputNumber, Modal, Select, Spin, Switch } from "antd";
+import { useState } from "react";
+import { Button, InputNumber, Modal, Select, Spin, Switch, Tabs } from "antd";
 import type { Account, Provider } from "../../types";
 import { accountExpirationDate } from "../../utils/expiration";
 import { maskAccountEmail } from "../../utils/accountPrivacy";
@@ -8,6 +9,7 @@ import {
 import type { GuiAutoSwitchAccountRule, GuiAutoSwitchSettings } from "./autoSwitchSettings";
 import { useGuiAutoSwitchSettings } from "./useGuiAutoSwitchSettings";
 import { GuiAccountUsage } from "./GuiAccountUsage";
+import { GuiAppearanceSettings } from "./GuiAppearanceSettings";
 import styles from "./GuiAutoSwitchSettingsDialog.module.less";
 
 type SettingsEditor = ReturnType<typeof useGuiAutoSwitchSettings>;
@@ -121,26 +123,35 @@ export function GuiAutoSwitchSettingsDialog({ accounts, providers, privacyMode, 
   accounts: Account[]; providers: ProviderChoice[]; privacyMode: boolean; onClose: () => void;
 }) {
   const editor = useGuiAutoSwitchSettings();
-  const save = async () => { if (await editor.save(accounts.map((account) => account.id))) onClose(); };
+  const [tab, setTab] = useState("accounts");
+  const save = async () => {
+    if (await editor.save(accounts.map((account) => account.id))) onClose();
+    else setTab("accounts");
+  };
   return <Modal open centered width="80vw" className={styles.dialog}
     title={<div className={styles.heading}>
-      <span>GUI 自动切号设置</span><p className={styles.hint}>仅用于 Codex GUI，设置单独保存。</p>
+      <span>Codex GUI 设置</span><p className={styles.hint}>按你的习惯调整 Codex GUI。</p>
     </div>}
     onCancel={onClose} closable={!editor.saving} maskClosable={!editor.saving} keyboard={!editor.saving}
-    footer={<>
+    footer={tab === "appearance" && !editor.dirty ? <Button onClick={onClose}>完成</Button> : <>
       <Button disabled={editor.saving} onClick={onClose}>取消</Button>
       <Button type="primary" loading={editor.saving} disabled={editor.loading || !editor.settings}
         onClick={() => void save()}>保存</Button>
     </>}>
-    {editor.loading && <div className={styles.loading} role="status"><Spin size="small" />正在读取设置…</div>}
-    {editor.error && <div className={styles.error} role="alert">
-      <span>{editor.error}</span>
-      {!editor.settings && <Button size="small" disabled={editor.loading}
-        onClick={() => void editor.load()}>重试</Button>}
-    </div>}
-    {editor.settings && <>
-      <GeneralSettings settings={editor.settings} editor={editor} providers={providers} />
-      <AccountSettings settings={editor.settings} editor={editor} accounts={accounts} privacyMode={privacyMode} />
-    </>}
+    <Tabs activeKey={tab} onChange={setTab} className={styles.tabs} items={[
+      { key: "accounts", label: "自动切号", disabled: editor.saving, children: <div className={styles.accountPanel}>
+        {editor.loading && <div className={styles.loading} role="status"><Spin size="small" />正在读取设置…</div>}
+        {editor.error && <div className={styles.error} role="alert">
+          <span>{editor.error}</span>
+          {!editor.settings && <Button size="small" disabled={editor.loading}
+            onClick={() => void editor.load()}>重试</Button>}
+        </div>}
+        {editor.settings && <>
+          <GeneralSettings settings={editor.settings} editor={editor} providers={providers} />
+          <AccountSettings settings={editor.settings} editor={editor} accounts={accounts} privacyMode={privacyMode} />
+        </>}
+      </div> },
+      { key: "appearance", label: "界面", disabled: editor.saving, children: <GuiAppearanceSettings /> },
+    ]} />
   </Modal>;
 }

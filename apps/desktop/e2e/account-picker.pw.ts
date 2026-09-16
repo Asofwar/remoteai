@@ -39,6 +39,38 @@ async function chooseSetting(page: Page, label: string, value: string) {
   await page.locator(".ant-select-dropdown:visible").getByText(value, { exact: true }).click();
 }
 
+test("appearance changes messages, composer and code immediately and survives reload", async ({ page }) => {
+  page.on("pageerror", (error) => { throw error; });
+  await mockCommands(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/e2e/account-picker-harness.html?fontSample");
+  const openAppearance = async () => {
+    await triggerFor(page).click();
+    await page.getByRole("button", { name: "Codex GUI 设置", exact: true }).click();
+    await page.getByRole("tab", { name: "界面", exact: true }).click();
+  };
+  await openAppearance();
+  await page.getByRole("spinbutton", { name: "字体大小", exact: true }).fill("24");
+  await page.getByRole("spinbutton", { name: "字体大小", exact: true }).blur();
+  const sample = page.getByRole("region", { name: "对话字号示例" });
+  await expect(sample.getByText("这是一条回复。", { exact: true })).toHaveCSS("font-size", "24px");
+  await expect(sample.getByText("你好，Codex。", { exact: true })).toHaveCSS("font-size", "24px");
+  await expect(sample.getByRole("textbox")).toHaveCSS("font-size", "24px");
+  await expect(sample.locator("pre code")).toHaveCSS("font-size", "22px");
+  await page.screenshot({ path: "../../.codex-tmp/gui-appearance-desktop.png", animations: "disabled" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const panel = page.getByRole("tabpanel", { name: "界面", exact: true });
+  expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await expect(page.getByRole("button", { name: "恢复默认" })).toBeInViewport();
+  await expect(page.getByRole("button", { name: /^完\s*成$/ })).toBeInViewport();
+  await page.screenshot({ path: "../../.codex-tmp/gui-appearance-narrow.png", animations: "disabled" });
+  await page.reload();
+  await expect(sample.getByRole("textbox")).toHaveCSS("font-size", "24px");
+  await openAppearance();
+  await page.getByRole("button", { name: "恢复默认" }).click();
+  await expect(sample.getByRole("textbox")).toHaveCSS("font-size", "14px");
+});
+
 test("picker edges match the footer across sidebar and viewport resizing", async ({ page }) => {
   await mockCommands(page);
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -63,8 +95,8 @@ test("gear opens an aligned 80vw settings dialog and saves GUI settings", async 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/e2e/account-picker-harness.html");
   await triggerFor(page).click();
-  await page.getByRole("button", { name: "自动切号设置", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "GUI 自动切号设置" });
+  await page.getByRole("button", { name: "Codex GUI 设置", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Codex GUI 设置" });
   await expect(dialog).toBeVisible();
   await expect.poll(async () => (await dialog.boundingBox())!.width).toBeCloseTo(1440 * 0.8, 0);
   // The opening transform changes cell coordinates until the dialog settles.
@@ -123,8 +155,8 @@ test("quota countdowns stay live while the account table scrolls inside a fixed 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/e2e/account-picker-harness.html?manyAccounts");
   await triggerFor(page).click();
-  await page.getByRole("button", { name: "自动切号设置", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "GUI 自动切号设置" });
+  await page.getByRole("button", { name: "Codex GUI 设置", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Codex GUI 设置" });
   const table = dialog.getByRole("table");
   const scroll = table.locator("..");
   await expect(table.getByRole("columnheader", { name: "主用量" })).toBeVisible();

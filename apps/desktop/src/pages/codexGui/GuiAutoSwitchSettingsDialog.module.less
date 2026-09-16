@@ -7,6 +7,13 @@
   :global(.ant-modal-footer) { flex-shrink: 0; }
 }
 .hint { color: var(--muted); font-size: 12px; font-weight: 400; overflow-wrap: anywhere; margin: 0; line-height: 1.6; }
+.tabs {
+  flex: 1; min-height: 0;
+  > :global(.ant-tabs-nav) { flex-shrink: 0; }
+  > :global(.ant-tabs-content-holder) { flex: 1; min-height: 0; overflow: hidden; }
+  :global(.ant-tabs-content), :global(.ant-tabs-tabpane-active) { height: 100%; }
+}
+.accountPanel { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .heading {
   display: flex; align-items: baseline; gap: 16px;
   > :first-child { flex-shrink: 0; }

@@ -32,7 +32,8 @@
   min-height: 24px; flex-shrink: 0; padding: 0 6px; }
 .sidebarTitle {
   --title-gradient: linear-gradient(105deg, #087f8c 0%, #2563eb 35%, #7c3aed 65%, #c0267e 100%);
-  margin: 0; font-size: 13px; font-weight: 600; line-height: 18px; white-space: nowrap;
+  margin: 0; font-size: calc(var(--gui-font-size, 14px) - 1px); font-weight: 600; line-height: max(18px, 1.4em);
+  white-space: nowrap;
   @supports (background-clip: text) or (-webkit-background-clip: text) {
     background-image: var(--title-gradient);
     background-clip: text;
@@ -89,26 +90,29 @@
 .threadSelect { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; text-align: left;
   border: 0; background: transparent; color: inherit; padding: 10px 7px; cursor: pointer; }
 .threadTitle { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap;
-  text-overflow: ellipsis; font-size: 13px; }
+  text-overflow: ellipsis; font-size: calc(var(--gui-font-size, 14px) - 1px); }
 .runningDot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .runningDot { background: #21a779; box-shadow: 0 0 0 3px #21a77915; }
 .workspace { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .header { display: flex; align-items: center; gap: 6px; padding: 4px 14px; flex-shrink: 0;
   box-sizing: border-box; border-bottom: 1px solid var(--gui-border); height: 38px; min-height: 38px;
   button:global(.ant-btn) { height: 26px; min-width: 26px; padding: 0 6px; gap: 4px;
-    font-size: 12px; line-height: 18px; }
+    font-size: calc(var(--gui-font-size, 14px) - 2px); line-height: max(18px, 1.4em); }
   button:global(.ant-btn-icon-only) { width: 26px; padding: 0; }
   :global(.ant-btn) svg { width: 14px; height: 14px; }
 }
 .heading { display: flex; min-width: 0;
-  strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; line-height: 16px; } }
+  strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: calc(var(--gui-font-size, 14px) - 1px); line-height: max(16px, 1.4em); } }
 .headerActions { margin-left: auto; display: flex; align-items: center; flex-shrink: 0; }
 .focusWindowControls { align-self: stretch; display: flex; flex-shrink: 0; margin: -4px -14px -4px 4px; }
 .messageViewport { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; overflow-anchor: none; }
 .messageEntry { display: flex; flex-direction: column; min-width: 0; }
 .historyLoader { height: 40px; display: flex; justify-content: center; align-items: center; margin-bottom: 12px;
-  > span { display: flex; align-items: center; gap: 8px; color: var(--gui-muted); font-size: 12px; max-width: 400px; }
-  > button { border: 0; background: none; color: var(--gui-muted); font-size: 12px; cursor: pointer; } }
+  > span { display: flex; align-items: center; gap: 8px; color: var(--gui-muted);
+  font-size: calc(var(--gui-font-size, 14px) - 2px); max-width: 400px; }
+  > button { border: 0; background: none; color: var(--gui-muted);
+  font-size: calc(var(--gui-font-size, 14px) - 2px); cursor: pointer; } }
 .messageArea { display: flex; flex-direction: column; position: relative; flex: 1; min-height: 0; }
 .messageScrollBody { display: flex; flex-direction: column; min-height: 100%; }
 // Keep the footer in the scroll flow so its full height remains available below the final message.
@@ -118,8 +122,8 @@
 .jumpToLatest { position: absolute; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid var(--gui-border);
   border-radius: 20px; background: var(--panel); box-shadow: 0 3px 12px #0001; color: var(--ink); cursor: pointer;
-  font-size: 12px; white-space: nowrap; }
-.workGroup { min-width: 0; font-size: 12px; color: var(--gui-muted);
+  font-size: calc(var(--gui-font-size, 14px) - 2px); white-space: nowrap; }
+.workGroup { min-width: 0; font-size: calc(var(--gui-font-size, 14px) - 2px); color: var(--gui-muted);
   > summary { display: flex; align-items: center; gap: 6px; list-style: none; cursor: pointer;
     padding: 8px 0 12px; border-bottom: 1px solid var(--gui-border);
     &::-webkit-details-marker { display: none; }
@@ -135,13 +139,14 @@
 .welcome { display: flex; flex-direction: column; justify-content: center; align-items: center;
   min-height: clamp(210px, 35vh, 400px); text-align: center;
   h1 { font-size: clamp(23px, 2.3vw, 34px); font-weight: 650; letter-spacing: -1px; margin: 20px 0 9px; }
-  p { color: var(--gui-muted); font-size: 14px; margin: 0; } }
+  p { color: var(--gui-muted); font-size: var(--gui-font-size, 14px); margin: 0; } }
 .welcomeIcon { display: grid; place-items: center; width: 60px; height: 60px; border: 1px solid var(--gui-border);
   border-radius: 18px; color: var(--green-dark); background: var(--green-soft); }
 .suggestions { display: flex; gap: 10px; margin-top: 28px;
-  span { font-size: 12px; border: 1px solid var(--gui-border); border-radius: 8px; padding: 8px 13px; color: var(--gui-muted); } }
+  span { font-size: calc(var(--gui-font-size, 14px) - 2px); border: 1px solid var(--gui-border);
+  border-radius: 8px; padding: 8px 13px; color: var(--gui-muted); } }
 .turn { display: flex; flex-direction: column; gap: 18px; padding-bottom: 26px; }
-.turnDuration { color: var(--gui-muted); font-size: 12px; padding: 8px 0 12px;
+.turnDuration { color: var(--gui-muted); font-size: calc(var(--gui-font-size, 14px) - 2px); padding: 8px 0 12px;
   border-bottom: 1px solid var(--gui-border); font-variant-numeric: tabular-nums; }
 .userMessage { align-self: flex-end; max-width: 70%; min-width: 0;
   &:hover .userMessageActions, &:focus-within .userMessageActions { opacity: 1; pointer-events: auto; } }
@@ -149,52 +154,58 @@
   padding: 12px 16px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.75; }
 .userMessageActions { display: flex; justify-content: flex-end; align-items: center; gap: 10px;
   min-height: 28px; padding: 3px 2px 0; opacity: 0; pointer-events: none;
-  color: var(--gui-muted); font-size: 12px;
+  color: var(--gui-muted); font-size: calc(var(--gui-font-size, 14px) - 2px);
   > button { color: inherit; } }
 @media (hover: none) { .userMessageActions { opacity: 1; pointer-events: auto; } }
-.agentMessage { min-width: 0; line-height: 1.8; font-size: 14px; }
+.agentMessage { min-width: 0; line-height: 1.8; font-size: var(--gui-font-size, 14px); }
 [data-quote-source] { user-select: text; }
 [data-quote-exclude] { user-select: none; }
 .markdown { overflow-wrap: anywhere; p { margin: 12px 0; } ul, ol { padding-left: 24px; }
   h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.4; margin: 20px 0 8px; }
   h1 { font-size: 1.5em; } h2 { font-size: 1.25em; } h3, h4, h5, h6 { font-size: 1.1em; }
   pre { padding: 16px; border-radius: 10px; background: var(--bg, #f4f6f5); overflow: auto; line-height: 1.6; }
-  code { font-family: Consolas, monospace; font-size: 12px; }
+  code { font-family: Consolas, monospace; font-size: calc(var(--gui-font-size, 14px) - 2px); }
   :not(pre) > code { background: var(--bg, #edf1ef); padding: 2px 5px; border-radius: 4px; }
   blockquote { border-left: 3px solid var(--gui-border); padding-left: 16px; margin-left: 0; color: var(--gui-muted); }
   a { color: var(--green-dark); text-decoration: underline; } }
 .messageCopy { display: flex; align-items: center; margin-top: 6px; margin-left: -4px;
   line-height: 1; > button { color: var(--gui-muted); } }
-.imageLabel { display: block; font-size: 12px; color: var(--gui-muted); }
-.working { display: flex; align-items: center; gap: 10px; padding: 8px 0; color: var(--gui-muted); font-size: 12px; }
-.muted { color: var(--gui-muted); font-size: 12px; }
-.turnError { color: #c96c3d; font-size: 12px; }
+.imageLabel { display: block; font-size: calc(var(--gui-font-size, 14px) - 2px); color: var(--gui-muted); }
+.working { display: flex; align-items: center; gap: 10px; padding: 8px 0; color: var(--gui-muted);
+  font-size: calc(var(--gui-font-size, 14px) - 2px); }
+.muted { color: var(--gui-muted); font-size: calc(var(--gui-font-size, 14px) - 2px); }
+.turnError { color: #c96c3d; font-size: calc(var(--gui-font-size, 14px) - 2px); }
 .composerWrap, .questionWrap { width: min(100%, 920px); align-self: center;
   padding: 0 28px; flex-shrink: 0; box-sizing: border-box; }
 .composerWrap { padding-bottom: 14px; }
 .projectBar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 5px 10px 8px; min-width: 0;
   > button { max-width: 50%; > span:last-child { overflow: hidden; text-overflow: ellipsis; } }
   :global(.ant-select) { width: 120px; } }
-.localLabel { font-size: 12px; color: var(--gui-muted); margin-left: auto; }
+.localLabel { font-size: calc(var(--gui-font-size, 14px) - 2px); color: var(--gui-muted); margin-left: auto; }
 .composer { border: 1px solid var(--gui-border); background: var(--panel); border-radius: 18px;
   padding: 12px 12px 9px; box-shadow: 0 5px 25px #173c2810;
   &:focus-within { border-color: var(--green); }
   textarea:global(.ant-input) { border: 0; background: transparent; resize: none; box-shadow: none;
-    padding: 5px 8px 12px; font-size: 14px; } }
+    padding: 5px 8px 12px; font-size: var(--gui-font-size, 14px); } }
 .composerAttached { border-top-left-radius: 0; border-top-right-radius: 0; }
 .composerControls { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
 .modelControls { margin-left: auto; display: flex; gap: 8px; align-items: center;
-  flex: 1 1 510px; justify-content: flex-end; min-width: 0; font-size: 12px; line-height: 20px; }
-.composerHint { display: flex; justify-content: space-between; font-size: 10px; color: var(--gui-muted); padding: 7px 5px 0; }
+  flex: 1 1 510px; justify-content: flex-end; min-width: 0; font-size: calc(var(--gui-font-size, 14px) - 2px);
+  line-height: max(20px, 1.4em); }
+.composerHint { display: flex; justify-content: space-between; font-size: calc(var(--gui-font-size, 14px) - 4px);
+  color: var(--gui-muted); padding: 7px 5px 0; }
 .attachments { padding: 3px 8px 8px; display: flex; flex-wrap: wrap; gap: 5px;
   :global(.ant-tag) { max-width: 240px; white-space: normal; overflow-wrap: anywhere; } }
-.error { margin: 10px 20px 0; flex-shrink: 0; font-size: 12px; overflow-wrap: anywhere; }
+.error { margin: 10px 20px 0; flex-shrink: 0; font-size: calc(var(--gui-font-size, 14px) - 2px);
+  overflow-wrap: anywhere; }
 .pendingBanner { border: 0; padding: 9px; background: #fff3d7; color: #885c20; cursor: pointer; }
 .approvals { flex-shrink: 0; max-height: 45%; overflow: auto; }
 .approval { width: min(100%, 400px); margin: 8px auto; padding: 16px; border: 1px solid #e4c993;
-  background: var(--panel); border-radius: 12px; font-size: 12px; overflow-wrap: anywhere;
+  background: var(--panel); border-radius: 12px; font-size: calc(var(--gui-font-size, 14px) - 2px);
+  overflow-wrap: anywhere;
   > strong { display: flex; gap: 8px; align-items: center; }
-  pre { font-size: 11px; padding: 10px; background: var(--bg, #f4f3ee); white-space: pre-wrap; max-height: 180px; overflow: auto; } }
+  pre { font-size: calc(var(--gui-font-size, 14px) - 3px); padding: 10px; background: var(--bg, #f4f3ee);
+  white-space: pre-wrap; max-height: 180px; overflow: auto; } }
 .questionCard { width: 100%; }
 .approvalActions { display: flex; gap: 8px; margin-top: 12px; }
 .question { display: flex; flex-direction: column; gap: 10px; padding-top: 16px;
@@ -202,12 +213,16 @@
   small { display: block; color: var(--gui-muted); } }
 .install { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
   flex: 1; min-height: 360px; padding: 36px; gap: 12px;
-  h2 { font-size: 25px; margin: 12px 0 0; } p { font-size: 13px; margin: 0; } small { color: var(--gui-muted); } }
+  h2 { font-size: 25px; margin: 12px 0 0; } p { font-size: calc(var(--gui-font-size, 14px) - 1px); margin: 0;
+  } small { color: var(--gui-muted); } }
 .installCompact { width: min(340px, 80vw); overflow-wrap: anywhere;
-  h2 { margin: 0 0 8px; font-size: 16px; } p, small { font-size: 12px; color: var(--gui-muted); } }
+  h2 { margin: 0 0 8px; font-size: 16px; } p, small { font-size: calc(var(--gui-font-size, 14px) - 2px);
+  color: var(--gui-muted); } }
 .installActions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
-.downloadProgress { width: min(100%, 340px); font-size: 12px; color: var(--gui-muted); margin-top: 8px; }
-.listEmpty { text-align: center; padding: 36px 10px; color: var(--gui-muted); font-size: 12px; }
+.downloadProgress { width: min(100%, 340px); font-size: calc(var(--gui-font-size, 14px) - 2px);
+  color: var(--gui-muted); margin-top: 8px; }
+.listEmpty { text-align: center; padding: 36px 10px; color: var(--gui-muted);
+  font-size: calc(var(--gui-font-size, 14px) - 2px); }
 @media (max-width: 1150px) {
   .page { grid-template-columns: 200px minmax(0, 1fr); }
   .collapsed { grid-template-columns: minmax(0, 1fr); }

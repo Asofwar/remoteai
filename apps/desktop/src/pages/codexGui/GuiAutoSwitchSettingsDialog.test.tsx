@@ -41,6 +41,7 @@ async function chooseOption(label: string, value: string) {
 }
 
 beforeEach(() => {
+  localStorage.clear();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn() })));
   const getComputedStyle = window.getComputedStyle;
@@ -57,6 +58,50 @@ afterEach(async () => {
   container.remove();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  localStorage.clear();
+});
+
+it("switches between top tabs and saves appearance independently of account settings", async () => {
+  await render();
+  const tab = (label: string) => [...document.querySelectorAll<HTMLElement>('[role="tab"]')]
+    .find((element) => element.textContent === label)!;
+  await click(tab("界面"));
+  expect(tab("界面").getAttribute("aria-selected")).toBe("true");
+  await typeNumber("字体大小", "20");
+  expect(document.querySelector('[aria-label="字体预览"]')?.getAttribute("style"))
+    .toContain("--gui-font-size: 20px");
+  await click(tab("自动切号"));
+  expect(button("自动切换账号")).toBeTruthy();
+  await click(tab("界面"));
+  expect(input("字体大小").value).toBe("20");
+  const reset = [...document.querySelectorAll<HTMLButtonElement>("button")]
+    .find((element) => element.textContent?.replace(/ /g, "") === "恢复默认")!;
+  await click(reset);
+  expect(input("字体大小").value).toBe("14");
+  expect(invoke).toHaveBeenCalledExactlyOnceWith("codex_gui_auto_switch_settings");
+});
+
+it("keeps appearance available when account settings cannot be loaded", async () => {
+  vi.mocked(invoke).mockRejectedValue(new Error("unavailable"));
+  await render();
+  await click([...document.querySelectorAll<HTMLElement>('[role="tab"]')]
+    .find((element) => element.textContent === "界面")!);
+  await typeNumber("字体大小", "18");
+  expect(input("字体大小").value).toBe("18");
+  await click(footerButton("完成"));
+  expect(onClose).toHaveBeenCalledOnce();
+});
+
+it("keeps pending account changes saveable after switching to appearance", async () => {
+  await render();
+  await click(button("自动切换账号"));
+  await click([...document.querySelectorAll<HTMLElement>('[role="tab"]')]
+    .find((element) => element.textContent === "界面")!);
+  await click(footerButton("保存"));
+  expect(invoke).toHaveBeenLastCalledWith("codex_gui_set_auto_switch_settings", {
+    settings: { ...defaults, enabled: true },
+  });
+  expect(onClose).toHaveBeenCalledOnce();
 });
 
 it("loads GUI rules independently and saves participation, priority and thresholds together", async () => {

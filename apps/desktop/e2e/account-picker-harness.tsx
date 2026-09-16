@@ -5,6 +5,10 @@ import { DEMO_ACCOUNTS } from "../src/demo";
 import type { Provider } from "../src/types";
 import { ProxyAccountPicker } from "../src/pages/codexGui/ProxyAccountPicker";
 import { useUsageStatus } from "../src/pages/codexGui/useUsageStatus";
+import { MessageItem } from "../src/pages/codexGui/MessageItem";
+import { DetailsWorkspace } from "../src/pages/codexGui/DetailsWorkspace";
+import { SkillInput } from "../src/pages/codexGui/SkillInput";
+import type { ComposerText } from "../src/pages/codexGui/types";
 
 const provider: Provider = {
   id: "backup", name: "备用服务", kind: "custom", group: "", baseUrl: "https://example.com/v1",
@@ -27,6 +31,20 @@ const accounts = Array.from({ length: accountCount }, (_, index) => ({ ...DEMO_A
 }));
 const TICK_MS = 50;
 
+function FontSample() {
+  const [value, setValue] = useState<ComposerText>({ text: "输入消息…", mentions: [] });
+  return <section aria-label="对话字号示例" style={{ position: "absolute", top: 60, left: 20, right: 20 }}>
+    <DetailsWorkspace selected="font-sample" active>
+      <MessageItem item={{ id: "reply", type: "agentMessage",
+        text: "这是一条回复。\n\n```js\nconst message = 'Hello, Codex!';\n```" }} streaming={false} />
+      <MessageItem item={{ id: "user", type: "userMessage", content: [{ type: "text", text: "你好，Codex。" }] }}
+        streaming={false} />
+      <SkillInput value={value} onChange={setValue} draftKey="sample" cwd="" active connected={false}
+        disabled={false} placeholder="输入消息…" onPaste={() => {}} onSend={() => {}} />
+    </DetailsWorkspace>
+  </section>;
+}
+
 function Harness() {
   const [beats, setBeats] = useState(0);
   useUsageStatus(true);
@@ -36,6 +54,7 @@ function Harness() {
   }, []);
   return <ConfigProvider theme={{ token: { colorPrimary: "#168348" } }}><App>
     <main><input aria-label="消息" placeholder="输入消息…" /><output aria-label="刷新次数" hidden>{beats}</output></main>
+    {new URLSearchParams(location.search).has("fontSample") && <FontSample />}
     <aside aria-label="会话侧栏">
       <ProxyAccountPicker active privacyMode={false} accounts={accounts} providers={[provider]}
         aggregateApis={[]} proxyRunning busy={false} loading={false}

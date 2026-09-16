@@ -1,3 +1,4 @@
+mod completion_notifications;
 mod context_capacity;
 mod context_change;
 mod live_settings;
@@ -40,6 +41,7 @@ pub(super) struct Client {
     pending: Mutex<Pending>,
     approvals: Mutex<HashMap<String, GuiEvent>>,
     active_turns: Mutex<HashMap<String, String>>,
+    completion_notifications: Mutex<completion_notifications::CompletionNotifications>,
     context_capacity: context_capacity::ContextCapacity,
     plugin_revision: Mutex<Option<String>>,
     next_id: AtomicU64,
@@ -87,6 +89,7 @@ impl Client {
             pending: Mutex::new(HashMap::new()),
             approvals: Mutex::new(HashMap::new()),
             active_turns: Mutex::new(HashMap::new()),
+            completion_notifications: Mutex::default(),
             context_capacity: context_capacity::ContextCapacity::default(),
             plugin_revision: Mutex::new(None),
             next_id: AtomicU64::new(1),
@@ -183,6 +186,7 @@ impl Client {
                 crate::local_proxy::gui_context::record_usage(&event.params).await;
             }
             if method == "turn/completed" {
+                self.notify_completion(&event).await;
                 if let Some(id) = event.params["turn"]["id"].as_str() {
                     self.approvals
                         .lock()

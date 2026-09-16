@@ -106,7 +106,7 @@ export function ProxyAccountPicker(props: ProxyAccountPickerProps) {
           value={query} allowClear onChange={(event) => setQuery(event.target.value)} />
         <div className={styles.actions}>
           {(saving || props.loading) && <Spin size="small" />}
-          <button type="button" className={styles.settings} aria-label="自动切号设置" aria-haspopup="dialog"
+          <button type="button" className={styles.settings} aria-label="Codex GUI 设置" aria-haspopup="dialog"
             disabled={saving || props.loading}
             onClick={() => { setOpen(false); setSettingsOpen(true); }}><Settings size={16} /></button>
         </div>

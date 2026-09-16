@@ -3,6 +3,7 @@ import { FileDiff, Maximize2, Minimize2, Minus, PanelRightOpen, X } from "lucide
 import { DetailsContext, type DiffPanelEntry } from "./detailsContext";
 import { DiffDocument } from "./DiffView";
 import { useDrawerResize } from "./useDrawerResize";
+import { guiFontStyle, useGuiFontSize } from "./guiAppearance";
 import styles from "./DetailsWorkspace.module.less";
 
 const MIN_CHAT_WIDTH = 520;
@@ -10,6 +11,7 @@ const MIN_CHAT_WIDTH = 520;
 export function DetailsWorkspace({ selected, active, children }: {
   selected: string | null; active: boolean; children: ReactNode;
 }) {
+  const fontSize = useGuiFontSize();
   const host = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   const opener = useRef<HTMLElement | null>(null);
@@ -37,7 +39,7 @@ export function DetailsWorkspace({ selected, active, children }: {
   useEffect(() => { if (visible) closeButton.current?.focus(); }, [visible, viewId]);
   useEffect(() => { if (!visible || expanded) resize.cancel(); }, [visible, expanded, resize.cancel]);
   return <DetailsContext.Provider value={context}>
-    <div ref={host} className={styles.host} data-dragging={resize.dragging || undefined}>
+    <div ref={host} className={styles.host} data-dragging={resize.dragging || undefined} style={guiFontStyle(fontSize)}>
       <div className={styles.conversation} style={{ marginRight: docked ? width : 0 }}>{children}</div>
       {entry && <aside hidden={!visible} id={panelId} aria-label="文件更改详情" className={styles.drawer}
         style={{ width }} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } }}>

@@ -21,14 +21,12 @@ import {
 import { initialWindowMetrics, SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import {
   clearSession,
-  consumeResetCredit,
   DEFAULT_GLOBAL_REFRESH_MINUTES,
   DEFAULT_CLOUD_BASE_URL,
   deleteRemoteDevice,
   fetchAccountSummary,
   fetchAccountUsage,
   fetchAccountUsageSummaries,
-  fetchResetCredits,
   fetchRemoteDevices,
   fetchRemoteProviders,
   fetchUserProfile,
@@ -53,19 +51,17 @@ import type {
   RemoteDevice,
   RemoteModelSwitchResult,
   RemoteProviderSummary,
-  ResetCreditsSummary,
   UsageWindow,
   UserProfile,
 } from './src/types';
 import { useMobileTelemetry } from './src/useMobileTelemetry';
-import { earliestExpirationDate } from './src/utils/expiration';
 import { mergeRefreshedUsage, mergeServerAccounts } from './src/utils/accounts';
 import { AccountCard } from './src/accounts/AccountCard';
 import { AccountOverview, AccountToolbar } from './src/accounts/AccountOverview';
-import { maskEmail, resetLabel } from './src/accounts/formatters';
+import { displayDate, maskEmail, resetLabel } from './src/accounts/formatters';
 import { styles as accountStyles } from './src/accounts/styles';
 import { AdminArea } from './src/admin/AdminArea';
-import { AccountPrivateDetailsSheet } from './src/components/AccountPrivateDetailsSheet';
+import { AccountDetailsDrawer } from './src/accounts/AccountDetailsDrawer';
 import { AddAccountSheet } from './src/components/AddAccountSheet';
 import { AppToastHost, Toast } from './src/components/AppToast';
 import { BottomSheet } from './src/components/BottomSheet';
@@ -127,33 +123,6 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : '发生未知错误，请稍后重试';
 }
 
-function displayDate(value?: string | null) {
-  if (!value) return '未刷新';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '未刷新';
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(date);
-}
-
-function displayFullDate(value?: string | null) {
-  if (!value) return '时间未知';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '时间未知';
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date);
-}
-
-function initials(email: string) {
-  return email.slice(0, 2).toUpperCase();
-}
-
 function applyRemoteModelSwitch(
   devices: RemoteDevice[],
   result: RemoteModelSwitchResult,
@@ -174,26 +143,6 @@ function usageColor(remaining: number) {
   if (remaining <= 15) return COLORS.danger;
   if (remaining <= 40) return '#d89a32';
   return COLORS.cyan;
-}
-
-function UsageMeter({ title, usage }: { title: string; usage?: UsageWindow | null }) {
-  if (!usage) {
-    return <View style={styles.usageBlock}>
-      <Text style={styles.usageTitle}>{title}</Text>
-      <Text style={styles.usageUnavailable}>--</Text>
-    </View>;
-  }
-  const remaining = Math.max(0, Math.min(100, Math.round(usage.remainingPercent)));
-  return <View style={styles.usageBlock}>
-    <View style={styles.usageHeader}>
-      <Text style={styles.usageTitle}>{title}</Text>
-      <Text style={[styles.remaining, { color: usageColor(remaining) }]}>{remaining}% <Text style={styles.remainingLabel}>剩余</Text></Text>
-    </View>
-    <View style={styles.progressTrack}>
-      <View style={[styles.progressFill, { width: `${remaining}%`, backgroundColor: usageColor(remaining) }]} />
-    </View>
-    <Text style={styles.resetText}>{resetLabel(usage.resetsAt)}</Text>
-  </View>;
 }
 
 function LoginScreen({ initialBaseUrl, onLoggedIn }: { initialBaseUrl: string; onLoggedIn: (session: AuthSession) => void }) {
@@ -328,23 +277,16 @@ function Dashboard({
 }) {
   const [privateMode, setPrivateMode] = useState(true);
   const [detailAccountId, setDetailAccountId] = useState<string | null>(null);
-  const [resetCreditsAccount, setResetCreditsAccount] = useState<AccountSummary | null>(null);
-  const [privateDetailsAccountId, setPrivateDetailsAccountId] = useState<string | null>(null);
   const [addAccountOpen, setAddAccountOpen] = useState(false);
   const [switchAccount, setSwitchAccount] = useState<AccountSummary | null>(null);
   const [quotaConsumptionOpen, setQuotaConsumptionOpen] = useState(false);
   const detailAccount = accounts.find((account) => account.id === detailAccountId) ?? null;
-  const privateDetailsAccount = accounts.find((account) => account.id === privateDetailsAccountId) ?? null;
   const latestUpdate = useMemo(() => {
     const timestamps = accounts.map((account) => account.usage.fetchedAt).filter(Boolean).sort();
     return timestamps.length ? timestamps[timestamps.length - 1] : null;
   }, [accounts]);
   const consumableQuotaCount = quotaConsumptionTargets(accounts).length;
   const refreshBusy = syncingServer || refreshingUsage || consumingQuota || Boolean(refreshingAccountId);
-  const openPrivateDetails = (account: AccountSummary) => {
-    setPrivateDetailsAccountId(account.id);
-    void onRefreshServer();
-  };
   return <>
     <ScrollView style={accountStyles.page} contentContainerStyle={accountStyles.scroll}
       refreshControl={<RefreshControl refreshing={syncingServer}
@@ -375,8 +317,10 @@ function Dashboard({
       refreshing={refreshBusy}
       onClose={() => setDetailAccountId(null)}
       onRefresh={onRefreshAccount}
-      onOpenResetCredits={(account) => setResetCreditsAccount(account)}
-      onOpenPrivateDetails={openPrivateDetails}
+      session={session}
+      syncing={syncingServer}
+      onRefreshServer={onRefreshServer}
+      onAccountUpdated={onAccountUpdated}
     />
     <DeviceSwitchDrawer
       account={switchAccount}
@@ -385,13 +329,6 @@ function Dashboard({
       onClose={() => setSwitchAccount(null)}
       onSwitch={onSwitch}
     />
-    <ResetCreditsDrawer
-      account={resetCreditsAccount}
-      onClose={() => setResetCreditsAccount(null)}
-      onConsumed={onRefreshServer}
-    />
-    <AccountPrivateDetailsSheet account={privateDetailsAccount} session={session} syncing={syncingServer}
-      onClose={() => setPrivateDetailsAccountId(null)} onUpdated={onAccountUpdated} />
     <AddAccountSheet session={session} visible={addAccountOpen}
       onClose={() => setAddAccountOpen(false)} onAdded={onRefreshServer} />
     <QuotaConsumptionSheet
@@ -621,7 +558,8 @@ function BottomNavigation({ activePage, onChange }: {
     </Pressable>
     <Pressable accessibilityRole="tab" accessibilityState={{ selected: activePage === 'accounts' }}
       onPress={() => onChange('accounts')} style={styles.navItem}>
-      <Ionicons name="grid-outline" size={23} color={activePage === 'accounts' ? '#00c98b' : '#858991'} />
+      <Ionicons name={activePage === 'accounts' ? 'people' : 'people-outline'}
+        size={23} color={activePage === 'accounts' ? '#00c98b' : '#858991'} />
       <Text style={[styles.navText, activePage === 'accounts' && styles.navTextActive]}>账号</Text>
     </Pressable>
     <Pressable accessibilityRole="tab" accessibilityState={{ selected: activePage === 'devices' }}
@@ -643,266 +581,6 @@ function BottomNavigation({ activePage, onChange }: {
       <Text style={[styles.navText, settingsActive && styles.navTextActive]}>设置</Text>
     </Pressable>
   </View>;
-}
-
-function AccountDetailsDrawer({
-  account,
-  devices,
-  privateMode,
-  refreshing,
-  onClose,
-  onRefresh,
-  onOpenResetCredits,
-  onOpenPrivateDetails,
-}: {
-  account: AccountSummary | null;
-  devices: RemoteDevice[];
-  privateMode: boolean;
-  refreshing: boolean;
-  onClose: () => void;
-  onRefresh: (accountId: string) => Promise<void>;
-  onOpenResetCredits: (account: AccountSummary) => void;
-  onOpenPrivateDetails: (account: AccountSummary) => void;
-}) {
-  const activeDevices = account
-    ? devices.filter((device) => !device.activeProviderId && device.activeAccountId === account.id)
-    : [];
-  const email = account
-    ? (privateMode ? maskEmail(account.email) : account.email)
-    : '';
-
-  return <BottomSheet
-    visible={Boolean(account)}
-    title="账号详情"
-    subtitle={email}
-    onClose={onClose}
-    tall
-  >
-    {account ? <ScrollView style={styles.accountDetailsScroll} showsVerticalScrollIndicator={false}>
-      <View style={styles.detailIdentity}>
-        <View style={styles.detailAvatar}><Text style={styles.avatarText}>{initials(account.email)}</Text></View>
-        <View style={styles.detailIdentityText}>
-          <Text style={styles.detailEmail} numberOfLines={1}>{email}</Text>
-          <Text style={styles.detailStatus}>
-            {activeDevices.length
-              ? `${activeDevices.map((device) => device.name).join('、')} 正在使用`
-              : '当前没有设备使用此账号'}
-          </Text>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`刷新 ${account.email} 的用量`}
-          accessibilityHint="仅刷新当前账号的用量"
-          disabled={refreshing}
-          hitSlop={8}
-          onPress={() => void onRefresh(account.id)}
-          style={({ pressed }) => [
-            styles.detailRefreshButton,
-            pressed && styles.pressed,
-            refreshing && styles.disabled,
-          ]}
-        >
-          {refreshing
-            ? <ActivityIndicator color={COLORS.green} size="small" />
-            : <Text style={styles.detailRefreshIcon}>↻</Text>}
-        </Pressable>
-      </View>
-
-      <View style={styles.detailInfoCard}>
-        <View style={styles.detailInfoRow}>
-          <Text style={styles.detailInfoLabel}>套餐</Text>
-          <Text selectable style={styles.detailInfoValue}>{account.plan || 'ChatGPT'}</Text>
-        </View>
-        <View style={styles.detailRowDivider} />
-        <View style={styles.detailInfoRow}>
-          <Text style={styles.detailInfoLabel}>到期时间</Text>
-          <Text selectable style={styles.detailInfoValue}>
-            {earliestExpirationDate(account.expiresAt, account.usage.apiExpiresAt) || '未设置'}
-          </Text>
-        </View>
-        <View style={styles.detailRowDivider} />
-        <View style={styles.detailInfoRow}>
-          <Text style={styles.detailInfoLabel}>账号 ID</Text>
-          <Text selectable style={styles.detailInfoValue}>{account.accountId || '未提供'}</Text>
-        </View>
-      </View>
-
-      <View style={styles.detailUsageCard}>
-        <UsageMeter title="主用量窗口" usage={account.usage.primary} />
-        <UsageMeter title="次用量窗口" usage={account.usage.secondary} />
-        <Text style={[styles.updatedText, account.usage.error && styles.errorText]}>
-          {account.usage.error
-            ? `获取失败：${account.usage.error}`
-            : `数据更新于 ${displayDate(account.usage.fetchedAt)}`}
-        </Text>
-      </View>
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityHint="在新的底部抽屉中查看和使用重置卡"
-        onPress={() => onOpenResetCredits(account)}
-        style={({ pressed }) => [styles.openNoteButton, pressed && styles.pressed]}
-      >
-        <View>
-          <Text style={styles.openNoteTitle}>重置卡</Text>
-          <Text style={styles.openNoteHint}>查看可用数量、有效期并使用重置卡</Text>
-        </View>
-        <Text style={styles.openNoteArrow}>›</Text>
-      </Pressable>
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityHint="在新的底部抽屉中查看账号私密资料"
-        onPress={() => onOpenPrivateDetails(account)}
-        style={({ pressed }) => [styles.openNoteButton, pressed && styles.pressed]}
-      >
-        <View>
-          <Text style={styles.openNoteTitle}>账号资料</Text>
-          <Text style={styles.openNoteHint}>编辑截止日期、备注、手机号、密码和 2FA</Text>
-        </View>
-        <Text style={styles.openNoteArrow}>›</Text>
-      </Pressable>
-    </ScrollView> : null}
-  </BottomSheet>;
-}
-
-function ResetCreditsDrawer({ account, onClose, onConsumed }: {
-  account: AccountSummary | null;
-  onClose: () => void;
-  onConsumed: () => Promise<void>;
-}) {
-  const [summary, setSummary] = useState<ResetCreditsSummary | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [consuming, setConsuming] = useState(false);
-  const requestIdRef = useRef(0);
-  const accountId = account?.id;
-
-  const loadCredits = useCallback(async () => {
-    if (!account) return;
-    const requestId = ++requestIdRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const next = await fetchResetCredits(account);
-      if (requestId === requestIdRef.current) setSummary(next);
-    } catch (nextError) {
-      if (requestId === requestIdRef.current) {
-        setSummary(null);
-        setError(errorMessage(nextError));
-      }
-    } finally {
-      if (requestId === requestIdRef.current) setLoading(false);
-    }
-  }, [account]);
-
-  useEffect(() => {
-    if (!accountId) {
-      requestIdRef.current += 1;
-      setSummary(null);
-      setError(null);
-      setLoading(false);
-      setConsuming(false);
-      return;
-    }
-    void loadCredits();
-  }, [accountId, loadCredits]);
-
-  const useCredit = useCallback(async () => {
-    if (!account || consuming) return;
-    setConsuming(true);
-    try {
-      await consumeResetCredit(account);
-      Toast.success('重置卡使用成功');
-      await Promise.all([loadCredits(), onConsumed()]);
-    } catch (nextError) {
-      Toast.fail(`使用失败：${errorMessage(nextError)}`);
-    } finally {
-      setConsuming(false);
-    }
-  }, [account, consuming, loadCredits, onConsumed]);
-
-  const confirmUseCredit = useCallback(() => {
-    if (!summary?.credits.length || consuming) return;
-    Alert.alert(
-      '确认使用重置卡？',
-      '确认后会先检查该账号的可用重置卡，并消费一张来重置当前可重置的用量窗口。',
-      [
-        { text: '取消', style: 'cancel' },
-        { text: '使用重置卡', style: 'destructive', onPress: () => void useCredit() },
-      ],
-    );
-  }, [consuming, summary?.credits.length, useCredit]);
-
-  const credits = summary?.credits ?? [];
-  return <BottomSheet
-    visible={Boolean(account)}
-    title="重置卡详情"
-    subtitle={account?.email}
-    onClose={onClose}
-    dismissible={!consuming}
-    actions={[
-      { label: '关闭', onPress: onClose, disabled: consuming },
-      {
-        label: '使用重置卡',
-        tone: 'primary',
-        onPress: confirmUseCredit,
-        loading: consuming,
-        disabled: loading || Boolean(error) || credits.length === 0,
-      },
-    ]}
-  >
-    <View style={styles.resetCreditSummary}>
-      <View>
-        <Text style={styles.resetCreditSummaryLabel}>当前可用</Text>
-        <Text style={styles.resetCreditSummaryHint}>使用前会再次向 Codex 确认可用状态</Text>
-      </View>
-      <Text style={styles.resetCreditCount}>{loading ? '—' : credits.length}<Text style={styles.resetCreditCountUnit}> 张</Text></Text>
-    </View>
-
-    <ScrollView
-      style={styles.resetCreditsScroll}
-      contentContainerStyle={styles.resetCreditsScrollContent}
-      showsVerticalScrollIndicator={false}
-    >
-      {loading ? <View style={styles.resetCreditStatus}>
-        <ActivityIndicator color={COLORS.green} />
-        <Text style={styles.resetCreditStatusText}>正在读取重置卡…</Text>
-      </View> : error ? <View style={styles.resetCreditStatus}>
-        <Text style={styles.resetCreditErrorTitle}>读取失败</Text>
-        <Text style={styles.resetCreditStatusText}>{error}</Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => void loadCredits()}
-          style={({ pressed }) => [styles.resetCreditRetry, pressed && styles.pressed]}
-        >
-          <Text style={styles.resetCreditRetryText}>重新读取</Text>
-        </Pressable>
-      </View> : credits.length === 0 ? <View style={styles.resetCreditStatus}>
-        <Text style={styles.resetCreditEmptyIcon}>✓</Text>
-        <Text style={styles.resetCreditEmptyTitle}>当前没有可用重置卡</Text>
-        <Text style={styles.resetCreditStatusText}>获得新的重置卡后，可在这里查看和使用。</Text>
-      </View> : credits.map((credit, index) => <View
-        key={`${credit.issuedAt ?? 'unknown'}-${credit.expiresAt ?? 'unknown'}-${index}`}
-        style={styles.resetCreditCard}
-      >
-        <View style={styles.resetCreditCardHeader}>
-          <View style={styles.resetCreditCardIcon}><Text style={styles.resetCreditCardIconText}>↻</Text></View>
-          <Text style={styles.resetCreditCardTitle}>重置卡 {index + 1}</Text>
-          <View style={styles.resetCreditAvailableBadge}><Text style={styles.resetCreditAvailableText}>可用</Text></View>
-        </View>
-        <View style={styles.resetCreditTimeRow}>
-          <Text style={styles.resetCreditTimeLabel}>发放时间</Text>
-          <Text style={styles.resetCreditTimeValue}>{displayFullDate(credit.issuedAt)}</Text>
-        </View>
-        <View style={styles.resetCreditTimeDivider} />
-        <View style={styles.resetCreditTimeRow}>
-          <Text style={styles.resetCreditTimeLabel}>到期时间</Text>
-          <Text style={styles.resetCreditTimeValue}>{displayFullDate(credit.expiresAt)}</Text>
-        </View>
-      </View>)}
-    </ScrollView>
-  </BottomSheet>;
 }
 
 function DeviceSwitchDrawer({ account, devices, switching, onClose, onSwitch }: {
@@ -1627,61 +1305,7 @@ const styles = StyleSheet.create({
   compactRemaining: { width: 38, textAlign: 'right', fontWeight: '800', fontSize: 12 },
   compactUsageUnavailable: { width: 38, color: COLORS.muted, textAlign: 'right', fontSize: 12 },
   compactResetText: { color: COLORS.muted, fontSize: 11, marginTop: 8 },
-  avatarText: { color: '#178ba1', fontWeight: '800', fontSize: 14 },
-  usageBlock: { marginBottom: 14 },
-  usageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 },
-  usageTitle: { color: COLORS.ink, fontWeight: '700', fontSize: 13 },
-  remaining: { fontWeight: '800', fontSize: 16 },
-  remainingLabel: { color: COLORS.muted, fontWeight: '400', fontSize: 12 },
-  usageUnavailable: { color: COLORS.muted, marginTop: 3 },
-  progressTrack: { height: 7, borderRadius: 10, overflow: 'hidden', backgroundColor: '#dbe8e0' },
   progressFill: { height: '100%', borderRadius: 10 },
-  resetText: { color: COLORS.muted, fontSize: 12, marginTop: 6 },
-  updatedText: { color: COLORS.muted, fontSize: 11, marginTop: 2 },
-  errorText: { color: COLORS.danger },
-  accountDetailsScroll: { maxHeight: 570, marginBottom: 12 },
-  detailIdentity: { flexDirection: 'row', alignItems: 'center', paddingBottom: 16 },
-  detailAvatar: { width: 48, height: 48, borderRadius: 14, backgroundColor: COLORS.paleBlue, justifyContent: 'center', alignItems: 'center' },
-  detailIdentityText: { flex: 1, minWidth: 0, marginLeft: 12 },
-  detailEmail: { color: COLORS.ink, fontSize: 16, fontWeight: '800' },
-  detailStatus: { color: COLORS.muted, fontSize: 12, lineHeight: 17, marginTop: 4 },
-  detailRefreshButton: { width: 40, height: 40, marginLeft: 10, borderRadius: 20, borderWidth: 1, borderColor: '#bde8d8', backgroundColor: COLORS.paleGreen, alignItems: 'center', justifyContent: 'center' },
-  detailRefreshIcon: { color: COLORS.green, fontSize: 24, lineHeight: 27, fontWeight: '700', marginTop: -1 },
-  detailInfoCard: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 14, backgroundColor: COLORS.canvas, paddingHorizontal: 14, paddingVertical: 8 },
-  detailInfoRow: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 14 },
-  detailInfoLabel: { width: 64, color: COLORS.muted, fontSize: 13 },
-  detailInfoValue: { flex: 1, color: COLORS.ink, fontSize: 13, fontWeight: '700', textAlign: 'right' },
-  detailRowDivider: { height: 1, backgroundColor: '#e4ede6' },
-  detailUsageCard: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 14, backgroundColor: '#fff', padding: 15, paddingBottom: 13, marginTop: 12 },
-  openNoteButton: { minHeight: 62, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: COLORS.border, borderRadius: 14, backgroundColor: COLORS.canvas, paddingHorizontal: 15, marginTop: 12, marginBottom: 4 },
-  openNoteTitle: { color: COLORS.ink, fontSize: 14, fontWeight: '800' },
-  openNoteHint: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
-  openNoteArrow: { color: '#91a198', fontSize: 28, lineHeight: 30 },
-  resetCreditSummary: { minHeight: 76, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14, borderRadius: 15, backgroundColor: COLORS.paleBlue, paddingHorizontal: 16, paddingVertical: 13 },
-  resetCreditSummaryLabel: { color: COLORS.ink, fontSize: 14, fontWeight: '800' },
-  resetCreditSummaryHint: { color: COLORS.muted, fontSize: 10, lineHeight: 15, marginTop: 4 },
-  resetCreditCount: { color: '#148da3', fontSize: 26, fontWeight: '900' },
-  resetCreditCountUnit: { color: COLORS.muted, fontSize: 12, fontWeight: '700' },
-  resetCreditsScroll: { maxHeight: 390, marginTop: 12 },
-  resetCreditsScrollContent: { paddingBottom: 4 },
-  resetCreditStatus: { minHeight: 190, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border, borderRadius: 15, backgroundColor: COLORS.canvas, padding: 22 },
-  resetCreditStatusText: { color: COLORS.muted, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 8 },
-  resetCreditErrorTitle: { color: COLORS.danger, fontSize: 16, fontWeight: '800' },
-  resetCreditRetry: { minWidth: 94, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: COLORS.paleBlue, marginTop: 15, paddingHorizontal: 14 },
-  resetCreditRetryText: { color: '#168da2', fontSize: 13, fontWeight: '800' },
-  resetCreditEmptyIcon: { width: 42, height: 42, borderRadius: 21, color: '#14806f', backgroundColor: '#d8f4ec', fontSize: 23, lineHeight: 42, fontWeight: '900', textAlign: 'center', overflow: 'hidden' },
-  resetCreditEmptyTitle: { color: COLORS.ink, fontSize: 15, fontWeight: '800', marginTop: 12 },
-  resetCreditCard: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 15, backgroundColor: '#fff', padding: 15, marginBottom: 10 },
-  resetCreditCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 13 },
-  resetCreditCardIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.paleBlue, marginRight: 10 },
-  resetCreditCardIconText: { color: '#168da2', fontSize: 19, lineHeight: 22, fontWeight: '800' },
-  resetCreditCardTitle: { flex: 1, color: COLORS.ink, fontSize: 14, fontWeight: '800' },
-  resetCreditAvailableBadge: { borderRadius: 7, backgroundColor: COLORS.paleGreen, paddingHorizontal: 8, paddingVertical: 4 },
-  resetCreditAvailableText: { color: '#14806f', fontSize: 10, fontWeight: '800' },
-  resetCreditTimeRow: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 14 },
-  resetCreditTimeLabel: { width: 58, color: COLORS.muted, fontSize: 11 },
-  resetCreditTimeValue: { flex: 1, color: COLORS.ink, fontSize: 12, fontWeight: '700', textAlign: 'right' },
-  resetCreditTimeDivider: { height: 1, backgroundColor: '#eef3ef' },
   switchDeviceScroll: { maxHeight: 440, marginBottom: 12 },
   switchDeviceRow: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: 11, borderWidth: 1, borderColor: COLORS.border, borderRadius: 14, backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 11, marginBottom: 10 },
   switchDeviceRowCurrent: { borderColor: '#8fdccf', backgroundColor: COLORS.paleBlue },

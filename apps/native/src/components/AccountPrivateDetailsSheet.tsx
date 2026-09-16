@@ -1,28 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
-import * as Clipboard from 'expo-clipboard';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { updateAccountDetails } from '../api/client';
-import { generateTotp, normalizeTotpSecret, parseOtpAuthUri } from '../totp/totp';
+import { normalizeTotpSecret, parseOtpAuthUri } from '../totp/totp';
 import { TotpQrScanner } from '../totp/TotpQrScanner';
 import type { AccountSummary, AuthSession } from '../types';
 import { BottomSheet } from './BottomSheet';
 import { SheetScrollView } from './SheetScrollView';
 import { Toast } from './AppToast';
-
-const TOTP_PERIOD_SECONDS = 30;
+import { useAccountTotp } from '../accounts/useAccountTotp';
+import { copyAccountValue as copyValue } from '../accounts/copyAccountValue';
 
 function messageOf(error: unknown) {
   return error instanceof Error ? error.message : '保存失败，请稍后重试';
-}
-
-async function copyValue(label: string, value: string) {
-  if (!value) return;
-  try {
-    await Clipboard.setStringAsync(value);
-    Toast.success(`已复制${label}`);
-  } catch {
-    Toast.fail('复制失败，请重试');
-  }
 }
 
 function normalizeAccountTotp(value: string) {
@@ -62,30 +51,6 @@ function SecretInputRow({ label, value, onChangeText, hidden, onToggle, maxLengt
       </Pressable>
     </View>
   </View>;
-}
-
-function useAccountTotp(secret: string) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    if (!secret) return undefined;
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 1_000);
-    return () => clearInterval(timer);
-  }, [secret]);
-  return useMemo(() => {
-    if (!secret) return null;
-    try {
-      const code = generateTotp({
-        id: 'account-preview', issuer: 'ChatGPT', accountName: '', secret,
-        algorithm: 'SHA1', digits: 6, period: TOTP_PERIOD_SECONDS,
-        createdAt: '1970-01-01T00:00:00.000Z', updatedAt: '1970-01-01T00:00:00.000Z',
-      }, now);
-      const elapsed = Math.floor(now / 1_000) % TOTP_PERIOD_SECONDS;
-      return { code, remaining: TOTP_PERIOD_SECONDS - elapsed };
-    } catch {
-      return null;
-    }
-  }, [now, secret]);
 }
 
 function AccountTotpPreview({ secret }: { secret: string }) {
@@ -171,7 +136,7 @@ export function AccountPrivateDetailsSheet({ account, session, syncing, onClose,
         privateDetails: { password, phoneNumber: phoneNumber.trim(), totpSecret: normalizedTotpSecret },
       });
       onUpdated(updated);
-      Toast.success('账号资料已保存');
+      Toast.success('账号信息已保存');
       onClose();
     } catch (error) {
       Toast.fail(messageOf(error));
@@ -181,7 +146,8 @@ export function AccountPrivateDetailsSheet({ account, session, syncing, onClose,
   };
 
   return <>
-    <BottomSheet fullWidthContent visible={Boolean(account) && !scannerOpen} tall title="账号资料" subtitle={account?.email}
+    <BottomSheet fullWidthContent dragFromHeaderOnly visible={Boolean(account) && !scannerOpen}
+      tall title="编辑账号信息" subtitle={account?.email}
       onClose={onClose} dismissible={!saving} actions={[
         { label: '取消', onPress: onClose, disabled: saving },
         {

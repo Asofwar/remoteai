@@ -1,0 +1,176 @@
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { consumeResetCredit } from '../api/client';
+import { BottomSheet } from '../components/BottomSheet';
+import { Toast } from '../components/AppToast';
+import type { AccountSummary } from '../types';
+import { displayFullDate, maskEmail } from './formatters';
+import type { ResetCreditsState } from './useResetCredits';
+
+const COLORS = { ink: '#111827', muted: '#738091', border: '#e6ebef', canvas: '#f7faf9',
+  paleBlue: '#e8f8fb', paleGreen: '#e6f8f1', green: '#00aa96', danger: '#d95454' };
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : '请稍后重试';
+}
+
+export function ResetCreditsDrawer({ account, visible, privateMode, credits: creditState, onClose, onConsumed }: {
+  account: AccountSummary;
+  visible: boolean;
+  privateMode: boolean;
+  credits: ResetCreditsState;
+  onClose: () => void;
+  onConsumed: () => Promise<void>;
+}) {
+  const [consuming, setConsuming] = useState(false);
+  const { summary, loading, error, reload: loadCredits } = creditState;
+
+  const useCredit = useCallback(async () => {
+    if (consuming) return;
+    setConsuming(true);
+    try {
+      await consumeResetCredit(account);
+      Toast.success('重置卡使用成功');
+      await Promise.all([loadCredits(), onConsumed()]);
+    } catch (nextError) {
+      Toast.fail(`使用失败：${errorMessage(nextError)}`);
+    } finally {
+      setConsuming(false);
+    }
+  }, [account, consuming, loadCredits, onConsumed]);
+
+  const confirmUseCredit = useCallback(() => {
+    if (!summary?.credits.length || consuming) return;
+    Alert.alert(
+      '确认使用重置卡？',
+      '使用一张重置卡，恢复当前可重置的用量额度。',
+      [
+        { text: '取消', style: 'cancel' },
+        { text: '使用重置卡', style: 'destructive', onPress: () => void useCredit() },
+      ],
+    );
+  }, [consuming, summary?.credits.length, useCredit]);
+
+  const credits = summary?.credits ?? [];
+  return <BottomSheet
+    visible={visible}
+    title="重置卡详情"
+    subtitle={privateMode ? maskEmail(account.email) : account.email}
+    onClose={onClose}
+    onBack={onClose}
+    dismissible={!consuming}
+    dragFromHeaderOnly
+    actions={[
+      { label: '关闭', onPress: onClose, disabled: consuming },
+      {
+        label: '使用重置卡',
+        tone: 'primary',
+        onPress: confirmUseCredit,
+        loading: consuming,
+        disabled: loading || Boolean(error) || credits.length === 0,
+      },
+    ]}
+  >
+    <View style={styles.resetCreditSummary}>
+      <View>
+        <Text style={styles.resetCreditSummaryLabel}>当前可用</Text>
+        <Text style={styles.resetCreditSummaryHint}>使用前会再次确认可用数量</Text>
+      </View>
+      <Text style={styles.resetCreditCount}>{loading || error ? '—' : credits.length}
+        <Text style={styles.resetCreditCountUnit}> 张</Text>
+      </Text>
+    </View>
+
+    <ScrollView
+      style={styles.resetCreditsScroll}
+      contentContainerStyle={styles.resetCreditsScrollContent}
+      showsVerticalScrollIndicator={false}
+    >
+      {loading ? <View style={styles.resetCreditStatus}>
+        <ActivityIndicator color={COLORS.green} />
+        <Text style={styles.resetCreditStatusText}>正在读取重置卡…</Text>
+      </View> : error ? <View style={styles.resetCreditStatus}>
+        <Text style={styles.resetCreditErrorTitle}>读取失败</Text>
+        <Text style={styles.resetCreditStatusText}>{error}</Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => void loadCredits()}
+          style={({ pressed }) => [styles.resetCreditRetry, pressed && styles.pressed]}
+        >
+          <Text style={styles.resetCreditRetryText}>重新读取</Text>
+        </Pressable>
+      </View> : credits.length === 0 ? <View style={styles.resetCreditStatus}>
+        <Text style={styles.resetCreditEmptyIcon}>✓</Text>
+        <Text style={styles.resetCreditEmptyTitle}>当前没有可用重置卡</Text>
+        <Text style={styles.resetCreditStatusText}>获得新的重置卡后，可在这里查看和使用。</Text>
+      </View> : credits.map((credit, index) => <View
+        key={`${credit.issuedAt ?? 'unknown'}-${credit.expiresAt ?? 'unknown'}-${index}`}
+        style={styles.resetCreditCard}
+      >
+        <View style={styles.resetCreditCardHeader}>
+          <View style={styles.resetCreditCardIcon}><Text style={styles.resetCreditCardIconText}>↻</Text></View>
+          <Text style={styles.resetCreditCardTitle}>重置卡 {index + 1}</Text>
+          <View style={styles.resetCreditAvailableBadge}><Text style={styles.resetCreditAvailableText}>可用</Text></View>
+        </View>
+        <View style={styles.resetCreditTimeRow}>
+          <Text style={styles.resetCreditTimeLabel}>发放时间</Text>
+          <Text style={styles.resetCreditTimeValue}>{displayFullDate(credit.issuedAt)}</Text>
+        </View>
+        <View style={styles.resetCreditTimeDivider} />
+        <View style={styles.resetCreditTimeRow}>
+          <Text style={styles.resetCreditTimeLabel}>到期时间</Text>
+          <Text style={styles.resetCreditTimeValue}>{displayFullDate(credit.expiresAt)}</Text>
+        </View>
+      </View>)}
+    </ScrollView>
+  </BottomSheet>;
+}
+
+const styles = StyleSheet.create({
+  resetCreditSummary: {
+    minHeight: 76, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14,
+    borderRadius: 15, backgroundColor: COLORS.paleBlue, paddingHorizontal: 16, paddingVertical: 13,
+  },
+  resetCreditSummaryLabel: { color: COLORS.ink, fontSize: 14, fontWeight: '800' },
+  resetCreditSummaryHint: { color: COLORS.muted, fontSize: 10, lineHeight: 15, marginTop: 4 },
+  resetCreditCount: { color: '#148da3', fontSize: 26, fontWeight: '900' },
+  resetCreditCountUnit: { color: COLORS.muted, fontSize: 12, fontWeight: '700' },
+  resetCreditsScroll: { maxHeight: 390, marginTop: 12 },
+  resetCreditsScrollContent: { paddingBottom: 4 },
+  resetCreditStatus: {
+    minHeight: 190, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border,
+    borderRadius: 15, backgroundColor: COLORS.canvas, padding: 22,
+  },
+  resetCreditStatusText: { color: COLORS.muted, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 8 },
+  resetCreditErrorTitle: { color: COLORS.danger, fontSize: 16, fontWeight: '800' },
+  resetCreditRetry: {
+    minWidth: 94, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 10,
+    backgroundColor: COLORS.paleBlue, marginTop: 15, paddingHorizontal: 14,
+  },
+  resetCreditRetryText: { color: '#168da2', fontSize: 13, fontWeight: '800' },
+  resetCreditEmptyIcon: {
+    width: 42, height: 42, borderRadius: 21, color: '#14806f', backgroundColor: '#d8f4ec', fontSize: 23,
+    lineHeight: 42, fontWeight: '900', textAlign: 'center', overflow: 'hidden',
+  },
+  resetCreditEmptyTitle: { color: COLORS.ink, fontSize: 15, fontWeight: '800', marginTop: 12 },
+  resetCreditCard: {
+    borderWidth: 1, borderColor: COLORS.border, borderRadius: 15, backgroundColor: '#fff', padding: 15,
+    marginBottom: 10,
+  },
+  resetCreditCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 13 },
+  resetCreditCardIcon: {
+    width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: COLORS.paleBlue, marginRight: 10,
+  },
+  resetCreditCardIconText: { color: '#168da2', fontSize: 19, lineHeight: 22, fontWeight: '800' },
+  resetCreditCardTitle: { flex: 1, color: COLORS.ink, fontSize: 14, fontWeight: '800' },
+  resetCreditAvailableBadge: {
+    borderRadius: 7, backgroundColor: COLORS.paleGreen, paddingHorizontal: 8, paddingVertical: 4,
+  },
+  resetCreditAvailableText: { color: '#14806f', fontSize: 10, fontWeight: '800' },
+  resetCreditTimeRow: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  resetCreditTimeLabel: { width: 58, color: COLORS.muted, fontSize: 11 },
+  resetCreditTimeValue: { flex: 1, color: COLORS.ink, fontSize: 12, fontWeight: '700', textAlign: 'right' },
+  resetCreditTimeDivider: { height: 1, backgroundColor: '#eef3ef' },
+  pressed: { opacity: 0.7 },
+});

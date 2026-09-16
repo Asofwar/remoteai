@@ -17,3 +17,26 @@ export function maskEmail(email: string) {
   const local = email.slice(0, at);
   return `${local.slice(0, 2)}${'*'.repeat(Math.min(5, Math.max(2, local.length - 2)))}${email.slice(at)}`;
 }
+
+export function displayDate(value?: string | null) {
+  if (!value) return '未刷新';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '未刷新';
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(date);
+}
+
+export function displayFullDate(value?: string | null) {
+  if (!value) return '时间未知';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '时间未知';
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date);
+}

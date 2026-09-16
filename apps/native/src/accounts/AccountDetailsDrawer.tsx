@@ -1,0 +1,94 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { AccountPrivateDetailsSheet } from '../components/AccountPrivateDetailsSheet';
+import { BottomSheet } from '../components/BottomSheet';
+import { SheetScrollView } from '../components/SheetScrollView';
+import type { AccountSummary, AuthSession, RemoteDevice } from '../types';
+import { AccountInfoCard } from './AccountInfoCard';
+import { AccountUsageSection, type UsageHelp } from './AccountUsageSection';
+import { detailColors as colors, detailStyles as styles } from './detailStyles';
+import { maskEmail } from './formatters';
+import { ResetCreditsDrawer } from './ResetCreditsDrawer';
+import { useResetCredits } from './useResetCredits';
+
+interface AccountDetailsProps {
+  account: AccountSummary;
+  session: AuthSession;
+  devices: RemoteDevice[];
+  privateMode: boolean;
+  refreshing: boolean;
+  syncing: boolean;
+  onClose: () => void;
+  onRefresh: (accountId: string) => Promise<void>;
+  onRefreshServer: () => Promise<void>;
+  onAccountUpdated: (account: AccountSummary) => void;
+}
+
+type DetailsPanel = 'overview' | 'edit' | 'credits' | 'note' | UsageHelp;
+
+function AccountIdentity({ account, devices, privateMode, refreshing, onRefresh }: Pick<AccountDetailsProps,
+  'account' | 'devices' | 'privateMode' | 'refreshing'> & { onRefresh: () => void }) {
+  const active = devices.filter((device) => !device.activeProviderId && device.activeAccountId === account.id);
+  const email = privateMode ? maskEmail(account.email) : account.email;
+  return <View style={styles.hero}>
+    <View style={styles.avatar}><Text style={styles.initials}>{account.email.slice(0, 2).toUpperCase()}</Text></View>
+    <View style={styles.identity}>
+      <Text style={styles.email} numberOfLines={1}>{email}</Text>
+      <Text style={styles.status}>{active.length
+        ? `${active.map((device) => device.name).join('、')} 正在使用` : '当前没有设备使用此账号'}</Text>
+      <View style={styles.badge}><Text style={styles.plan}>{account.plan || 'ChatGPT'}</Text></View>
+    </View>
+    <Pressable accessibilityRole="button" accessibilityLabel="刷新账号状态" disabled={refreshing}
+      onPress={onRefresh} style={({ pressed }) => [styles.refresh,
+        pressed && styles.pressed, refreshing && styles.disabled]}>
+      <View style={styles.refreshCircle}>{refreshing ? <ActivityIndicator color={colors.green} />
+        : <Ionicons name="sync" size={23} color={colors.green} />}</View>
+      <Text style={styles.refreshCaption}>刷新状态</Text>
+    </Pressable>
+  </View>;
+}
+
+function DetailMessage({ panel, note, onClose }: { panel: DetailsPanel; note: string; onClose: () => void }) {
+  const visible = panel === 'note' || panel === 'primary' || panel === 'secondary';
+  const title = panel === 'note' ? '账号备注' : `${panel === 'primary' ? '主' : '次'}用量窗口`;
+  return <BottomSheet visible={visible} title={title} onClose={onClose} onBack={onClose}
+    fullWidthContent dragFromHeaderOnly>
+    <SheetScrollView contentContainerStyle={styles.messageContent}>
+      <Text selectable style={styles.note}>{panel === 'note' ? (note || '还没有备注')
+        : '这里显示该用量窗口的剩余额度和重置时间。不同套餐的窗口时长可能不同，请以账号返回的用量为准。'}</Text>
+    </SheetScrollView>
+  </BottomSheet>;
+}
+
+function AccountDetailsContent(props: AccountDetailsProps) {
+  const { account, onClose, onRefresh, onRefreshServer } = props;
+  const [panel, setPanel] = useState<DetailsPanel>('overview');
+  const credits = useResetCredits(account);
+  const overview = panel === 'overview';
+  const returnToOverview = () => setPanel('overview');
+  const refresh = () => { void onRefresh(account.id); void credits.reload(); };
+  const edit = () => { setPanel('edit'); void onRefreshServer(); };
+  return <>
+    <BottomSheet visible={overview} title="账号详情" subtitle="查看账号的使用情况与配置信息"
+      onClose={onClose} tall fullWidthContent dragFromHeaderOnly>
+      <SheetScrollView contentContainerStyle={styles.content}>
+        <AccountIdentity {...props} onRefresh={refresh} />
+        <AccountUsageSection usage={account.usage} refreshing={props.refreshing}
+          onRefresh={refresh} onHelp={setPanel} />
+        <AccountInfoCard account={account} credits={credits} active={overview} onEdit={edit}
+          onNote={() => setPanel('note')} onCredits={() => setPanel('credits')} />
+      </SheetScrollView>
+    </BottomSheet>
+    <AccountPrivateDetailsSheet account={panel === 'edit' ? account : null} session={props.session}
+      syncing={props.syncing} onClose={returnToOverview} onUpdated={props.onAccountUpdated} />
+    <ResetCreditsDrawer account={account} visible={panel === 'credits'} credits={credits}
+      privateMode={props.privateMode} onClose={returnToOverview} onConsumed={onRefreshServer} />
+    <DetailMessage panel={panel} note={account.note} onClose={returnToOverview} />
+  </>;
+}
+
+export function AccountDetailsDrawer(props: Omit<AccountDetailsProps, 'account'> & { account: AccountSummary | null }) {
+  if (!props.account) return null;
+  return <AccountDetailsContent {...props} account={props.account} key={props.account.id} />;
+}

@@ -25,6 +25,13 @@ same-named user groups are left in place. Opening returns the tab, window and gr
 failure closes only the newly created tab and reports an error. Bringing a page forward requires
 an explicit user request in the browser instructions. This is an agent instruction, not an access
 restriction on existing tabs; users can still request operations on their own open pages.
+The debugger session prepares background input with Chrome's focus emulation without activating a
+tab or bringing a window forward. A selected tab created in a minimized window can have a zero-sized
+viewport; only that session receives temporary viewport dimensions. The window remains minimized.
+Input-driven rendering is allowed to settle before detaching, with a one-second limit so background
+animation callbacks do not leave the tool waiting indefinitely. All overrides end with the session.
+This fixes the case where input commands acknowledged a click but the background page received no
+mouse event. A fresh snapshot is still required to verify the site's actual response.
 GUI conversations support the upstream MCP tool confirmation form with single-use allow/deny choices;
 site access and tool approval remain separate controls. Chrome webpage tasks prefer the Chrome skill,
 which explicitly checks tool availability instead of assuming that an installed skill provides tools.
@@ -208,6 +215,7 @@ node --test scripts/chrome-plugin.test.mjs scripts/chrome-plugin-snapshot.test.m
 node scripts/chrome-plugin-tab-groups.test.mjs
 node scripts/chrome-plugin-tab-indicator.test.mjs
 node --test scripts/chrome-plugin-update.test.mjs
+node --test scripts/chrome-plugin-driver.test.mjs
 cargo build --manifest-path apps/desktop/src-tauri/Cargo.toml --bin csw
 node --test scripts/chrome-plugin-protocol.test.mjs
 ```
@@ -217,3 +225,11 @@ library harness and fail before running tests. For a release STDIO check, set `C
 to the release executable and run `node scripts/chrome-plugin-protocol.test.mjs --initialize-only`.
 Release builds intentionally ignore the debug-only `CSW_CHROME_TEST_ROOT` override. The full debug
 protocol fixture uses temporary credentials and a simulated extension without changing Chrome registration.
+
+`node scripts/chrome-plugin-background.e2e.mjs` tests real extension input in an isolated Chrome profile.
+Install a Playwright Chromium build or set `CSW_CHROME_TEST_BROWSER` to a Chrome for Testing executable.
+On Windows the fixture creates its own unfocused window and minimizes it, testing both selected and
+unselected tabs, trusted clicks, animation updates, input, checkboxes, and same/cross-origin frames.
+It asserts that window state and tab selection are unchanged. The harness attaches raw CDP only to
+the extension worker: Playwright page setup would otherwise supply its own focus emulation and hide
+the original bug. The test does not connect to the user's native host or touch existing browser profiles.

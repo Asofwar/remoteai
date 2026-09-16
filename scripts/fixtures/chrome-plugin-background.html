@@ -1,0 +1,33 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Browser background input fixture</title>
+<style>
+  body{font:16px sans-serif;padding:24px}button,input{padding:12px;margin:8px}iframe{width:90%;height:240px}
+</style>
+<h1>Background input</h1>
+<button id="plain">Plain click</button><button id="animated">Animated click</button>
+<input aria-label="Test input"><label><input id="check" type="checkbox">Test checkbox</label>
+<pre id="state"></pre><div id="frames"></div>
+<div style="height:1200px"></div><button id="offscreen">Offscreen click</button>
+<script>
+  const state = { plain: 0, animated: 0, offscreen: 0, input: '', trusted: false };
+  const report = () => document.querySelector('#state').textContent = JSON.stringify(state);
+  for (const id of ['plain', 'animated', 'offscreen']) document.getElementById(id).onclick = event => {
+    state.trusted = event.isTrusted;
+    if (id === 'animated') requestAnimationFrame(() => { state[id]++; report(); });
+    else { state[id]++; report(); }
+  };
+  document.querySelector('input').oninput = event => { state.input = event.target.value; report(); };
+  if (!new URL(location.href).searchParams.has('frame')) {
+    for (const host of [location.hostname, 'localhost']) {
+      const url = new URL(location.href);
+      url.hostname = host;
+      url.search = '?frame';
+      const frame = document.createElement('iframe');
+      frame.src = url;
+      frame.title = host;
+      document.querySelector('#frames').append(frame);
+    }
+  }
+  report();
+</script>

@@ -25,6 +25,9 @@ claim that Computer Use provides these Chrome MCP tools.
    `browser_tabs` to select an existing user page when the user has requested that page; a matching
    URL or the currently active tab alone is not a request to use it. Leave that page in its original group.
    Keep `background` enabled and avoid `browser_focus` unless the user asks to bring the page forward.
+   The plugin prepares background input without switching tabs or raising Chrome. An ineffective click
+   alone does not establish that foreground access is required: refresh the snapshot, check the target
+   and any page changes, and report the observed failure instead of assuming that background control is unsupported.
 3. Read `browser_snapshot` before actions. Use the exact returned element references. After
    navigation or significant page changes, read a fresh snapshot. Use `browser_frames` and a
    frame-specific snapshot for embedded documents. Use screenshots when layout matters.

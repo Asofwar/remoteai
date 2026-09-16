@@ -1,6 +1,7 @@
 import { authorize, assertRunning } from './permissions.js';
 import { createFrameSessions } from './frame-sessions.js';
 import { markControlledTab, clearControlledTabs } from './tab-indicator.js';
+import { prepareBackgroundPage, restoreBackgroundPage, settleRendering } from './rendering.js';
 
 const queues = new Map();
 const attached = new Set();
@@ -30,15 +31,21 @@ async function run(context, args, operation) {
     await authorize(current.url, context.clientId, context.signal);
   };
   const sessions = createFrameSessions(target, guard);
+  let viewportOverridden = false;
   try {
     await guard();
+    // Prepare the renderer for trusted input without activating its tab or bringing Chrome forward.
+    viewportOverridden = await prepareBackgroundPage({ tab, send: sessions.send });
     await markControlledTab(tab.id);
     await sessions.initialize();
     const driver = { tab, send: sessions.send, documents: sessions.documents, context, guard };
-    return await operation(driver);
+    const result = await operation(driver);
+    await settleRendering(driver);
+    return result;
   } finally {
     context.signal?.removeEventListener('abort', abort);
     sessions.dispose();
+    await restoreBackgroundPage(target, viewportOverridden);
     attached.delete(tab.id);
     // The browser can detach first when the tab closes or the user stops debugging.
     await chrome.debugger.detach(target).catch(() => {});

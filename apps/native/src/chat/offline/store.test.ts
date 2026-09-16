@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import initSqlJs from 'sql.js';
 import type { BindParams, Database } from 'sql.js';
 import { accountScope, SqliteHistoryStore } from './store';
@@ -6,6 +6,7 @@ import { readDevices, saveDevices } from './devices';
 import { THREAD_COUNT_LIMIT, THREAD_CHAR_LIMIT, HISTORY_CHAR_LIMIT, IMAGE_CHAR_LIMIT } from './records';
 import type { Thread } from '../types';
 import { sliceHistory } from '../../../../../shared/remote-chat/historyPage';
+import { DEFAULT_CHAT_POLICY, setChatPolicy } from '../../../../../shared/remote-chat/policy';
 
 const state = vi.hoisted(() => ({ db: null as Database | null, reads: [] as string[] }));
 vi.mock('expo-sqlite', () => {
@@ -53,8 +54,24 @@ beforeEach(() => {
   state.db.exec('PRAGMA foreign_keys = ON'); state.reads = [];
 });
 afterAll(() => state.db?.close());
+afterEach(() => setChatPolicy(DEFAULT_CHAT_POLICY));
 
 describe('persistent chat cache using SQLite', () => {
+  it('loads more than 100 messages per page and applies updated settings to older history', async () => {
+    await store().save({ thread: history('chat', 500), page: { hasMore: false }, archived: false });
+    setChatPolicy({ ...DEFAULT_CHAT_POLICY, historyPageSize: 150 });
+    const recent = await store().read('chat', {});
+    expect(items(recent)).toHaveLength(150);
+    expect(recent?.page.hasMore).toBe(true);
+    setChatPolicy({ ...DEFAULT_CHAT_POLICY, historyPageSize: 200 });
+    const older = await store().read('chat', { start: recent?.page.start, older: true });
+    expect(items(older)).toHaveLength(350);
+    expect(older?.page.hasMore).toBe(true);
+    const first = await store().read('chat', { start: older?.page.start, older: true });
+    expect(items(first)).toHaveLength(500);
+    expect(first?.page.hasMore).toBe(false);
+  });
+
   it('survives reopening and reads only the newest page before loading older records', async () => {
     await store().save({ ...sliceHistory(history(), { start: { turnId: 'turn', itemId: '5' } }), archived: false });
     const bytes = state.db!.export();

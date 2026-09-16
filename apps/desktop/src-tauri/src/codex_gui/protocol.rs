@@ -9,8 +9,7 @@ use super::prompt::{
     batch_params, send_params, AttachmentInput, PromptInput, SkillInput, TurnOptions,
 };
 
-const PAGE_SIZE: u32 = 50;
-const MAX_PAGE_SIZE: u32 = 100;
+const PAGE_SIZE: u64 = 50;
 
 #[derive(Debug, Deserialize)]
 #[serde(
@@ -63,7 +62,7 @@ pub(crate) enum GuiRequest {
         thread_id: String,
     },
     List {
-        limit: Option<u32>,
+        limit: Option<u64>,
         cursor: Option<String>,
         archived: bool,
         search: Option<String>,
@@ -259,7 +258,7 @@ impl GuiRequest {
             } => Ok((
                 "thread/list",
                 json!({
-                    "limit": limit.unwrap_or(PAGE_SIZE).clamp(1, MAX_PAGE_SIZE),
+                    "limit": limit.unwrap_or(PAGE_SIZE).max(1),
                     "cursor": cursor, "archived": archived, "searchTerm": search,
                     "sortKey": "updated_at", "modelProviders": []
                 }),

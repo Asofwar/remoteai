@@ -2,8 +2,8 @@
 export const CHAT_POLICY_FIELDS = {
   relayMaxMbPerSecond: { min: -1, max: undefined, default: -1 },
   relayMaxFramesPerSecond: { min: -1, max: undefined, default: -1 },
-  threadPageSize: { min: 1, max: 100, default: 50 },
-  historyPageSize: { min: 1, max: 100, default: 10 },
+  threadPageSize: { min: 1, max: undefined, default: 50 },
+  historyPageSize: { min: 1, max: undefined, default: 10 },
   imageSourceMaxMb: { min: 1, max: undefined, default: 20 },
   imageMaxEdge: { min: 256, max: undefined, default: 2048 },
   imageTargetKb: { min: 32, max: undefined, default: 512 },

@@ -27,12 +27,12 @@ export const POLICY_SECTIONS: PolicySection[] = [
     { key: 'videoPreviewMaxMb', label: ['视频播放上限', 'Video playback limit'],
       hint: ['允许播放的最大视频文件大小', 'Maximum video file size for playback'], unit: ['MB', 'MB'] },
   ] },
-  { key: 'history', title: ['聊天记录', 'Chat history'], hint: ['调整每次加载的内容数量。',
-    'Choose how much content to load at a time.'], fields: [
+  { key: 'history', title: ['聊天记录', 'Chat history'], hint: ['调整每次加载的数量，数值不设上限。',
+    'Choose how many items to load at a time, with no upper limit.'], fields: [
     { key: 'threadPageSize', label: ['会话数量', 'Conversations per page'],
-      hint: ['每次加载 1–100 个会话', 'Load 1–100 conversations at a time'], unit: ['个', 'items'] },
+      hint: ['每次加载的会话数，至少 1 个', 'Conversations to load at a time; at least 1'], unit: ['个', 'items'] },
     { key: 'historyPageSize', label: ['历史消息数量', 'History messages per page'],
-      hint: ['每次加载 1–100 条历史消息', 'Load 1–100 older messages at a time'], unit: ['条', 'items'] },
+      hint: ['每次加载的历史消息数，至少 1 条', 'Older messages to load at a time; at least 1'], unit: ['条', 'items'] },
   ] },
   { key: 'files', title: ['文件', 'Files'], hint: ['设置文件上传、文本预览和下载的大小限制。',
     'Set size limits for file uploads, text previews and downloads.'], fields: [

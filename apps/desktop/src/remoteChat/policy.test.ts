@@ -21,19 +21,19 @@ it('checks the current limit before starting a web download, including previousl
 
 it('applies changed history page sizes without moving the previously loaded boundary', () => {
   const thread = { id: 'chat', turns: [
-    { id: 'turn', items: Array.from({ length: 20 }, (_, id) => ({ id: `${id}` })) },
+    { id: 'turn', items: Array.from({ length: 500 }, (_, id) => ({ id: `${id}` })) },
   ] } as Thread;
-  setChatPolicy({ ...DEFAULT_CHAT_POLICY, historyPageSize: 3 });
+  setChatPolicy({ ...DEFAULT_CHAT_POLICY, historyPageSize: 150 });
   const first = sliceHistory(thread);
-  expect(first.thread.turns?.[0].items).toHaveLength(3);
-  setChatPolicy({ ...DEFAULT_CHAT_POLICY, historyPageSize: 5 });
+  expect(first.thread.turns?.[0].items).toHaveLength(150);
+  setChatPolicy({ ...DEFAULT_CHAT_POLICY, historyPageSize: 200 });
   const next = sliceHistory(thread, { start: first.page.start, older: true });
-  expect(next.thread.turns?.[0].items).toHaveLength(8);
+  expect(next.thread.turns?.[0].items).toHaveLength(350);
   expect(next.page.hasMore).toBe(true);
 });
 
 it('overrides client-supplied pagination and preview limits and preserves retried request bodies', async () => {
-  setChatPolicy({ ...DEFAULT_CHAT_POLICY, threadPageSize: 7, filePreviewMaxMb: 1 });
+  setChatPolicy({ ...DEFAULT_CHAT_POLICY, threadPageSize: 1000, filePreviewMaxMb: 1 });
   vi.mocked(guiApi.request).mockResolvedValue({ data: [], nextCursor: null });
   const operations = new ChatOperations();
   const request = { kind: 'request' as const, id: 'page', method: 'request' as const,
@@ -41,7 +41,7 @@ it('overrides client-supplied pagination and preview limits and preserves retrie
   await operations.execute(request);
   await operations.execute(request);
   expect(guiApi.request).toHaveBeenCalledTimes(1);
-  expect(guiApi.request).toHaveBeenCalledWith({ ...request.body, limit: 7 });
+  expect(guiApi.request).toHaveBeenCalledWith({ ...request.body, limit: 1000 });
   expect(request.body.limit).toBe(100);
   await operations.execute({ ...request, id: 'preview', body: {
     operation: 'textPreview', threadId: 'chat', path: 'text.txt', maxBytes: 99999999,

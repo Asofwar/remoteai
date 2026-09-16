@@ -39,7 +39,7 @@ describe('chat settings', () => {
       ) => work({ save, create }) } };
     const service = new ChatSettingsService(repository as unknown as Repository<ChatSettingsEntity>);
     expect(await service.read()).toEqual(DEFAULT_CHAT_POLICY);
-    const policy = { ...DEFAULT_CHAT_POLICY, threadPageSize: 7, imageTargetKb: 128,
+    const policy = { ...DEFAULT_CHAT_POLICY, threadPageSize: 1000, historyPageSize: 500, imageTargetKb: 128,
       fileUploadMaxMb: 20, fileUploadTotalMaxMb: 50, filePreviewMaxMb: 100, fileDownloadMaxMb: 1000 };
     const actor = { id: 'owner', email: 'owner@example.test' } as AuthUser;
     expect(await service.update(actor, policy)).toEqual(policy);
@@ -67,6 +67,16 @@ describe('chat settings', () => {
     'accepts large image settings without an upper cap: %s', (key) => {
       for (const value of [1000000, Number.MAX_SAFE_INTEGER]) {
         expect(parseChatPolicy({ ...DEFAULT_CHAT_POLICY, [key]: value })[key]).toBe(value);
+      }
+    });
+
+  it.each(['threadPageSize', 'historyPageSize'] as const)(
+    'accepts positive page sizes above 100 and rejects invalid values: %s', (key) => {
+      for (const value of [1, 101, 1000, Number.MAX_SAFE_INTEGER]) {
+        expect(parseChatPolicy({ ...DEFAULT_CHAT_POLICY, [key]: value })[key]).toBe(value);
+      }
+      for (const value of [0, -1, 0.5, NaN, Infinity, '100', Number.MAX_SAFE_INTEGER + 1]) {
+        expect(() => parseChatPolicy({ ...DEFAULT_CHAT_POLICY, [key]: value })).toThrow();
       }
     });
 

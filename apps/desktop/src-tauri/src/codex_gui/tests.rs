@@ -72,6 +72,24 @@ fn reads_include_history_and_lists_include_all_providers() {
 }
 
 #[test]
+fn list_page_sizes_are_forwarded_without_an_upper_cap() {
+    for (limit, expected) in [
+        (0_u64, 1_u64),
+        (101, 101),
+        (1000, 1000),
+        (9_007_199_254_740_991, 9_007_199_254_740_991),
+    ] {
+        let (method, params) = request(json!({"operation": "list", "archived": false,
+            "limit": limit, "cursor": "next-page"}))
+        .into_rpc()
+        .unwrap();
+        assert_eq!(method, "thread/list");
+        assert_eq!(params["limit"], expected);
+        assert_eq!(params["cursor"], "next-page");
+    }
+}
+
+#[test]
 fn empty_turns_and_invalid_image_paths_are_rejected() {
     for (text, images) in [(" ", json!([])), ("hello", json!(["relative.png"]))] {
         assert!(request(

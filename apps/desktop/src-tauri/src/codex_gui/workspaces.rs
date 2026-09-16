@@ -47,6 +47,11 @@ pub(super) fn prepare_request_with_upload_policy(
             thread_id,
             ..
         }
+        | GuiRequest::Fork {
+            cwd: Some(cwd),
+            thread_id,
+            ..
+        }
         | GuiRequest::Send {
             cwd: Some(cwd),
             thread_id,

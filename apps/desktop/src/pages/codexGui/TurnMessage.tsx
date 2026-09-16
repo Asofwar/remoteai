@@ -15,11 +15,12 @@ import { groupTurnItems } from "../../../../../shared/chat/turnGroups";
 export { groupTurnItems } from "../../../../../shared/chat/turnGroups";
 
 export const TurnMessage = memo(function TurnMessage({ turn, running, active, followsInterruption = false,
-  editableItemId, onEdit, editDisabled, threadId, visibleItems = turn.items }: {
+  editableItemId, onEdit, editDisabled, threadId, visibleItems = turn.items, onFork, forkDisabled }: {
   turn: Turn; running: boolean; active: boolean; followsInterruption?: boolean;
   editableItemId?: string; onEdit?: SubmitMessageEdit; editDisabled?: boolean;
   threadId?: string;
   visibleItems?: Item[];
+  onFork?: () => void; forkDisabled?: boolean;
 }) {
   const groups = useMemo(() => {
     const visible = new Set(visibleItems.map((item) => item.id));
@@ -41,6 +42,8 @@ export const TurnMessage = memo(function TurnMessage({ turn, running, active, fo
         active={active} timed={index === responseIndex} />
         : <div className={styles.messageEntry} data-message-id={group.items[0].id}>
         <MessageItem item={group.items[0]} startedAt={turn.startedAt}
+        completedAt={turn.completedAt} onFork={onFork}
+        forkDisabled={forkDisabled || running || turn.status === "inProgress"}
         onEdit={group.items[0].id === editableItemId ? onEdit : undefined} editDisabled={editDisabled}
         streaming={running && group.items[0].status !== "completed"} /></div>}
     </Fragment>)}

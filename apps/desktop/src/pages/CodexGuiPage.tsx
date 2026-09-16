@@ -4,6 +4,7 @@ import { Download, PanelBottom, PanelLeftClose, PanelLeftOpen, RefreshCw } from 
 import { canManageCodexConnection, hasLocalBackend, isDesktopApp } from "../api/backend";
 import { getGuiController, retainGuiSession } from "./codexGui/session";
 import { canEditMessage } from "./codexGui/editMessage";
+import { canForkConversation } from "./codexGui/forkConversation";
 import { ThreadSidebar, threadTitle } from "./codexGui/ThreadSidebar";
 import { Composer, type ComposerHandle } from "./codexGui/Composer";
 import { Messages } from "./codexGui/Messages";
@@ -146,6 +147,7 @@ function Workspace({ active, accountPicker, providers, aggregateApis, windowCont
         <Messages value={current} selected={state.selected} active={conversationActive}
           editCwd={state.selected ? state.projectOverrides[state.selected] : undefined}
           onEdit={controller.messageEditor.submit} editDisabled={!canEditMessage(state)}
+          onFork={controller.forkConversation} forkDisabled={!canForkConversation(state)}
           onQuote={canQuote ? (quote) => composer.current?.addQuote(quote) ?? false : undefined}
           pendingRequest={state.pendingRequest} footer={<>
           <Approvals events={pending} controller={controller} />

@@ -84,6 +84,12 @@ pub(crate) enum GuiRequest {
         access: AccessMode,
         cwd: Option<String>,
     },
+    Fork {
+        thread_id: String,
+        turn_id: String,
+        access: AccessMode,
+        cwd: Option<String>,
+    },
     Send {
         #[serde(default)]
         transfer_mode: super::upload_policy::TransferMode,
@@ -282,6 +288,24 @@ impl GuiRequest {
                 let mut params = thread_params(thread_id)?;
                 params["includeTurns"] = json!(true);
                 Ok(("thread/read", params))
+            }
+            Self::Fork {
+                thread_id,
+                turn_id,
+                access,
+                cwd,
+            } => {
+                id(&turn_id)?;
+                let mut params = thread_params(thread_id)?;
+                params["lastTurnId"] = json!(turn_id);
+                // Forking opens a draft; an inherited goal must wait for the user's next message.
+                params["deferGoalContinuation"] = json!(true);
+                if let Some(cwd) = cwd {
+                    directory(&cwd)?;
+                    params["cwd"] = json!(cwd);
+                }
+                access.apply_to_thread(&mut params);
+                Ok(("thread/fork", params))
             }
             Self::Send {
                 transfer_mode,

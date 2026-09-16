@@ -18,11 +18,12 @@ import { FileThreadContext } from "./fileApi";
 import { MessageEditContext } from "./messageEditContext";
 
 export function Messages({ value, selected, active = true, footer, pendingRequest, onQuote,
-  onEdit, editDisabled, editCwd }: {
+  onEdit, editDisabled, editCwd, onFork, forkDisabled }: {
   value?: Conversation; selected: string | null; active?: boolean; footer?: ReactNode;
   pendingRequest?: PendingRequest;
   onQuote?: (quote: ReplyQuote) => boolean;
   onEdit?: EditMessage; editDisabled?: boolean; editCwd?: string;
+  onFork?: (threadId: string, turnId: string) => Promise<boolean>; forkDisabled?: boolean;
 }) {
   const last = lastUserMessage(value);
   const { viewport, content, away, onScroll, jumpToLatest, pauseFollowing } = useFollowScroll(selected, active);
@@ -59,6 +60,8 @@ export function Messages({ value, selected, active = true, footer, pendingReques
           {history.entries.map(({ turn, items, followsInterruption }) => <TurnMessage
             key={`${selected}:${turn.id}`} turn={turn} visibleItems={items}
             threadId={selected ?? undefined}
+            onFork={onFork && selected ? () => { void onFork(selected, turn.id); } : undefined}
+            forkDisabled={forkDisabled}
             editableItemId={last?.turnId === turn.id ? last.item.id : undefined}
             editDisabled={editDisabled || Boolean(value?.activeTurn || pendingRequest || last?.item.localEcho)}
             onEdit={onEdit && selected && last ? (content) => onEdit({ threadId: selected,

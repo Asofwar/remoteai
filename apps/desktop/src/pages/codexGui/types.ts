@@ -173,6 +173,7 @@ export interface GuiState {
   loading: boolean;
   sending: boolean;
   deleting?: string;
+  forking?: string;
   compacting?: string;
   archived: boolean;
   search: string;
@@ -211,6 +212,7 @@ export type Request =
   | { operation: "models"; cursor?: string }
   | { operation: "list"; cursor?: string; archived: boolean; search?: string; limit?: number }
   | { operation: "start"; cwd?: string; model?: string; access: AccessMode }
+  | { operation: "fork"; threadId: string; turnId: string; access: AccessMode; cwd?: string }
   | { operation: "resume"; threadId: string; access: AccessMode; cwd?: string }
   | { operation: "send"; threadId: string; text: string; images: string[]; access: AccessMode;
       transferMode?: 'direct' | 'relay';

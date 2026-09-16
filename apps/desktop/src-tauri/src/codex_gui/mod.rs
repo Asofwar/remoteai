@@ -14,6 +14,8 @@ pub(crate) mod deletion;
 mod error;
 pub(crate) mod file_actions;
 mod file_stream;
+#[cfg(test)]
+mod fork_tests;
 pub(crate) mod git;
 mod goals;
 mod home;

@@ -4,7 +4,7 @@ import { connect, send, settled, screenshot, state } from './chat-helpers';
 async function choosePhotos(page: Page, count: number) {
   await page.getByRole('button', { name: '添加内容', exact: true }).click();
   const chooser = page.waitForEvent('filechooser');
-  await page.getByRole('button', { name: '相册', exact: true }).click();
+  await page.getByRole('menuitem', { name: '相册', exact: true }).click();
   const picker = await chooser;
   expect(picker.isMultiple()).toBe(true);
   await picker.setFiles(Array.from({ length: count }, () => '../desktop/src-tauri/icons/128x128.png'));

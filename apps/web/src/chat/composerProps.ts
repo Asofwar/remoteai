@@ -1,0 +1,42 @@
+import type { Model, SendInput, ThreadTokenUsage } from './types';
+import type { ComposerSettings } from '../../../../shared/remote-chat/composer';
+import type { ReadUsage } from '../../../../shared/remote-chat/usage';
+import type { ContextSettingsApi } from '../../../../shared/remote-chat/contextSettings';
+import type { QueueProps } from '../../../../shared/remote-chat/client/queueProps';
+import type { UploadProgress } from '../../../../shared/remote-chat/uploadProgress';
+import type { RemoteGoals } from '../../../../shared/remote-chat/client/goals';
+import type { ThreadGoal } from '../../../desktop/src/pages/codexGui/goalTypes';
+import type { SkillCatalogState } from '../../../../shared/chat/skillCatalog';
+import type { RemoteComposerCatalog } from '../../../../shared/remote-chat/composerCatalog';
+import type { ProjectFilesRequest, ProjectFilesResponse } from '../../../../shared/remote-chat/projectFiles';
+
+export interface ComposerProps {
+  uploadProgress?: UploadProgress;
+  queue?: QueueProps;
+  tokenUsage?: ThreadTokenUsage;
+  readUsage: ReadUsage;
+  contextSettings: ContextSettingsApi;
+  models: Model[];
+  selection: ComposerSettings;
+  settingsBusy: boolean;
+  settingsError: string;
+  updateSettings: (settings: Partial<ComposerSettings>) => Promise<void>;
+  threadId: string | null;
+  active: boolean;
+  ready: boolean;
+  sending: boolean;
+  running: boolean;
+  interrupted?: boolean;
+  send: (input: SendInput) => Promise<boolean>;
+  interrupt: () => Promise<void>;
+  goals: Pick<RemoteGoals, 'load' | 'clear'>;
+  goal?: ThreadGoal | null;
+  goalBusy: boolean;
+  catalog: SkillCatalogState & { refresh: () => void };
+  cwd: string;
+  compactReason: string | null;
+  compacting: boolean;
+  compact: () => Promise<boolean>;
+  loadCatalog: (cwd: string) => Promise<RemoteComposerCatalog>;
+  loadFiles: (options: ProjectFilesRequest) => Promise<ProjectFilesResponse>;
+}

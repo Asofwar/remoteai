@@ -1,65 +1,92 @@
-import { memo } from 'react';
-import ReactMarkdown, { type Components } from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import type { Item } from './types';
+import { useMemo, useState } from 'react';
+import { ArrowDown, ChevronDown, ChevronRight, Terminal } from 'lucide-react';
 import type { ChatMessagesProps } from '../../../../shared/remote-chat/client/messageProps';
+import { useConversationEntries } from '../../../../shared/chat/useConversationEntries';
+import { findWorkEntry, type TurnEntry, type WorkEntry } from '../../../../shared/chat/turnPresentation';
+import { formatTurnDuration, turnElapsedMs } from '../../../desktop/src/pages/codexGui/turnTiming';
+import { AdaptiveSheet } from '../components/AdaptiveSheet';
 import { useHistoryScroll } from './useHistoryScroll';
-import { ChatImage } from './ChatImage';
-import { ChatFileLink } from './ChatFileLink';
-import { parseFileReference } from '../../../../shared/chat/fileReference';
-import { itemImageSources, isInlineImage, localImageSource } from '../../../../shared/chat/imageSources';
+import { ChatMessage } from './ChatMessage';
+import { ChatToolDetails } from './ChatToolDetails';
+import { ChatTurnDetails } from './ChatTurnDetails';
+import { ChatTurnSummary, type TurnPanel } from './ChatTurnSummary';
+import './messages.css';
 
-const toolLabels: Record<string, string> = {
-  commandExecution: '执行命令', fileChange: '文件修改', reasoning: '思考过程', webSearch: '搜索网页',
-  mcpToolCall: '使用工具', collabAgentToolCall: '协作任务', plan: '执行计划',
-};
-// Stable renderers keep an open image viewer mounted while history or live text updates.
-const markdownComponents: Components = {
-  a: ({ children, href }) => <ChatFileLink href={href}>{children}</ChatFileLink>,
-  img: ({ src, alt }) => <ChatImage source={src} description={alt || '图片'} />,
-};
-function content(item: Item) {
-  return item.text || (item.content ?? [])
-    .map((entry) => typeof entry === 'string' ? entry : entry.text ?? '').join('\n');
+type Selection = { type: 'work'; id: string } | { type: 'item'; id: string; workId?: string }
+  | { type: 'turn'; id: string; panel: TurnPanel };
+
+function WorkSummary({ entry, open, inline }: {
+  entry: WorkEntry; open: () => void; inline: (id: string, value: boolean) => void;
+}) {
+  const running = entry.turn.status === 'inProgress';
+  const elapsed = entry.timed ? turnElapsedMs(entry.turn, 0) : null;
+  const label = elapsed == null ? (running ? '正在处理' : '处理过程') : `用时 ${formatTurnDuration(elapsed)}`;
+  return <div className="chat-work-summary">
+    <button type="button" aria-label={`查看处理过程，${entry.items.length} 项活动`} onClick={open}>
+      {label}<ChevronRight size={14} /></button>
+    {(entry.inline || ['inProgress', 'interrupted', 'failed'].includes(entry.turn.status)) &&
+      <button type="button" aria-expanded={entry.inline} aria-label={entry.inline ? '收起处理过程' : '展开处理过程'}
+        onClick={() => inline(entry.turn.id, !entry.inline)}>{entry.inline ? '收起' : '展开'}<ChevronDown size={14} /></button>}
+  </div>;
 }
-const ChatMessage = memo(function ChatMessage({ item }: { item: Item }) {
-  const images = itemImageSources(item);
-  if (item.type === 'userMessage') return <div className="chat-user-message">{content(item)}
-    {images.map((source, index) => <ChatImage key={index} source={source} />)}</div>;
-  if (images.length) return <div>{images.map((source, index) => <ChatImage key={index} source={source} />)}</div>;
-  if (item.type === 'agentMessage') return <article className="chat-assistant-message">
-    <strong className="chat-speaker">Codex</strong>
-    <div className="chat-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={(url, key) => {
-      if (/^https?:\/\//i.test(url)) return url;
-      if (key === 'href' && parseFileReference(url)) return url;
-      return key === 'src' && (isInlineImage(url) || localImageSource(url)) ? url : '';
-    }} components={markdownComponents}>{content(item)}</ReactMarkdown></div>
-  </article>;
-  const details = item.aggregatedOutput || item.summary?.join('\n') || content(item)
-    || item.changes?.map((change) => `${change.path}\n${change.diff}`).join('\n')
-    || (item.output ? JSON.stringify(item.output, null, 2) : '');
-  return <details className="chat-tool"><summary>{toolLabels[item.type] ?? '任务活动'}
-    {item.status === 'inProgress' ? ' · 进行中' : ''}{item.command && <code>{item.command}</code>}</summary>
-    {!!details && <pre>{details}</pre>}
-  </details>;
-});
+
+function TimelineEntry({ entry, open, inline }: {
+  entry: TurnEntry; open: (selection: Selection) => void; inline: (id: string, value: boolean) => void;
+}) {
+  if (entry.kind === 'duration') {
+    const elapsed = turnElapsedMs(entry.turn, 0);
+    return elapsed == null ? null : <p className="chat-turn-duration">用时 {formatTurnDuration(elapsed)}</p>;
+  }
+  if (entry.kind === 'summary') return <ChatTurnSummary turn={entry.turn}
+    onOpen={panel => open({ type: 'turn', id: entry.turn.id, panel })} />;
+  if (entry.kind === 'work') return <WorkSummary entry={entry} inline={inline}
+    open={() => open({ type: 'work', id: entry.id })} />;
+  return <ChatMessage item={entry.item} process={entry.kind === 'process'}
+    onOpen={id => { if (entry.kind === 'process') inline(entry.turn.id, true); open({ type: 'item', id }); }}
+    running={entry.turn.status === 'inProgress' && entry.item.status !== 'completed'} />;
+}
 
 export function ChatMessages(props: ChatMessagesProps) {
-  const { thread, loading, loadingMore, hasMore } = props;
+  const { thread, loading, loadingMore, hasMore, offline } = props;
+  const turns = useMemo(() => (thread?.turns ?? []).map(turn => offline && turn.status === 'inProgress'
+    ? { ...turn, status: 'cached' } : turn), [thread?.turns, offline]);
+  const { entries, setInline } = useConversationEntries(turns);
   const scroll = useHistoryScroll(props);
-  const items = thread?.turns?.flatMap((turn) => turn.items) ?? [];
-  const lastTurn = thread?.turns?.at(-1);
-  return <div ref={scroll.list} className="chat-scroll chat-messages" aria-label="聊天记录" onScroll={scroll.onScroll}>
-    <div ref={scroll.content} className="chat-message-content">
-    {(hasMore || (loading && !items.length)) && <div className="chat-history-more">
-      {loadingMore || (loading && !items.length)
-        ? <span role="status" className="chat-processing"><span className="chat-spinner" aria-hidden="true" />
-          正在加载聊天记录…</span>
-        : <button type="button" className="chat-button" onClick={scroll.more}>加载更早的消息</button>}
-    </div>}
-    {items.map((item) => <div key={item.id} data-message-id={item.id}><ChatMessage item={item} /></div>)}
-    {!items.length && !loading && <div className="chat-empty"><span className="chat-empty-glyph">✳</span>
-      <h2>想一起完成什么？</h2><p className="chat-muted">消息会发送到你的电脑，随时可以接着聊。</p></div>}
-    {lastTurn?.error && <p role="alert" className="chat-error">{lastTurn.error.message}</p>}
-  </div></div>;
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const work = selection?.type === 'work' ? findWorkEntry(entries, selection.id) : undefined;
+  const item = selection?.type === 'item'
+    ? turns.flatMap(turn => turn.items).find(item => item.id === selection.id) : undefined;
+  const turn = selection?.type === 'turn' ? turns.find(turn => turn.id === selection.id) : undefined;
+  const workId = selection?.type === 'item' ? selection.workId : undefined;
+  const close = () => setSelection(null);
+  return <>
+    <div className="chat-message-region">
+      <div ref={scroll.list} className="chat-scroll chat-messages" aria-label="聊天记录" onScroll={scroll.onScroll}>
+        <div ref={scroll.content} className={`chat-message-content${!entries.length ? ' is-empty' : ''}`}>
+          {(hasMore || (loading && !entries.length)) && <div className="chat-history-more">
+            {loadingMore || (loading && !entries.length)
+              ? <span role="status" className="chat-processing"><span className="chat-spinner" />正在加载聊天记录…</span>
+              : <button type="button" className="chat-text-action" onClick={scroll.more}>加载更早的消息</button>}
+          </div>}
+          {entries.map(entry => <div key={entry.id}
+            data-message-id={'item' in entry ? entry.item.id : entry.id} className={`chat-entry-${entry.kind}`}>
+            <TimelineEntry entry={entry} open={setSelection} inline={setInline} />
+          </div>)}
+          {!entries.length && !loading && <div className="chat-empty"><Terminal size={28} className="chat-empty-glyph" />
+            <h2>想一起完成什么？</h2><p className="chat-muted">直接提问，或选择一个项目开始任务。</p></div>}
+        </div>
+      </div>
+      {scroll.showBottom && entries.length > 0 && <button type="button" className="chat-scroll-bottom"
+        onClick={scroll.toBottom}><ArrowDown size={17} />回到底部</button>}
+    </div>
+    {work && <AdaptiveSheet open title={work.turn.status === 'inProgress' ? '正在处理' : '处理过程'}
+      subtitle={`${work.items.length} 项活动`} width={760} onClose={close}>
+      <div className="chat-detail-stack">{work.items.map(item => <ChatMessage key={item.id} item={item} process
+        running={work.turn.status === 'inProgress' && item.status !== 'completed'} onQuote={close}
+        onOpen={id => setSelection({ type: 'item', id, workId: work.id })} />)}</div>
+    </AdaptiveSheet>}
+    {item && <ChatToolDetails item={item} onClose={close}
+      onBack={workId ? () => setSelection({ type: 'work', id: workId }) : undefined} />}
+    {turn && selection?.type === 'turn' && <ChatTurnDetails turn={turn} panel={selection.panel} onClose={close} />}
+  </>;
 }

@@ -23,8 +23,9 @@ export async function groupPreviewJourney({ page, request, info }: {
   await click(page.getByRole('button', { name: '打开聊天列表' }));
   await expect(project.locator('.chat-thread')).toHaveCount(5);
   await expect(project.getByRole('button', { name: '移动端聊天体验', exact: true })).toBeVisible();
-  await drawer.getByRole('textbox', { name: '搜索聊天' }).fill('聊天');
-  await click(drawer.getByRole('button', { name: '搜索', exact: true }));
-  await expect(project.locator('.chat-thread')).toHaveCount(7);
-  await expect(project.getByRole('button', { name: /展开显示|收起/ })).toHaveCount(0);
+  await click(drawer.getByRole('button', { name: '搜索聊天', exact: true }));
+  await page.getByRole('textbox', { name: '搜索聊天' }).fill('聊天');
+  await expect(page.locator('.chat-search-results .chat-thread')).toHaveCount(17);
+  await click(page.getByRole('button', { name: '关闭', exact: true }).last());
+  await expect(project.locator('.chat-thread')).toHaveCount(5);
 }

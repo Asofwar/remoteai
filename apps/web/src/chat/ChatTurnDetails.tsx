@@ -1,0 +1,30 @@
+import { CheckCircle2, Circle, LoaderCircle } from 'lucide-react';
+import type { Turn } from './types';
+import { AdaptiveSheet } from '../components/AdaptiveSheet';
+import { completedTurnFiles } from '../../../../shared/chat/turnPresentation';
+import { requestErrorDetails } from '../../../desktop/src/pages/codexGui/requestError';
+import { turnErrorNotice, type TurnPanel } from './ChatTurnSummary';
+import { ChatMarkdown } from './ChatMarkdown';
+import { ChatDiff } from './ChatDiff';
+import { ChatCodeBlock } from './ChatCodeBlock';
+
+const TITLES = { plan: '任务计划', changes: '本轮修改', error: '报错详情' };
+export function ChatTurnDetails({ turn, panel, onClose }: { turn: Turn; panel: TurnPanel; onClose: () => void }) {
+  const error = turn.error ?? turn.retryError;
+  return <AdaptiveSheet open title={TITLES[panel]} width={760} onClose={onClose}>
+    <div className="chat-detail-stack">
+      {panel === 'changes' && <ChatDiff files={completedTurnFiles(turn)} />}
+      {panel === 'error' && <ChatCodeBlock label="报错详情" copyLabel="复制报错详情"
+        text={error ? requestErrorDetails(error) : turnErrorNotice(turn)} />}
+      {panel === 'plan' && <>
+        {turn.planExplanation && <ChatMarkdown text={turn.planExplanation} />}
+        {turn.plan?.map((step, index) => {
+          const Icon = step.status === 'completed' ? CheckCircle2 : step.status === 'inProgress' ? LoaderCircle : Circle;
+          const label = { completed: '已完成', inProgress: '进行中', pending: '待开始' }[step.status] || '待开始';
+          return <div className="chat-plan-step" key={index}><Icon size={17} />
+            <span>{step.step}</span><small>{label}</small></div>;
+        })}
+      </>}
+    </div>
+  </AdaptiveSheet>;
+}

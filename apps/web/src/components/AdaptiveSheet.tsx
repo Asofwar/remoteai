@@ -28,6 +28,7 @@ export function AdaptiveSheet({
     {subtitle ? <span>{subtitle}</span> : null}</div>;
   if (screens.md) {
     return <Modal open={open} onCancel={onClose} footer={null} width={width} centered destroyOnClose
+      closable={{ 'aria-label': '关闭' }}
       title={onBack ? <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>{back}{heading}</div> : heading}>
       {children}
     </Modal>;

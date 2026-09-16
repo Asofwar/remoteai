@@ -69,9 +69,9 @@ test('syncs request speed with the PC and shows a lightning indicator only in fa
     window.visualViewport.dispatchEvent(new Event('resize'));
   });
   const settings = page.getByRole('button', { name: /聊天设置/ });
-  await expect(settings).toContainText('⚡');
+  await expect(settings).toHaveAccessibleName(/快速模式/);
   await request.post(`${fixtureUrl}/test/composer`, { data: { speed: 'normal' } });
-  await expect(settings).not.toContainText('⚡');
+  await expect(settings).not.toHaveAccessibleName(/快速模式/);
   await openChatSettings(page);
   await expect(page.getByRole('button', { name: '设置速度模式', exact: true })).toContainText('普通模式');
 });

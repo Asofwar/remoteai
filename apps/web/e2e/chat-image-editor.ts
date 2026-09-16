@@ -24,7 +24,7 @@ async function prepareDraft(page: Page) {
   await connect(page);
   await page.getByRole('button', { name: '添加内容', exact: true }).click();
   const chooser = page.waitForEvent('filechooser');
-  await page.getByRole('button', { name: '相册', exact: true }).click();
+  await page.getByRole('menuitem', { name: '相册', exact: true }).click();
   await (await chooser).setFiles(['../desktop/src-tauri/icons/128x128.png',
     '../desktop/src-tauri/icons/128x128.png']);
   const previews = page.locator('.chat-attachment-preview img');

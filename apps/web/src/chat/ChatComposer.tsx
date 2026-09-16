@@ -1,138 +1,147 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowUp, Pause, Play, Plus } from 'lucide-react';
-import { useComposerKeyboard } from './useComposerKeyboard';
-import { composerAction, COMPOSER_ACTION_LABELS, CONTINUE_MESSAGE }
-  from '../../../../shared/remote-chat/composerAction';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowUp, ChevronDown, File, Pause, Play, Plus, SlidersHorizontal, Target, X, Zap } from 'lucide-react';
+import { COMPOSER_ACTION_LABELS } from '../../../../shared/remote-chat/composerAction';
+import { composerLabel } from '../../../../shared/remote-chat/composer';
 import { ChatSettings } from './ChatSettings';
-import type { ReadUsage } from '../../../../shared/remote-chat/usage';
-import { ChatAttachmentPreviews, ChatAttachmentSheet } from './ChatAttachments';
+import { ChatAttachmentPreviews } from './ChatAttachments';
 import { pickChatImages } from './pickChatImages';
 import { ChatImageEditor } from './ChatImageEditor';
 import { ChatUploadProgress } from './ChatUploadProgress';
-import type { UploadProgress } from '../../../../shared/remote-chat/uploadProgress';
-import type { Model, SendInput, ThreadTokenUsage } from './types';
-import { composerLabel, type ComposerSettings } from '../../../../shared/remote-chat/composer';
-import { useChatDraft } from '../../../../shared/remote-chat/client/useChatDraft';
 import { ChatQueue } from './ChatQueue';
-import type { QueueProps } from '../../../../shared/remote-chat/client/queueProps';
-import { useQueueEditor } from '../../../../shared/remote-chat/client/useQueueEditor';
+import { ComposerQuotes } from './ChatQuotes';
+import { ComposerAddMenu, ComposerPluginMenu, ChatCommandMenu, type ComposerAddAction } from './ComposerMenus';
+import { ComposerProjectFiles } from './ComposerProjectFiles';
+import { useComposerState } from './useComposerState';
+import type { ComposerProps } from './composerProps';
+import './composer.css';
 
-interface Props {
-  uploadProgress?: UploadProgress;
-  queue?: QueueProps;
-  tokenUsage?: ThreadTokenUsage;
-  readUsage: ReadUsage;
-  models: Model[];
-  selection: ComposerSettings;
-  settingsBusy: boolean;
-  settingsError: string;
-  updateSettings: (settings: Partial<ComposerSettings>) => Promise<void>;
-  threadId: string | null;
-  active: boolean;
-  ready: boolean;
-  sending: boolean;
-  running: boolean;
-  interrupted?: boolean;
-  send: (input: SendInput) => Promise<boolean>;
-  interrupt: () => Promise<void>;
-}
-export function ChatComposer({ models, selection, settingsBusy, settingsError, updateSettings,
-  readUsage, tokenUsage, queue, uploadProgress,
-  threadId, active, ready, sending, running, interrupted = false, send, interrupt }: Props) {
+export function ChatComposer(props: ComposerProps) {
+  const { models, selection, settingsBusy, settingsError, updateSettings, readUsage, tokenUsage, queue,
+    uploadProgress, threadId, active, ready, sending, goal, goalBusy, catalog, cwd, loadFiles, loadCatalog } = props;
+  const state = useComposerState(props);
+  const { draft, attachments, menu, busy, compact, action, actionDisabled, goalMode } = state;
   const [settings, setSettings] = useState(false);
-  const [attachments, setAttachments] = useState(false);
-  const [pausing, setPausing] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [projectFiles, setProjectFiles] = useState<'files' | 'photos' | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const photoInput = useRef<HTMLInputElement>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const pickerThread = useRef(threadId);
-  const textarea = useRef<HTMLTextAreaElement>(null);
-  const keyboardVisible = useComposerKeyboard(active);
-  const disabled = !ready || settingsBusy;
-  const draft = useChatDraft({ threadId, sending, disabled, selection, send });
-  const queueEditor = useQueueEditor({ threadId, queue,
-    disabled: !active || disabled || sending || draft.picking || draft.hasContent,
-    restore: (message) => { draft.restore(message); requestAnimationFrame(() => textarea.current?.focus()); } });
-  const busy = sending || draft.picking || queueEditor.loading;
-  const editing = draft.images.find((image) => image.id === editingId);
+  const dock = useRef<HTMLDivElement>(null);
+  const editing = draft.images.find(image => image.id === editingId);
+  const readCatalog = useCallback(() => loadCatalog(cwd), [loadCatalog, cwd]);
   useEffect(() => { if (!active || busy || !editing) setEditingId(null); }, [active, busy, editing]);
-  const action = composerAction({ running: running && !draft.hasContent, interrupted, hasDraft: draft.hasContent });
-  const actionDisabled = action === 'pause' ? !ready || pausing
-    : disabled || busy || (action === 'send' && !draft.hasContent);
-  useEffect(() => { if (!active) { setSettings(false); setAttachments(false); } }, [active]);
-  useEffect(() => { setSettings(false); setAttachments(false); }, [threadId]);
-  useLayoutEffect(() => {
-    if (!textarea.current || !active) return;
-    textarea.current.style.height = 'auto';
-    textarea.current.style.height = `${textarea.current.scrollHeight}px`;
-  }, [draft.text, active]);
-  const openAttachments = () => { textarea.current?.blur(); setAttachments(true); };
-  const openAlbum = () => {
-    pickerThread.current = threadId;
-    fileInput.current?.click();
-    setAttachments(false);
-  };
-  const submit = async () => {
-    if (actionDisabled) return;
-    if (action === 'pause') {
-      setPausing(true);
-      try { await interrupt(); } finally { setPausing(false); }
-      return;
+  useEffect(() => { if (!active) { setSettings(false); setAdding(false); setProjectFiles(null); } }, [active]);
+  useEffect(() => { setSettings(false); setAdding(false); setProjectFiles(null); }, [threadId]);
+  useEffect(() => { setProjectFiles(null); }, [cwd]);
+  useEffect(() => {
+    if (!adding && !menu.open) return;
+    const close = (event: PointerEvent) => {
+      if (!dock.current?.contains(event.target as Node)) { setAdding(false); menu.close(); }
+    };
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setAdding(false); menu.close(); }
+    };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', keydown);
+    return () => {
+      document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', keydown);
+    };
+  }, [adding, menu.open, menu.close]);
+  const chooseAdd = (choice: ComposerAddAction) => {
+    setAdding(false);
+    if (choice === 'plugins') { menu.openPlugins(); return; }
+    if (choice === 'projectFiles' || choice === 'projectPhotos') {
+      setProjectFiles(choice === 'projectPhotos' ? 'photos' : 'files'); return;
     }
-    await draft.submit(action === 'continue' ? { text: CONTINUE_MESSAGE } : {});
+    pickerThread.current = threadId;
+    ({ camera: cameraInput, photos: photoInput, file: fileInput })[choice].current?.click();
+  };
+  const pickPhotos = (files: File[]) => {
+    if (pickerThread.current === threadId) void draft.addImages(remaining => pickChatImages(files, remaining));
   };
   const ActionIcon = { send: ArrowUp, pause: Pause, continue: Play }[action];
-  return <>
-    {queue && <ChatQueue {...queue} {...queueEditor} />}
-    <form className="chat-composer" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-      <input ref={fileInput} type="file" accept="image/*" multiple hidden aria-label="选择相册图片"
-        onChange={(event) => {
-          const files = Array.from(event.target.files ?? []);
-          event.target.value = '';
-          if (pickerThread.current === threadId) void draft.addImages((remaining) => pickChatImages(files, remaining));
-        }} />
-      <ChatAttachmentPreviews images={draft.images} busy={busy} remove={draft.removeImage} add={openAttachments}
-        edit={(id) => { textarea.current?.blur(); setEditingId(id); }} />
-      {draft.references.map((item) => <div className="chat-row" key={`${item.kind}:${item.path}:${item.name}`}>
-        <span>{item.name}</span><button type="button" disabled={busy} aria-label={`移除${item.name}`}
-          onClick={() => draft.removeReference(item)}>×</button></div>)}
-      {!!draft.error && <p role="alert" className="chat-error">{draft.error}</p>}
-      {draft.picking && <p role="status" className="chat-muted">正在添加图片…</p>}
+  const label = composerLabel(models, selection);
+  return <div className="chat-composer-dock" ref={dock} onKeyDown={event => {
+    if (event.key === 'Escape') { setAdding(false); menu.close(); }
+  }}>
+    {queue && <ChatQueue {...queue} {...state.queueEditor} />}
+    <form className={`chat-composer${compact ? ' is-compact' : ''}`}
+      onSubmit={event => { event.preventDefault(); void state.submit(); }}>
+      <input ref={photoInput} type="file" accept="image/*" multiple hidden aria-label="选择相册图片"
+        onChange={event => { pickPhotos(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
+      <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden aria-label="拍照"
+        onChange={event => { pickPhotos(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
+      <input ref={fileInput} type="file" multiple hidden aria-label="选择文件" onChange={event => {
+        if (pickerThread.current === threadId) void attachments.pick(Array.from(event.target.files ?? []));
+        event.target.value = '';
+      }} />
+      {state.error && <p role="alert" className="chat-error">{state.error}</p>}
+      {props.compacting && <p role="status" className="chat-muted">正在压缩上下文…</p>}
+      {(draft.picking || attachments.busy) && <p role="status" className="chat-muted">正在添加附件…</p>}
       <ChatUploadProgress progress={uploadProgress} reconnecting={!ready} />
-      <div className={`chat-composer-field${draft.text.length === 0 ? ' chat-composer-field-empty' : ''}`}>
-        <textarea ref={textarea} aria-label="聊天消息" value={draft.text} maxLength={100_000} rows={1}
-          readOnly={queueEditor.loading}
-          onChange={(event) => draft.setText(event.target.value)}
-          placeholder={ready ? '发消息给 Codex…' : '连接后即可发送消息'}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter' || event.nativeEvent.isComposing || !(event.ctrlKey || event.metaKey)) return;
-            event.preventDefault(); void submit();
-          }} />
+      {(adding || menu.open) && <div className="chat-composer-popover" onKeyDown={event => {
+        if (event.key === 'Escape') { setAdding(false); menu.close(); menu.input.current?.focus(); }
+      }}>{adding ? <ComposerAddMenu busy={busy} choose={chooseAdd} />
+        : menu.plugins ? <ComposerPluginMenu catalog={catalog} query={menu.query} load={readCatalog}
+          chooseSkill={menu.choose} choosePlugin={plugin => { attachments.addPlugin(plugin); menu.consumeTrigger(); }} />
+          : <ChatCommandMenu catalog={catalog} query={menu.query} skillsOnly={menu.skillsOnly}
+            compactReason={props.compactReason} choose={menu.choose} compact={() => { void menu.runCompact(); }}
+            goal={() => { menu.consumeTrigger(); goalMode.enter(); }} close={menu.close} />}</div>}
+      <div className="chat-composer-field">
+        <div className="chat-composer-content">
+          <ChatAttachmentPreviews images={draft.images} busy={busy} remove={draft.removeImage}
+            add={() => setAdding(true)} edit={id => { menu.input.current?.blur(); setEditingId(id); }} />
+          <div className="chat-composer-capsules">{attachments.items.map((item, index) =>
+            <span className="chat-capsule" key={`${item.path}:${index}`}><File size={14} />
+              <span title={item.name}>{item.name}</span><button type="button" aria-label={`移除${item.name}`}
+                disabled={busy} onClick={() => attachments.remove(item)}><X size={14} /></button></span>)}</div>
+          <ComposerQuotes disabled={busy} />
+          <textarea ref={menu.input} aria-label="聊天消息" value={draft.text} maxLength={100_000} rows={1}
+            readOnly={state.queueEditor.loading} onChange={event => {
+              draft.setText(event.target.value);
+              menu.setSelection({ start: event.target.selectionStart, end: event.target.selectionEnd });
+            }}
+            onSelect={event => menu.setSelection({ start: event.currentTarget.selectionStart,
+              end: event.currentTarget.selectionEnd })}
+            placeholder={ready ? (goalMode.enabled ? '描述想完成的目标…' : '发消息…') : '连接后发消息'}
+            onKeyDown={event => {
+              if (event.key === 'Escape') { menu.close(); setAdding(false); return; }
+              if (event.key !== 'Enter' || event.nativeEvent.isComposing || !(event.ctrlKey || event.metaKey)) return;
+              event.preventDefault(); void state.submit();
+            }} />
+        </div>
         <div className="chat-composer-actions">
-          <button type="button" className="chat-composer-add" aria-label="添加内容" disabled={busy}
-            onPointerDown={(event) => event.preventDefault()} onClick={openAttachments}>
-            <Plus size={24} aria-hidden="true" />
-          </button>
-          <button type="submit" className="chat-composer-submit" aria-label={COMPOSER_ACTION_LABELS[action]}
-            onPointerDown={(event) => event.preventDefault()}
-            aria-busy={pausing || sending} disabled={actionDisabled}>
-            <ActionIcon size={20} aria-hidden="true" fill={action === 'continue' ? 'currentColor' : 'none'} />
-          </button>
+          <button type="button" className="chat-composer-add" aria-label="添加内容" aria-expanded={adding}
+            disabled={busy} onPointerDown={event => event.preventDefault()}
+            onClick={() => { menu.close(); setAdding(value => !value); }}><Plus size={24} /></button>
+          <div className="chat-composer-trailing">
+            {(goalMode.enabled || goal) && <span className="chat-goal-capsule"><Target size={15} /><span>目标</span>
+              <button type="button" aria-label="退出目标模式" disabled={sending || goalBusy || (!!goal && !ready)}
+                onClick={state.removeGoal}><X size={13} /></button></span>}
+            <button type="button" className="chat-model" onPointerDown={event => event.preventDefault()}
+              aria-label={`${label}${selection.speed === 'fast' ? '，快速模式' : ''}，聊天设置`}
+              onClick={() => { menu.close(); setAdding(false); setSettings(true); }}>
+              {compact ? <SlidersHorizontal size={20} /> : <><span>{label}</span>
+                {selection.speed === 'fast' && <Zap size={14} aria-label="快速模式" />}<ChevronDown size={12} /></>}
+            </button>
+            <button type="submit" className="chat-composer-submit" aria-label={COMPOSER_ACTION_LABELS[action]}
+              onPointerDown={event => event.preventDefault()} aria-busy={state.pausing || sending} disabled={actionDisabled}>
+              <ActionIcon size={22} fill={action === 'continue' ? 'currentColor' : 'none'} /></button>
+          </div>
         </div>
       </div>
-      {keyboardVisible && <div className="chat-row chat-composer-settings">
-        <button type="button" className="chat-button chat-model" onPointerDown={(event) => event.preventDefault()}
-          aria-label={`${composerLabel(models, selection)}${selection.speed === 'fast' ? '，快速模式' : ''}，聊天设置`}
-          onClick={() => setSettings(true)}>
-          {composerLabel(models, selection)}{selection.speed === 'fast' && <span aria-hidden="true"> ⚡</span>}
-          {' ▾'}</button>
-      </div>}
     </form>
     {active && !busy && editing && <ChatImageEditor key={editing.id} image={editing}
-      save={(url) => draft.replaceImage(editing, url)} close={() => setEditingId(null)} />}
-    {attachments && <ChatAttachmentSheet busy={busy} pick={openAlbum} onClose={() => setAttachments(false)} />}
-    {settings && <ChatSettings models={models} selection={selection}
-      readUsage={readUsage} tokenUsage={tokenUsage}
+      save={url => draft.replaceImage(editing, url)} close={() => setEditingId(null)} />}
+    {projectFiles && <ComposerProjectFiles imagesOnly={projectFiles === 'photos'} threadId={threadId} cwd={cwd}
+      load={loadFiles} close={() => setProjectFiles(null)} choose={file => {
+        attachments.add({ kind: 'file', name: file.name, path: file.path }); setProjectFiles(null);
+      }} />}
+    {settings && <ChatSettings models={models} selection={selection} threadId={threadId}
+      contextSettings={props.contextSettings} readUsage={readUsage} tokenUsage={tokenUsage}
       saving={settingsBusy} error={settingsError} ready={ready}
       updateSettings={updateSettings} onClose={() => setSettings(false)} />}
-  </>;
+  </div>;
 }

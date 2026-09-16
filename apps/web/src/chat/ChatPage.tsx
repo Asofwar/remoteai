@@ -12,6 +12,14 @@ import { ChatFileContext } from './ChatFileLink';
 import { ChatThreads } from './ChatThreads';
 import { ChatDevices } from './ChatDevices';
 import { ChatConnectionInfo } from './ChatConnectionInfo';
+import { ChatQuotesProvider } from './ChatQuotes';
+import { ChatAsyncQuestions } from './ChatAsyncQuestions';
+import { ChatSearch } from './ChatSearch';
+import { ChatProfileMenu } from './ChatProfileMenu';
+import { ChatTokenSummary } from './ChatTokenSummary';
+import { useChatCatalog } from './useChatCatalog';
+import { compactUnavailableReason } from '../../../../shared/remote-chat/client/composerCommands';
+import { threadPresentation } from '../../../../shared/remote-chat/sidebar';
 import { useChat } from './useChat';
 import { useChatViewport } from './useChatViewport';
 import type { ChatProject } from './types';
@@ -37,19 +45,26 @@ function ConnectedChat({ session, device, devices, active, chooseDevice }: Props
   const { state, controller } = useChat(session, device?.deviceId ?? '', active && Boolean(device));
   const [drawer, setDrawer] = useState(false);
   const [pickingDevice, setPickingDevice] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [tokenSummary, setTokenSummary] = useState(false);
   const ready = state.ready;
+  const cwd = state.selected?.cwd ?? state.draftProject?.cwd ?? '';
+  const catalog = useChatCatalog(controller, cwd, ready);
   const runningTurn = state.selected?.turns?.find((turn) => turn.status === 'inProgress');
   const running = Boolean(runningTurn);
   const approvals = state.approvals.filter((event) => event.params.threadId === state.selected?.id);
   const newChat = (project?: ChatProject) => { if (!state.sending) { controller.back(project); setDrawer(false); } };
-  useEffect(() => { controller.setViewing(active && !drawer && !pickingDevice); },
-    [active, drawer, pickingDevice, controller]);
-  useEffect(() => { if (!active) { setDrawer(false); setPickingDevice(false); } }, [active]);
-  return <>
+  useEffect(() => { controller.setViewing(active && !drawer && !pickingDevice && !searching && !tokenSummary); },
+    [active, drawer, pickingDevice, searching, tokenSummary, controller]);
+  useEffect(() => {
+    if (!active) { setDrawer(false); setPickingDevice(false); setSearching(false); setTokenSummary(false); }
+  }, [active]);
+  return <ChatQuotesProvider scope={state.selected?.id ?? null} sending={state.sending}
+    enabled={active && !state.selectedArchived}>
     <header className="chat-header">
       <button type="button" className="chat-back" aria-label="打开聊天列表" onClick={() => setDrawer(true)}>
         <PanelLeft size={21} /></button>
-      <div className="chat-grow"><h2>{state.selected?.name || '新聊天'}</h2>
+      <div className="chat-grow"><h2>{state.selected ? threadPresentation(state.selected, state.sidebar).title : '新聊天'}</h2>
         <ChatConnectionInfo state={state} controller={controller} device={device} active={active}
           chooseDevice={() => setPickingDevice(true)} /></div>
       {state.selected && state.selectedArchived && <button type="button" className="chat-button"
@@ -59,8 +74,9 @@ function ConnectedChat({ session, device, devices, active, chooseDevice }: Props
     </header>
     {!!state.error && <p role="alert" className="chat-error">{state.error}</p>}
     <ChatImageContext.Provider value={{ threadId: state.selected?.id ?? null, ready, load: controller.imagePreview }}>
-      <ChatFileContext.Provider value={{ threadId: state.selected?.id ?? null, ready, client: controller.files }}>
-      <ChatMessages key={state.selected?.id ?? 'new'} thread={state.selected}
+      <ChatFileContext.Provider value={{ threadId: state.selected?.id ?? null, ready, client: controller.files,
+        load: controller.textPreview }}>
+      <ChatMessages key={state.selected?.id ?? 'new'} thread={state.selected} offline={!ready}
         loading={state.historyLoading} loadingMore={state.historyLoadingMore} hasMore={state.historyHasMore}
         loadOlder={() => controller.loadOlder()} />
       </ChatFileContext.Provider>
@@ -71,21 +87,36 @@ function ConnectedChat({ session, device, devices, active, chooseDevice }: Props
       {approvals.map((event) => <ChatApproval key={String(event.id)} event={event}
         ready={ready} respond={(reply) => controller.respond(reply)} />)}
     </div>}
+    <ChatAsyncQuestions thread={state.selected} error={state.error}
+      disabled={!ready || state.sending || state.settingsBusy || state.selectedArchived || state.queueBusy
+        || state.compacting === state.selected?.id} answer={controller.answerAsyncQuestion} />
     <ChatComposer queue={queueProps(state, controller)}
+      goals={controller.goals} goal={state.selected ? state.goals?.[state.selected.id] : null} goalBusy={!!state.goalBusy}
+      contextSettings={controller.contextSettings} cwd={cwd} catalog={catalog}
+      compactReason={compactUnavailableReason(state)} compacting={!!state.compacting
+        && state.compacting === state.selected?.id} compact={controller.compact}
+      loadCatalog={controller.loadComposerCatalog} loadFiles={controller.loadProjectFiles}
       uploadProgress={state.upload}
       threadId={state.selected?.id ?? null} models={state.models} selection={state.settings}
       readUsage={controller.readUsage} tokenUsage={state.selected?.tokenUsage}
       settingsBusy={state.settingsBusy} settingsError={state.settingsError}
       updateSettings={(settings) => controller.setSettings(settings)}
-      active={active} ready={ready} sending={state.sending} running={running}
+      active={active} ready={ready && !state.selectedArchived} sending={state.sending} running={running}
       interrupted={state.selected?.turns?.at(-1)?.status === 'interrupted'}
       send={(input) => controller.send(input)} interrupt={() => controller.interrupt()} />
     <Drawer open={drawer} placement="left" width="min(360px, 88vw)" rootClassName="chat-drawer"
       title="聊天" destroyOnClose onClose={() => setDrawer(false)} closeIcon={<X size={20} aria-label="收起聊天列表" />}>
       <ChatThreads state={state} controller={controller} newChat={newChat} onClose={() => setDrawer(false)}
-        deviceName={device?.name ?? '选择电脑'} chooseDevice={() => { setDrawer(false); setPickingDevice(true); }} />
+        openSearch={() => setSearching(true)} profile={<ChatProfileMenu client={controller.guiAccounts}
+          deviceName={device?.name ?? '选择电脑'} email={session.email} ready={ready}
+          chooseDevice={() => { setDrawer(false); setPickingDevice(true); }}
+          openTokenSummary={() => { setDrawer(false); setTokenSummary(true); }} />} />
     </Drawer>
+    {searching && <ChatSearch state={state} controller={controller} onClose={() => setSearching(false)}
+      select={thread => { setSearching(false); setDrawer(false); void controller.select(thread); }} />}
+    {tokenSummary && <ChatTokenSummary read={controller.readTokenSummary} ready={ready}
+      deviceName={device?.name} onClose={() => setTokenSummary(false)} />}
     {pickingDevice && <ChatDevices devices={devices} onClose={() => setPickingDevice(false)}
       choose={(id) => { chooseDevice(id); setPickingDevice(false); }} />}
-  </>;
+  </ChatQuotesProvider>;
 }

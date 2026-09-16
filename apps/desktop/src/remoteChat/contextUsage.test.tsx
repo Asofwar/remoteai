@@ -81,6 +81,7 @@ it('shows and updates context in settings even while daily usage is still loadin
   const root = createRoot(container);
   const readUsage = vi.fn(() => new Promise<never>(() => {}));
   const render = async (tokenUsage?: ThreadTokenUsage) => act(async () => root.render(<ChatSettings
+    threadId="demo" contextSettings={{ read: vi.fn(), write: vi.fn() }}
     tokenUsage={tokenUsage} readUsage={readUsage} ready models={[]} saving={false} error=""
     selection={{ model: 'astra', effort: 'low', access: 'workspace-write' }}
     updateSettings={async () => {}} onClose={() => {}} />));

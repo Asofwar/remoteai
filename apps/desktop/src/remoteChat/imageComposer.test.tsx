@@ -20,6 +20,9 @@ beforeEach(() => {
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
   props = { models: [], selection: { model: 'astra', effort: 'high', access: 'workspace-write' },
     readUsage: vi.fn(),
+    contextSettings: { read: vi.fn(), write: vi.fn() }, goals: { load: vi.fn(), clear: vi.fn() }, goalBusy: false,
+    catalog: { skills: [], loaded: true, loading: false, error: '', refresh: vi.fn() }, cwd: '',
+    compactReason: null, compacting: false, compact: vi.fn(), loadCatalog: vi.fn(), loadFiles: vi.fn(),
     settingsBusy: false, settingsError: '', updateSettings: vi.fn(), active: true, ready: true,
     sending: false, running: false, threadId: null, send: vi.fn().mockResolvedValue(true), interrupt: vi.fn() };
   mocks.pick.mockReset().mockImplementation(async () => [draftImage(url)]);
@@ -49,7 +52,8 @@ it('opens the album from an empty composer, previews, removes and sends an image
   await render();
   expect(button('发送消息')!.disabled).toBe(true);
   await act(async () => button('添加内容')!.click());
-  const album = container.querySelector<HTMLButtonElement>('.chat-album')!;
+  const album = Array.from(container.querySelectorAll<HTMLButtonElement>('.chat-add-menu button'))
+    .find(element => element.textContent === '相册')!;
   expect(album.textContent).toContain('相册');
   const picker = vi.spyOn(container.querySelector<HTMLInputElement>('input')!, 'click');
   await act(async () => album.click());

@@ -72,11 +72,13 @@ async function approvals({ page, request, info }: Journey) {
 
 async function manageHistory({ page, request }: Journey) {
   await click(page.getByRole('button', { name: '打开聊天列表', exact: true }));
+  await click(page.getByRole('button', { name: '搜索聊天', exact: true }));
   await page.getByRole('textbox', { name: '搜索聊天' }).fill('不存在的任务');
   await click(page.getByRole('button', { name: '搜索', exact: true }));
-  await expect(page.getByText('暂时没有聊天')).toBeVisible();
+  await expect(page.getByText('没有找到相关聊天')).toBeVisible();
   await page.getByRole('textbox', { name: '搜索聊天' }).fill('');
   await click(page.getByRole('button', { name: '搜索', exact: true }));
+  await click(page.getByRole('button', { name: '关闭', exact: true }).last());
   await click(page.getByRole('button', { name: '在 演示项目 中新建对话', exact: true }));
   await expect(page.locator('.chat-header')).toContainText('演示项目');
   await send(page, 'new chat from H5');

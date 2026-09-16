@@ -54,6 +54,7 @@ export async function openChatSettings(page: Page) {
   });
 }
 export async function screenshot(page: Page, info: TestInfo, name: string) {
+  await expect(page.locator('.adm-toast-mask')).toHaveCount(0);
   const path = info.outputPath(`${name}.png`);
   await page.screenshot({ path, animations: 'disabled' });
   await info.attach(name, { path, contentType: 'image/png' });

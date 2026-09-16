@@ -55,8 +55,25 @@ h1, h2, h3, .brand-lockup { font-family: "Manrope", "PingFang SC", "Microsoft Ya
 .story-points { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 38px; }
 .story-points span { display: flex; align-items: center; gap: 8px; padding: 10px 13px; border: 1px solid rgba(211, 238, 224, 0.16); border-radius: 10px; background: rgba(255,255,255,.055); color: #deeee6; font-size: 12px; font-weight: 600; backdrop-filter: blur(7px); }
 .login-story > small { color: #7da393; font-size: 11px; font-weight: 700; letter-spacing: 1.7px; text-transform: uppercase; }
-.login-panel { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 44px clamp(36px, 7vw, 110px); background: radial-gradient(circle at 100% 0%, #edf8f3, transparent 35%), #fff; }
-.login-form-wrap { width: min(100%, 450px); }
+.login-panel {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 44px clamp(28px, 4vw, 64px);
+  background: #f5f7f1 url("./assets/login-glass.webp") center / cover no-repeat;
+}
+.login-form-wrap {
+  width: min(100%, 450px);
+  min-width: 0;
+  padding: 36px;
+  border: 1px solid rgba(255, 255, 255, .9);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, .88);
+  box-shadow: 0 16px 48px rgba(28, 73, 53, .07);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
 .login-kicker { color: var(--green); font-size: 12px; font-weight: 800; letter-spacing: 1.6px; text-transform: uppercase; }
 .login-form-wrap h2 { margin-top: 10px; font-size: clamp(30px, 3vw, 39px); letter-spacing: -1.5px; color: var(--ink); }
 .login-intro { margin-top: 10px; color: var(--muted); font-size: 14px; }
@@ -71,10 +88,23 @@ h1, h2, h3, .brand-lockup { font-family: "Manrope", "PingFang SC", "Microsoft Ya
 .login-form .adm-button, .password-form .adm-button { height: 52px; border-radius: 13px; font-weight: 800; box-shadow: 0 12px 25px rgba(11, 155, 124, 0.16); }
 .server-toggle { display: flex; align-items: center; gap: 7px; margin: -3px 0 20px; padding: 0; border: 0; color: #5d7168; background: none; cursor: pointer; font-size: 12px; font-weight: 700; }
 .server-toggle svg:last-child { margin-left: auto; transition: transform .2s ease; }
+.server-toggle[aria-expanded="true"] svg:last-child { transform: rotate(90deg); }
+.server-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: 4px; border-radius: 6px; }
 .form-error { margin: -6px 0 18px; padding: 11px 13px; border-radius: 9px; color: #af403d; background: #fff1f0; font-size: 12px; line-height: 1.5; }
 .login-security { display: flex; align-items: flex-start; gap: 9px; margin-top: 23px; color: #89978f; font-size: 11px; line-height: 1.55; }
 .login-security svg { flex: 0 0 auto; margin-top: 1px; color: #6da08e; }
 .mobile-login-brand { display: none; }
+.login-web-badge {
+  margin-left: auto;
+  padding: 4px 9px;
+  border: 1px solid rgba(38, 83, 62, .12);
+  border-radius: 8px;
+  color: #526c5f;
+  background: rgba(255, 255, 255, .6);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .4px;
+}
 
 /* Shell */
 .app-shell { min-height: 100vh; background: var(--canvas); }
@@ -205,12 +235,47 @@ h1, h2, h3, .brand-lockup { font-family: "Manrope", "PingFang SC", "Microsoft Ya
 
 @media (max-width: 860px) {
   body { background: var(--canvas); }
-  .login-page { display: block; background: radial-gradient(circle at 100% 0%, #e4f5ed, transparent 38%), #fff; }
+  .login-page {
+    display: block;
+    min-height: 100svh;
+    background: #f5f7f1 url("./assets/login-glass.webp") center top / cover no-repeat;
+  }
   .login-story { display: none; }
-  .login-panel { min-height: 100svh; align-items: flex-start; padding: max(28px, env(safe-area-inset-top)) 22px max(35px, env(safe-area-inset-bottom)); background: transparent; }
-  .mobile-login-brand { display: flex; margin-bottom: 72px; }
-  .login-form-wrap { margin: auto; }
-  .login-form-wrap h2 { font-size: 31px; }.login-form { margin-top: 30px; }
+  .login-panel {
+    min-height: 100svh;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 32px;
+    padding: max(28px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+      max(32px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+    background: transparent;
+  }
+  .mobile-login-brand {
+    display: flex;
+    width: min(100%, 450px);
+    flex-shrink: 0;
+    white-space: nowrap;
+    font-size: 19px;
+  }
+  .login-form-wrap {
+    margin: 0;
+    padding: 28px;
+    border-radius: 24px;
+  }
+  .login-kicker { font-size: 11px; letter-spacing: 2px; }
+  .login-form-wrap h2 { margin-top: 9px; font-size: 32px; line-height: 1.35; letter-spacing: -1px; }
+  .login-intro { font-size: 13px; line-height: 1.7; }
+  .login-form { margin-top: 28px; }
+  .login-form .adm-list-item-content-main { padding: 0; }
+  .login-form .adm-list-item-content { padding-bottom: 20px; }
+  .login-form .adm-input { --font-size: 16px; --placeholder-color: #9aa69f; }
+  .login-form .adm-form-item-label { font-size: 14px; }
+  .login-form .adm-button { font-size: 16px; box-shadow: 0 8px 20px rgba(11, 155, 124, .14); }
+  .login-form .server-toggle { min-height: 44px; margin: -8px 0 12px; font-size: 12px; }
+  .login-form .adm-form-item-feedback-help { font-size: 12px; line-height: 1.6; }
+  .login-security { justify-content: center; margin-top: 22px; font-size: 12px; }
+  .login-form .form-error { max-width: 400px; overflow-wrap: anywhere; }
   .desktop-sidebar, .desktop-topbar { display: none; }
   .content-shell { margin-left: 0; padding-bottom: calc(67px + env(safe-area-inset-bottom)); }
   .main-content { min-height: 100vh; }
@@ -232,7 +297,9 @@ h1, h2, h3, .brand-lockup { font-family: "Manrope", "PingFang SC", "Microsoft Ya
 }
 
 @media (max-width: 420px) {
-  .mobile-login-brand { margin-bottom: 58px; }
+  .login-panel { gap: 28px; padding-top: max(24px, env(safe-area-inset-top)); }
+  .login-form-wrap { padding: 24px 20px; border-radius: 20px; }
+  .login-form-wrap h2 { font-size: 30px; }
   .story-points { display: none; }
   .overview-hero { min-height: 224px; }
   .hero-copy h2 { font-size: 28px; }

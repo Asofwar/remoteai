@@ -200,36 +200,44 @@ function LoginView() {
         <div className="story-points">
           <span><CircleGauge size={17} /> 实时用量</span>
           <span><MonitorCog size={17} /> 远程控制</span>
-          <span><ShieldCheck size={17} /> JWT 安全认证</span>
+          <span><ShieldCheck size={17} /> 安全登录</span>
         </div>
       </div>
-      <small>Mobile first · Browser ready</small>
+      <small>随时连接，自在切换</small>
     </section>
     <section className="login-panel">
-      <div className="mobile-login-brand brand-lockup"><span className="brand-mark"><Zap size={21} fill="currentColor" /></span><b>Codex Switch</b></div>
+      <div className="mobile-login-brand brand-lockup">
+        <span className="brand-mark"><Zap size={21} fill="currentColor" /></span>
+        <b>Codex Switch</b><span className="login-web-badge">Web</span>
+      </div>
       <div className="login-form-wrap">
-        <span className="login-kicker">账户中心</span>
-        <h2>登录 Web 控制台</h2>
-        <p className="login-intro">使用你的 Codex Switch 云端账号继续</p>
+        <span className="login-kicker">云端控制台</span>
+        <h2>欢迎回来</h2>
+        <p className="login-intro">登录云端账号，随时管理用量与设备。</p>
         <Form className="login-form" layout="vertical" footer={<Button block color="primary" size="large" loading={submitting} onClick={submit}>登录并查看</Button>}>
           <Form.Item label="邮箱">
             <Input value={email} onChange={(value) => { setEmail(value); dispatch(clearAuthError()); }}
-              type="email" autoComplete="email" placeholder="name@example.com" clearable />
+              type="email" inputMode="email" autoCapitalize="none"
+              aria-label="邮箱" autoComplete="email" placeholder="name@example.com" clearable />
           </Form.Item>
           <Form.Item label="密码">
             <Input value={password} onChange={(value) => { setPassword(value); dispatch(clearAuthError()); }}
-              type="password" autoComplete="current-password" placeholder="输入登录密码"
+              type="password" aria-label="密码" autoComplete="current-password" placeholder="输入登录密码"
               onEnterPress={() => void submit()} clearable />
           </Form.Item>
-          <button type="button" className="server-toggle" onClick={() => setShowServer((value) => !value)}>
-            <Server size={15} /> {showServer ? "收起服务地址" : "连接其他服务器"} <ChevronRight size={14} />
+          <button type="button" className="server-toggle" aria-expanded={showServer}
+            aria-controls="login-server" onClick={() => setShowServer((value) => !value)}>
+            <Server size={15} /> {showServer ? "收起服务器设置" : "连接其他服务器"} <ChevronRight size={14} />
           </button>
-          {showServer ? <Form.Item label="云端服务器地址" help="自部署时填写 Kong 对外提供的 HTTPS 根地址">
-            <Input value={baseUrl} onChange={setBaseUrl} placeholder="https://api.example.com" clearable />
-          </Form.Item> : null}
-          {error ? <div className="form-error">{error}</div> : null}
+          <div id="login-server" hidden={!showServer}>
+            {showServer ? <Form.Item label="服务器地址" help="使用自己的服务器时填写，通常无需修改。">
+              <Input value={baseUrl} onChange={setBaseUrl} type="url" inputMode="url" aria-label="服务器地址"
+                autoCapitalize="none" placeholder="https://api.example.com" clearable />
+            </Form.Item> : null}
+          </div>
+          {error ? <div className="form-error" role="alert">{error}</div> : null}
         </Form>
-        <div className="login-security"><ShieldCheck size={16} /><span>受保护接口由 Kong 校验 JWT，会话过期后自动安全续期。</span></div>
+        <div className="login-security"><ShieldCheck size={16} /><span>安全连接，安心管理你的账号。</span></div>
       </div>
     </section>
   </main>;

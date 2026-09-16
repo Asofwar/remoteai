@@ -94,13 +94,7 @@ mod tests {
             .bearer_auth("test-secret")
             .header("ChatGPT-Account-Id", "test-account")
             .body(vec![b'x'; 128 * 1024]);
-        let mut request = Request::prepare(builder).unwrap();
-        request.client = reqwest::Client::builder()
-            .no_proxy()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .unwrap();
-        request
+        Request::prepare(builder).unwrap()
     }
 
     fn receive(server: &Server) -> tiny_http::Request {

@@ -123,11 +123,6 @@ fn progressing_upload_still_has_an_absolute_limit() {
 fn prepared_request(url: String, body: Vec<u8>) -> Request {
     let builder = reqwest::blocking::Client::new().post(url).body(body);
     let mut request = Request::prepare(builder).unwrap();
-    request.client = reqwest::Client::builder()
-        .no_proxy()
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .unwrap();
     request.timeouts = timeouts();
     request
 }

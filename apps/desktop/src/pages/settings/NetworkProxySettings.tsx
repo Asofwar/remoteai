@@ -3,35 +3,13 @@ import { Input, InputNumber, Modal, Switch } from "antd";
 import { Waypoints } from "lucide-react";
 import type { Translate } from "../../i18n";
 import type { NetworkProxySettings } from "../../types";
+import { validateProxy } from "./networkProxyValidation";
 
 interface NetworkProxyEditorProps {
   loading: boolean;
   onSave: (settings: NetworkProxySettings) => Promise<boolean>;
   t: Translate;
   value: NetworkProxySettings;
-}
-
-function validateProxy(settings: NetworkProxySettings, t: Translate) {
-  if (!settings.enabled) return null;
-  const rawUrl = settings.proxyUrl.trim();
-  if (!rawUrl) return t("settings.networkProxy.invalidAddress");
-  try {
-    const url = new URL(rawUrl);
-    const pathIsEmpty = url.pathname === "/" && !url.search && !url.hash;
-    const invalidUrl = !["http:", "https:"].includes(url.protocol)
-      || !url.hostname
-      || Boolean(url.port)
-      || !pathIsEmpty;
-    if (invalidUrl) {
-      return t("settings.networkProxy.invalidAddress");
-    }
-  } catch {
-    return t("settings.networkProxy.invalidAddress");
-  }
-  if (!settings.proxyPort || settings.proxyPort < 1 || settings.proxyPort > 65_535) {
-    return t("settings.networkProxy.invalidPort");
-  }
-  return null;
 }
 
 function settingsMatch(first: NetworkProxySettings, second: NetworkProxySettings) {
@@ -78,7 +56,7 @@ function NetworkProxyEditor({ loading, onSave, t, value }: NetworkProxyEditorPro
     }}>
       <div className="network-proxy-toggle">
         <span>{t("settings.networkProxy.enabled")}</span>
-        <Switch checked={draft.enabled} disabled={loading}
+        <Switch checked={draft.enabled} disabled={loading} aria-label={t("settings.networkProxy.enabled")}
           onChange={updateEnabled} />
       </div>
       <div className="network-proxy-fields">

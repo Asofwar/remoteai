@@ -63,6 +63,8 @@ pub(super) enum Error {
     UnbufferedBody,
     #[error("upstream redirect could not be followed")]
     Redirect,
+    #[error(transparent)]
+    Proxy(#[from] crate::system_proxy::ProxyResolutionError),
     #[error("{0}")]
     AfterRedirect(#[source] Box<Self>),
 }
@@ -73,7 +75,7 @@ impl Error {
             Self::Timeout { .. } => true,
             Self::Http { source, .. } => source.is_timeout(),
             Self::AfterRedirect(source) => source.is_timeout(),
-            Self::UnbufferedBody | Self::Redirect => false,
+            Self::UnbufferedBody | Self::Redirect | Self::Proxy(_) => false,
         }
     }
 
@@ -105,7 +107,6 @@ impl From<reqwest::Error> for Error {
 
 /// Shared bytes make pre-upload retries cheap; none of the retry attempts mutate the body.
 pub(super) struct Request {
-    client: reqwest::Client,
     method: Method,
     url: reqwest::Url,
     headers: header::HeaderMap,
@@ -120,12 +121,7 @@ impl Request {
             None => Bytes::new(),
             Some(body) => Bytes::copy_from_slice(body.as_bytes().ok_or(Error::UnbufferedBody)?),
         };
-        let client = crate::system_proxy::apply_async(reqwest::Client::builder())
-            .connect_timeout(super::UPSTREAM_CONNECT_TIMEOUT)
-            .redirect(reqwest::redirect::Policy::none())
-            .build()?;
         Ok(Self {
-            client,
             method: request.method().clone(),
             url: request.url().clone(),
             headers: request.headers().clone(),
@@ -167,6 +163,11 @@ impl Request {
     }
 
     async fn send_target(&self, target: &redirect::Target) -> Result<reqwest::Response, Error> {
+        let client = crate::system_proxy::apply_async(reqwest::Client::builder(), &target.url)
+            .await?
+            .connect_timeout(super::UPSTREAM_CONNECT_TIMEOUT)
+            .redirect(reqwest::redirect::Policy::none())
+            .build()?;
         let initial = Progress {
             sent_bytes: 0,
             updated_at: Instant::now(),
@@ -180,8 +181,7 @@ impl Request {
         if !target.body.is_empty() {
             headers.insert(header::CONTENT_LENGTH, target.body.len().into());
         }
-        let mut request = self
-            .client
+        let mut request = client
             .request(target.method.clone(), target.url.clone())
             .headers(headers);
         if !target.body.is_empty() {
@@ -268,5 +268,7 @@ fn phase_deadline(
     )
 }
 
+#[cfg(test)]
+mod proxy_tests;
 #[cfg(test)]
 mod tests;

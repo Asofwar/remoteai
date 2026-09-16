@@ -4,7 +4,13 @@ use reqwest::{blocking::ClientBuilder, Proxy, Url};
 
 use crate::models::NetworkProxySettings;
 
+mod bypass;
+mod environment;
+mod parsing;
 mod platform;
+
+use bypass::{bypass_rule_matches, should_proxy_target};
+use parsing::supported_proxy_scheme;
 
 static NETWORK_PROXY: OnceLock<RwLock<Option<Url>>> = OnceLock::new();
 
@@ -13,6 +19,7 @@ struct SystemProxyConfig {
     default_proxy: Option<Url>,
     http_proxy: Option<Url>,
     https_proxy: Option<Url>,
+    socks_proxy: Option<Url>,
     bypass: Vec<String>,
     #[cfg(target_os = "windows")]
     auto_config_url: Option<String>,
@@ -20,16 +27,36 @@ struct SystemProxyConfig {
     auto_detect: bool,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+enum ProxyDecision {
+    Direct,
+    Proxy(Url),
+}
+
 impl SystemProxyConfig {
     fn proxy_for(&self, target: &Url) -> Option<Url> {
-        if let Some(proxy) = self.configured_proxy_for(target) {
-            return Some(proxy);
+        if self.should_bypass(target) {
+            return None;
         }
         #[cfg(target_os = "windows")]
-        if !self.should_bypass(target) {
-            return platform::windows_auto_proxy_for(self, target);
+        // Explicit PAC takes precedence over saved manual settings. Do not start WPAD
+        // discovery when a manual proxy is available; Windows often leaves it enabled.
+        if self.auto_config_url.is_some() || !self.has_manual_proxy() {
+            if let Some(decision) = platform::windows_auto_proxy_for(self, target) {
+                return match decision {
+                    ProxyDecision::Direct => None,
+                    ProxyDecision::Proxy(proxy) => Some(proxy),
+                };
+            }
         }
-        None
+        self.configured_proxy_for(target)
+    }
+
+    fn has_manual_proxy(&self) -> bool {
+        self.default_proxy.is_some()
+            || self.http_proxy.is_some()
+            || self.https_proxy.is_some()
+            || self.socks_proxy.is_some()
     }
 
     fn configured_proxy_for(&self, target: &Url) -> Option<Url> {
@@ -42,11 +69,13 @@ impl SystemProxyConfig {
                 .http_proxy
                 .as_ref()
                 .or(self.default_proxy.as_ref())
+                .or(self.socks_proxy.as_ref())
                 .cloned(),
             "https" => self
                 .https_proxy
                 .as_ref()
                 .or(self.default_proxy.as_ref())
+                .or(self.socks_proxy.as_ref())
                 .cloned(),
             _ => None,
         }
@@ -57,11 +86,7 @@ impl SystemProxyConfig {
             return true;
         };
         let host = host.trim_matches(['[', ']']).to_ascii_lowercase();
-        if host == "localhost"
-            || host
-                .parse::<std::net::IpAddr>()
-                .is_ok_and(|address| address.is_loopback())
-        {
+        if !should_proxy_target(target) {
             return true;
         }
 
@@ -72,34 +97,53 @@ impl SystemProxyConfig {
 }
 
 pub(crate) fn apply(builder: ClientBuilder) -> ClientBuilder {
-    if configured_network_proxy().is_some() {
-        return builder.no_proxy().proxy(Proxy::custom(move |target| {
-            configured_network_proxy().filter(|_| should_proxy_target(target))
-        }));
-    }
-    let Some(config) = platform::current_system_proxy() else {
-        return builder;
-    };
-    builder.proxy(Proxy::custom(move |target| config.proxy_for(target)))
+    builder.no_proxy().proxy(Proxy::custom(proxy_for_target))
 }
 
 pub(crate) fn proxy_for_target(target: &Url) -> Option<Url> {
+    if !should_proxy_target(target) {
+        return None;
+    }
     if let Some(proxy_url) = configured_network_proxy() {
-        return should_proxy_target(target).then_some(proxy_url);
+        return Some(proxy_url);
+    }
+    match environment::proxy_for(target) {
+        Some(ProxyDecision::Direct) => return None,
+        Some(ProxyDecision::Proxy(proxy)) => return Some(proxy),
+        None => {}
     }
     platform::current_system_proxy().and_then(|config| config.proxy_for(target))
 }
 
-pub(crate) fn apply_async(builder: reqwest::ClientBuilder) -> reqwest::ClientBuilder {
-    if configured_network_proxy().is_some() {
-        return builder.no_proxy().proxy(Proxy::custom(move |target| {
-            configured_network_proxy().filter(|_| should_proxy_target(target))
-        }));
-    }
-    let Some(config) = platform::current_system_proxy() else {
-        return builder;
-    };
-    builder.proxy(Proxy::custom(move |target| config.proxy_for(target)))
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum ProxyResolutionError {
+    #[error("Reading network proxy settings failed")]
+    Task(#[from] tokio::task::JoinError),
+    #[error("Reading network proxy settings timed out")]
+    Timeout,
+}
+
+/// Resolve the complete URL off the async runtime; callers must resolve each redirect separately.
+pub(crate) async fn apply_async(
+    builder: reqwest::ClientBuilder,
+    target: &Url,
+) -> Result<reqwest::ClientBuilder, ProxyResolutionError> {
+    resolve_async(builder, target.clone(), proxy_for_target).await
+}
+
+async fn resolve_async(
+    builder: reqwest::ClientBuilder,
+    target: Url,
+    resolve: impl FnOnce(&Url) -> Option<Url> + Send + 'static,
+) -> Result<reqwest::ClientBuilder, ProxyResolutionError> {
+    const LOOKUP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+    let lookup = tokio::task::spawn_blocking(move || resolve(&target));
+    let proxy = tokio::time::timeout(LOOKUP_TIMEOUT, lookup)
+        .await
+        .map_err(|_| ProxyResolutionError::Timeout)??;
+    Ok(builder
+        .no_proxy()
+        .proxy(Proxy::custom(move |_| proxy.clone())))
 }
 
 pub(crate) fn configure(settings: &NetworkProxySettings) -> Result<(), String> {
@@ -143,8 +187,8 @@ fn network_proxy_url(settings: &NetworkProxySettings) -> Result<Option<Url>, Str
         return Ok(None);
     }
     let normalized = normalize_settings(settings.clone())?;
-    let mut url = Url::parse(&normalized.proxy_url)
-        .map_err(|_| "Enter a valid HTTP proxy address".to_string())?;
+    let mut url =
+        Url::parse(&normalized.proxy_url).map_err(|_| "Enter a valid proxy address".to_string())?;
     url.set_port(normalized.proxy_port)
         .map_err(|_| "Enter a valid proxy port".to_string())?;
     Ok(Some(url))
@@ -154,322 +198,21 @@ fn parse_network_proxy_base_url(value: &str) -> Result<String, String> {
     if value.is_empty() {
         return Err("Enter a proxy address".to_string());
     }
-    let url = Url::parse(value).map_err(|_| "Enter a valid HTTP(S) proxy URL".to_string())?;
-    let valid = matches!(url.scheme(), "http" | "https")
+    let url =
+        Url::parse(value).map_err(|_| "Enter a valid HTTP(S) or SOCKS proxy URL".to_string())?;
+    let valid = supported_proxy_scheme(url.scheme())
         && url.host_str().is_some()
         && url.port().is_none()
-        && url.path() == "/"
+        && matches!(url.path(), "" | "/")
         && url.query().is_none()
         && url.fragment().is_none();
     if !valid {
-        return Err("Use an HTTP proxy address without a port or path".to_string());
+        return Err("Use an HTTP(S) or SOCKS proxy address without a port or path".to_string());
     }
     Ok(url.as_str().trim_end_matches('/').to_string())
 }
 
-fn should_proxy_target(target: &Url) -> bool {
-    let Some(host) = target.host_str() else {
-        return false;
-    };
-    let host = host.trim_matches(['[', ']']);
-    host != "localhost"
-        && !host
-            .parse::<std::net::IpAddr>()
-            .is_ok_and(|address| address.is_loopback())
-}
-
-#[cfg(any(windows, test))]
-fn parse_windows_proxy(
-    proxy_server: &str,
-    proxy_bypass: Option<&str>,
-) -> Option<SystemProxyConfig> {
-    let mut config = SystemProxyConfig {
-        bypass: proxy_bypass
-            .unwrap_or_default()
-            .split(';')
-            .map(str::trim)
-            .filter(|entry| !entry.is_empty())
-            .map(str::to_string)
-            .collect(),
-        ..SystemProxyConfig::default()
-    };
-
-    for entry in proxy_server.split(';').map(str::trim) {
-        if entry.is_empty() {
-            continue;
-        }
-        let Some((kind, endpoint)) = entry.split_once('=') else {
-            if config.default_proxy.is_none() {
-                config.default_proxy = parse_proxy_endpoint(entry);
-            }
-            continue;
-        };
-        match kind.trim().to_ascii_lowercase().as_str() {
-            "http" => config.http_proxy = parse_proxy_endpoint(endpoint),
-            "https" => config.https_proxy = parse_proxy_endpoint(endpoint),
-            _ => {}
-        }
-    }
-
-    (config.default_proxy.is_some() || config.http_proxy.is_some() || config.https_proxy.is_some())
-        .then_some(config)
-}
-
-#[cfg(any(windows, test))]
-fn parse_proxy_endpoint(endpoint: &str) -> Option<Url> {
-    let endpoint = endpoint.trim().trim_matches('"');
-    if endpoint.is_empty() {
-        return None;
-    }
-    let value = if endpoint.contains("://") {
-        endpoint.to_string()
-    } else {
-        format!("http://{endpoint}")
-    };
-    Url::parse(&value)
-        .ok()
-        .filter(|url| matches!(url.scheme(), "http" | "https") && url.host_str().is_some())
-}
-
-#[cfg(any(windows, test))]
-fn parse_proxy_result(value: &str) -> Option<Url> {
-    for entry in value.split(';').map(str::trim) {
-        let mut parts = entry.split_whitespace();
-        let Some(kind) = parts.next() else {
-            continue;
-        };
-        let Some(endpoint) = parts.next() else {
-            continue;
-        };
-        if matches!(kind.to_ascii_uppercase().as_str(), "PROXY" | "HTTP") {
-            if let Some(proxy) = parse_proxy_endpoint(endpoint) {
-                return Some(proxy);
-            }
-        }
-    }
-    None
-}
-
-fn bypass_rule_matches(rule: &str, host: &str, port: Option<u16>) -> bool {
-    let rule = rule.trim().to_ascii_lowercase();
-    if rule.is_empty() {
-        return false;
-    }
-    if rule == "<local>" {
-        return !host.contains('.');
-    }
-    if rule.starts_with("<-") && rule.ends_with('>') {
-        return false;
-    }
-
-    let rule = rule
-        .strip_prefix("http://")
-        .or_else(|| rule.strip_prefix("https://"))
-        .unwrap_or(&rule)
-        .trim_end_matches('/');
-    let (rule_host, rule_port) = split_bypass_host_port(rule);
-    if rule_port.is_some() && rule_port != port {
-        return false;
-    }
-    if let Some(suffix) = rule_host.strip_prefix('.') {
-        return host == suffix || host.ends_with(&format!(".{suffix}"));
-    }
-    wildcard_matches(rule_host, host)
-}
-
-fn split_bypass_host_port(rule: &str) -> (&str, Option<u16>) {
-    if let Some(rest) = rule.strip_prefix('[') {
-        if let Some(closing) = rest.find(']') {
-            let host = &rest[..closing];
-            let port = rest[closing + 1..]
-                .strip_prefix(':')
-                .and_then(|value| value.parse().ok());
-            return (host, port);
-        }
-    }
-    if rule.matches(':').count() == 1 {
-        if let Some((host, port)) = rule.rsplit_once(':') {
-            if let Ok(port) = port.parse() {
-                return (host, Some(port));
-            }
-        }
-    }
-    (rule.trim_matches(['[', ']']), None)
-}
-
-fn wildcard_matches(pattern: &str, value: &str) -> bool {
-    let (pattern, value) = (pattern.as_bytes(), value.as_bytes());
-    let (mut pattern_index, mut value_index) = (0, 0);
-    let (mut star_index, mut star_value_index) = (None, 0);
-
-    while value_index < value.len() {
-        if pattern_index < pattern.len() && pattern[pattern_index] == value[value_index] {
-            pattern_index += 1;
-            value_index += 1;
-        } else if pattern_index < pattern.len() && pattern[pattern_index] == b'*' {
-            star_index = Some(pattern_index);
-            pattern_index += 1;
-            star_value_index = value_index;
-        } else if let Some(star) = star_index {
-            pattern_index = star + 1;
-            star_value_index += 1;
-            value_index = star_value_index;
-        } else {
-            return false;
-        }
-    }
-    while pattern_index < pattern.len() && pattern[pattern_index] == b'*' {
-        pattern_index += 1;
-    }
-    pattern_index == pattern.len()
-}
-
 #[cfg(test)]
-mod tests {
-    use reqwest::Url;
-
-    use crate::models::NetworkProxySettings;
-
-    use super::{
-        bypass_rule_matches, network_proxy_url, normalize_settings, parse_proxy_result,
-        parse_windows_proxy, should_proxy_target, wildcard_matches,
-    };
-
-    #[test]
-    fn normalizes_enabled_network_proxy() {
-        let normalized = normalize_settings(NetworkProxySettings {
-            enabled: true,
-            proxy_url: " http://127.0.0.1/ ".to_string(),
-            proxy_port: Some(7897),
-        })
-        .expect("proxy should normalize");
-
-        assert_eq!(normalized.proxy_url, "http://127.0.0.1");
-        assert_eq!(
-            network_proxy_url(&normalized)
-                .expect("proxy should parse")
-                .map(|url| url.to_string()),
-            Some("http://127.0.0.1:7897/".to_string())
-        );
-    }
-
-    #[test]
-    fn rejects_enabled_network_proxy_without_port() {
-        let error = normalize_settings(NetworkProxySettings {
-            enabled: true,
-            proxy_url: "http://127.0.0.1".to_string(),
-            proxy_port: None,
-        })
-        .expect_err("missing port should fail");
-
-        assert!(error.contains("proxy port"));
-
-        let zero_port_error = normalize_settings(NetworkProxySettings {
-            enabled: true,
-            proxy_url: "http://127.0.0.1".to_string(),
-            proxy_port: Some(0),
-        })
-        .expect_err("zero port should fail");
-        assert!(zero_port_error.contains("proxy port"));
-    }
-
-    #[test]
-    fn rejects_proxy_address_without_url_scheme() {
-        let error = normalize_settings(NetworkProxySettings {
-            enabled: true,
-            proxy_url: "127.0.0.1".to_string(),
-            proxy_port: Some(7897),
-        })
-        .expect_err("proxy address without a URL scheme should fail");
-
-        assert!(error.contains("proxy URL"));
-    }
-
-    #[test]
-    fn explicit_network_proxy_bypasses_loopback_targets() {
-        assert!(!should_proxy_target(
-            &Url::parse("http://localhost:1455/callback").unwrap()
-        ));
-        assert!(!should_proxy_target(
-            &Url::parse("http://127.0.0.1:3000/api").unwrap()
-        ));
-        assert!(should_proxy_target(
-            &Url::parse("https://api.openai.com/v1/models").unwrap()
-        ));
-    }
-
-    #[test]
-    fn parses_clash_style_single_proxy_for_http_and_https() {
-        let config = parse_windows_proxy("127.0.0.1:7897", Some("<local>;localhost;127.*"))
-            .expect("proxy should parse");
-
-        assert_eq!(
-            config.default_proxy.as_ref().map(|url| url.as_str()),
-            Some("http://127.0.0.1:7897/")
-        );
-        assert_eq!(config.bypass, ["<local>", "localhost", "127.*"]);
-        assert_eq!(
-            config
-                .configured_proxy_for(&Url::parse("https://auth.openai.com/oauth").unwrap())
-                .as_ref()
-                .map(Url::as_str),
-            Some("http://127.0.0.1:7897/")
-        );
-        assert!(config
-            .configured_proxy_for(&Url::parse("http://localhost:1455/auth/callback").unwrap())
-            .is_none());
-    }
-
-    #[test]
-    fn parses_protocol_specific_windows_proxy_list() {
-        let config = parse_windows_proxy(
-            "http=127.0.0.1:7890;https=127.0.0.1:7891;socks=127.0.0.1:7892",
-            None,
-        )
-        .expect("proxy should parse");
-
-        assert_eq!(
-            config.http_proxy.as_ref().map(|url| url.as_str()),
-            Some("http://127.0.0.1:7890/")
-        );
-        assert_eq!(
-            config.https_proxy.as_ref().map(|url| url.as_str()),
-            Some("http://127.0.0.1:7891/")
-        );
-        assert!(config.default_proxy.is_none());
-    }
-
-    #[test]
-    fn parses_winhttp_autoproxy_results_without_treating_direct_as_a_host() {
-        assert_eq!(
-            parse_proxy_result("PROXY 127.0.0.1:7890; DIRECT")
-                .as_ref()
-                .map(Url::as_str),
-            Some("http://127.0.0.1:7890/")
-        );
-        assert!(parse_proxy_result("DIRECT").is_none());
-    }
-
-    #[test]
-    fn matches_windows_proxy_bypass_rules() {
-        assert!(bypass_rule_matches("<local>", "intranet", Some(80)));
-        assert!(!bypass_rule_matches("<local>", "example.com", Some(80)));
-        assert!(bypass_rule_matches(
-            "*.example.com",
-            "api.example.com",
-            Some(443)
-        ));
-        assert!(bypass_rule_matches("10.*", "10.2.3.4", Some(80)));
-        assert!(bypass_rule_matches(
-            "localhost:3000",
-            "localhost",
-            Some(3000)
-        ));
-        assert!(!bypass_rule_matches(
-            "localhost:3000",
-            "localhost",
-            Some(3001)
-        ));
-        assert!(wildcard_matches("*", "anything.example"));
-    }
-}
+mod tests;
+#[cfg(test)]
+mod transport_tests;

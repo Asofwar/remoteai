@@ -87,8 +87,7 @@ fn prepared_request_retains_scope_after_worker_returns() {
             ..Default::default()
         });
         let builder = reqwest::blocking::Client::new().get(url);
-        let mut request = Request::prepare(builder).unwrap();
-        request.client = reqwest::Client::builder().no_proxy().build().unwrap();
+        let request = Request::prepare(builder).unwrap();
         assert!(request.timeouts.sse_response_idle.is_none());
         request
     };

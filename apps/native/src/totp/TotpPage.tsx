@@ -2,16 +2,18 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Pressable,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { Toast } from '../components/AppToast';
 import { TotpCodeCard } from './TotpCodeCard';
 import { TotpFormSheet } from './TotpFormSheet';
+import { TotpPageHeader, TotpSearchBar } from './TotpPageHeader';
+import { TotpOptionsMenu } from './TotpOptionsMenu';
+import { selectTotpEntries, type TotpSortOrder } from './entryList';
+import { pageStyles as styles } from './pageStyles';
 import { totpStyles } from './styles';
 import { generateTotp } from './totp';
 import type { TotpEntry, TotpManagerState } from './types';
@@ -31,30 +33,9 @@ function useTotpCodes(entries: TotpEntry[]) {
   return { codes, now };
 }
 
-function PageHeader({ onManualAdd, onScanAdd }: {
-  onManualAdd: () => void;
-  onScanAdd: () => void;
-}) {
-  return <View style={styles.header}>
-    <View style={styles.heading}>
-      <Text style={styles.title}>2FA 验证码</Text>
-      <Text style={styles.subtitle}>下拉获取云端密钥，点击验证码即可复制</Text>
-    </View>
-    <View style={styles.actions}>
-      <Pressable accessibilityRole="button" onPress={onManualAdd}
-        style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
-        <Text style={styles.secondaryButtonText}>手动添加</Text>
-      </Pressable>
-      <Pressable accessibilityRole="button" onPress={onScanAdd}
-        style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
-        <Text style={styles.primaryButtonText}>扫码添加</Text>
-      </Pressable>
-    </View>
-  </View>;
-}
-
-function EntryList({ manager, codes, now, onEdit }: {
+function EntryList({ manager, entries, codes, now, onEdit }: {
   manager: TotpManagerState;
+  entries: TotpEntry[];
   codes: Record<string, string>;
   now: number;
   onEdit: (entry: TotpEntry) => void;
@@ -72,7 +53,11 @@ function EntryList({ manager, codes, now, onEdit }: {
     <Text style={totpStyles.emptyTitle}>还没有 2FA 密钥</Text>
     <Text style={totpStyles.emptyText}>扫描二维码或手动输入密钥，即可生成动态验证码。</Text>
   </View>;
-  return <>{manager.entries.map((entry) => <TotpCodeCard
+  if (!entries.length) return <View style={totpStyles.empty}>
+    <Text style={totpStyles.emptyTitle}>没有找到匹配的账号</Text>
+    <Text style={totpStyles.emptyText}>试试其他服务名称或账号，或清空搜索查看全部。</Text>
+  </View>;
+  return <>{entries.map((entry) => <TotpCodeCard
     key={entry.id}
     entry={entry}
     code={codes[entry.id] ?? ''}
@@ -87,6 +72,10 @@ export function TotpPage({ manager }: { manager: TotpManagerState }) {
   const [editing, setEditing] = useState<TotpEntry | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [scanOnOpen, setScanOnOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<TotpSortOrder>('default');
+  const [sortOpen, setSortOpen] = useState(false);
+  const entries = useMemo(() => selectTotpEntries(manager.entries, query, sort), [manager.entries, query, sort]);
   const { codes, now } = useTotpCodes(manager.entries);
 
   const openForm = (entry: TotpEntry | null, scanFirst = false) => {
@@ -108,12 +97,20 @@ export function TotpPage({ manager }: { manager: TotpManagerState }) {
   };
 
   return <View style={styles.page}>
-    <PageHeader onManualAdd={() => openForm(null)} onScanAdd={() => openForm(null, true)} />
     <ScrollView style={styles.list} contentContainerStyle={styles.listContent}
+      keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
       refreshControl={<RefreshControl refreshing={manager.syncing}
-        onRefresh={() => void refreshCloud()} tintColor="#18af8c" />}>
-      <EntryList manager={manager} codes={codes} now={now} onEdit={openForm} />
+        onRefresh={() => void refreshCloud()} tintColor="#2ba47d" colors={['#2ba47d']} />}>
+      <TotpPageHeader onManualAdd={() => openForm(null)} onScanAdd={() => openForm(null, true)} />
+      <TotpSearchBar query={query} onQueryChange={setQuery} onSort={() => setSortOpen(true)}
+        sorted={sort !== 'default'} />
+      <EntryList manager={manager} entries={entries} codes={codes} now={now} onEdit={openForm} />
     </ScrollView>
+    <TotpOptionsMenu title="验证码排序" visible={sortOpen} onClose={() => setSortOpen(false)} options={[
+      { label: '默认顺序', icon: 'list-outline', selected: sort === 'default', onPress: () => setSort('default') },
+      { label: '按服务名称', icon: 'text-outline', selected: sort === 'name', onPress: () => setSort('name') },
+      { label: '最近添加优先', icon: 'time-outline', selected: sort === 'newest', onPress: () => setSort('newest') },
+    ]} />
     <TotpFormSheet
       visible={formOpen}
       entry={editing}
@@ -126,35 +123,3 @@ export function TotpPage({ manager }: { manager: TotpManagerState }) {
     />
   </View>;
 }
-
-const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: '#f7faf7' },
-  header: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 14 },
-  heading: { marginBottom: 16 },
-  title: { color: '#13231c', fontSize: 27, lineHeight: 34, fontWeight: '900' },
-  subtitle: { color: '#6f8177', fontSize: 12, marginTop: 4 },
-  actions: { flexDirection: 'row', gap: 10 },
-  secondaryButton: {
-    flex: 1,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#bde8d8',
-    borderRadius: 12,
-    backgroundColor: '#ffffff',
-  },
-  secondaryButtonText: { color: '#0b8065', fontSize: 13, fontWeight: '800' },
-  primaryButton: {
-    flex: 1,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    backgroundColor: '#18af8c',
-  },
-  primaryButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
-  list: { flex: 1 },
-  listContent: { flexGrow: 1, paddingHorizontal: 18, paddingTop: 4, paddingBottom: 34 },
-  pressed: { opacity: 0.76 },
-});

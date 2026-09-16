@@ -1,5 +1,10 @@
 import * as Clipboard from 'expo-clipboard';
-import { Pressable, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
+import { Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { Toast } from '../components/AppToast';
+import { TotpOptionsMenu } from './TotpOptionsMenu';
+import { TotpServiceIcon } from './TotpServiceIcon';
 import { totpStyles as styles } from './styles';
 import type { TotpEntry } from './types';
 
@@ -12,41 +17,61 @@ interface TotpCodeCardProps {
   onEdit: () => void;
 }
 
+const COMPACT_CARD_SCREEN_WIDTH = 360;
+
 function displayCode(code: string) {
   const splitAt = code.length / 2;
   return `${code.slice(0, splitAt)} ${code.slice(splitAt)}`;
 }
 
 export function TotpCodeCard({ code, entry, now, onCopied, onDelete, onEdit }: TotpCodeCardProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const compact = useWindowDimensions().width < COMPACT_CARD_SCREEN_WIDTH;
   const elapsed = Math.floor(now / 1000) % entry.period;
   const remaining = entry.period - elapsed;
   const progress = `${(remaining / entry.period) * 100}%` as `${number}%`;
   const copy = async () => {
-    await Clipboard.setStringAsync(code);
-    onCopied();
+    if (!code) return;
+    try {
+      await Clipboard.setStringAsync(code);
+      onCopied();
+    } catch {
+      Toast.fail('复制失败，请重试');
+    }
   };
   return <View style={styles.codeCard}>
     <View style={styles.codeHeader}>
+      <TotpServiceIcon issuer={entry.issuer} />
       <View style={styles.codeIdentity}>
         <Text style={styles.issuer} numberOfLines={1}>{entry.issuer}</Text>
         <Text style={styles.account} numberOfLines={1}>{entry.accountName}</Text>
       </View>
-      <View style={styles.codeActions}>
-        <Pressable style={styles.smallAction} onPress={onEdit}>
-          <Text style={styles.smallActionText}>编辑</Text>
-        </Pressable>
-        <Pressable style={[styles.smallAction, styles.smallActionDanger]} onPress={onDelete}>
-          <Text style={[styles.smallActionText, styles.smallActionDangerText]}>删除</Text>
-        </Pressable>
-      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel={`管理 ${entry.issuer} 的 2FA 密钥`}
+        style={({ pressed }) => [styles.moreButton, pressed && styles.pressed]} onPress={() => setMenuOpen(true)}>
+        <Ionicons name="ellipsis-horizontal" size={21} color="#838b99" />
+      </Pressable>
     </View>
-    <Pressable accessibilityRole="button" accessibilityLabel={`复制 ${entry.issuer} 验证码`}
-      style={styles.codeButton} onPress={() => void copy()}>
-      <View style={styles.codeRow}>
-        <Text style={styles.codeValue}>{displayCode(code)}</Text>
-        <Text style={styles.countdown}>{remaining} 秒</Text>
-      </View>
-      <View style={styles.progressTrack}><View style={[styles.progressFill, { width: progress }]} /></View>
-    </Pressable>
+    <View style={[styles.codeBody, compact && styles.compactCodeBody]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`复制 ${entry.issuer} 验证码`}
+        disabled={!code} style={styles.codeButton} onPress={() => void copy()}>
+        <View style={styles.codeRow}>
+          <Text style={styles.codeValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
+            {displayCode(code)}
+          </Text>
+          <Text style={styles.countdown}>{remaining} 秒</Text>
+        </View>
+        <View style={styles.progressTrack}><View style={[styles.progressFill, { width: progress }]} /></View>
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={`复制 ${entry.issuer} 验证码到剪贴板`}
+        disabled={!code} onPress={() => void copy()}
+        style={({ pressed }) => [styles.copyButton, compact && styles.compactCopyButton, pressed && styles.pressed]}>
+        <Ionicons name="copy-outline" size={21} color="#008956" />
+        {!compact && <Text style={styles.copyText}>复制</Text>}
+      </Pressable>
+    </View>
+    <TotpOptionsMenu title={entry.issuer} visible={menuOpen} onClose={() => setMenuOpen(false)} options={[
+      { label: '编辑密钥', icon: 'create-outline', onPress: onEdit },
+      { label: '删除密钥', icon: 'trash-outline', onPress: onDelete, danger: true },
+    ]} />
   </View>;
 }

@@ -72,6 +72,7 @@ import { BottomSheet } from './src/components/BottomSheet';
 import { RemoteModelSwitchSheet } from './src/components/RemoteModelSwitchSheet';
 import { QuotaConsumptionSheet } from './src/components/QuotaConsumptionSheet';
 import { TotpPage } from './src/totp/TotpPage';
+import { pageStyles as totpPageStyles } from './src/totp/pageStyles';
 import { ChatPage } from './src/chat/ChatPage';
 import { palette as chatPalette } from './src/chat/styles';
 import { useChatNotificationNavigation } from './src/chat/useChatNotificationNavigation';
@@ -840,8 +841,11 @@ function BottomNavigation({ activePage, onChange }: {
     </Pressable>
     <Pressable accessibilityRole="tab" accessibilityState={{ selected: activePage === 'totp' }}
       onPress={() => onChange('totp')} style={styles.navItem}>
-      <Ionicons name="shield-checkmark-outline" size={23} color={activePage === 'totp' ? '#00c98b' : '#858991'} />
-      <Text style={[styles.navText, activePage === 'totp' && styles.navTextActive]}>2FA</Text>
+      <View style={activePage === 'totp' ? totpPageStyles.activeTab : totpPageStyles.tab}>
+        <Ionicons name={activePage === 'totp' ? 'shield-checkmark' : 'shield-checkmark-outline'}
+          size={23} color={activePage === 'totp' ? '#008956' : '#858991'} />
+        <Text style={[styles.navText, activePage === 'totp' && styles.navTextActive]}>2FA</Text>
+      </View>
     </Pressable>
     <Pressable accessibilityRole="tab" accessibilityState={{ selected: settingsActive }}
       onPress={() => onChange('settings')} style={styles.navItem}>
@@ -1755,7 +1759,8 @@ function AppContent() {
   if (!session) return <View style={styles.app}>
     <LoginScreen initialBaseUrl={DEFAULT_CLOUD_BASE_URL} onLoggedIn={handleLogin} />
   </View>;
-  return <SafeAreaView style={[styles.app, activePage === 'accounts' && accountStyles.page,
+  return <SafeAreaView style={[styles.app, activePage === 'totp' && totpPageStyles.page,
+    activePage === 'accounts' && accountStyles.page,
     activePage === 'chat' && styles.chatCanvas,
     (activePage === 'settings' || activePage === 'about') && styles.settingsCanvas]}>
     <StatusBar style="dark" />

@@ -8,6 +8,8 @@ import type { ReadUsage } from '../../../../shared/remote-chat/usage';
 import { ChatAttachmentPreviews, ChatAttachmentSheet } from './ChatAttachments';
 import { pickChatImages } from './pickChatImages';
 import { ChatImageEditor } from './ChatImageEditor';
+import { ChatUploadProgress } from './ChatUploadProgress';
+import type { UploadProgress } from '../../../../shared/remote-chat/uploadProgress';
 import type { Model, SendInput, ThreadTokenUsage } from './types';
 import { composerLabel, type ComposerSettings } from '../../../../shared/remote-chat/composer';
 import { useChatDraft } from '../../../../shared/remote-chat/client/useChatDraft';
@@ -16,6 +18,7 @@ import type { QueueProps } from '../../../../shared/remote-chat/client/queueProp
 import { useQueueEditor } from '../../../../shared/remote-chat/client/useQueueEditor';
 
 interface Props {
+  uploadProgress?: UploadProgress;
   queue?: QueueProps;
   tokenUsage?: ThreadTokenUsage;
   readUsage: ReadUsage;
@@ -34,7 +37,7 @@ interface Props {
   interrupt: () => Promise<void>;
 }
 export function ChatComposer({ models, selection, settingsBusy, settingsError, updateSettings,
-  readUsage, tokenUsage, queue,
+  readUsage, tokenUsage, queue, uploadProgress,
   threadId, active, ready, sending, running, interrupted = false, send, interrupt }: Props) {
   const [settings, setSettings] = useState(false);
   const [attachments, setAttachments] = useState(false);
@@ -94,6 +97,7 @@ export function ChatComposer({ models, selection, settingsBusy, settingsError, u
           onClick={() => draft.removeReference(item)}>×</button></div>)}
       {!!draft.error && <p role="alert" className="chat-error">{draft.error}</p>}
       {draft.picking && <p role="status" className="chat-muted">正在添加图片…</p>}
+      <ChatUploadProgress progress={uploadProgress} reconnecting={!ready} />
       <div className={`chat-composer-field${draft.text.length === 0 ? ' chat-composer-field-empty' : ''}`}>
         <textarea ref={textarea} aria-label="聊天消息" value={draft.text} maxLength={100_000} rows={1}
           readOnly={queueEditor.loading}

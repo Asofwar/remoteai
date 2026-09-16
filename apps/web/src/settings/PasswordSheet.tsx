@@ -1,0 +1,40 @@
+import { useState } from 'react';
+import { Button, Form, Input, Toast } from 'antd-mobile';
+import { apiJson } from '../api';
+import { AdaptiveSheet } from '../components/AdaptiveSheet';
+
+export function PasswordSheet({ onClose }: { onClose: () => void }) {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmation, setConfirmation] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const save = async () => {
+    if (saving) return;
+    if (!currentPassword || newPassword.length < 8 || newPassword !== confirmation) {
+      setError(newPassword !== confirmation ? '两次输入的新密码不一致' : '请输入当前密码，并设置至少 8 位的新密码');
+      return;
+    }
+    setSaving(true);
+    try {
+      await apiJson('/admin/api/profile/password', { method: 'PATCH',
+        body: JSON.stringify({ currentPassword, newPassword }) });
+      Toast.show({ icon: 'success', content: '密码已修改' });
+      onClose();
+    } catch { setError('修改失败，请检查当前密码后重试'); }
+    finally { setSaving(false); }
+  };
+  return <AdaptiveSheet open title="修改密码" subtitle="新密码至少 8 位" width={400}
+    onClose={() => { if (!saving) onClose(); }}>
+    <Form layout="vertical" footer={<Button block color="primary" loading={saving}
+      onClick={() => void save()}>确认修改</Button>}>
+      <Form.Item label="当前密码"><Input aria-label="当前密码" type="password" autoComplete="current-password"
+        value={currentPassword} onChange={setCurrentPassword} /></Form.Item>
+      <Form.Item label="新密码"><Input aria-label="新密码" type="password" autoComplete="new-password"
+        value={newPassword} onChange={setNewPassword} /></Form.Item>
+      <Form.Item label="确认新密码"><Input aria-label="确认新密码" type="password" autoComplete="new-password"
+        value={confirmation} onChange={setConfirmation} onEnterPress={() => void save()} /></Form.Item>
+      {error && <p className="form-error" role="alert">{error}</p>}
+    </Form>
+  </AdaptiveSheet>;
+}

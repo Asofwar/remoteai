@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Toast } from 'antd-mobile';
 import { fetchTotpVault, putTotpVault } from './api';
 import { emptyTotpVault, mergeTotpVaults } from './totp';
 import type { AuthSession, TotpEntry, TotpVault } from './types';
@@ -42,9 +43,13 @@ export function useTotpVault(session: AuthSession | null) {
   const [syncing, setSyncing] = useState(false);
   const [cloudSyncEnabled, setCloudSyncEnabled] = useState(false);
   const vaultRef = useRef(vault);
+  const activeSessionRef = useRef(session);
   vaultRef.current = vault;
+  activeSessionRef.current = session;
 
   const persist = useCallback((activeSession: AuthSession, next: TotpVault) => {
+    if (activeSessionRef.current?.email !== activeSession.email
+      || activeSessionRef.current?.baseUrl !== activeSession.baseUrl) return;
     vaultRef.current = next;
     setVault(next);
     saveVault(activeSession, next);
@@ -54,13 +59,16 @@ export function useTotpVault(session: AuthSession | null) {
     setSyncing(true);
     try {
       const remote = await putTotpVault(next);
-      persist(activeSession, mergeTotpVaults(next, remote));
+      persist(activeSession, mergeTotpVaults(vaultRef.current, remote));
+    } catch {
+      Toast.show({ icon: 'fail', content: '云端同步失败，本机密钥已保留，请稍后重试' });
     } finally {
       setSyncing(false);
     }
   }, [persist]);
 
   useEffect(() => {
+    activeSessionRef.current = session;
     if (!session) {
       setVault(emptyTotpVault());
       setInitialized(true);
@@ -74,7 +82,10 @@ export function useTotpVault(session: AuthSession | null) {
     if (enabled) void synchronize(session, local);
     const onSyncChange = () => setCloudSyncEnabled(loadTotpSyncEnabled(session));
     window.addEventListener(SYNC_EVENT, onSyncChange);
-    return () => window.removeEventListener(SYNC_EVENT, onSyncChange);
+    return () => {
+      activeSessionRef.current = null;
+      window.removeEventListener(SYNC_EVENT, onSyncChange);
+    };
   }, [persist, session, synchronize]);
 
   const commit = useCallback((updater: (current: TotpVault, now: string) => TotpVault) => {

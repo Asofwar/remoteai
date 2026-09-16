@@ -1,0 +1,24 @@
+import { ArrowLeft, Box, FileText, Github, Globe, Zap } from 'lucide-react';
+import { SettingsRow } from './SettingsRow';
+import { version } from '../../../../package.json';
+
+export function AboutPage({ onBack }: { onBack: () => void }) {
+  return <div className="page-body settings-page about-page">
+    <header className="settings-navigation"><button type="button" className="icon-button"
+      aria-label="返回设置" onClick={onBack}><ArrowLeft size={22} /></button><h1>关于</h1></header>
+    <section className="settings-group about-identity">
+      <span className="brand-mark"><Zap size={28} fill="currentColor" /></span>
+      <div><h2>Codex Switch <small>Web</small></h2><p>v{version}</p></div>
+      <p>管理账号用量，随时连接桌面设备。</p>
+    </section>
+    <section className="settings-group">
+      <SettingsRow label="当前版本" value={`v${version}`} icon={Box} tone="blue" />
+      <SettingsRow label="运行平台" value="Web 浏览器" icon={Globe} tone="blue" />
+      <SettingsRow label="开源许可" value="Apache-2.0" icon={FileText} tone="orange" />
+    </section>
+    <section className="settings-group"><a className="settings-link"
+      href="https://github.com/piperhex/codex-switch/releases"
+      target="_blank" rel="noreferrer"><Github size={21} /><span>开源项目与历史版本</span></a></section>
+    <p className="settings-hint">网页版由服务端更新，无需下载安装包。</p>
+  </div>;
+}

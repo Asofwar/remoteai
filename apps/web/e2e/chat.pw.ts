@@ -109,8 +109,8 @@ test('keeps the PC chat after login renewal and disconnects on logout', async ({
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('codex-switch.web.session.v1') ?? '{}').accessToken))
     .toBe('renewed-test-token');
   await navigate(page, '设置');
-  await page.locator('.settings-list').getByText('退出登录').click();
   await page.getByRole('button', { name: '退出登录', exact: true }).click();
+  await page.locator('.adm-dialog').getByRole('button', { name: '退出登录', exact: true }).click();
   await expect(page.getByRole('button', { name: '登录并查看' })).toBeVisible();
   await expect.poll(async () => (await state(request)).connectedMobiles).toBe(0);
 });

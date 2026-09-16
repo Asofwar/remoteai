@@ -72,6 +72,7 @@ function ConnectedChat({ session, device, devices, active, chooseDevice }: Props
         ready={ready} respond={(reply) => controller.respond(reply)} />)}
     </div>}
     <ChatComposer queue={queueProps(state, controller)}
+      uploadProgress={state.upload}
       threadId={state.selected?.id ?? null} models={state.models} selection={state.settings}
       readUsage={controller.readUsage} tokenUsage={state.selected?.tokenUsage}
       settingsBusy={state.settingsBusy} settingsError={state.settingsError}

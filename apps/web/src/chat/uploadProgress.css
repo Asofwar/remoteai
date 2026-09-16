@@ -1,0 +1,8 @@
+.chat-upload-progress { width: 100%; max-width: 400px; margin: 0 auto; padding: 8px 12px; }
+.chat-upload-progress > div:first-child { display: flex; align-items: center; gap: 8px;
+  color: #28766c; font-size: 13px; line-height: 20px; }
+.chat-upload-progress svg { flex-shrink: 0; }
+.chat-upload-progress span { min-width: 0; overflow-wrap: anywhere; }
+.chat-upload-track { height: 4px; margin-top: 7px; overflow: hidden; border-radius: 2px; background: #e1eeeb; }
+.chat-upload-track i { display: block; height: 100%; border-radius: inherit; background: #238578; }
+.chat-connection-info .chat-reconnect { flex-shrink: 0; margin-left: 6px; color: #238578; }

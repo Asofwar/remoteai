@@ -86,7 +86,9 @@ export const signOut = createAsyncThunk("auth/signOut", async () => {
   await logout();
 });
 
-export const refreshAll = createAsyncThunk("data/refreshAll", async () => fetchDashboardData(true));
+export const refreshAll = createAsyncThunk("data/refreshAll", async () => fetchDashboardData(true), {
+  condition: (_, { getState }) => !(getState() as { data: DataState }).data.refreshing,
+});
 
 export const refreshOneAccount = createAsyncThunk("data/refreshAccount", async (accountId: string) => ({
   accountId,

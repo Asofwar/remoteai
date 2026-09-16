@@ -1,138 +1,69 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { Button, Dialog, Empty, Form, Input, SpinLoading, Switch, Toast } from 'antd-mobile';
-import { Clipboard, Plus, QrCode, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
-import { useAppSelector } from '../hooks';
-import { generateTotp, normalizeTotpSecret, parseOtpAuthUri } from '../totp';
+import { useMemo, useRef, useState } from 'react';
+import { Dropdown } from 'antd';
+import { Button, Dialog, Empty, Input, PullToRefresh, SpinLoading, Toast } from 'antd-mobile';
+import { ListFilter, Plus, QrCode, RefreshCw, Search, ShieldCheck } from 'lucide-react';
 import type { TotpEntry } from '../types';
-import { useTotpVault } from '../useTotpVault';
-import { AdaptiveSheet } from './AdaptiveSheet';
+import type { useTotpVault } from '../useTotpVault';
+import { selectTotpEntries, type TotpSortOrder } from '../../../native/src/totp/entryList';
+import { TotpCodeCard } from '../totp/TotpCodeCard';
+import { TotpForm } from '../totp/TotpForm';
+import { useTotpCodes } from '../totp/useTotpCodes';
+import '../totp/styles.css';
 
-interface TotpDraft {
-  issuer: string;
-  accountName: string;
-  secret: string;
-}
+const SORT_OPTIONS = [{ key: 'default', label: '默认顺序' }, { key: 'name', label: '按服务名称' },
+  { key: 'newest', label: '最近添加优先' }];
+const REFRESH_TEXT = { pulling: '下拉同步', canRelease: '释放立即同步', refreshing: '正在同步…', complete: '同步完成' };
 
-const EMPTY_DRAFT: TotpDraft = { issuer: '', accountName: '', secret: '' };
-
-async function scanQrFile(file: File) {
-  const detectorType = (window as unknown as {
-    BarcodeDetector?: new (options: { formats: string[] }) => {
-      detect(source: ImageBitmap): Promise<Array<{ rawValue?: string }>>;
-    };
-  }).BarcodeDetector;
-  if (!detectorType) throw new Error('当前浏览器不支持二维码识别，请手动粘贴密钥');
-  const bitmap = await createImageBitmap(file);
-  try {
-    const results = await new detectorType({ formats: ['qr_code'] }).detect(bitmap);
-    const value = results[0]?.rawValue;
-    if (!value) throw new Error('没有识别到有效的二维码');
-    return value;
-  } finally {
-    bitmap.close();
-  }
-}
-
-function useCodes(entries: TotpEntry[]) {
-  const [now, setNow] = useState(Date.now());
-  const [codes, setCodes] = useState<Record<string, string>>({});
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-  useEffect(() => {
-    let cancelled = false;
-    void Promise.all(entries.map(async (entry) => [entry.id, await generateTotp(entry, now)] as const))
-      .then((values) => { if (!cancelled) setCodes(Object.fromEntries(values)); });
-    return () => { cancelled = true; };
-  }, [entries, now]);
-  return { codes, now };
-}
-
-export function TotpPage() {
-  const session = useAppSelector((state) => state.auth.session);
-  const manager = useTotpVault(session);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [editing, setEditing] = useState<TotpEntry | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
-  const [draft, setDraft] = useState<TotpDraft>(EMPTY_DRAFT);
-  const { codes, now } = useCodes(manager.entries);
-  const sortedEntries = useMemo(
-    () => [...manager.entries].sort((left, right) => left.issuer.localeCompare(right.issuer)),
-    [manager.entries],
-  );
-
-  const openForm = (entry?: TotpEntry) => {
-    setEditing(entry ?? null);
-    setDraft(entry ? { issuer: entry.issuer, accountName: entry.accountName, secret: entry.secret } : EMPTY_DRAFT);
-    setFormOpen(true);
-  };
-
-  const save = () => {
-    try {
-      const parsed = draft.secret.trim().toLowerCase().startsWith('otpauth://')
-        ? parseOtpAuthUri(draft.secret)
-        : {
-          issuer: draft.issuer.trim(),
-          accountName: draft.accountName.trim(),
-          secret: normalizeTotpSecret(draft.secret),
-          algorithm: editing?.algorithm ?? 'SHA1',
-          digits: editing?.digits ?? 6,
-          period: editing?.period ?? 30,
-        };
-      manager.saveEntry(parsed, editing?.id);      setFormOpen(false);
-      Toast.show({ icon: 'success', content: '2FA 密钥已保存' });
-    } catch (error) {
-      Toast.show({ icon: 'fail', content: error instanceof Error ? error.message : '2FA 密钥无效' });
-    }
-  };
-
-  const importQr = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    try {
-      const parsed = parseOtpAuthUri(await scanQrFile(file));
-      setEditing(null);
-      setDraft(parsed);
-      setFormOpen(true);
-    } catch (error) {
-      Toast.show({ icon: 'fail', content: error instanceof Error ? error.message : '二维码识别失败' });
-    }
-  };
-
+export function TotpPage({ manager }: { manager: ReturnType<typeof useTotpVault> }) {
+  const [form, setForm] = useState<{ entry: TotpEntry | null; scanFirst: boolean } | null>(null);
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<TotpSortOrder>('default');
+  const refreshing = useRef(false);
+  const entries = useMemo(() => selectTotpEntries(manager.entries, query, sort), [manager.entries, query, sort]);
+  const { codes, now } = useTotpCodes(manager.entries);
   const refresh = async () => {
+    if (refreshing.current || manager.syncing || !manager.initialized) return;
+    refreshing.current = true;
     try {
       const result = await manager.refreshCloud();
       const messages = { empty: '云端暂无 2FA 密钥', current: '2FA 密钥已是最新', updated: '已获取云端 2FA 密钥' };
-      Toast.show({ icon: result === 'empty' ? 'fail' : 'success', content: messages[result] });
-    } catch (error) {
-      Toast.show({ icon: 'fail', content: error instanceof Error ? error.message : '获取云端 2FA 密钥失败' });
-    }
+      Toast.show({ content: messages[result] });
+    } catch { Toast.show({ icon: 'fail', content: '获取云端 2FA 密钥失败，请重试' }); }
+    finally { refreshing.current = false; }
   };
-
+  const remove = async (entry: TotpEntry) => {
+    const confirmed = await Dialog.confirm({ title: '删除 2FA 密钥？',
+      content: `确定删除“${entry.issuer}”的密钥吗？`, confirmText: '删除', cancelText: '取消' });
+    if (confirmed) manager.deleteEntry(entry.id);
+  };
   return <>
-    <div className="page-body totp-page">
-      <header className="page-heading"><div><span>安全工具</span><h1>2FA 验证码</h1></div>
-        <div className="totp-heading-actions"><Button size="small" onClick={() => fileRef.current?.click()}><QrCode size={15} />识别二维码</Button><Button size="small" color="primary" onClick={() => openForm()}><Plus size={15} />手动添加</Button></div>
-      </header>
-      <section className="totp-sync-card"><ShieldCheck size={20} /><div><strong>云端同步</strong><span>开启后会与手机端共享 2FA 密钥</span></div><Switch checked={manager.cloudSyncEnabled} onChange={manager.setCloudSyncEnabled} /></section>
-      <div className="section-toolbar"><div><h2>动态验证码</h2><span>点击验证码即可复制</span></div><Button size="small" loading={manager.syncing} onClick={() => void refresh()}><RefreshCw size={15} />同步</Button></div>
-      {!manager.initialized ? <div className="page-loading"><SpinLoading color="primary" /><span>正在读取 2FA 密钥</span></div>
-        : !sortedEntries.length ? <Empty className="page-empty" description="还没有 2FA 密钥" />
-          : <div className="totp-grid">{sortedEntries.map((entry) => {
-            const code = codes[entry.id] ?? '------';
-            const seconds = entry.period - (Math.floor(now / 1000) % entry.period);
-            return <article className="totp-card" key={entry.id}><div className="totp-card-header"><div><strong>{entry.issuer || '未命名'}</strong><span>{entry.accountName}</span></div><button type="button" onClick={() => void Dialog.confirm({ title: '删除 2FA 密钥？', content: entry.issuer, confirmText: '删除' }).then((confirmed) => { if (confirmed) manager.deleteEntry(entry.id); })}><Trash2 size={16} /></button></div><button type="button" className="totp-code" onClick={() => void navigator.clipboard.writeText(code).then(() => Toast.show({ icon: 'success', content: '验证码已复制' }))}><span>{code.slice(0, 3)}</span><span>{code.slice(3)}</span><Clipboard size={15} /></button><div className="totp-progress"><i style={{ width: `${(seconds / entry.period) * 100}%` }} /></div><footer><span>{seconds} 秒</span><button type="button" onClick={() => openForm(entry)}>编辑</button></footer></article>;
-          })}</div>}
-      <input ref={fileRef} hidden type="file" accept="image/*" onChange={(event) => void importQr(event)} />
-    </div>
-    <AdaptiveSheet open={formOpen} title={editing ? '编辑 2FA 密钥' : '添加 2FA 密钥'} subtitle="支持 Base32 密钥或 otpauth:// 地址" onClose={() => setFormOpen(false)}>
-      <Form layout="vertical" footer={<Button block color="primary" size="large" onClick={save}>保存密钥</Button>}>
-        <Form.Item label="服务名称"><Input value={draft.issuer} onChange={(value) => setDraft((current) => ({ ...current, issuer: value }))} placeholder="例如 OpenAI" /></Form.Item>
-        <Form.Item label="账号名称"><Input value={draft.accountName} onChange={(value) => setDraft((current) => ({ ...current, accountName: value }))} placeholder="name@example.com" /></Form.Item>
-        <Form.Item label="2FA 密钥"><Input value={draft.secret} onChange={(value) => setDraft((current) => ({ ...current, secret: value }))} placeholder="Base32 或 otpauth://" /></Form.Item>
-      </Form>
-    </AdaptiveSheet>
+    <PullToRefresh onRefresh={refresh} renderText={status => REFRESH_TEXT[status]}>
+      <div className="page-body verification-page">
+        <header className="verification-heading"><div><h1>2FA 验证码</h1>
+          <p>同步云端密钥，点击验证码即可复制</p></div><ShieldCheck size={82} aria-hidden="true" /></header>
+        <div className="verification-actions">
+          <Button onClick={() => setForm({ entry: null, scanFirst: false })}><Plus size={22} />手动添加</Button>
+          <Button color="primary" onClick={() => setForm({ entry: null, scanFirst: true })}>
+            <QrCode size={22} />扫码添加</Button>
+        </div>
+        <div className="verification-toolbar"><label className="verification-search"><Search size={20} />
+          <Input value={query} onChange={setQuery} aria-label="搜索服务名称或账号" placeholder="搜索服务名称或账号" clearable />
+        </label><Dropdown trigger={['click']} menu={{ selectable: true, selectedKeys: [sort], items: SORT_OPTIONS,
+          onClick: ({ key }) => setSort(key as TotpSortOrder) }}>
+          <button className="icon-button" type="button" aria-label="验证码排序"><ListFilter size={23} /></button>
+        </Dropdown><button className="icon-button" type="button" aria-label="同步 2FA 密钥"
+          disabled={manager.syncing || !manager.initialized} onClick={() => void refresh()}>
+          <RefreshCw size={20} className={manager.syncing ? 'spin' : ''} /></button></div>
+        {!manager.initialized ? <div className="page-loading"><SpinLoading /><span>正在读取 2FA 密钥</span></div>
+          : !entries.length ? <div className="verification-empty"><Empty
+            description={manager.entries.length ? '没有找到匹配的账号' : '还没有 2FA 密钥'} />
+            <p>{manager.entries.length ? '试试其他服务名称或账号，或清空搜索查看全部。'
+              : '扫描二维码或手动输入密钥，即可生成动态验证码。'}</p></div>
+            : <div className="verification-grid">{entries.map(entry => <TotpCodeCard key={entry.id} entry={entry}
+              code={codes[entry.id] ?? ''} now={now} onEdit={() => setForm({ entry, scanFirst: false })}
+              onDelete={() => void remove(entry)} />)}</div>}
+      </div>
+    </PullToRefresh>
+    {form && <TotpForm {...form} onSave={manager.saveEntry} onClose={() => setForm(null)} />}
   </>;
 }

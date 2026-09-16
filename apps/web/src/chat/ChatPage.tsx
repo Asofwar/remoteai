@@ -22,6 +22,7 @@ import { compactUnavailableReason } from '../../../../shared/remote-chat/client/
 import { threadPresentation } from '../../../../shared/remote-chat/sidebar';
 import { useChat } from './useChat';
 import { useChatViewport } from './useChatViewport';
+import { useChatDrawerSwipe } from './useChatDrawerSwipe';
 import type { ChatProject } from './types';
 import './chat.css';
 
@@ -47,6 +48,8 @@ function ConnectedChat({ session, device, devices, active, chooseDevice }: Props
   const [pickingDevice, setPickingDevice] = useState(false);
   const [searching, setSearching] = useState(false);
   const [tokenSummary, setTokenSummary] = useState(false);
+  useChatDrawerSwipe({ enabled: active && !pickingDevice && !searching && !tokenSummary,
+    open: drawer, onOpenChange: setDrawer });
   const ready = state.ready;
   const cwd = state.selected?.cwd ?? state.draftProject?.cwd ?? '';
   const catalog = useChatCatalog(controller, cwd, ready);

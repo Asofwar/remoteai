@@ -1,3 +1,7 @@
+/* Keep a rejected or cancelled horizontal gesture from navigating browser history. */
+html:has(.app-shell.chat-active), body:has(.app-shell.chat-active) { overscroll-behavior: none; }
+/* Empty chats have no scroll overflow to absorb a browser's horizontal navigation gesture. */
+.chat-message-content.is-empty { touch-action: pan-y pinch-zoom; }
 .app-shell.chat-active {
   position: fixed; inset: var(--chat-top, 0) 0 auto; height: var(--chat-height, 100dvh); min-height: 0;
   display: flex; flex-direction: column; overflow: hidden;

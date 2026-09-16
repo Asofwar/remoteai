@@ -95,7 +95,10 @@ const httpServer = http.createServer((request, response) => {
     blockMobileConnections = false;
     for (const client of mobileClients) client.terminate();
     relayFrames = 0;
-    void page.evaluate(() => localStorage.clear()).then(() => page.reload()).then(() => response.end('{}'))
+    // The page load event can precede the chat harness's asynchronous initialization.
+    void page.evaluate(() => localStorage.clear()).then(() => page.reload())
+      .then(() => page.waitForFunction(() => Boolean(window.chatTest)))
+      .then(() => response.end('{}'))
       .catch(() => response.writeHead(503).end('{}'));
     return;
   }
@@ -179,6 +182,7 @@ page.on('console', (message) => { if (message.type() === 'error') console.error(
 page.on('requestfailed', (request) => console.error('Fixture request failed:', request.url(), request.failure()));
 await page.goto(`http://127.0.0.1:${uiPort}/e2e/chat-harness.html?role=desktop&demo&socket=ws://127.0.0.1:${apiPort}/device-chat`,
   { timeout: 60_000 });
+await page.waitForFunction(() => Boolean(window.chatTest));
 console.log(`Mobile fixture ready on port ${apiPort} (local test data only).`);
 process.on('SIGINT', async () => {
   await browser.close();

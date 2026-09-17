@@ -64,7 +64,8 @@ function ToolContent({ item }: { item: Item }) {
 export function ChatToolDetails({ item, onClose, onBack }: {
   item: Item; onClose: () => void; onBack?: () => void;
 }) {
-  return <AdaptiveSheet open title={messageLabel(item)} width={760} onClose={onClose} onBack={onBack}>
+  return <AdaptiveSheet open title={messageLabel(item)} width={760} onClose={onClose} onBack={onBack}
+    presentation={item.type === 'fileChange' ? 'drawer' : 'adaptive'}>
     <div className="chat-detail-stack">
       {item.status === 'inProgress' && <p className="chat-muted">进行中…</p>}
       <ToolContent item={item} />

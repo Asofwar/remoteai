@@ -99,7 +99,7 @@ export function ChatComposer(props: ComposerProps) {
                 disabled={busy} onClick={() => attachments.remove(item)}><X size={14} /></button></span>)}</div>
           <ComposerQuotes disabled={busy} />
           <textarea ref={menu.input} aria-label="聊天消息" value={draft.text} maxLength={100_000} rows={1}
-            readOnly={state.queueEditor.loading} onChange={event => {
+            readOnly={state.queueEditor.loading} onPaste={state.paste} onChange={event => {
               draft.setText(event.target.value);
               menu.setSelection({ start: event.target.selectionStart, end: event.target.selectionEnd });
             }}

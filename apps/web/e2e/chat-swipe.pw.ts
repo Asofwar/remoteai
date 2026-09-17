@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { connect, fixtureUrl, login, screenshot } from './chat-helpers';
+import { connect, fixtureUrl, login, screenshot, send, settled } from './chat-helpers';
 
 type Point = { x: number; y: number };
 async function swipe(page: Page, points: Point[], cancel = false) {
@@ -105,8 +105,53 @@ test('keeps desktop mouse selection and button navigation available', async ({ p
   await page.mouse.move(400, 300); await page.mouse.down();
   await page.mouse.move(650, 310, { steps: 10 }); await page.mouse.up();
   await expect(drawer(page)).toHaveCount(0);
+  await expect(page.locator('.chat-sidebar')).toBeVisible();
+  await page.locator('.chat-header').getByRole('button', { name: '收起聊天列表' }).click();
+  await expect(page.locator('.chat-sidebar')).toHaveCount(0);
   await page.getByRole('button', { name: '打开聊天列表' }).click();
-  await expect(drawer(page)).toBeVisible();
-  await page.locator('.chat-drawer .ant-drawer-close').click();
+  await expect(page.locator('.chat-sidebar')).toBeVisible();
   await expect(drawer(page)).toHaveCount(0);
 });
+
+test('keeps desktop chat beside independently collapsible menus and remembers the layout',
+  async ({ page, isMobile }, info) => {
+    test.skip(isMobile, 'Desktop uses persistent sidebars.');
+    const sidebar = page.locator('.chat-sidebar');
+    const header = page.locator('.chat-header');
+    await expect(sidebar).toBeVisible();
+    await expect(page.locator('.desktop-topbar')).toHaveCount(0);
+    expect((await header.boundingBox())!.y).toBe(0);
+    await sidebar.getByRole('button', { name: '移动端聊天体验', exact: true }).click();
+    await expect(sidebar).toBeVisible();
+    await send(page, 'slow sidebar layout test');
+    await expect(page.getByRole('button', { name: '暂停生成' })).toBeVisible();
+    await page.getByRole('textbox', { name: '聊天消息' }).fill('保留未发送草稿');
+    await page.getByRole('button', { name: '收起主菜单' }).click();
+    await expect(page.locator('.desktop-sidebar')).toBeHidden();
+    await expect(sidebar).toBeVisible();
+    await header.getByRole('button', { name: '收起聊天列表' }).click();
+    await expect(sidebar).toHaveCount(0);
+    const text = await page.locator('.chat-markdown').last().innerText();
+    await expect.poll(() => page.locator('.chat-markdown').last().innerText()).not.toBe(text);
+    await page.getByRole('button', { name: '打开聊天列表' }).click();
+    await expect(sidebar).toBeVisible();
+    await expect(page.getByRole('textbox', { name: '聊天消息' })).toHaveValue('保留未发送草稿');
+    await page.getByRole('button', { name: '展开主菜单' }).click();
+    await screenshot(page, info, 'desktop-three-columns');
+    for (const width of [861, 1024, 1920]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(page.getByRole('button', { name: '发送消息', exact: true })).toBeInViewport();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+    await page.getByRole('textbox', { name: '聊天消息' }).fill('');
+    await page.getByRole('button', { name: '暂停生成' }).click();
+    await settled(page);
+    await page.getByRole('button', { name: '收起主菜单' }).click();
+    await header.getByRole('button', { name: '收起聊天列表' }).click();
+    await page.reload();
+    await expect(page.getByRole('button', { name: '展开主菜单' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '打开聊天列表' })).toBeVisible();
+    await expect(sidebar).toHaveCount(0);
+    await page.getByRole('button', { name: '打开聊天列表' }).click();
+    await expect(sidebar).toBeVisible();
+  });

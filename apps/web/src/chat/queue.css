@@ -1,4 +1,5 @@
-.chat-queue { flex-shrink: 0; margin: 0 12px; border: 1px solid var(--chat-border); border-radius: 12px;
+.chat-queue { flex-shrink: 0; width: 100%; max-width: 900px; margin: 0 auto 8px;
+  border: 1px solid var(--chat-border); border-radius: 12px;
   background: #fff; font-size: 13px; overflow: hidden; }
 .chat-queue-heading { display: flex; align-items: center; justify-content: space-between;
   padding: 6px 12px; color: var(--chat-muted); }

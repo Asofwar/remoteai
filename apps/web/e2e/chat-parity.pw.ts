@@ -1,9 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
-import { connect, fixtureUrl, login, operationCount, screenshot, send, settled, state } from './chat-helpers';
+import { openChatList, connect, fixtureUrl, login, operationCount, screenshot, send, settled, state } from './chat-helpers';
 
 const closeSheet = (page: Page) => page.getByRole('button', { name: '关闭', exact: true }).last().click();
 async function selectChat(page: Page) {
-  await page.getByRole('button', { name: '打开聊天列表' }).click();
+  await openChatList(page);
   await page.getByRole('button', { name: '移动端聊天体验', exact: true }).click();
   await expect(page.getByRole('heading', { name: '移动端聊天体验', exact: true })).toBeVisible();
 }
@@ -38,7 +38,16 @@ test('renders rich replies, folded work, nested output, file previews and reply 
   await expect(page.getByRole('heading', { name: '工具结果' })).toBeVisible();
   await expect(page.getByRole('img', { name: '工具返回的图片' })).toBeVisible();
   await closeSheet(page);
+  await page.getByRole('button', { name: /查看处理过程/ }).click();
+  await page.getByRole('button', { name: /^文件修改/ }).click();
+  await expect(page.locator('.ant-drawer-right .chat-diff')).toBeVisible();
+  await page.locator('.chat-diff-file summary').first().click();
+  await expect(page.locator('.chat-diff-line.remove').first()).toBeVisible();
+  await page.getByRole('button', { name: '返回上一层' }).click();
+  await expect(page.getByRole('button', { name: /^文件修改/ })).toBeVisible();
+  await closeSheet(page);
   await page.getByRole('button', { name: /查看本轮修改：3 个文件/ }).click();
+  await expect(page.locator('.ant-drawer-right .chat-diff')).toBeVisible();
   await expect(page.locator('.chat-diff > section')).toHaveCount(2);
   await page.locator('.chat-diff-file summary').first().click();
   await expect(page.locator('.chat-diff-line.add').first()).toBeVisible();
@@ -116,7 +125,7 @@ test('changes context capacity and opens profile, account picker and token summa
   await expect.poll(async () => (await state(request)).operations.findLast(entry =>
     entry.operation === 'contextSettingsWrite')?.settings).toEqual({ capacity: 400000 });
   await page.getByRole('button', { name: '完成', exact: true }).click();
-  await page.getByRole('button', { name: '打开聊天列表' }).click();
+  await openChatList(page);
   await page.getByRole('button', { name: '打开头像菜单' }).click();
   await page.getByRole('button', { name: '切换账户', exact: true }).click();
   await expect(page.getByRole('button', { name: '演示账户一', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -147,7 +156,7 @@ test('answers asynchronous questions without blocking the draft and preserves in
   await page.getByRole('button', { name: '提交回答' }).click();
   await expect(page.getByRole('button', { name: /回答补充问题/ })).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: '聊天消息' })).toHaveValue('草稿保持不变');
-  await page.getByRole('button', { name: '打开聊天列表' }).click();
+  await openChatList(page);
   await page.getByRole('button', { name: '搜索聊天', exact: true }).click();
   await page.getByRole('textbox', { name: '搜索聊天' }).fill('不存在');
   await expect(page.getByText('没有找到相关聊天')).toBeVisible();

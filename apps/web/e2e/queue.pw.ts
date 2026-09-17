@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { connect, send, state, fixtureUrl, operationCount } from './chat-helpers';
+import { openChatList, connect, send, state, fixtureUrl, operationCount } from './chat-helpers';
 
 test('queues supplements on the PC, sends one immediately and restores the rest after reconnecting',
   async ({ page, request }) => {
@@ -11,7 +11,7 @@ test('queues supplements on the PC, sends one immediately and restores the rest 
     await connect(page);
     await expect(page.getByRole('status').filter({ hasText: /P2P|Relay/ }))
       .toBeVisible({ timeout: 20_000 });
-    await page.getByRole('button', { name: '打开聊天列表' }).click();
+    await openChatList(page);
     await page.getByRole('button', { name: /移动端聊天体验/ }).click();
     await send(page, 'slow queue test');
     await expect(page.getByRole('button', { name: '暂停生成' })).toBeVisible();
@@ -19,6 +19,10 @@ test('queues supplements on the PC, sends one immediately and restores the rest 
     await send(page, '再补充回归测试');
     const queue = page.getByRole('region', { name: '待发送消息', exact: true });
     await expect(queue.getByRole('listitem')).toHaveCount(2);
+    const composerBounds = (await page.locator('.chat-composer').boundingBox())!;
+    const queueBounds = (await queue.boundingBox())!;
+    expect(queueBounds.x).toBeCloseTo(composerBounds.x, 0);
+    expect(queueBounds.width).toBeCloseTo(composerBounds.width, 0);
     const first = queue.getByRole('listitem').first();
     await expect(queue.getByRole('button', { name: '上移待发送消息' })).toBeDisabled();
     await queue.getByRole('button', { name: '下移待发送消息' }).click();

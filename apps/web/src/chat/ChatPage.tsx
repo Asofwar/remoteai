@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Drawer } from 'antd';
-import { PanelLeft, X } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { PanelLeft } from 'lucide-react';
 import type { AuthSession, RemoteDevice } from '../types';
 import { ChatApproval } from './ChatApproval';
 import { ChatComposer } from './ChatComposer';
@@ -10,6 +9,8 @@ import { ChatProcessing } from './ChatProcessing';
 import { ChatImageContext } from './ChatImage';
 import { ChatFileContext } from './ChatFileLink';
 import { ChatThreads } from './ChatThreads';
+import { ChatSidebar } from './ChatSidebar';
+import { useDesktopLayout, usePanelVisibility } from '../useDesktopLayout';
 import { ChatDevices } from './ChatDevices';
 import { ChatConnectionInfo } from './ChatConnectionInfo';
 import { ChatQuotesProvider } from './ChatQuotes';
@@ -26,9 +27,9 @@ import { useChatDrawerSwipe } from './useChatDrawerSwipe';
 import type { ChatProject } from './types';
 import './chat.css';
 
-interface Props { session: AuthSession; devices: RemoteDevice[]; active: boolean }
+interface Props { session: AuthSession; devices: RemoteDevice[]; active: boolean; menuControl: ReactNode }
 
-export function ChatPage({ session, devices, active }: Props) {
+export function ChatPage({ session, devices, active, menuControl }: Props) {
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const device = devices.find((entry) => entry.deviceId === deviceId)
     ?? devices.find((entry) => entry.online) ?? devices[0];
@@ -36,19 +37,24 @@ export function ChatPage({ session, devices, active }: Props) {
   useChatViewport(active);
   return <section className="chat-page" hidden={!active} aria-label="Codex 聊天">
     <ConnectedChat key={`${session.baseUrl}:${session.email}:${device?.deviceId ?? ''}`} session={session}
-      device={device} devices={devices} active={active} chooseDevice={setDeviceId} />
+      device={device} devices={devices} active={active} chooseDevice={setDeviceId} menuControl={menuControl} />
   </section>;
 }
 
-function ConnectedChat({ session, device, devices, active, chooseDevice }: Props & {
+function ConnectedChat({ session, device, devices, active, chooseDevice, menuControl }: Props & {
   device?: RemoteDevice; chooseDevice: (id: string) => void;
 }) {
   const { state, controller } = useChat(session, device?.deviceId ?? '', active && Boolean(device));
   const [drawer, setDrawer] = useState(false);
+  const desktop = useDesktopLayout();
+  const [sidebar, setSidebar] = usePanelVisibility('chat-list');
+  const listOpen = desktop ? sidebar : drawer;
+  const closeList = () => { if (desktop) setSidebar(false); else setDrawer(false); };
+  const selectedFromList = () => { if (!desktop) setDrawer(false); };
   const [pickingDevice, setPickingDevice] = useState(false);
   const [searching, setSearching] = useState(false);
   const [tokenSummary, setTokenSummary] = useState(false);
-  useChatDrawerSwipe({ enabled: active && !pickingDevice && !searching && !tokenSummary,
+  useChatDrawerSwipe({ enabled: active && !desktop && !pickingDevice && !searching && !tokenSummary,
     open: drawer, onOpenChange: setDrawer });
   const ready = state.ready;
   const cwd = state.selected?.cwd ?? state.draftProject?.cwd ?? '';
@@ -57,15 +63,19 @@ function ConnectedChat({ session, device, devices, active, chooseDevice }: Props
   const running = Boolean(runningTurn);
   const approvals = state.approvals.filter((event) => event.params.threadId === state.selected?.id);
   const newChat = (project?: ChatProject) => { if (!state.sending) { controller.back(project); setDrawer(false); } };
-  useEffect(() => { controller.setViewing(active && !drawer && !pickingDevice && !searching && !tokenSummary); },
-    [active, drawer, pickingDevice, searching, tokenSummary, controller]);
+  useEffect(() => {
+    controller.setViewing(active && (desktop || !drawer) && !pickingDevice && !searching && !tokenSummary);
+  }, [active, desktop, drawer, pickingDevice, searching, tokenSummary, controller]);
   useEffect(() => {
     if (!active) { setDrawer(false); setPickingDevice(false); setSearching(false); setTokenSummary(false); }
   }, [active]);
   return <ChatQuotesProvider scope={state.selected?.id ?? null} sending={state.sending}
     enabled={active && !state.selectedArchived}>
+    <div className="chat-conversation">
     <header className="chat-header">
-      <button type="button" className="chat-back" aria-label="打开聊天列表" onClick={() => setDrawer(true)}>
+      {menuControl}
+      <button type="button" className="chat-back" aria-label={listOpen ? '收起聊天列表' : '打开聊天列表'}
+        aria-expanded={listOpen} onClick={() => { if (desktop) setSidebar(!sidebar); else setDrawer(!drawer); }}>
         <PanelLeft size={21} /></button>
       <div className="chat-grow"><h2>{state.selected ? threadPresentation(state.selected, state.sidebar).title : '新聊天'}</h2>
         <ChatConnectionInfo state={state} controller={controller} device={device} active={active}
@@ -107,14 +117,14 @@ function ConnectedChat({ session, device, devices, active, chooseDevice }: Props
       active={active} ready={ready && !state.selectedArchived} sending={state.sending} running={running}
       interrupted={state.selected?.turns?.at(-1)?.status === 'interrupted'}
       send={(input) => controller.send(input)} interrupt={() => controller.interrupt()} />
-    <Drawer open={drawer} placement="left" width="min(360px, 88vw)" rootClassName="chat-drawer"
-      title="聊天" destroyOnClose onClose={() => setDrawer(false)} closeIcon={<X size={20} aria-label="收起聊天列表" />}>
-      <ChatThreads state={state} controller={controller} newChat={newChat} onClose={() => setDrawer(false)}
+    </div>
+    <ChatSidebar desktop={desktop} open={listOpen} onClose={closeList}>
+      <ChatThreads state={state} controller={controller} newChat={newChat} onClose={selectedFromList}
         openSearch={() => setSearching(true)} profile={<ChatProfileMenu client={controller.guiAccounts}
           deviceName={device?.name ?? '选择电脑'} email={session.email} ready={ready}
           chooseDevice={() => { setDrawer(false); setPickingDevice(true); }}
           openTokenSummary={() => { setDrawer(false); setTokenSummary(true); }} />} />
-    </Drawer>
+    </ChatSidebar>
     {searching && <ChatSearch state={state} controller={controller} onClose={() => setSearching(false)}
       select={thread => { setSearching(false); setDrawer(false); void controller.select(thread); }} />}
     {tokenSummary && <ChatTokenSummary read={controller.readTokenSummary} ready={ready}

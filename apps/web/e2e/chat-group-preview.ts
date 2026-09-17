@@ -1,12 +1,12 @@
 import { expect, type Page, type APIRequestContext, type TestInfo } from '@playwright/test';
-import { click, fixtureUrl, screenshot } from './chat-helpers';
+import { openChatList, click, fixtureUrl, screenshot } from './chat-helpers';
 
 export async function groupPreviewJourney({ page, request, info }: {
   page: Page; request: APIRequestContext; info: TestInfo;
 }) {
   await request.post(`${fixtureUrl}/test/sidebar`, { data: { action: 'group-preview' } });
-  await click(page.getByRole('button', { name: '打开聊天列表' }));
-  const drawer = page.locator('.chat-drawer');
+  await openChatList(page);
+  const drawer = page.locator('.chat-drawer, .chat-sidebar');
   const project = drawer.getByRole('region', { name: '演示项目', exact: true });
   const recent = drawer.getByRole('region', { name: '最近', exact: true });
   const five = drawer.getByRole('region', { name: '五条项目', exact: true });
@@ -20,12 +20,13 @@ export async function groupPreviewJourney({ page, request, info }: {
   await screenshot(page, info, '10-folded-project-groups');
   await click(project.getByRole('button', { name: '展开显示：演示项目' }));
   await click(project.getByRole('button', { name: '移动端聊天体验', exact: true }));
-  await click(page.getByRole('button', { name: '打开聊天列表' }));
-  await expect(project.locator('.chat-thread')).toHaveCount(5);
+  await openChatList(page);
+  const visibleCount = page.viewportSize()!.width > 860 ? 7 : 5;
+  await expect(project.locator('.chat-thread')).toHaveCount(visibleCount);
   await expect(project.getByRole('button', { name: '移动端聊天体验', exact: true })).toBeVisible();
   await click(drawer.getByRole('button', { name: '搜索聊天', exact: true }));
   await page.getByRole('textbox', { name: '搜索聊天' }).fill('聊天');
   await expect(page.locator('.chat-search-results .chat-thread')).toHaveCount(17);
   await click(page.getByRole('button', { name: '关闭', exact: true }).last());
-  await expect(project.locator('.chat-thread')).toHaveCount(5);
+  await expect(project.locator('.chat-thread')).toHaveCount(visibleCount);
 }

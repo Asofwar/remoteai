@@ -24,6 +24,11 @@ export async function navigate(page: Page, label: string) {
   const mobile = (page.viewportSize()?.width ?? 0) <= 860;
   await click(page.locator(mobile ? '.mobile-tabbar' : '.desktop-sidebar nav').getByText(label, { exact: true }));
 }
+export async function openChatList(page: Page) {
+  const toggle = page.getByRole('button', { name: '打开聊天列表', exact: true });
+  if (await toggle.isVisible()) await click(toggle);
+  await expect(page.locator('.chat-drawer, .chat-sidebar')).toBeVisible();
+}
 export async function connect(page: Page) {
   await navigate(page, '聊天');
   await expect(page.getByRole('textbox', { name: '聊天消息' })).toBeVisible();

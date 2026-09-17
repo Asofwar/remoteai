@@ -1,5 +1,5 @@
 import { expect, type Page, type APIRequestContext, type TestInfo } from '@playwright/test';
-import { click, connect, navigate, operationCount, send, settled, screenshot, state, fixtureUrl } from './chat-helpers';
+import { openChatList, click, connect, navigate, operationCount, send, settled, screenshot, state, fixtureUrl } from './chat-helpers';
 import { sidebarJourney } from './chat-sidebar';
 import { existingChatSettings } from './chat-existing-settings';
 import { groupPreviewJourney } from './chat-group-preview';
@@ -15,7 +15,7 @@ async function initialChat({ page, request, info, transport }: Journey) {
   await ready(page, transport);
   await expect(page.getByText('欢迎回来', { exact: true })).toHaveCount(0);
   await screenshot(page, info, '00-new-chat');
-  await click(page.getByRole('button', { name: '打开聊天列表' }));
+  await openChatList(page);
   await expect(page.getByRole('region', { name: '演示项目', exact: true })).toBeVisible();
   await click(page.getByRole('button', { name: /移动端聊天体验/ }));
   await expect(page.getByText('帮我整理今天的工作计划。')).toBeVisible();
@@ -71,7 +71,7 @@ async function approvals({ page, request, info }: Journey) {
 }
 
 async function manageHistory({ page, request }: Journey) {
-  await click(page.getByRole('button', { name: '打开聊天列表', exact: true }));
+  await openChatList(page);
   await click(page.getByRole('button', { name: '搜索聊天', exact: true }));
   await page.getByRole('textbox', { name: '搜索聊天' }).fill('不存在的任务');
   await click(page.getByRole('button', { name: '搜索', exact: true }));
@@ -88,7 +88,7 @@ async function manageHistory({ page, request }: Journey) {
   expect((await state(request)).operations.findLast((entry) => entry.operation === 'start'))
     .toMatchObject({ cwd: 'F:/projects/demo' });
   await expect(page.locator('.chat-header').getByRole('button', { name: '归档', exact: true })).toHaveCount(0);
-  await click(page.getByRole('button', { name: '打开聊天列表', exact: true }));
+  await openChatList(page);
   await expect(page.getByRole('region', { name: '演示项目', exact: true })
     .getByRole('button', { name: '手机新聊天', exact: true })).toBeVisible();
   await click(page.getByRole('button', { name: /移动端聊天体验/ }));

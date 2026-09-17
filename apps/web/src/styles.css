@@ -126,6 +126,10 @@ h1, h2, h3, .brand-lockup { font-family: "Manrope", "PingFang SC", "Microsoft Ya
 .sidebar-profile strong, .sidebar-profile small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-profile strong { font-size: 11px; }.sidebar-profile small { margin-top: 2px; color: var(--muted); font-size: 10px; }
 .content-shell { min-height: 100vh; margin-left: 252px; }
+@media (min-width: 861px) {
+  .main-menu-collapsed .desktop-sidebar { display: none; }
+  .main-menu-collapsed .content-shell { margin-left: 0; }
+}
 .desktop-topbar { height: 88px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(28px, 4vw, 58px); border-bottom: 1px solid rgba(218, 229, 223, .85); background: rgba(244, 247, 245, .86); backdrop-filter: blur(18px); }
 .desktop-topbar > div:first-child { display: flex; align-items: baseline; gap: 18px; }
 .desktop-topbar > div:first-child span { color: var(--green); font-size: 12px; font-weight: 800; letter-spacing: 1.2px; }

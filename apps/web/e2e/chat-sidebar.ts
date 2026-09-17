@@ -1,12 +1,16 @@
 import { expect, type Page, type APIRequestContext, type TestInfo } from '@playwright/test';
-import { click, fixtureUrl, screenshot, state } from './chat-helpers';
+import { openChatList, click, fixtureUrl, screenshot, state } from './chat-helpers';
 
 export async function sidebarJourney({ page, request, info }: {
   page: Page; request: APIRequestContext; info: TestInfo;
 }) {
   const change = (action: string) => request.post(`${fixtureUrl}/test/sidebar`, { data: { action } });
-  await click(page.getByRole('button', { name: '打开聊天列表' }));
-  const drawer = page.locator('.chat-drawer');
+  await openChatList(page);
+  const drawer = page.locator('.chat-drawer, .chat-sidebar');
+  if (page.viewportSize()!.width > 860) {
+    await click(drawer.getByRole('button', { name: '新聊天', exact: true }));
+    await expect(page.getByRole('heading', { name: '新聊天', exact: true })).toBeVisible();
+  }
   await expect(drawer.getByRole('region', { name: '演示项目' })).toBeVisible();
   await expect(drawer.getByRole('region', { name: '演示项目', exact: true })
     .getByRole('button', { name: '手机新聊天', exact: true })).toBeVisible();
@@ -27,7 +31,7 @@ export async function sidebarJourney({ page, request, info }: {
   await click(row);
   await expect(page.getByRole('textbox', { name: '搜索聊天' })).toHaveCount(0);
   await expect.poll(async () => (await state(request)).sidebar.readState['demo-chat']?.unread).toBe(false);
-  await click(page.getByRole('button', { name: '打开聊天列表' }));
+  await openChatList(page);
   await expect(row.getByLabel('未读回复')).toHaveCount(0);
   await click(drawer.getByRole('button', { name: '新聊天', exact: true }));
   await expect(page.getByRole('heading', { name: '新聊天', exact: true })).toBeVisible();

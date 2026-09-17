@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Dialog, Form, Input, PullToRefresh, SafeArea, SpinLoading, TabBar, Toast } from "antd-mobile";
 import { Dropdown, Tooltip, type MenuProps } from "antd";
 import { ChevronRight, CircleGauge, Laptop, LayoutDashboard, LogOut, Menu, MonitorCog,
-  MessageSquare, RefreshCw, Server, Settings, ShieldCheck, Sparkles, Zap } from "lucide-react";
+  MessageSquare, PanelLeft, RefreshCw, Server, Settings, ShieldCheck, Sparkles, Zap } from "lucide-react";
 import { defaultApiBaseUrl, deviceStatusWebSocketUrl, getActiveSession, parseDeviceStatusMessage } from "./api";
 import { useAppDispatch, useAppSelector } from "./hooks";
 import { bootstrapApp, clearAuthError, clearDataError, deviceSocketMessage, pageChanged, refreshAll,
@@ -19,6 +19,7 @@ import { SettingsPage } from "./settings/SettingsPage";
 import { loadRefreshMinutes, REFRESH_INTERVAL_EVENT } from "./settings/refreshInterval";
 import { useTotpVault } from "./useTotpVault";
 import { ChatPage } from "./chat/ChatPage";
+import { usePanelVisibility } from "./useDesktopLayout";
 
 const PULL_REFRESH_TEXT = {
   pulling: "下拉刷新",
@@ -235,6 +236,7 @@ const navItems: Array<{ key: AppPage; label: string; icon: typeof LayoutDashboar
 ];
 
 function AppShell() {
+  const [menuVisible, setMenuVisible] = usePanelVisibility('main-menu');
   const dispatch = useAppDispatch();
   const { session } = useAppSelector((state) => state.auth);
   const { page, profile, devices, refreshing, lastRefreshAt, error } = useAppSelector((state) => state.data);
@@ -312,15 +314,16 @@ function AppShell() {
     { key: "logout", label: "退出登录", danger: true, icon: <LogOut size={16} />, onClick: () => void dispatch(signOut()) },
   ];
 
-  const pageDescriptions: Record<AppPage, string> = {
-    chat: "把电脑上的对话带在身边。", accounts: "欢迎回来，今天也保持从容。",
+  const pageDescriptions: Record<Exclude<AppPage, 'chat'>, string> = {
+    accounts: "欢迎回来，今天也保持从容。",
     devices: "查看并控制你的桌面设备。", totp: "管理并同步你的 2FA 验证码。", settings: "管理偏好与账户安全。",
   };
   const otherPages = {
     accounts: <AccountsPage />, devices: <DevicesPage />,
     totp: <TotpPage manager={totpManager} />, settings: <SettingsPage totpManager={totpManager} />,
   };
-  return <div className={page === "chat" ? "app-shell chat-active" : "app-shell"}>
+  const shellClass = `app-shell${page === 'chat' ? ' chat-active' : ''}${menuVisible ? '' : ' main-menu-collapsed'}`;
+  return <div className={shellClass}>
     <aside className="desktop-sidebar">
       <div className="brand-lockup"><span className="brand-mark"><Zap size={21} fill="currentColor" /></span><b>Codex Switch</b></div>
       <nav>{navItems.map((item) => <button key={item.key} type="button" className={page === item.key ? "active" : ""} onClick={() => dispatch(pageChanged(item.key))}><item.icon size={19} /><span>{item.label}</span>{item.key === "devices" && onlineCount ? <b>{onlineCount}</b> : null}</button>)}</nav>
@@ -328,11 +331,20 @@ function AppShell() {
       <Dropdown menu={{ items: userMenu }} trigger={["click"]}><button type="button" className="sidebar-profile"><span>{(profile?.email || session?.email || "U").slice(0, 2).toUpperCase()}</span><div><strong>{profile?.email || session?.email}</strong><small>{profile?.roleName || (profile?.role === "admin" ? "管理员" : "用户")}</small></div><Menu size={17} /></button></Dropdown>
     </aside>
     <div className="content-shell">
-      <header className="desktop-topbar"><div><span>{navItems.find((item) => item.key === page)?.label}</span><strong>{pageDescriptions[page]}</strong></div>
-        <div><Tooltip title="刷新全部数据"><button className="icon-button" type="button" onClick={() => void dispatch(refreshAll())}><RefreshCw size={18} className={refreshing ? "spin" : ""} /></button></Tooltip><span className="topbar-date">{new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "short" }).format(new Date())}</span></div></header>
+      {page !== 'chat' && <header className="desktop-topbar"><div>
+        <button type="button" className="icon-button" aria-label={menuVisible ? '收起主菜单' : '展开主菜单'}
+          aria-expanded={menuVisible} onClick={() => setMenuVisible(value => !value)}><PanelLeft size={18} /></button>
+        <span>{navItems.find((item) => item.key === page)?.label}</span><strong>{pageDescriptions[page]}</strong></div>
+        <div><Tooltip title="刷新全部数据"><button className="icon-button" type="button"
+          onClick={() => void dispatch(refreshAll())}>
+          <RefreshCw size={18} className={refreshing ? "spin" : ""} /></button></Tooltip>
+          <span className="topbar-date">{new Intl.DateTimeFormat("zh-CN",
+            { month: "long", day: "numeric", weekday: "short" }).format(new Date())}</span></div></header>}
       <main className="main-content">
         {session && <ChatPage key={session.baseUrl + session.email} session={session} devices={devices}
-          active={page === "chat"} />}
+          active={page === "chat"} menuControl={<button type="button" className="chat-back desktop-menu-toggle"
+            aria-label={menuVisible ? '收起主菜单' : '展开主菜单'} aria-expanded={menuVisible}
+            onClick={() => setMenuVisible(value => !value)}><Menu size={21} /></button>} />}
         {page !== "chat" && otherPages[page]}
       </main>
     </div>

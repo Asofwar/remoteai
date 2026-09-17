@@ -11,7 +11,8 @@ import { ChatCodeBlock } from './ChatCodeBlock';
 const TITLES = { plan: '任务计划', changes: '本轮修改', error: '报错详情' };
 export function ChatTurnDetails({ turn, panel, onClose }: { turn: Turn; panel: TurnPanel; onClose: () => void }) {
   const error = turn.error ?? turn.retryError;
-  return <AdaptiveSheet open title={TITLES[panel]} width={760} onClose={onClose}>
+  return <AdaptiveSheet open title={TITLES[panel]} width={760} onClose={onClose}
+    presentation={panel === 'changes' ? 'drawer' : 'adaptive'}>
     <div className="chat-detail-stack">
       {panel === 'changes' && <ChatDiff files={completedTurnFiles(turn)} />}
       {panel === 'error' && <ChatCodeBlock label="报错详情" copyLabel="复制报错详情"

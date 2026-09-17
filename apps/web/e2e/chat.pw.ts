@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { connect, navigate, send, settled, screenshot, state, fixtureUrl, openChatSettings } from './chat-helpers';
+import { openChatList, connect, navigate, send, settled, screenshot, state, fixtureUrl, openChatSettings } from './chat-helpers';
 import { chatJourney } from './chat-journey';
 import { historyJourney } from './chat-history';
 import { attachmentJourney } from './chat-attachments';
 import { imageEditorJourney } from './chat-image-editor';
 import { composerLayout } from './chat-composer';
 import { projectPickerJourney } from './chat-project-picker';
+import { clipboardJourney } from './chat-clipboard';
 
 test.beforeEach(async ({ page, request }, info) => {
   // Login can open chat immediately; install the network fault before any peer is created.
@@ -27,6 +28,8 @@ test.beforeEach(async ({ page, request }, info) => {
 
 
 test('keeps composer icons below single and multiline drafts', async ({ page }) => composerLayout(page));
+test('pastes text, images and files without replacing the draft',
+  async ({ page, request }) => clipboardJourney(page, request));
 
 test('annotates photos before sending and preserves cancelled edits',
   async ({ page, request }, info) => imageEditorJourney({ page, request, info }));
@@ -91,7 +94,7 @@ for (const relay of [false, true]) {
 test('keeps the PC chat after login renewal and disconnects on logout', async ({ page, request }) => {
   await connect(page);
   await expect(page.getByRole('status').filter({ hasText: 'P2P' })).toBeVisible({ timeout: 15_000 });
-  await page.getByRole('button', { name: '打开聊天列表' }).click();
+  await openChatList(page);
   await page.getByRole('button', { name: /移动端聊天体验/ }).click();
   await navigate(page, '账号');
   await expect.poll(async () => (await state(request)).connectedMobiles).toBe(0);
@@ -126,7 +129,7 @@ test('falls back after direct discovery fails and keeps the composer within a sm
     await connect(page);
     await expect(page.getByRole('status').filter({ hasText: 'Relay' })).toBeVisible({ timeout: 16_000 });
     expect(Date.now() - started).toBeGreaterThanOrEqual(10_000);
-    await page.getByRole('button', { name: '打开聊天列表' }).click();
+    await openChatList(page);
     await page.getByRole('button', { name: /移动端聊天体验/ }).click();
     await send(page, 'encrypted relay from H5');
     await settled(page);

@@ -1,6 +1,7 @@
 /* The conversation and composer share one surface; message styling stays scoped to its viewport. */
 @media (min-width: 861px) {
   .chat-conversation { background: #fbfcfa; }
+  .chat-conversation .chat-composer { box-shadow: 0 0 0 1px #17211b12, 0 4px 16px #17211b0a; }
   .chat-message-region {
     color: #17211b; font-size: 14px;
     font-family: "DM Sans", "Microsoft YaHei UI", sans-serif;

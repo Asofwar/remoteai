@@ -238,6 +238,34 @@ html.codex-dream-skin .dream-task [data-message-author-role] {
   color: var(--dream-text);
 }
 
+/* Paint one glass surface per bubble or code block; keep native text opaque. */
+html.codex-dream-skin main.main-surface
+  :is([data-user-message-bubble], [data-markdown-copy="code-block"]) {
+  --color-text-user-message: var(--dream-text);
+  --color-text: var(--dream-text);
+  --color-text-secondary: var(--dream-text-muted);
+  --color-token-text-preformat-foreground: var(--dream-text);
+  color: var(--dream-text) !important;
+  background: color-mix(in oklab, var(--dream-surface-raised) 78%, transparent) !important;
+  border-color: var(--dream-line-soft) !important;
+  box-shadow: inset 0 0 0 1px var(--dream-line-soft) !important;
+  backdrop-filter: blur(14px) saturate(1.05) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.05) !important;
+}
+
+/* Native sticky code headers otherwise cover the translucent outer surface. */
+html.codex-dream-skin main.main-surface [data-markdown-copy="code-block"]
+  > :is([data-markdown-copy="exclude"], .overflow-auto, pre, code) {
+  background: transparent !important;
+}
+
+html.codex-dream-skin main.main-surface [data-user-message-bubble] [data-markdown-copy="code-block"] {
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 /* The home route keeps the source image expressive, with a semantic safe-area
    wash selected from image focus metadata. */
 html.codex-dream-skin .dream-home {

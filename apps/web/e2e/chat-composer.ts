@@ -32,7 +32,7 @@ export async function composerLayout(page: Page) {
   await expect(settings).toBeVisible();
   await settings.click();
   await expect(page.getByRole('button', { name: '设置推理强度' })).toBeVisible();
-  await page.getByRole('button', { name: '完成', exact: true }).click();
+  await page.getByRole('button', { name: '关闭', exact: true }).last().click();
   await page.evaluate(() => {
     Reflect.deleteProperty(window.visualViewport!, 'height');
     window.visualViewport!.dispatchEvent(new Event('resize'));

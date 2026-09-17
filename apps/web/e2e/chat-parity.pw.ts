@@ -124,7 +124,7 @@ test('changes context capacity and opens profile, account picker and token summa
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await expect.poll(async () => (await state(request)).operations.findLast(entry =>
     entry.operation === 'contextSettingsWrite')?.settings).toEqual({ capacity: 400000 });
-  await page.getByRole('button', { name: '完成', exact: true }).click();
+  await closeSheet(page);
   await openChatList(page);
   await page.getByRole('button', { name: '打开头像菜单' }).click();
   await page.getByRole('button', { name: '切换账户', exact: true }).click();

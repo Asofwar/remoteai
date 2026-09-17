@@ -44,7 +44,6 @@ export function ChatSettings({ models, selection, saving, ready, error, updateSe
       {!!notice && <p role={error ? 'alert' : 'status'} className={error ? 'chat-error' : 'chat-muted'}>{notice}</p>}
       {!!error && <button type="button" className="chat-button" onClick={() => { void updateSettings(selection); }}>
         重新保存</button>}
-      <button type="button" className="chat-button chat-primary" tabIndex={field ? -1 : 0} onClick={onClose}>完成</button>
       <ChatUsage read={readUsage} active={!field && !contextOpen} ready={ready} tokenUsage={tokenUsage}
         onContextSettings={threadId ? () => setContextOpen(true) : undefined} />
     </div>

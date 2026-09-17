@@ -63,7 +63,7 @@ test('syncs request speed with the PC and shows a lightning indicator only in fa
   await page.getByRole('button', { name: '设置速度模式', exact: true }).click();
   await page.getByRole('radio', { name: '快速模式', exact: true }).click();
   await expect.poll(async () => (await state(request)).composer.settings.speed).toBe('fast');
-  await page.getByRole('button', { name: '完成', exact: true }).click();
+  await page.getByRole('button', { name: '关闭', exact: true }).last().click();
   await page.getByRole('textbox', { name: '聊天消息' }).focus();
   await page.evaluate(() => {
     // This web composer shows its model control while the keyboard is open.

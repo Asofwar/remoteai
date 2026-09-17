@@ -28,7 +28,7 @@ export async function existingChatSettings({ page, request, info }: {
   });
   await expect(page.getByText('正在保存设置…', { exact: true })).toHaveCount(0, { timeout: 15_000 });
   await request.post(`${fixtureUrl}/test/settings-delay`, { data: { milliseconds: 0 } });
-  await click(page.getByRole('button', { name: '完成', exact: true }));
+  await click(page.getByRole('button', { name: '关闭', exact: true }).last());
   await click(page.getByRole('button', { name: '暂停生成' }));
   await settled(page);
   await send(page, 'next message after editing existing settings');

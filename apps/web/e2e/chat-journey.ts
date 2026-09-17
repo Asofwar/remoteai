@@ -32,7 +32,7 @@ async function settingsAndContinue({ page, request }: Journey) {
   await chooseSetting(page, '模型', '测试模型');
   await chooseSetting(page, '推理强度', '高');
   await chooseSetting(page, '访问权限', '请求批准');
-  await click(page.getByRole('button', { name: '完成', exact: true }));
+  await click(page.getByRole('button', { name: '关闭', exact: true }).last());
   await send(page, 'slow task');
   await expect(page.getByRole('button', { name: '暂停生成' })).toBeVisible();
   const input = page.getByRole('textbox', { name: '聊天消息' });
@@ -160,7 +160,7 @@ async function synchronizeComposer({ page, request, info }: Journey) {
   }
   await chooseSetting(page, '模型', '测试模型');
   await chooseSetting(page, '推理强度', '高');
-  await click(page.getByRole('button', { name: '完成', exact: true }));
+  await click(page.getByRole('button', { name: '关闭', exact: true }).last());
   await send(page, 'send with synced settings');
   await settled(page);
   expect((await state(request)).operations.filter((entry) => entry.operation === 'send').at(-1))

@@ -1,7 +1,12 @@
-.loginAvatar {
+button.loginAvatar {
   padding: 0;
   border: 0;
   cursor: pointer;
+
+  &:global(.table-avatar), &:global(.avatar) {
+    background: linear-gradient(110deg, #73d9e544 0%, #899bff44 45%, #d58de244 75%, #f59aaf44 100%),
+      var(--green-soft);
+  }
 
   &:focus-visible {
     outline: 2px solid var(--green-dark);
@@ -12,11 +17,7 @@
 }
 
 .loginLabel {
-  background: linear-gradient(110deg, #087e8b 0%, #435cdb 45%, #a533ac 75%, #c44763 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+  color: var(--green-dark);
   font-family: Manrope, sans-serif;
   font-weight: 700;
   line-height: 1;

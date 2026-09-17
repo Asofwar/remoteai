@@ -8,6 +8,7 @@ import {
   consumeAccountQuota,
   deactivateAccount as deactivateActiveAccount,
   importAccountJsonFromClipboard as importAccountJsonClipboard,
+  importAccountJsonText,
   chooseAndExportAccountArchive,
   chooseAndImportAccountArchive,
   hasLocalBackend,
@@ -129,7 +130,7 @@ export function useAccountManager(
   }, [notify, t]);
 
   const importAccountJson = useCallback(async () => {
-    notify(isDesktopApp ? t("toast.accountJsonImportPrompt") : t("toast.previewNoFile"));
+    notify(hasLocalBackend ? t("toast.accountJsonImportPrompt") : t("toast.previewNoFile"));
     try {
       const result = await chooseAndImportAccountJson();
       if (result.status === "imported") {
@@ -144,20 +145,23 @@ export function useAccountManager(
     }
   }, [notify, refreshAddedAccounts, t]);
 
-  const importAccountJsonFromClipboard = useCallback(async () => {
-    notify(isDesktopApp ? t("toast.clipboardImportPrompt") : t("toast.previewNoFile"));
+  const importAccountJsonFromClipboard = useCallback(async (content?: string) => {
+    const prompt = content === undefined ? t("toast.clipboardImportPrompt") : t("toast.accountImporting");
+    notify(hasLocalBackend ? prompt : t("toast.previewNoFile"));
     try {
-      const result = await importAccountJsonClipboard();
+      const result = content === undefined ? await importAccountJsonClipboard() : await importAccountJsonText(content);
       if (result.status === "imported") {
         await refreshAddedAccounts(result.ids);
         notify(t(result.skipped.length ? "toast.accountJsonImportedWithSkipped" : "toast.accountJsonImported", {
           count: result.ids.length,
           skipped: result.skipped.length,
         }));
+        return true;
       }
     } catch (error) {
       notify(String(error));
     }
+    return false;
   }, [notify, refreshAddedAccounts, t]);
 
   const exportAccountArchive = useCallback(async () => {

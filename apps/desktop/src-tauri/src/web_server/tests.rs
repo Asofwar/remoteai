@@ -66,7 +66,11 @@ mod tests {
         assert!(LAN_COMMAND_ALLOWLIST.contains(&"get_codex_connection_status"));
         assert!(!LAN_COMMAND_ALLOWLIST.contains(&"connect_codex"));
         assert!(!LAN_COMMAND_ALLOWLIST.contains(&"restart_chatgpt"));
-        assert!(!LAN_COMMAND_ALLOWLIST.contains(&"cloud_login"));
+        assert!(!LAN_COMMAND_ALLOWLIST.contains(&"get_saved_cloud_login"));
+        assert!(!LAN_COMMAND_ALLOWLIST.contains(&"start_login"));
+        assert!(!LAN_COMMAND_ALLOWLIST.contains(&"start_web_session_login"));
+        assert!(!LAN_COMMAND_ALLOWLIST.contains(&"import_account_json_file"));
+        assert!(!LAN_COMMAND_ALLOWLIST.contains(&"import_account_json_from_clipboard"));
         assert!(!LAN_COMMAND_ALLOWLIST.contains(&"delete_account"));
         assert!(!LAN_COMMAND_ALLOWLIST.contains(&"discard_codex_threads"));
         assert!(!LAN_COMMAND_ALLOWLIST.contains(&"recover_codex_threads"));
@@ -77,6 +81,17 @@ mod tests {
         assert!(!LAN_COMMAND_ALLOWLIST.contains(&"codex_gui_image_action"));
         assert!(!LAN_COMMAND_ALLOWLIST.contains(&"codex_gui_attachment_preview"));
         assert!(!LAN_COMMAND_ALLOWLIST.contains(&"codex_gui_file_applications"));
+    }
+
+    #[test]
+    fn lan_clients_can_sign_in_and_import_uploaded_account_content() {
+        for command in [
+            "cloud_login", "cloud_logout", "cloud_register", "cloud_request_registration_code",
+            "cloud_sync_accounts", "cloud_push_accounts", "cloud_push_account", "cloud_pull_account",
+            "import_account_json_text", "refresh_usage",
+        ] {
+            assert!(WebRequestAccess::Lan.allows_command(command), "{command}");
+        }
     }
 
     #[test]

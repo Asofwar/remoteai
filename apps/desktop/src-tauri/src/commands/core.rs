@@ -188,11 +188,27 @@ pub(crate) fn import_account_json_file<R: Runtime>(
 ) -> Result<CompatibleJsonImportResult, String> {
     let content =
         fs::read_to_string(&path).map_err(|error| format!("读取 {} 失败：{error}", path))?;
-    import_account_json_text(app, content)
+    import_account_json_text_blocking(app, content)
 }
 
 #[tauri::command]
-pub(crate) fn import_account_json_text<R: Runtime>(
+pub(crate) async fn import_account_json_text<R: Runtime + 'static>(
+    app: tauri::AppHandle<R>,
+    content: String,
+) -> Result<CompatibleJsonImportResult, String> {
+    const MAX_ACCOUNT_IMPORT_BYTES: usize = 20 * 1024 * 1024;
+    if content.len() > MAX_ACCOUNT_IMPORT_BYTES {
+        return Err("导入内容过大，请拆分为小于 20 MB 的文件后重试".to_string());
+    }
+    tauri::async_runtime::spawn_blocking(move || import_account_json_text_blocking(app, content))
+        .await
+        .map_err(|error| {
+            eprintln!("account text import task failed: {error}");
+            "账户导入未完成，请重试".to_string()
+        })?
+}
+
+fn import_account_json_text_blocking<R: Runtime>(
     app: tauri::AppHandle<R>,
     content: String,
 ) -> Result<CompatibleJsonImportResult, String> {
@@ -229,7 +245,7 @@ fn import_account_json_from_clipboard_blocking<R: Runtime>(
         eprintln!("failed to read account JSON from clipboard: {error}");
         "无法读取剪贴板，请复制账号 JSON 后重试".to_string()
     })?;
-    import_account_json_text(app, content)
+    import_account_json_text_blocking(app, content)
 }
 
 #[tauri::command]

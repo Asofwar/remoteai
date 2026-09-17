@@ -1608,7 +1608,8 @@ export function DashboardApp() {
 
         {showLogin && <LoginModal onClose={() => setShowLogin(false)} onWebSession={startWebSessionLogin}
           onStart={startLogin}
-          onImport={importAccountJson} onImportClipboard={importAccountJsonFromClipboard} t={t} />}
+          onImport={importAccountJson} onImportClipboard={importAccountJsonFromClipboard}
+          onImportText={manager.importAccountJsonFromClipboard} t={t} />}
         {showMenuSearch && <MenuSearchModal items={menuItems.search} onClose={() => setShowMenuSearch(false)}
           onSelect={(action) => {
             setShowMenuSearch(false);

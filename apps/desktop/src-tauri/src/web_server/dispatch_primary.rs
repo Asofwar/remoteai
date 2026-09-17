@@ -1,5 +1,9 @@
 fn dispatch_command(app: AppHandle, command: &str, args: Value) -> Result<Value, String> {
     match command {
+        "import_account_json_text" => serialize(block_on(crate::commands::import_account_json_text(
+            app,
+            argument(&args, "content")?,
+        ))),
         "list_error_logs" => serialize(block_on(crate::error_logs::list_error_logs(
             argument(&args, "limit")?,
             argument(&args, "beforeId")?,

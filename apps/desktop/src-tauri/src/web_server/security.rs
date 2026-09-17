@@ -185,6 +185,17 @@ fn request_header<'a>(request: &'a Request, name: &str) -> Option<&'a str> {
 }
 
 const LAN_COMMAND_ALLOWLIST: &[&str] = &[
+    // Authenticated clients may sign in and upload accounts without reading host files or clipboard.
+    "cloud_login",
+    "cloud_logout",
+    "cloud_register",
+    "cloud_request_registration_code",
+    "cloud_sync_accounts",
+    "cloud_push_accounts",
+    "cloud_push_account",
+    "cloud_pull_account",
+    "import_account_json_text",
+    "refresh_usage",
     // The authenticated browser GUI controls Codex on this host using its existing approval flow.
     "codex_gui_connect",
     "codex_gui_account_selection",

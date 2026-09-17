@@ -3,16 +3,20 @@ import {
 } from "lucide-react";
 import { Button, Modal } from "antd";
 import { useState } from "react";
+import { isHostedWebApp } from "../../api/backend";
+import { PasteAccountModal } from "./PasteAccountModal";
 import type { Translate } from "../../i18n";
 
-export function LoginModal({ onClose, onWebSession, onStart, onImport, onImportClipboard, t }: {
+export function LoginModal({ onClose, onWebSession, onStart, onImport, onImportClipboard, onImportText, t }: {
   onClose: () => void;
   onWebSession: () => void;
   onStart: (embedded: boolean, privateMode?: boolean) => void;
   onImport: () => void;
   onImportClipboard: () => void;
+  onImportText: (content: string) => Promise<boolean>;
   t: Translate;
 }) {
+  const [pasteOpen, setPasteOpen] = useState(false);
   const [browserModeConfirmOpen, setBrowserModeConfirmOpen] = useState(false);
 
   const confirmWebSession = () => {
@@ -38,7 +42,8 @@ export function LoginModal({ onClose, onWebSession, onStart, onImport, onImportC
       <section className="modal" onClick={(event) => event.stopPropagation()}>
         <button type="button" className="modal-close" aria-label={t("login.close")} onClick={onClose}><X size={19} /></button>
         <div className="modal-icon"><KeyRound size={25} /></div>
-        <h2>{t("login.title")}</h2>
+        <h2>{t(isHostedWebApp ? "login.importTitle" : "login.title")}</h2>
+        {!isHostedWebApp && <>
         <button type="button" className="login-choice" onClick={() => setBrowserModeConfirmOpen(true)}>
           <span className="choice-icon"><ExternalLink size={20} /></span>
           <span><b>{t("login.browser.title")}</b><small>{t("login.browser.description")}</small></span><ChevronRight size={19} />
@@ -47,22 +52,26 @@ export function LoginModal({ onClose, onWebSession, onStart, onImport, onImportC
           <span className="choice-icon"><LayoutGrid size={20} /></span>
           <span><b>{t("login.embedded.title")}</b><small>{t("login.embedded.description")}</small></span><ChevronRight size={19} />
         </button>
+        </>}
         <button type="button" className="login-choice import-choice" onClick={onImport}>
           <span className="choice-icon"><FileInput size={20} /></span>
           <span><b>{t("login.importMultiple")}</b><small>{t("login.importCompatible")}</small></span>
           <ChevronRight size={19} />
         </button>
-        <button type="button" className="login-choice import-choice" onClick={onImportClipboard}>
+        <button type="button" className="login-choice import-choice"
+          onClick={isHostedWebApp ? () => setPasteOpen(true) : onImportClipboard}>
           <span className="choice-icon"><ClipboardPaste size={20} /></span>
           <span><b>{t("login.importClipboard")}</b><small>{t("login.importClipboardDescription")}</small></span>
           <ChevronRight size={19} />
         </button>
-        <button type="button" className="login-choice" onClick={confirmWebSession}>
+        {!isHostedWebApp && <button type="button" className="login-choice" onClick={confirmWebSession}>
           <span className="choice-icon"><Globe2 size={20} /></span>
           <span><b>{t("login.webSession.title")}</b><small>{t("login.webSession.description")}</small></span>
           <ChevronRight size={19} />
-        </button>
+        </button>}
       </section>
+      {pasteOpen && <PasteAccountModal onClose={() => setPasteOpen(false)}
+        onImported={onClose} onImport={onImportText} t={t} />}
       <Modal
         open={browserModeConfirmOpen}
         centered

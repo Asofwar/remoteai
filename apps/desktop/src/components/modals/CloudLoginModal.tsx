@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { ArrowRight, CircleAlert, Cloud, KeyRound, LockKeyhole, Mail, UserPlus, X } from "lucide-react";
-import { loadSavedCloudLogin } from "../../api/backend";
+import { isHostedWebApp, loadSavedCloudLogin } from "../../api/backend";
 import type { Translate } from "../../i18n";
 
 export function CloudLoginModal({
@@ -107,7 +107,7 @@ export function CloudLoginModal({
               }}
               placeholder={t("cloudLogin.passwordPlaceholder")} /></span>
           <div className="cloud-login-options-row">
-            <label className="cloud-remember-password">
+            {!isHostedWebApp && <label className="cloud-remember-password">
               <input type="checkbox" checked={rememberPassword} disabled={loading}
                 onChange={(event) => {
                   credentialsEdited.current = true;
@@ -117,7 +117,7 @@ export function CloudLoginModal({
                 <b>{t("cloudLogin.rememberPassword")}</b>
                 <small>{t("cloudLogin.rememberPasswordHint")}</small>
               </span>
-            </label>
+            </label>}
             <button type="button" className="cloud-forgot-password" onClick={onForgotPassword}>
               {t("cloudLogin.forgotPassword")}
             </button>

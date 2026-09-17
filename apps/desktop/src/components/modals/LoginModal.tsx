@@ -39,18 +39,13 @@ export function LoginModal({ onClose, onWebSession, onStart, onImport, onImportC
         <button type="button" className="modal-close" aria-label={t("login.close")} onClick={onClose}><X size={19} /></button>
         <div className="modal-icon"><KeyRound size={25} /></div>
         <h2>{t("login.title")}</h2>
-        <button type="button" className="login-choice featured" onClick={() => onStart(true)}>
-          <span className="choice-icon"><LayoutGrid size={20} /></span>
-          <span><b>{t("login.embedded.title")}</b><small>{t("login.embedded.description")}</small></span><ChevronRight size={19} />
-        </button>
-        <button type="button" className="login-choice" onClick={confirmWebSession}>
-          <span className="choice-icon"><Globe2 size={20} /></span>
-          <span><b>{t("login.webSession.title")}</b><small>{t("login.webSession.description")}</small></span>
-          <ChevronRight size={19} />
-        </button>
         <button type="button" className="login-choice" onClick={() => setBrowserModeConfirmOpen(true)}>
           <span className="choice-icon"><ExternalLink size={20} /></span>
           <span><b>{t("login.browser.title")}</b><small>{t("login.browser.description")}</small></span><ChevronRight size={19} />
+        </button>
+        <button type="button" className="login-choice featured" onClick={() => onStart(true)}>
+          <span className="choice-icon"><LayoutGrid size={20} /></span>
+          <span><b>{t("login.embedded.title")}</b><small>{t("login.embedded.description")}</small></span><ChevronRight size={19} />
         </button>
         <button type="button" className="login-choice import-choice" onClick={onImport}>
           <span className="choice-icon"><FileInput size={20} /></span>
@@ -60,6 +55,11 @@ export function LoginModal({ onClose, onWebSession, onStart, onImport, onImportC
         <button type="button" className="login-choice import-choice" onClick={onImportClipboard}>
           <span className="choice-icon"><ClipboardPaste size={20} /></span>
           <span><b>{t("login.importClipboard")}</b><small>{t("login.importClipboardDescription")}</small></span>
+          <ChevronRight size={19} />
+        </button>
+        <button type="button" className="login-choice" onClick={confirmWebSession}>
+          <span className="choice-icon"><Globe2 size={20} /></span>
+          <span><b>{t("login.webSession.title")}</b><small>{t("login.webSession.description")}</small></span>
           <ChevronRight size={19} />
         </button>
       </section>

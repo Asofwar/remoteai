@@ -1,4 +1,5 @@
 import type { LocalProxyLanApiKey, LocalProxyLanApiKeyInput } from "../types";
+import { DEFAULT_USAGE_REVIEW_THRESHOLD, unconfirmedRequests, usageReviewThreshold } from "./localProxyLanUsage";
 
 const STORAGE_KEY = "codex-switch:local-proxy-lan-api-keys";
 const LEGACY_STORAGE_KEY = "codex-switch:local-proxy-lan-api-key";
@@ -35,7 +36,9 @@ function writeKeys(keys: PreviewKey[]): LocalProxyLanApiKey[] {
 }
 
 export function previewLocalProxyLanApiKeys(): LocalProxyLanApiKey[] {
-  return readKeys().map(({ apiKey: _apiKey, ...key }) => key);
+  return readKeys().map(({ apiKey: _apiKey, ...key }) => ({ ...key,
+    unconfirmedRequests: unconfirmedRequests(key), usageReviewThreshold: usageReviewThreshold(key),
+  }));
 }
 
 export function previewHasLocalProxyLanApiKey(): boolean {
@@ -49,10 +52,12 @@ export function previewSaveLocalProxyLanApiKey(input: LocalProxyLanApiKeyInput):
   const apiKey = input.apiKey?.trim() || current?.apiKey || generateLocalProxyLanApiKey();
   if (keys.some((key) => key.id !== current?.id && key.apiKey === apiKey)) throw new Error("Duplicate key");
   const usedCostUsd = current?.usedCostUsd ?? 0;
+  const pendingCount = input.acknowledgeUsage || !current ? 0 : unconfirmedRequests(current);
   const saved: PreviewKey = { id: current?.id ?? crypto.randomUUID(), name: input.name.trim(),
     apiKey, keyPreview: maskKey(apiKey), enabled: input.enabled, quotaUsd: input.quotaUsd,
     usedTokens: current?.usedTokens ?? 0, usedCostUsd,
-    usageIncomplete: input.acknowledgeUsage ? false : current?.usageIncomplete ?? false,
+    usageIncomplete: pendingCount > 0, unconfirmedRequests: pendingCount,
+    usageReviewThreshold: input.usageReviewThreshold ?? current?.usageReviewThreshold ?? DEFAULT_USAGE_REVIEW_THRESHOLD,
     remainingUsd: input.quotaUsd === null ? null : Math.max(0, input.quotaUsd - usedCostUsd) };
   return writeKeys(current ? keys.map((key) => key.id === current.id ? saved : key) : [...keys, saved]);
 }

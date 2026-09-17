@@ -45,8 +45,28 @@ it("clears incomplete usage only after an explicit acknowledgment", () => {
   const [key] = previewSaveLocalProxyLanApiKey({ name: "First", enabled: true, quotaUsd: 10 });
   const raw = JSON.parse(localStorage.getItem("codex-switch:local-proxy-lan-api-keys")!) as Record<string, unknown>[];
   raw[0].usageIncomplete = true;
+  raw[0].unconfirmedRequests = 12;
+  raw[0].usedCostUsd = 2;
   localStorage.setItem("codex-switch:local-proxy-lan-api-keys", JSON.stringify(raw));
   const input = { id: key.id, name: "Renamed", enabled: true, quotaUsd: 20 };
-  expect(previewSaveLocalProxyLanApiKey(input)[0].usageIncomplete).toBe(true);
-  expect(previewSaveLocalProxyLanApiKey({ ...input, acknowledgeUsage: true })[0].usageIncomplete).toBe(false);
+  expect(previewSaveLocalProxyLanApiKey(input)[0]).toMatchObject({ usageIncomplete: true, unconfirmedRequests: 12 });
+  expect(previewSaveLocalProxyLanApiKey({ ...input, acknowledgeUsage: true })[0]).toMatchObject({
+    usageIncomplete: false, unconfirmedRequests: 0, usedCostUsd: 2,
+  });
+});
+
+it("migrates old incomplete flags and keeps a custom limit through toggles", () => {
+  const [key] = previewSaveLocalProxyLanApiKey({ name: "First", enabled: true, quotaUsd: 10 });
+  expect(key.usageReviewThreshold).toBe(1000);
+  const raw = JSON.parse(localStorage.getItem("codex-switch:local-proxy-lan-api-keys")!) as Record<string, unknown>[];
+  delete raw[0].unconfirmedRequests;
+  delete raw[0].usageReviewThreshold;
+  raw[0].usageIncomplete = true;
+  localStorage.setItem("codex-switch:local-proxy-lan-api-keys", JSON.stringify(raw));
+  expect(previewLocalProxyLanApiKeys()[0]).toMatchObject({ unconfirmedRequests: 1, usageReviewThreshold: 1000 });
+  const input = { id: key.id, name: key.name, enabled: true, quotaUsd: 10 };
+  previewSaveLocalProxyLanApiKey({ ...input, usageReviewThreshold: 50 });
+  expect(previewSaveLocalProxyLanApiKey({ ...input, enabled: false })[0]).toMatchObject({
+    unconfirmedRequests: 1, usageReviewThreshold: 50,
+  });
 });

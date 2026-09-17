@@ -67,6 +67,7 @@ fn apply_legacy_lan_key(
         enabled: true,
         quota_usd: existing.and_then(|key| key.quota_usd),
         acknowledge_usage: false,
+        usage_review_threshold: None,
     };
     lan_keys::save_key(state, key).map_err(|error| error.to_string())
 }

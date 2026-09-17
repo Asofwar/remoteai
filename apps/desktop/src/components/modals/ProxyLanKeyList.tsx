@@ -4,6 +4,7 @@ import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import type { useLocalProxyLanKeys } from "../../hooks/useLocalProxyLanKeys";
 import type { Translate, TranslationKey } from "../../i18n";
 import type { LocalProxyLanApiKey } from "../../types";
+import { needsUsageReview, unconfirmedRequests, usageReviewThreshold } from "../../api/localProxyLanUsage";
 import { ProxyLanKeyEditor } from "./ProxyLanKeyEditor";
 import "./ProxyLanKeyList.css";
 
@@ -27,6 +28,8 @@ function KeyUsage({ entry, t }: { entry: LocalProxyLanApiKey; t: Translate }) {
     <div><dt>{t("providers.proxy.lanKeyRemaining")}</dt><dd>{formatCost(entry.remainingUsd, t)}</dd></div>
     <div><dt>{t("providers.proxy.lanKeyUsedTokens")}</dt><dd>{entry.usedTokens.toLocaleString()}</dd></div>
     <div><dt>{t("providers.proxy.lanKeyUsedCost")}</dt><dd>{formatCost(entry.usedCostUsd, t)}</dd></div>
+    <div><dt>{t("providers.proxy.lanKeyUnconfirmedRequests")}</dt>
+      <dd>{unconfirmedRequests(entry).toLocaleString()} / {usageReviewThreshold(entry).toLocaleString()}</dd></div>
   </dl>;
 }
 
@@ -51,7 +54,10 @@ function KeyRow({ entry, actions, state, t }: KeyRowProps) {
         })} />
     </div>
     <KeyUsage entry={entry} t={t} />
-    {entry.usageIncomplete && <p className="proxy-lan-key-error">{t("providers.proxy.lanKeyUsageIncomplete")}</p>}
+    {unconfirmedRequests(entry) > 0 && <p className={needsUsageReview(entry) ? "proxy-lan-key-error" : undefined}>
+      {t(needsUsageReview(entry) ? "providers.proxy.lanKeyUsageReviewRequired"
+        : "providers.proxy.lanKeyUsageIncomplete")}
+    </p>}
     <div className="proxy-settings-key-actions">
       <Button size="small" icon={<Copy size={13} />} disabled={disabled}
         aria-label={label("providers.proxy.copyLanApiKey")} onClick={() => void manager.copy(entry.id)}>

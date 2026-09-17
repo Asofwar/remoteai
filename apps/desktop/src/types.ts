@@ -201,6 +201,8 @@ export interface LocalProxyLanApiKey {
   usedCostUsd: number;
   remainingUsd: number | null;
   usageIncomplete?: boolean;
+  unconfirmedRequests?: number;
+  usageReviewThreshold?: number;
 }
 
 export interface LocalProxyLanApiKeyInput {
@@ -210,6 +212,7 @@ export interface LocalProxyLanApiKeyInput {
   enabled: boolean;
   quotaUsd: number | null;
   acknowledgeUsage?: boolean;
+  usageReviewThreshold?: number;
 }
 
 export interface LocalProxyStatus {

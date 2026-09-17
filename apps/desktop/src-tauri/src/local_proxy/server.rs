@@ -311,12 +311,12 @@ fn handle_request<R: Runtime>(app: tauri::AppHandle<R>, mut request: Request) {
     if method == Method::Post
         && lan_key
             .as_ref()
-            .is_some_and(|key| key.quota_usd.is_some() && key.usage_incomplete)
+            .is_some_and(|key| key.needs_usage_review())
     {
         respond_error(
             request,
             503,
-            "Usage could not be confirmed. Ask the owner to review this API key's usage and quota."
+            "Unconfirmed usage has reached this API key's review limit. Ask the owner to review usage and resume access."
                 .to_string(),
         );
         return;

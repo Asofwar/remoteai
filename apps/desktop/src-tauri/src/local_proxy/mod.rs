@@ -20,6 +20,7 @@ pub(crate) mod gui_context;
 mod gui_forwarding;
 mod gui_routing;
 pub(crate) mod lan_keys;
+mod lan_usage_capture;
 mod quota_detection;
 mod quota_sse;
 mod session_titles;

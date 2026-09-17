@@ -108,6 +108,7 @@ mod tests {
             state.local_proxy_lan_api_keys = vec![crate::models::LocalProxyLanApiKey {
                 id: "first".into(), name: "First".into(), api_key: "new-secret".into(),
                 enabled: true, quota_usd: Some(5.0),
+                usage_review_threshold: crate::models::DEFAULT_LAN_USAGE_REVIEW_THRESHOLD,
             }];
             state.local_proxy_lan_api_keys_changed = true;
             Ok(())

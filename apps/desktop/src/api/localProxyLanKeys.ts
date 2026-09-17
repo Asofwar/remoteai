@@ -1,8 +1,16 @@
 import type { LocalProxyLanApiKey, LocalProxyLanApiKeyInput } from "../types";
+import { listen } from "@tauri-apps/api/event";
 import { copyText } from "../utils/clipboard";
-import { hasLocalBackend, isHostedWebApp, invoke } from "./backend";
+import { hasLocalBackend, isDesktopApp, isHostedWebApp, invoke } from "./backend";
 import { previewCopyLocalProxyLanApiKey, previewDeleteLocalProxyLanApiKey,
   previewLocalProxyLanApiKeys, previewSaveLocalProxyLanApiKey } from "./localProxyLanKeysPreview";
+
+export function subscribeToLocalProxyLanKeyChanges(onChange: () => void): () => void {
+  if (!isDesktopApp) return () => undefined;
+  // Polling remains available if native events cannot be registered.
+  const subscription = listen("local-proxy-lan-keys-updated", onChange).catch(() => () => undefined);
+  return () => { void subscription.then((unlisten) => unlisten()); };
+}
 
 export async function loadLocalProxyLanApiKeys(): Promise<LocalProxyLanApiKey[]> {
   if (!hasLocalBackend) return previewLocalProxyLanApiKeys();

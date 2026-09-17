@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { loadLocalProxyIpv4Addresses } from "../../api/proxyEndpoints";
 import { loadProxySessions } from "../../api/backend";
 import { copyLocalProxyLanApiKey, deleteLocalProxyLanApiKey, loadLocalProxyLanApiKeys,
-  saveLocalProxyLanApiKey } from "../../api/localProxyLanKeys";
+  saveLocalProxyLanApiKey, subscribeToLocalProxyLanKeyChanges } from "../../api/localProxyLanKeys";
 import type { LocalProxyLanApiKey, LocalProxyStatus, ProxySession } from "../../types";
 import { ProxySessionManager } from "../ProxySessionManager";
 import { ProxySettingsModal } from "./ProxySettingsModal";
@@ -20,6 +20,7 @@ vi.mock("../../api/localProxyLanKeys", () => ({
   saveLocalProxyLanApiKey: vi.fn(),
   deleteLocalProxyLanApiKey: vi.fn(),
   copyLocalProxyLanApiKey: vi.fn(),
+  subscribeToLocalProxyLanKeyChanges: vi.fn(() => () => undefined),
 }));
 vi.mock("../../api/backend", () => ({
   loadProxySessions: vi.fn(),
@@ -124,7 +125,7 @@ it("adds a generated key with a spending limit and shows its usage beside the co
   expect(onSave).not.toHaveBeenCalled();
   await act(async () => button("providers.proxy.saveApiKey").click());
   expect(saveLocalProxyLanApiKey).toHaveBeenCalledWith({ id: undefined, name: lanKey.name,
-    apiKey: generated, enabled: true, quotaUsd: 10 });
+    apiKey: generated, enabled: true, quotaUsd: 10, usageReviewThreshold: 1000 });
   expect(keyInput()).toBeNull();
   expect(document.body.textContent).toContain("12,345");
   expect(document.body.textContent).toContain("$2.50");
@@ -211,7 +212,7 @@ it("allows unlimited keys, preserves totals on edits, and removes only the selec
   await act(async () => button(`providers.proxy.lanKeyEdit: ${second.name}`).click());
   await act(async () => button("providers.proxy.saveApiKey").click());
   expect(saveLocalProxyLanApiKey).toHaveBeenCalledWith({ id: second.id, name: second.name,
-    apiKey: undefined, enabled: true, quotaUsd: null });
+    apiKey: undefined, enabled: true, quotaUsd: null, usageReviewThreshold: 1000 });
   expect(document.body.textContent).toContain("providers.proxy.lanKeyUnlimited");
   vi.mocked(deleteLocalProxyLanApiKey).mockResolvedValue([lanKey]);
   await act(async () => button(`providers.proxy.lanKeyDelete: ${second.name}`).click());
@@ -234,7 +235,7 @@ it("keeps usage polling single flight and ignores stale responses after saving a
   await fillInput("#proxy-lan-key-name", lanKey.name);
   await act(async () => button("providers.proxy.saveApiKey").click());
   expect(saveLocalProxyLanApiKey).toHaveBeenCalledWith({ id: undefined, name: lanKey.name,
-    apiKey: undefined, enabled: true, quotaUsd: null });
+    apiKey: undefined, enabled: true, quotaUsd: null, usageReviewThreshold: 1000 });
   await act(async () => completePoll([]));
   expect(document.body.textContent).toContain(lanKey.name);
   await render({}, false);
@@ -254,4 +255,63 @@ it("requires an explicit selection to acknowledge incomplete usage", async () =>
   expect(saveLocalProxyLanApiKey).toHaveBeenCalledWith(expect.objectContaining({
     id: lanKey.id, acknowledgeUsage: true,
   }));
+});
+
+it("edits the review limit, rejects invalid counts, and preserves pending usage", async () => {
+  vi.mocked(loadLocalProxyLanApiKeys).mockResolvedValue([
+    { ...lanKey, unconfirmedRequests: 24, usageReviewThreshold: 25 },
+  ]);
+  await render();
+  expect(document.body.textContent).toContain("24 / 25");
+  expect(document.body.textContent).not.toContain("providers.proxy.lanKeyUsageReviewRequired");
+  await act(async () => button(`providers.proxy.lanKeyEdit: ${lanKey.name}`).click());
+  expect(document.querySelector<HTMLInputElement>("#proxy-lan-key-review-threshold")!.value).toBe("25");
+  const form = document.querySelector("form.proxy-lan-key-editor")!;
+  for (const value of ["", "0", "-1", "1.5", "1000000001"]) {
+    await fillInput("#proxy-lan-key-review-threshold", value);
+    await act(async () => { form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
+    expect(saveLocalProxyLanApiKey).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain("providers.proxy.lanKeyReviewThresholdInvalid");
+  }
+  await fillInput("#proxy-lan-key-review-threshold", "50");
+  await act(async () => button("providers.proxy.saveApiKey").click());
+  expect(saveLocalProxyLanApiKey).toHaveBeenCalledWith({
+    id: lanKey.id, name: lanKey.name, apiKey: undefined, enabled: true, quotaUsd: 10, usageReviewThreshold: 50,
+  });
+});
+
+it("shows blocking only when a limited key reaches its configured count", async () => {
+  vi.mocked(loadLocalProxyLanApiKeys).mockResolvedValue([
+    { ...lanKey, unconfirmedRequests: 25, usageReviewThreshold: 25 },
+    { ...lanKey, id: "unlimited", name: "Unlimited", quotaUsd: null,
+      unconfirmedRequests: 25, usageReviewThreshold: 25 },
+  ]);
+  await render();
+  const rows = document.querySelectorAll(".proxy-lan-key-row");
+  expect(rows[0].textContent).toContain("providers.proxy.lanKeyUsageReviewRequired");
+  expect(rows[1].textContent).toContain("providers.proxy.lanKeyUsageIncomplete");
+});
+
+it("refreshes card counts on usage events and through LAN polling, and unsubscribes on close", async () => {
+  const unsubscribe = vi.fn();
+  vi.mocked(subscribeToLocalProxyLanKeyChanges).mockReturnValueOnce(unsubscribe);
+  vi.mocked(loadLocalProxyLanApiKeys).mockResolvedValue([{ ...lanKey, unconfirmedRequests: 1 }]);
+  await render();
+  expect(document.body.textContent).toContain("1 / 1,000");
+  const onUsageChanged = vi.mocked(subscribeToLocalProxyLanKeyChanges).mock.calls[0][0];
+  vi.mocked(loadLocalProxyLanApiKeys).mockResolvedValue([{ ...lanKey, unconfirmedRequests: 2 }]);
+  await act(async () => {
+    onUsageChanged();
+    onUsageChanged();
+    vi.advanceTimersByTime(100);
+  });
+  expect(document.body.textContent).toContain("2 / 1,000");
+  expect(loadLocalProxyLanApiKeys).toHaveBeenCalledTimes(2);
+  vi.mocked(loadLocalProxyLanApiKeys).mockResolvedValue([{ ...lanKey, unconfirmedRequests: 3 }]);
+  await act(async () => vi.advanceTimersByTime(2_000));
+  expect(document.body.textContent).toContain("3 / 1,000");
+  await render({}, false);
+  expect(unsubscribe).toHaveBeenCalledOnce();
+  await act(async () => vi.advanceTimersByTime(10_000));
+  expect(loadLocalProxyLanApiKeys).toHaveBeenCalledTimes(3);
 });

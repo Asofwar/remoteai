@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { copyLocalProxyLanApiKey, deleteLocalProxyLanApiKey, loadLocalProxyLanApiKeys,
-  saveLocalProxyLanApiKey } from "../api/localProxyLanKeys";
+  saveLocalProxyLanApiKey, subscribeToLocalProxyLanKeyChanges } from "../api/localProxyLanKeys";
 import type { Translate, TranslationKey } from "../i18n";
 import type { LocalProxyLanApiKey, LocalProxyLanApiKeyInput } from "../types";
 
-const USAGE_REFRESH_INTERVAL_MS = 5_000;
+const USAGE_REFRESH_INTERVAL_MS = 2_000;
+const USAGE_EVENT_REFRESH_DELAY_MS = 100;
 
 interface LocalProxyLanKeysOptions {
   open: boolean;
@@ -49,10 +50,20 @@ export function useLocalProxyLanKeys({ open, notify, t }: LocalProxyLanKeysOptio
     if (!open) return;
     void refresh();
     const timer = window.setInterval(() => void refresh(), USAGE_REFRESH_INTERVAL_MS);
+    let eventTimer: number | undefined;
+    const unsubscribe = subscribeToLocalProxyLanKeyChanges(() => {
+      if (eventTimer !== undefined) return;
+      eventTimer = window.setTimeout(() => {
+        eventTimer = undefined;
+        void refresh();
+      }, USAGE_EVENT_REFRESH_DELAY_MS);
+    });
     return () => {
       active.current = false;
       revision.current += 1;
       window.clearInterval(timer);
+      window.clearTimeout(eventTimer);
+      unsubscribe();
     };
   }, [open, refresh]);
 

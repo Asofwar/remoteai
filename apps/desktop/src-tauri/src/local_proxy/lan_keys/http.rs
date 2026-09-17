@@ -79,6 +79,9 @@ pub(in crate::local_proxy) fn quota_payload(key: &LocalProxyLanApiKeySummary) ->
             "usedTokens": key.used_tokens,
             "unlimited": key.quota_usd.is_none(),
             "usageIncomplete": key.usage_incomplete,
+            "unconfirmedRequests": key.unconfirmed_requests,
+            "usageReviewThreshold": key.usage_review_threshold,
+            "usageReviewRequired": key.needs_usage_review(),
             "unit": "USD",
         }),
     );
@@ -153,7 +156,7 @@ mod tests {
             ledger::KeyUsage {
                 tokens: 123,
                 cost_usd: 1.5,
-                incomplete: false,
+                unconfirmed_requests: 0,
             },
         );
         let payload = quota_payload(&summary);

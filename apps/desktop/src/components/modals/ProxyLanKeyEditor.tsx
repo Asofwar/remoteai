@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Button, Checkbox, Input } from "antd";
 import { Sparkles } from "lucide-react";
 import { generateLocalProxyLanApiKey } from "../../api/localProxyLanKeysPreview";
+import { DEFAULT_USAGE_REVIEW_THRESHOLD, MAX_USAGE_REVIEW_THRESHOLD,
+  unconfirmedRequests } from "../../api/localProxyLanUsage";
 import type { Translate, TranslationKey } from "../../i18n";
 import type { LocalProxyLanApiKey, LocalProxyLanApiKeyInput } from "../../types";
 
@@ -16,12 +18,16 @@ interface ProxyLanKeyEditorProps {
 const MAX_API_KEY_LENGTH = 512;
 const MAX_QUOTA_USD = 1_000_000_000;
 
-function validateInput(name: string, apiKey: string, quota: string): TranslationKey | null {
+function validateInput(name: string, apiKey: string, quota: string, threshold: string): TranslationKey | null {
   if (!name.trim()) return "providers.proxy.lanKeyNameRequired";
   if (apiKey.trim() && !/^[\x21-\x7e]{16,512}$/.test(apiKey.trim())) return "providers.proxy.lanKeyInvalid";
   const quotaUsd = Number(quota);
   if (quota.trim() && (!Number.isFinite(quotaUsd) || quotaUsd < 0 || quotaUsd > MAX_QUOTA_USD)) {
     return "providers.proxy.lanKeyQuotaInvalid";
+  }
+  const count = Number(threshold);
+  if (!Number.isInteger(count) || count < 1 || count > MAX_USAGE_REVIEW_THRESHOLD) {
+    return "providers.proxy.lanKeyReviewThresholdInvalid";
   }
   return null;
 }
@@ -30,14 +36,18 @@ export function ProxyLanKeyEditor({ entry, disabled, onSave, onCancel, t }: Prox
   const [name, setName] = useState(entry?.name ?? "");
   const [apiKey, setApiKey] = useState("");
   const [quota, setQuota] = useState(entry?.quotaUsd?.toString() ?? "");
+  const [threshold, setThreshold] = useState(
+    String(entry?.usageReviewThreshold ?? DEFAULT_USAGE_REVIEW_THRESHOLD),
+  );
   const [error, setError] = useState<TranslationKey | null>(null);
   const [acknowledgeUsage, setAcknowledgeUsage] = useState(false);
   const save = async () => {
-    const invalid = validateInput(name, apiKey, quota);
+    const invalid = validateInput(name, apiKey, quota, threshold);
     setError(invalid);
     if (invalid || disabled) return;
     const saved = await onSave({ id: entry?.id, name: name.trim(), apiKey: apiKey.trim() || undefined,
       ...(acknowledgeUsage ? { acknowledgeUsage: true } : {}),
+      usageReviewThreshold: Number(threshold),
       quotaUsd: quota.trim() ? Number(quota) : null, enabled: entry?.enabled ?? true });
     if (saved) onCancel();
   };
@@ -63,8 +73,13 @@ export function ProxyLanKeyEditor({ entry, disabled, onSave, onCancel, t }: Prox
         placeholder={t("providers.proxy.lanKeyUnlimitedPlaceholder")}
         onChange={(event) => setQuota(event.target.value)} />
       <p>{t("providers.proxy.lanKeyQuotaHint")}</p>
+      <label htmlFor="proxy-lan-key-review-threshold">{t("providers.proxy.lanKeyReviewThreshold")}</label>
+      <Input id="proxy-lan-key-review-threshold" value={threshold} type="number" min={1}
+        max={MAX_USAGE_REVIEW_THRESHOLD} step={1} disabled={disabled}
+        onChange={(event) => setThreshold(event.target.value)} />
+      <p>{t("providers.proxy.lanKeyReviewThresholdHint")}</p>
       {entry && <p>{t("providers.proxy.lanKeyEditHint")}</p>}
-      {entry?.usageIncomplete && <div className="proxy-lan-key-usage-review">
+      {entry && unconfirmedRequests(entry) > 0 && <div className="proxy-lan-key-usage-review">
         <p>{t("providers.proxy.lanKeyUsageReviewHint")}</p>
         <Checkbox checked={acknowledgeUsage} disabled={disabled}
           onChange={(event) => setAcknowledgeUsage(event.target.checked)}>

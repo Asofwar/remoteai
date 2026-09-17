@@ -15,7 +15,7 @@ static PENDING_USAGE: LazyLock<Mutex<HashMap<PathBuf, HashMap<String, KeyUsage>>
 pub(super) struct KeyUsage {
     pub(super) tokens: u64,
     pub(super) cost_usd: f64,
-    pub(super) incomplete: bool,
+    pub(super) unconfirmed_requests: u64,
 }
 
 /// This guard spans the complete operation, including queries and writes.
@@ -48,8 +48,31 @@ fn init_schema(connection: &Connection) -> Result<(), LanKeyError> {
             key_id TEXT PRIMARY KEY NOT NULL,
             used_tokens INTEGER NOT NULL DEFAULT 0 CHECK(used_tokens >= 0),
             used_cost_usd REAL NOT NULL DEFAULT 0 CHECK(used_cost_usd >= 0),
-            usage_incomplete INTEGER NOT NULL DEFAULT 0
+            usage_incomplete INTEGER NOT NULL DEFAULT 0,
+            unconfirmed_requests INTEGER NOT NULL DEFAULT 0 CHECK(unconfirmed_requests >= 0)
         );",
+        )
+        .map_err(|_| LanKeyError::Unavailable)?;
+    migrate_usage_counts(connection)
+}
+
+fn migrate_usage_counts(connection: &Connection) -> Result<(), LanKeyError> {
+    let migrated: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM pragma_table_info('lan_key_usage') WHERE name = 'unconfirmed_requests')",
+        [],
+        |row| row.get(0),
+    ).map_err(|_| LanKeyError::Unavailable)?;
+    if migrated {
+        return Ok(());
+    }
+    // Older ledgers only know that at least one request needs review; retain that known minimum.
+    connection
+        .execute_batch(
+            "BEGIN IMMEDIATE;
+         ALTER TABLE lan_key_usage ADD COLUMN unconfirmed_requests INTEGER NOT NULL DEFAULT 0
+             CHECK(unconfirmed_requests >= 0);
+         UPDATE lan_key_usage SET unconfirmed_requests = 1 WHERE usage_incomplete != 0;
+         COMMIT;",
         )
         .map_err(|_| LanKeyError::Unavailable)
 }
@@ -59,7 +82,9 @@ pub(super) fn load_all(paths: &Paths) -> Result<HashMap<String, KeyUsage>, LanKe
     flush_pending(&ledger.connection, paths)?;
     let mut statement = ledger
         .connection
-        .prepare("SELECT key_id, used_tokens, used_cost_usd, usage_incomplete FROM lan_key_usage")
+        .prepare(
+            "SELECT key_id, used_tokens, used_cost_usd, unconfirmed_requests FROM lan_key_usage",
+        )
         .map_err(|_| LanKeyError::Unavailable)?;
     let rows = statement
         .query_map([], |row| {
@@ -68,7 +93,7 @@ pub(super) fn load_all(paths: &Paths) -> Result<HashMap<String, KeyUsage>, LanKe
                 KeyUsage {
                     tokens: row.get(1)?,
                     cost_usd: row.get(2)?,
-                    incomplete: row.get(3)?,
+                    unconfirmed_requests: row.get(3)?,
                 },
             ))
         })
@@ -97,7 +122,7 @@ pub(super) fn acknowledge_usage(paths: &Paths, key_id: &str) -> Result<(), LanKe
     ledger
         .connection
         .execute(
-            "UPDATE lan_key_usage SET usage_incomplete = 0 WHERE key_id = ?1",
+            "UPDATE lan_key_usage SET usage_incomplete = 0, unconfirmed_requests = 0 WHERE key_id = ?1",
             [key_id],
         )
         .map_err(|_| LanKeyError::Unavailable)?;
@@ -113,7 +138,9 @@ fn remember_pending(paths: &Paths, key_id: &str, usage: KeyUsage) -> Result<(), 
         .or_default();
     outstanding.tokens = outstanding.tokens.saturating_add(usage.tokens);
     outstanding.cost_usd += usage.cost_usd;
-    outstanding.incomplete = true;
+    outstanding.unconfirmed_requests = outstanding
+        .unconfirmed_requests
+        .saturating_add(usage.unconfirmed_requests.max(1));
     Ok(())
 }
 
@@ -142,15 +169,17 @@ fn record_in_connection(
         return Err(LanKeyError::Unavailable);
     }
     let tokens = usage.tokens.min(i64::MAX as u64) as i64;
+    let unconfirmed_requests = usage.unconfirmed_requests.min(i64::MAX as u64) as i64;
     connection
         .execute(
-            "INSERT INTO lan_key_usage (key_id, used_tokens, used_cost_usd, usage_incomplete)
-         VALUES (?1, ?2, ?3, ?5)
+            "INSERT INTO lan_key_usage (key_id, used_tokens, used_cost_usd, usage_incomplete, unconfirmed_requests)
+         VALUES (?1, ?2, ?3, ?5 > 0, ?5)
          ON CONFLICT(key_id) DO UPDATE SET
              used_tokens = MIN(?4, lan_key_usage.used_tokens + excluded.used_tokens),
              used_cost_usd = lan_key_usage.used_cost_usd + excluded.used_cost_usd,
-             usage_incomplete = MAX(lan_key_usage.usage_incomplete, excluded.usage_incomplete)",
-            params![key_id, tokens, usage.cost_usd, i64::MAX, usage.incomplete],
+             usage_incomplete = MAX(lan_key_usage.usage_incomplete, excluded.usage_incomplete),
+             unconfirmed_requests = MIN(?4, lan_key_usage.unconfirmed_requests + excluded.unconfirmed_requests)",
+            params![key_id, tokens, usage.cost_usd, i64::MAX, unconfirmed_requests],
         )
         .map_err(|_| LanKeyError::Unavailable)?;
     Ok(())
@@ -159,6 +188,45 @@ fn record_in_connection(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn old_flags_migrate_once_and_counts_accumulate_without_changing_spent_totals() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection
+            .execute_batch(
+                "CREATE TABLE lan_key_usage (key_id TEXT PRIMARY KEY, used_tokens INTEGER,
+             used_cost_usd REAL, usage_incomplete INTEGER);
+             INSERT INTO lan_key_usage VALUES ('a', 100, 0.25, 1), ('b', 20, 0.5, 0);",
+            )
+            .unwrap();
+        init_schema(&connection).unwrap();
+        init_schema(&connection).unwrap();
+        for id in ["a", "b"] {
+            record_in_connection(
+                &connection,
+                id,
+                KeyUsage {
+                    unconfirmed_requests: 2,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        }
+        init_schema(&connection).unwrap();
+        let usage: (u64, f64, u64) = connection.query_row(
+            "SELECT used_tokens, used_cost_usd, unconfirmed_requests FROM lan_key_usage WHERE key_id = 'a'",
+            [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        ).unwrap();
+        assert_eq!(usage, (100, 0.25, 3));
+        let count: u64 = connection
+            .query_row(
+                "SELECT unconfirmed_requests FROM lan_key_usage WHERE key_id = 'b'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 2);
+    }
 
     #[test]
     fn ledger_accumulates_each_key_and_has_no_dependency_on_request_history() {
@@ -170,7 +238,7 @@ mod tests {
             KeyUsage {
                 tokens: 100,
                 cost_usd: 0.25,
-                incomplete: false,
+                unconfirmed_requests: 0,
             },
         )
         .unwrap();
@@ -180,7 +248,7 @@ mod tests {
             KeyUsage {
                 tokens: 20,
                 cost_usd: 0.5,
-                incomplete: false,
+                unconfirmed_requests: 0,
             },
         )
         .unwrap();
@@ -190,7 +258,7 @@ mod tests {
             KeyUsage {
                 tokens: 200,
                 cost_usd: 0.75,
-                incomplete: false,
+                unconfirmed_requests: 0,
             },
         )
         .unwrap();

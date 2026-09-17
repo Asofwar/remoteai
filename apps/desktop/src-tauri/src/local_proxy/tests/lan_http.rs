@@ -18,6 +18,7 @@ fn lan_http_test_keys() -> Vec<crate::models::LocalProxyLanApiKey> {
         api_key: secret.into(),
         enabled: true,
         quota_usd: quota,
+        usage_review_threshold: 2,
     })
     .collect()
 }
@@ -61,16 +62,18 @@ fn assert_lan_missing_usage_blocks(
         session_id: None,
         session_request_id: None,
     });
-    attach_token_usage_capture(app, context, Ok(json_payload(200, json!({"output": []})))).unwrap();
-    let quota: Value = client
-        .get(format!("{base}/v1/codex-switch/quota"))
-        .bearer_auth("second-http-test-secret")
-        .send()
-        .unwrap()
-        .json()
-        .unwrap();
-    assert_eq!(quota["usageIncomplete"], true);
-    assert_eq!(quota["remainingUsd"], 12.5);
+    for count in 1..=2 {
+        attach_token_usage_capture(app, context.clone(), Ok(json_payload(200, json!({"output": []})))).unwrap();
+        let quota: Value = client
+            .get(format!("{base}/v1/codex-switch/quota"))
+            .bearer_auth("second-http-test-secret")
+            .send().unwrap().json().unwrap();
+        assert_eq!(quota["usageIncomplete"], true);
+        assert_eq!(quota["unconfirmedRequests"], count);
+        assert_eq!(quota["usageReviewThreshold"], 2);
+        assert_eq!(quota["usageReviewRequired"], count == 2);
+        assert_eq!(quota["remainingUsd"], 12.5);
+    }
     let response = client
         .post(format!("{base}/v1/responses"))
         .bearer_auth("second-http-test-secret")
@@ -119,7 +122,7 @@ fn lan_http_quota_is_private_and_exhausted_keys_cannot_generate() {
     let base = format!("http://{}", server.server_addr());
     let request_app = app.handle().clone();
     let worker = thread::spawn(move || {
-        for _ in 0..8 {
+        for _ in 0..9 {
             let request = server.recv_timeout(LAN_HTTP_TEST_TIMEOUT).unwrap().unwrap();
             handle_request(request_app.clone(), request);
         }

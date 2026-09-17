@@ -1,5 +1,6 @@
 use crate::models::{
     LocalProxyLanApiKey, LocalProxyLanApiKeySummary, ManagerStateFile, SaveLocalProxyLanApiKey,
+    DEFAULT_LAN_USAGE_REVIEW_THRESHOLD, MAX_LAN_USAGE_REVIEW_THRESHOLD,
 };
 use crate::storage::{self, Paths};
 use tauri::{Emitter, Runtime};
@@ -29,6 +30,8 @@ pub(super) enum LanKeyError {
     InvalidKey,
     #[error("额度需为 0 至 10 亿美元之间的金额。")]
     InvalidQuota,
+    #[error("未确认请求上限须为 1 至 10 亿之间的整数。")]
+    InvalidUsageReviewThreshold,
     #[error("这个 API Key 已存在，请使用其他密钥。")]
     Duplicate,
     #[error("这个 API Key 已不存在，请刷新后重试。")]
@@ -49,6 +52,7 @@ fn legacy_key(secret: &str) -> LocalProxyLanApiKey {
         api_key: secret.to_string(),
         enabled: true,
         quota_usd: None,
+        usage_review_threshold: DEFAULT_LAN_USAGE_REVIEW_THRESHOLD,
     }
 }
 
@@ -80,6 +84,12 @@ pub(super) fn migrate_legacy_key(state: &mut ManagerStateFile) {
 }
 
 fn validate_input(input: &SaveLocalProxyLanApiKey) -> Result<(), LanKeyError> {
+    if input
+        .usage_review_threshold
+        .is_some_and(|value| !(1..=MAX_LAN_USAGE_REVIEW_THRESHOLD).contains(&value))
+    {
+        return Err(LanKeyError::InvalidUsageReviewThreshold);
+    }
     let name_length = input.name.trim().chars().count();
     if !(1..=MAX_NAME_LENGTH).contains(&name_length) {
         return Err(LanKeyError::InvalidName);
@@ -145,6 +155,11 @@ pub(super) fn save_key(
         api_key: secret,
         enabled: input.enabled,
         quota_usd: input.quota_usd,
+        usage_review_threshold: input.usage_review_threshold.unwrap_or_else(|| {
+            existing
+                .map(|index| state.local_proxy_lan_api_keys[index].usage_review_threshold)
+                .unwrap_or(DEFAULT_LAN_USAGE_REVIEW_THRESHOLD)
+        }),
     };
     match existing {
         Some(index) => state.local_proxy_lan_api_keys[index] = key,
@@ -220,7 +235,9 @@ fn summary(key: &LocalProxyLanApiKey, usage: ledger::KeyUsage) -> LocalProxyLanA
         used_tokens: usage.tokens,
         used_cost_usd: usage.cost_usd,
         remaining_usd: key.quota_usd.map(|quota| (quota - usage.cost_usd).max(0.0)),
-        usage_incomplete: usage.incomplete,
+        usage_incomplete: usage.unconfirmed_requests > 0,
+        unconfirmed_requests: usage.unconfirmed_requests,
+        usage_review_threshold: key.usage_review_threshold,
     }
 }
 
@@ -264,7 +281,7 @@ pub(super) fn record_usage<R: Runtime>(
         ledger::KeyUsage {
             tokens,
             cost_usd,
-            incomplete,
+            unconfirmed_requests: u64::from(incomplete),
         },
     )?;
     if let Err(error) = app.emit("local-proxy-lan-keys-updated", ()) {

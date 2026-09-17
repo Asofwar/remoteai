@@ -2,6 +2,8 @@ const MISSING_INPUT_TOKENS_FLAG: &str = "input_tokens_missing";
 const MISSING_OUTPUT_TOKENS_FLAG: &str = "output_tokens_missing";
 const INCOMPLETE_USAGE_FLAG: &str = "usage_incomplete";
 
+use lan_usage_capture::{LanUsageAccounting, LanUsageCapture};
+
 fn attach_token_usage_capture<R: Runtime + 'static>(
     app: &tauri::AppHandle<R>,
     context: Option<TokenUsageContext>,
@@ -52,7 +54,8 @@ fn attach_token_usage_capture<R: Runtime + 'static>(
                 context.content_type.as_deref(),
                 context.expects_event_stream,
             );
-            record_token_usage_entry(app, &context, usage, buffered_usage_complete(&body));
+            let accounting = lan_usage_capture::buffered_accounting(&body, &context);
+            record_token_usage_entry(app, &context, usage, accounting);
             UpstreamBody::Buffered(body)
         }
         UpstreamBody::Streaming(reader) => UpstreamBody::Streaming(Box::new(
@@ -71,6 +74,7 @@ struct TokenUsageCaptureReader<R: Runtime> {
     usage: Option<TokenUsageValues>,
     recorded: bool,
     complete: bool,
+    lan_usage: LanUsageCapture,
 }
 
 impl<R: Runtime> TokenUsageCaptureReader<R> {
@@ -80,6 +84,7 @@ impl<R: Runtime> TokenUsageCaptureReader<R> {
         context: TokenUsageContext,
     ) -> Self {
         Self {
+            lan_usage: LanUsageCapture::new(&context),
             inner,
             app,
             context,
@@ -92,6 +97,7 @@ impl<R: Runtime> TokenUsageCaptureReader<R> {
     }
 
     fn observe(&mut self, bytes: &[u8]) {
+        self.lan_usage.observe(bytes);
         if self.captures_event_stream() {
             let chunk = String::from_utf8_lossy(bytes).replace("\r\n", "\n");
             self.sse_buffer.push_str(&chunk);
@@ -142,17 +148,14 @@ impl<R: Runtime> TokenUsageCaptureReader<R> {
     }
 
     fn captures_event_stream(&self) -> bool {
-        let content_type = self.context.content_type.as_deref();
-        if content_type.is_some_and(|value| value.contains("application/json")) {
-            return false;
-        }
-        self.context.expects_event_stream || is_event_stream(content_type)
+        lan_usage_capture::captures_event_stream(&self.context)
     }
 
     fn finish(&mut self) {
         if self.recorded {
             return;
         }
+        self.lan_usage.finish(false);
         if self.captures_event_stream() {
             self.process_sse_blocks();
             if !self.sse_buffer.trim().is_empty() {
@@ -181,7 +184,12 @@ impl<R: Runtime> TokenUsageCaptureReader<R> {
             return;
         }
         self.recorded = true;
-        record_token_usage_entry(&self.app, &self.context, self.usage.clone(), self.complete);
+        record_token_usage_entry(
+            &self.app,
+            &self.context,
+            self.usage.clone(),
+            self.lan_usage.accounting(self.complete),
+        );
     }
 }
 
@@ -200,6 +208,7 @@ impl<R: Runtime> Read for TokenUsageCaptureReader<R> {
                 Ok(count)
             }
             Err(error) => {
+                self.lan_usage.finish(true);
                 self.finish();
                 Err(error)
             }
@@ -209,6 +218,10 @@ impl<R: Runtime> Read for TokenUsageCaptureReader<R> {
 
 impl<R: Runtime> Drop for TokenUsageCaptureReader<R> {
     fn drop(&mut self) {
+        // A reader dropped before EOF or a terminal event represents an unfinished request.
+        if !self.recorded {
+            self.lan_usage.finish(true);
+        }
         self.finish();
     }
 }
@@ -399,7 +412,7 @@ fn record_token_usage_entry<R: Runtime>(
     app: &tauri::AppHandle<R>,
     context: &TokenUsageContext,
     usage: Option<TokenUsageValues>,
-    usage_complete: bool,
+    accounting: LanUsageAccounting,
 ) {
     let usage = usage.unwrap_or_default();
     update_proxy_session_request_usage(
@@ -452,7 +465,12 @@ fn record_token_usage_entry<R: Runtime>(
         total_tokens: usage.total_tokens,
         model_context_window: None,
     };
-    if let Some(key_id) = context.lan_api_key_id.as_deref() {
+    let usage_complete = match accounting {
+        LanUsageAccounting::Complete => Some(true),
+        LanUsageAccounting::Incomplete => Some(false),
+        LanUsageAccounting::Failed => None,
+    };
+    if let (Some(key_id), Some(usage_complete)) = (context.lan_api_key_id.as_deref(), usage_complete) {
         if let Err(error) = lan_keys::record_usage(app, key_id, &entry, usage_complete) {
             log_proxy_error!("failed to record LAN API key usage: {error}");
         }

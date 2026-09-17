@@ -13,6 +13,7 @@ COPY apps/web ./apps/web
 COPY shared ./shared
 # Shared chat settings reuse the backend's policy definition.
 COPY apps/admin/src/modules/chat-settings/chat-policy.ts ./apps/admin/src/modules/chat-settings/chat-policy.ts
+COPY apps/admin/src/modules/chat-settings/title-settings.ts ./apps/admin/src/modules/chat-settings/title-settings.ts
 # Shared chat logic imports model selection and turn timing from the desktop sources.
 COPY apps/desktop/src ./apps/desktop/src
 # Account formatting and 2FA lists share pure helpers with the mobile client.

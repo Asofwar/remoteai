@@ -29,6 +29,7 @@ services:
           - /device-switch
           - /device-chat
           - /prompt-plugins
+          - /chat/title-settings
         strip_path: false
       - name: codex-switch-protected
         paths:

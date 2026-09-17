@@ -1644,7 +1644,8 @@ export function DashboardApp() {
           onDownload={() => void downloadUpdate(availableUpdate, true)}
           onInstall={() => void installUpdate()} downloading={downloadingUpdate}
           downloadRequested={installAfterDownloadRequested} downloaded={updateDownloaded}
-          installing={installingUpdate} progress={updateProgress} error={updateInstallError} t={t} />}
+          checking={appUpdate.checkingBeforeInstall} installing={installingUpdate}
+          progress={updateProgress} error={updateInstallError} t={t} />}
         <ProxySettingsModal open={showProxySettings} proxy={providerManager.localProxy}
           loading={providerManager.proxyBusy || chatGptOperation !== null}
           onClose={() => setShowProxySettings(false)}

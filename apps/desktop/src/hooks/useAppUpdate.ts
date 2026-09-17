@@ -7,7 +7,6 @@ import {
 import {
   checkForUpdate,
   downloadAvailableUpdate,
-  installDownloadedUpdate,
 } from "../api/backend";
 import type { HelpVersionState } from "../components/modals/HelpModal";
 import type { Translate } from "../i18n";
@@ -15,6 +14,7 @@ import type { UpdateInfo } from "../types";
 import { useBackgroundUpdateCheck } from "./useBackgroundUpdateCheck";
 import { usePendingAppUpdateInstall } from "./usePendingAppUpdateInstall";
 import { useAutoUpdatePreference } from "./useAutoUpdatePreference";
+import { useVerifiedAppUpdateInstall } from "./useVerifiedAppUpdateInstall";
 
 export function useAppUpdate(notify: (message: string) => void, t: Translate) {
   const autoUpdate = useAutoUpdatePreference(notify, t);
@@ -51,6 +51,8 @@ export function useAppUpdate(notify: (message: string) => void, t: Translate) {
       userInitiatedDownloadRef.current = false;
     }
     downloadingUpdateRef.current = true;
+    updateDownloadedRef.current = false;
+    setUpdateDownloaded(false);
     setDownloadingUpdate(true);
     setUpdateProgress(null);
     setUpdateInstallError(null);
@@ -108,17 +110,10 @@ export function useAppUpdate(notify: (message: string) => void, t: Translate) {
   }), [downloadUpdate]);
   useBackgroundUpdateCheck(backgroundUpdateOptions);
 
-  const installUpdate = useCallback(async () => {
-    userInitiatedDownloadRef.current = true;
-    setInstallingUpdate(true);
-    setUpdateInstallError(null);
-    try {
-      await installDownloadedUpdate();
-    } catch (error) {
-      setUpdateInstallError(String(error));
-      setInstallingUpdate(false);
-    }
-  }, []);
+  const { checkingBeforeInstall, installUpdate } = useVerifiedAppUpdateInstall({
+    availableUpdateRef, downloadingUpdateRef, userInitiatedDownloadRef,
+    downloadUpdate, setInstallingUpdate, setUpdateInstallError,
+  });
 
   const checkAboutVersion = useCallback(() => {
     const requestId = ++helpVersionRequestId.current;
@@ -147,7 +142,7 @@ export function useAppUpdate(notify: (message: string) => void, t: Translate) {
 
   return {
     autoUpdateEnabled: autoUpdate.enabled, setAutoUpdateEnabled: autoUpdate.setEnabled,
-    availableUpdate, checkingForUpdate, checkAboutVersion, checkForUpdates, downloadingUpdate,
+    availableUpdate, checkingBeforeInstall, checkingForUpdate, checkAboutVersion, checkForUpdates, downloadingUpdate,
     downloadRequested, downloadUpdate, helpVersionState, installingUpdate, installUpdate,
     setShowUpdatePrompt, showAvailableUpdate, showUpdatePrompt, updateDownloaded,
     updateInstallError, updateProgress,

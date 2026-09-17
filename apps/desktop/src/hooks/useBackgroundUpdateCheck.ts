@@ -16,20 +16,25 @@ interface BackgroundUpdateOptions {
 export function useBackgroundUpdateCheck(options: BackgroundUpdateOptions) {
   useEffect(() => {
     let cancelled = false;
+    let checking = false;
     const checkAndDownload = async () => {
+      if (checking || options.downloadingUpdateRef.current || options.userInitiatedDownloadRef.current) return;
+      checking = true;
       try {
-        if (options.downloadingUpdateRef.current || options.userInitiatedDownloadRef.current) return;
         const replacePending = options.updateDownloadedRef.current;
         const previousVersion = options.availableUpdateRef.current?.latestVersion;
         const update = await checkForUpdate({ force: true, replacePending });
+        if (cancelled || options.userInitiatedDownloadRef.current) return;
         if (!update || (replacePending && update.latestVersion === previousVersion)) return;
         if (replacePending) {
           options.updateDownloadedRef.current = false;
           options.setUpdateDownloaded(false);
         }
-        if (!cancelled) await options.downloadUpdate(update, false);
+        await options.downloadUpdate(update, false);
       } catch {
         // Background update checks retry quietly on the next interval.
+      } finally {
+        checking = false;
       }
     };
     void checkAndDownload();

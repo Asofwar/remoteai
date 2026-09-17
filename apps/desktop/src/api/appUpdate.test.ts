@@ -196,4 +196,38 @@ describe("automatic app updates", () => {
     expect(stored.get(PENDING_VERSION_KEY)).toBe(UPDATE_VERSION);
     expect(restarted.backend.hasPendingAppUpdateInstall()).toBe(false);
   });
+
+  it("replaces a downloaded release when a fresh check finds a newer version", async () => {
+    const { backend } = await loadApp();
+    await backend.downloadAvailableUpdate();
+    const newer = { ...createUpdate(), version: "1.4.6" };
+    updater.check.mockResolvedValueOnce(newer);
+
+    const latest = await backend.checkForUpdate({ force: true, replacePending: true });
+    expect(updater.check).toHaveBeenCalledTimes(2);
+    expect(latest?.latestVersion).toBe(newer.version);
+    expect(update.close).toHaveBeenCalledOnce();
+    await expect(backend.installDownloadedUpdate()).rejects.toThrow("not finished downloading");
+    await backend.downloadAvailableUpdate();
+
+    expect(newer.download).toHaveBeenCalledOnce();
+    expect(update.install).not.toHaveBeenCalled();
+    expect(newer.install).not.toHaveBeenCalled();
+    expect(stored.get(PENDING_VERSION_KEY)).toBe(newer.version);
+  });
+
+  it.each([UPDATE_VERSION, "1.4.4", null])("retains the downloaded release if the check returns %s", async (version) => {
+    const { backend } = await loadApp();
+    await backend.downloadAvailableUpdate();
+    const candidate = version ? { ...createUpdate(), version } : null;
+    updater.check.mockResolvedValueOnce(candidate);
+
+    const latest = await backend.checkForUpdate({ force: true, replacePending: true });
+    expect(latest?.latestVersion).toBe(UPDATE_VERSION);
+    expect(update.close).not.toHaveBeenCalled();
+    if (candidate) expect(candidate.close).toHaveBeenCalledOnce();
+    await backend.installDownloadedUpdate();
+    expect(update.install).toHaveBeenCalledOnce();
+    expect(update.download).toHaveBeenCalledOnce();
+  });
 });

@@ -1,7 +1,8 @@
-/* Desktop alignment is confined to the conversation viewport and its content previews. */
+/* The conversation and composer share one surface; message styling stays scoped to its viewport. */
 @media (min-width: 861px) {
+  .chat-conversation { background: #fbfcfa; }
   .chat-message-region {
-    background: #fbfcfa; color: #17211b; font-size: 14px;
+    color: #17211b; font-size: 14px;
     font-family: "DM Sans", "Microsoft YaHei UI", sans-serif;
     container: chat-message-panel / inline-size;
   }

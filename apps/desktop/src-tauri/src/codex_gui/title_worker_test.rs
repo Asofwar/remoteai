@@ -6,6 +6,11 @@ use std::sync::{
 };
 use tiny_http::{Header, Response, Server};
 
+struct CapturedRequest {
+    body: Value,
+    purpose: Option<String>,
+}
+
 fn response_stream() -> String {
     let text = r#"{"title":"熊骑车 SVG 动画"}"#;
     let item = json!({"id": "message-title", "type": "message", "role": "assistant", "status": "completed",
@@ -31,7 +36,7 @@ fn response_stream() -> String {
         .collect()
 }
 
-fn serve(server: Server, stop: Arc<AtomicBool>, bodies: Arc<Mutex<Vec<Value>>>) {
+fn serve(server: Server, stop: Arc<AtomicBool>, bodies: Arc<Mutex<Vec<CapturedRequest>>>) {
     while !stop.load(Ordering::Acquire) {
         let Some(mut request) = server.recv_timeout(Duration::from_millis(100)).unwrap() else {
             continue;
@@ -39,10 +44,18 @@ fn serve(server: Server, stop: Arc<AtomicBool>, bodies: Arc<Mutex<Vec<Value>>>) 
         if request.url().ends_with("/responses") {
             let mut body = String::new();
             request.as_reader().read_to_string(&mut body).unwrap();
-            bodies
-                .lock()
-                .unwrap()
-                .push(serde_json::from_str(&body).unwrap());
+            bodies.lock().unwrap().push(CapturedRequest {
+                body: serde_json::from_str(&body).unwrap(),
+                purpose: request
+                    .headers()
+                    .iter()
+                    .find(|header| {
+                        header
+                            .field
+                            .equiv(crate::codex_config::LOCAL_PROXY_REQUEST_PURPOSE_HEADER)
+                    })
+                    .map(|header| header.value.to_string()),
+            });
             request
                 .respond(
                     Response::from_string(response_stream()).with_header(
@@ -114,8 +127,14 @@ async fn real_cli_generates_a_private_title_with_configured_model_and_effort() {
     remove_fixture(&root);
     assert_eq!(result.unwrap(), "熊骑车 SVG 动画");
     let bodies = bodies.lock().unwrap();
-    assert_eq!(bodies.first().unwrap()["model"], "gpt-6-astra");
-    let body = bodies.last().expect("the CLI must contact the fixture");
+    assert_eq!(bodies.first().unwrap().body["model"], "gpt-6-astra");
+    assert!(bodies.first().unwrap().purpose.is_none());
+    let naming = bodies.last().expect("the CLI must contact the fixture");
+    assert_eq!(
+        naming.purpose.as_deref(),
+        Some(crate::codex_config::TITLE_GENERATION_REQUEST_PURPOSE)
+    );
+    let body = &naming.body;
     assert_eq!(body["model"], "gpt-5.6-luna");
     assert_eq!(body["reasoning"]["effort"], "low");
     assert_eq!(body["text"]["format"]["type"], "json_schema");
@@ -174,7 +193,7 @@ async fn name_first_turn(
                 path: binary.path.clone(),
                 version: binary.version.clone(),
             },
-            root.to_owned(),
+            naming_home(root),
             &request,
         )
         .await?;
@@ -201,4 +220,20 @@ async fn name_first_turn(
         .await
         .map_err(|_| GuiError::Disconnected)?;
     result
+}
+
+fn naming_home(root: &std::path::Path) -> PathBuf {
+    let home = crate::codex_gui::home::prepare_title_home(root).unwrap();
+    let original: toml_edit::DocumentMut = std::fs::read_to_string(root.join("config.toml"))
+        .unwrap()
+        .parse()
+        .unwrap();
+    let mut config: toml_edit::DocumentMut = std::fs::read_to_string(home.join("config.toml"))
+        .unwrap()
+        .parse()
+        .unwrap();
+    config["model_providers"]["codex-switch-gui"]["base_url"] =
+        original["model_providers"]["codex-switch-gui"]["base_url"].clone();
+    std::fs::write(home.join("config.toml"), config.to_string()).unwrap();
+    home
 }

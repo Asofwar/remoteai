@@ -94,7 +94,7 @@ fn begin_proxy_session_request(
             .entry(id.clone())
             .or_insert_with(|| ProxySessionState {
                 id: id.clone(),
-                title: None,
+                title: session_titles::from_request(headers).map(str::to_owned),
                 client: client.clone(),
                 remote_address: remote_address.clone(),
                 connected_at: now,

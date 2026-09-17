@@ -128,5 +128,12 @@ fn naming_home_does_not_import_personal_tools_or_project_config() {
     assert!(config.contains("codex-switch-gui"));
     assert!(!config.contains("private-tool"));
     assert!(!config.contains("mcp_servers"));
+    let config: toml_edit::DocumentMut = config.parse().unwrap();
+    assert_eq!(
+        config["model_providers"]["codex-switch-gui"]["http_headers"]
+            [crate::codex_config::LOCAL_PROXY_REQUEST_PURPOSE_HEADER]
+            .as_str(),
+        Some(crate::codex_config::TITLE_GENERATION_REQUEST_PURPOSE)
+    );
     std::fs::remove_dir_all(root).unwrap();
 }

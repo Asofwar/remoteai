@@ -74,8 +74,13 @@ fn isolated_config(config: &str, target: &Path) -> Result<String> {
 pub(super) fn prepare_title_home(gui_home: &Path) -> Result<PathBuf> {
     let target = gui_home.join("title-generator");
     fs::create_dir_all(&target).map_err(|_| GuiError::Startup)?;
-    let config = isolated_config("", &target)?;
-    crate::storage::write_text_if_changed(&target.join("config.toml"), &config)
+    let mut config = isolated_config("", &target)?
+        .parse::<DocumentMut>()
+        .map_err(|_| GuiError::Startup)?;
+    config["model_providers"][GUI_PROVIDER_ID]["http_headers"]
+        [crate::codex_config::LOCAL_PROXY_REQUEST_PURPOSE_HEADER] =
+        value(crate::codex_config::TITLE_GENERATION_REQUEST_PURPOSE);
+    crate::storage::write_text_if_changed(&target.join("config.toml"), &config.to_string())
         .map_err(|_| GuiError::Startup)?;
     Ok(target)
 }

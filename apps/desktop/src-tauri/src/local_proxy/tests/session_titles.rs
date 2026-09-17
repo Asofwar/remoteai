@@ -92,3 +92,53 @@ fn duplicate_homes_are_skipped_and_primary_titles_keep_precedence() {
     );
     assert!(resolve_from_homes(&homes, &HashSet::new()).is_empty());
 }
+
+#[test]
+fn internal_naming_requests_keep_their_default_title_in_saved_history() {
+    use super::super::{
+        begin_proxy_session_request, proxy_sessions, ProxyHistorySnapshot, ProxyHistoryStore,
+    };
+    use crate::codex_config::{
+        LOCAL_PROXY_REQUEST_PURPOSE_HEADER, TITLE_GENERATION_REQUEST_PURPOSE,
+    };
+    let id = uuid::Uuid::new_v4().to_string();
+    let headers = vec![
+        ("thread-id".into(), id.clone()),
+        (
+            LOCAL_PROXY_REQUEST_PURPOSE_HEADER.to_ascii_uppercase(),
+            TITLE_GENERATION_REQUEST_PURPOSE.into(),
+        ),
+    ];
+    let guard = begin_proxy_session_request(&headers, None, br#"{"model":"gpt-5.6-luna"}"#, None);
+    let metadata = proxy_sessions().lock().unwrap()[&id].metadata_snapshot();
+    assert_eq!(metadata.title.as_deref(), Some("内部对话标题生成"));
+    let fixture = TestHomes::new();
+    let directory = fixture.home("history");
+    let store = ProxyHistoryStore::open(&directory).unwrap();
+    store
+        .save_with(|| {
+            Ok(Some(ProxyHistorySnapshot {
+                session: metadata,
+                request: None,
+            }))
+        })
+        .unwrap();
+    drop(store);
+    let reopened = ProxyHistoryStore::open(&directory).unwrap();
+    assert_eq!(
+        reopened.sessions().unwrap()[0].title.as_deref(),
+        Some("内部对话标题生成")
+    );
+    assert_eq!(from_request(&[]), None);
+    assert_eq!(
+        from_request(&[(LOCAL_PROXY_REQUEST_PURPOSE_HEADER.into(), "other".into())]),
+        None
+    );
+    assert!(super::super::should_skip_header(
+        LOCAL_PROXY_REQUEST_PURPOSE_HEADER,
+        false
+    ));
+    drop(reopened);
+    drop(guard);
+    proxy_sessions().lock().unwrap().remove(&id);
+}

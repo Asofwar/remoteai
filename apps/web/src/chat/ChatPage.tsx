@@ -101,6 +101,7 @@ function ConnectedChat({ session, device, devices, active, chooseDevice }: Props
         ready={ready} respond={(reply) => controller.respond(reply)} />)}
     </div>}
     <ChatAsyncQuestions thread={state.selected} error={state.error}
+      scope={JSON.stringify([session.baseUrl, session.email, device?.deviceId ?? ''])}
       disabled={!ready || state.sending || state.settingsBusy || state.selectedArchived || state.queueBusy
         || state.compacting === state.selected?.id} answer={controller.answerAsyncQuestion} />
     <ChatComposer queue={queueProps(state, controller)}

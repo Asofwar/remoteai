@@ -1,14 +1,18 @@
 import { useRef, useState } from 'react';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, Trash2 } from 'lucide-react';
 import { AdaptiveSheet } from '../components/AdaptiveSheet';
 import { pendingQuestions } from '../../../../shared/remote-chat/client/asyncQuestions';
 import type { Item, Thread } from './types';
+import { useDismissedQuestions } from './useDismissedQuestions';
 
 interface Props {
   thread: Thread | null; disabled: boolean; error: string;
+  scope: string;
   answer: (item: Item, answers: string[]) => Promise<boolean>;
 }
-function QuestionCard({ item, disabled, error, answer }: Omit<Props, 'thread'> & { item: Item }) {
+function QuestionCard({ item, disabled, error, answer, onDelete }: Omit<Props, 'thread' | 'scope'> & {
+  item: Item; onDelete: () => void;
+}) {
   const questions = item.questions ?? [];
   const [open, setOpen] = useState(false);
   const [answers, setAnswers] = useState(() => questions.map(question => question.options?.[0] ?? ''));
@@ -27,10 +31,14 @@ function QuestionCard({ item, disabled, error, answer }: Omit<Props, 'thread'> &
   const update = (index: number, value: string) => setAnswers(previous =>
     previous.map((entry, position) => position === index ? value : entry));
   return <>
-    <button type="button" className="chat-question-entry" onClick={() => setOpen(true)}
-      aria-label={`回答补充问题：${questions[0]?.title ?? ''}`}><MessageCircle size={19} />
-      <span className="chat-grow"><strong>需要你的补充</strong><small className="chat-ellipsis">
-        {questions[0]?.title}</small></span><span>回答 ›</span></button>
+    <div className="chat-question-entry">
+      <button type="button" className="chat-question-open" onClick={() => setOpen(true)}
+        aria-label={`回答补充问题：${questions[0]?.title ?? ''}`}><MessageCircle size={19} />
+        <span className="chat-grow"><strong>需要你的补充</strong><small className="chat-ellipsis">
+          {questions[0]?.title}</small></span><span>回答 ›</span></button>
+      <button type="button" className="chat-question-delete" aria-label={`删除补充问题：${questions[0]?.title ?? ''}`}
+        disabled={busy} onClick={onDelete}><Trash2 size={16} /></button>
+    </div>
     {open && <AdaptiveSheet open title="需要你的补充" width={520} onClose={() => { if (!busy) setOpen(false); }}>
       <form className="chat-detail-stack" onSubmit={event => { event.preventDefault(); void submit(); }}>
         {questions.map((question, index) => <fieldset key={index} className="chat-question" disabled={disabled || busy}>
@@ -47,9 +55,14 @@ function QuestionCard({ item, disabled, error, answer }: Omit<Props, 'thread'> &
     </AdaptiveSheet>}
   </>;
 }
-export function ChatAsyncQuestions({ thread, ...props }: Props) {
-  const questions = pendingQuestions(thread);
+export function ChatAsyncQuestions({ thread, scope, ...props }: Props) {
+  const { dismissed, dismiss, error } = useDismissedQuestions(scope);
+  const questionKey = (item: Item) => JSON.stringify([thread?.id, item.id]);
+  const questions = pendingQuestions(thread).filter(item => !dismissed.has(questionKey(item)));
   if (!questions.length) return null;
-  return <div className="chat-async-questions chat-scroll">{questions.map(item =>
-    <QuestionCard key={`${thread?.id}:${item.id}`} item={item} {...props} />)}</div>;
+  return <div className="chat-async-questions chat-scroll">
+    {questions.map(item => <QuestionCard key={questionKey(item)} item={item} {...props}
+      onDelete={() => dismiss(questionKey(item))} />)}
+    {error && <p role="alert" className="chat-error">{error}</p>}
+  </div>;
 }

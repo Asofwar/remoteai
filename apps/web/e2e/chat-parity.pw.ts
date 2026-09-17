@@ -24,6 +24,7 @@ test('renders rich replies, folded work, nested output, file previews and reply 
   await expect(page.locator('.chat-messages .chat-code-block pre')).toHaveText('const ready: boolean = true;');
   await expect(page.locator('.chat-messages .chat-code-block pre span[style]')).not.toHaveCount(0);
   await expect(page.locator('.chat-messages .chat-activity')).toHaveCount(0);
+  await expect(page.locator('.chat-messages').getByRole('button', { name: '下载', exact: true })).toHaveCount(0);
   await screenshot(page, info, 'rich-chat');
   await page.getByRole('button', { name: /查看处理过程/ }).click();
   await page.getByRole('button', { name: /执行命令.*npm test/ }).click();
@@ -63,10 +64,22 @@ test('renders rich replies, folded work, nested output, file previews and reply 
   await page.getByRole('button', { name: '查看文件', exact: true }).click();
   await expect(page.getByText('引用位置：第 2 行')).toBeVisible();
   await expect(page.getByRole('button', { name: '复制文件内容' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '下载', exact: true })).toBeVisible();
+  await screenshot(page, info, 'file-preview-download');
   await closeSheet(page);
   await page.getByRole('button', { name: '播放视频', exact: true }).click();
   await expect(page.locator('video')).toBeVisible();
   await expect.poll(() => page.locator('video').evaluate(video => video.readyState)).toBeGreaterThan(0);
+  // Exercise the browser save fallback without opening a native file picker in the test runner.
+  await page.evaluate(() => {
+    Object.defineProperty(window, 'showSaveFilePicker', { configurable: true, value: undefined });
+  });
+  const saving = page.waitForEvent('download');
+  await page.getByRole('button', { name: '下载', exact: true }).click();
+  const saved = await saving;
+  expect(saved.suggestedFilename()).toBe('test.mp4');
+  expect(await saved.failure()).toBeNull();
+  await expect(page.getByRole('status').filter({ hasText: '文件已交给浏览器保存' })).toBeVisible();
   await closeSheet(page);
   await page.locator('.chat-assistant-message').last().getByRole('button', { name: '引用回复' }).click();
   await expect(page.getByRole('button', { name: '移除引用' })).toBeVisible();
@@ -169,4 +182,24 @@ test('answers asynchronous questions without blocking the draft and preserves in
   await expect(page.getByText('没有找到相关聊天')).toBeVisible();
   await closeSheet(page);
   await expect(page.getByRole('button', { name: '移动端聊天体验', exact: true })).toBeVisible();
+});
+
+test('deletes a question reminder without sending an answer and keeps it deleted after reload',
+  async ({ page, request }, info) => {
+  await request.post(`${fixtureUrl}/test/sidebar`, { data: { action: 'async-parity' } });
+  await selectChat(page);
+  const input = page.getByRole('textbox', { name: '聊天消息' });
+  await input.fill('保留这份草稿');
+  await screenshot(page, info, 'question-delete');
+  const before = await operationCount(request, 'queueEnqueue');
+  await page.getByRole('button', { name: /删除补充问题/ }).click();
+  await expect(page.getByRole('button', { name: /回答补充问题/ })).toHaveCount(0);
+  await expect(input).toHaveValue('保留这份草稿');
+  expect(await operationCount(request, 'queueEnqueue')).toBe(before);
+  expect(await operationCount(request, 'send')).toBe(0);
+  await page.reload();
+  await connect(page);
+  await selectChat(page);
+  await expect(page.getByRole('button', { name: /回答补充问题/ })).toHaveCount(0);
+  await expect(page.locator('.chat-message-content')).toContainText('下一步验证什么？');
 });

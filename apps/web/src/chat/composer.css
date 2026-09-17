@@ -65,6 +65,12 @@
   margin: 0 auto 8px; padding: 10px 14px; border: 1px solid #dfe5e1; border-radius: 12px;
   background: white; color: #14806f; text-align: left; font: inherit; font-size: 13px; }
 .chat-question-entry small { color: #74847b; margin-top: 2px; }
+.chat-question-open { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 0;
+  border: 0; background: transparent; color: inherit; text-align: left; font: inherit; }
+.chat-question-open > svg, .chat-question-open > span:last-child { flex-shrink: 0; }
+.chat-question-delete { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px;
+  padding: 0; border: 0; border-radius: 8px; background: transparent; color: #74847b; }
+.chat-question-delete:hover { background: #fff1f0; color: #c74e47; }
 .chat-question { border: 0; padding: 0; margin: 0; min-width: 0; }
 .chat-question legend { margin-bottom: 12px; font-weight: 600; }
 @media (min-width: 861px) { .chat-composer-dock { padding: 12px 28px 20px; } }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Download } from 'lucide-react';
 import { AdaptiveSheet } from '../components/AdaptiveSheet';
 import type { TextPreview } from '../../../../shared/remote-chat/textPreview';
 import type { FileClient } from '../../../../shared/remote-chat/fileDownload';
@@ -6,6 +7,8 @@ import { isVideoPath } from '../../../../shared/remote-chat/video';
 import { ChatCodeBlock } from './ChatCodeBlock';
 import { ChatImage } from './ChatImage';
 import { loadVideoPreview } from './videoPreview';
+import { useFileDownload } from '../../../../shared/remote-chat/useFileDownload';
+import { browserDownloadTarget, prepareBrowserDownload } from './fileDownloadTarget';
 
 export interface FilePreviewContext {
   client: FileClient; threadId: string | null; ready: boolean;
@@ -57,8 +60,16 @@ export function ChatFilePreview({ path, line, context, onClose }: {
   path: string; line?: number; context: FilePreviewContext; onClose: () => void;
 }) {
   const image = /\.(png|jpe?g|gif|webp|bmp|avif)$/i.test(path);
+  const download = useFileDownload({ ...context, path, target: browserDownloadTarget,
+    prepare: () => prepareBrowserDownload(path), success: '文件已交给浏览器保存' });
   return <AdaptiveSheet open title={path.split(/[\\/]/).at(-1) || '文件预览'} width={800} onClose={onClose}>
-    <div className="chat-detail-stack">{image ? <ChatImage source={path} description="文件预览" />
+    <div className="chat-detail-stack">
+      <div><button type="button" className="chat-button"
+        disabled={!download.busy && (!context.ready || !context.threadId)}
+        onClick={download.busy ? download.cancel : download.start}><Download size={15} />{download.label}</button></div>
+      {download.busy && !!download.detail && <p className="chat-muted" style={{ maxWidth: 400 }}>{download.detail}</p>}
+      {!!download.message && <p role="status" className="chat-muted" style={{ maxWidth: 400 }}>{download.message}</p>}
+      {image ? <ChatImage source={path} description="文件预览" />
       : isVideoPath(path) ? <VideoFile path={path} context={context} />
         : <TextFile path={path} context={context} line={line} />}</div>
   </AdaptiveSheet>;

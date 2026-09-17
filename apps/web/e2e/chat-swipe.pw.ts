@@ -127,11 +127,18 @@ test('keeps desktop chat beside independently collapsible menus and remembers th
     await expect(page.getByRole('button', { name: '暂停生成' })).toBeVisible();
     await page.getByRole('textbox', { name: '聊天消息' }).fill('保留未发送草稿');
     await page.getByRole('button', { name: '收起主菜单' }).click();
-    await expect(page.locator('.desktop-sidebar nav')).toBeHidden();
+    await expect(page.locator('.desktop-sidebar nav')).toBeVisible();
+    await expect(page.locator('.desktop-sidebar .brand-mark')).toBeVisible();
+    await expect(page.locator('.desktop-sidebar nav').getByRole('button')).toHaveCount(5);
+    await expect(page.locator('.desktop-sidebar nav').getByRole('button', { name: '聊天', exact: true }))
+      .toHaveAttribute('aria-current', 'page');
     await expect(page.locator('.desktop-sidebar').getByRole('button', { name: '展开主菜单' })).toBeVisible();
     await expect(sidebar).toBeVisible();
     await header.getByRole('button', { name: '收起聊天列表' }).click();
     await expect(sidebar).toHaveCount(0);
+    const mainToggle = (await page.locator('.main-menu-toggle svg').boundingBox())!;
+    const chatToggle = (await header.locator('.chat-back > svg').boundingBox())!;
+    expect(mainToggle.y + mainToggle.height / 2).toBe(chatToggle.y + chatToggle.height / 2);
     await screenshot(page, info, 'desktop-collapsed-menus');
     const text = await page.locator('.chat-markdown').last().innerText();
     await expect.poll(() => page.locator('.chat-markdown').last().innerText()).not.toBe(text);
@@ -156,4 +163,12 @@ test('keeps desktop chat beside independently collapsible menus and remembers th
     await expect(sidebar).toHaveCount(0);
     await page.getByRole('button', { name: '打开聊天列表' }).click();
     await expect(sidebar).toBeVisible();
+    const menu = page.locator('.desktop-sidebar nav');
+    await menu.getByRole('button', { name: '设置', exact: true }).hover();
+    await expect(page.getByRole('tooltip', { name: '设置', exact: true })).toBeVisible();
+    await menu.getByRole('button', { name: '设置', exact: true }).click();
+    await expect(menu.getByRole('button', { name: '设置', exact: true })).toHaveAttribute('aria-current', 'page');
+    await menu.getByRole('button', { name: '聊天', exact: true }).click();
+    await expect(sidebar).toBeVisible();
+    await expect(page.getByRole('button', { name: '展开主菜单' })).toBeVisible();
   });

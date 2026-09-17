@@ -334,9 +334,26 @@ function AppShell() {
           aria-expanded={menuVisible} onClick={() => setMenuVisible(value => !value)}>
           <MenuToggleIcon size={20} /></button>
       </div>
-      <nav>{navItems.map((item) => <button key={item.key} type="button" className={page === item.key ? "active" : ""} onClick={() => dispatch(pageChanged(item.key))}><item.icon size={19} /><span>{item.label}</span>{item.key === "devices" && onlineCount ? <b>{onlineCount}</b> : null}</button>)}</nav>
+      <nav>{navItems.map((item) => <Tooltip key={item.key} placement="right"
+        title={menuVisible ? undefined : item.label}>
+        <button type="button" aria-label={item.label} aria-current={page === item.key ? 'page' : undefined}
+          className={`sidebar-nav-${item.key}${page === item.key ? ' active' : ''}`}
+          onClick={() => dispatch(pageChanged(item.key))}>
+          <item.icon size={19} /><span>{item.label}</span>
+          {item.key === "devices" && onlineCount ? <b>{onlineCount}</b> : null}
+        </button>
+      </Tooltip>)}</nav>
       <div className="sidebar-live"><span><i /> 服务已连接</span><p>安心管理账号与设备</p></div>
-      <Dropdown menu={{ items: userMenu }} trigger={["click"]}><button type="button" className="sidebar-profile"><span>{(profile?.email || session?.email || "U").slice(0, 2).toUpperCase()}</span><div><strong>{profile?.email || session?.email}</strong><small>{profile?.roleName || (profile?.role === "admin" ? "管理员" : "用户")}</small></div><Menu size={17} /></button></Dropdown>
+      <Tooltip placement="right" title={menuVisible ? undefined : '账户菜单'}>
+        <Dropdown menu={{ items: userMenu }} trigger={["click"]}>
+          <button type="button" className="sidebar-profile" aria-label="账户菜单">
+            <span>{(profile?.email || session?.email || "U").slice(0, 2).toUpperCase()}</span>
+            <div><strong>{profile?.email || session?.email}</strong>
+              <small>{profile?.roleName || (profile?.role === "admin" ? "管理员" : "用户")}</small></div>
+            <Menu size={17} />
+          </button>
+        </Dropdown>
+      </Tooltip>
     </aside>
     <div className="content-shell">
       {page !== 'chat' && <header className="desktop-topbar"><div>

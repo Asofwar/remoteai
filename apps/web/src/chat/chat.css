@@ -107,6 +107,11 @@ html:has(.app-shell.chat-active), body:has(.app-shell.chat-active) { overscroll-
 }
 .chat-header h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-header .chat-muted { font-size: 11px; margin-top: 4px; }
+@media (min-width: 861px) {
+  .chat-header { padding-block: var(--desktop-header-padding); }
+  .chat-header > .chat-back { align-self: flex-start; height: var(--desktop-toggle-size); }
+  .chat-header > .chat-back svg { width: 20px; height: 20px; }
+}
 .chat-thread-controls { padding-bottom: 0; }
 .chat-search { padding: 0 8px 0 12px; border: 1px solid var(--chat-border); border-radius: 12px; background: white; }
 .chat-search input { width: 100%; min-width: 0; border: 0; background: transparent; color: inherit; font-size: 16px; }

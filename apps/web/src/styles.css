@@ -107,7 +107,8 @@ h1, h2, h3, .brand-lockup { font-family: "Manrope", "PingFang SC", "Microsoft Ya
 }
 
 /* Shell */
-.app-shell { min-height: 100vh; background: var(--canvas); }
+.app-shell { --desktop-header-padding: 12px; --desktop-toggle-size: 40px;
+  min-height: 100vh; background: var(--canvas); }
 .desktop-sidebar { position: fixed; inset: 0 auto 0 0; z-index: 20; width: 252px; display: flex; flex-direction: column; padding: 30px 22px 22px; border-right: 1px solid #e3ebe7; background: rgba(250, 252, 251, 0.94); backdrop-filter: blur(18px); }
 .desktop-sidebar-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .desktop-sidebar .brand-lockup { min-width: 0; white-space: nowrap; }
@@ -131,13 +132,25 @@ h1, h2, h3, .brand-lockup { font-family: "Manrope", "PingFang SC", "Microsoft Ya
 .sidebar-profile strong { font-size: 11px; }.sidebar-profile small { margin-top: 2px; color: var(--muted); font-size: 10px; }
 .content-shell { min-height: 100vh; margin-left: 252px; }
 @media (min-width: 861px) {
-  .main-menu-collapsed .desktop-sidebar { width: 64px; padding-inline: 12px; }
-  .main-menu-collapsed .desktop-sidebar-heading { justify-content: center; }
-  .main-menu-collapsed .desktop-sidebar .brand-lockup,
-  .main-menu-collapsed .desktop-sidebar nav,
+  .main-menu-collapsed .desktop-sidebar { width: 72px;
+    padding: var(--desktop-header-padding) 10px 12px; overflow-y: auto; }
+  .main-menu-collapsed .desktop-sidebar-heading { flex-direction: column-reverse; gap: 18px; }
+  .main-menu-collapsed .main-menu-toggle { width: var(--desktop-toggle-size); height: var(--desktop-toggle-size);
+    border: 1px solid #d8e7e0; }
+  .main-menu-collapsed .brand-mark { width: 42px; height: 42px; }
+  .main-menu-collapsed .desktop-sidebar .brand-lockup b,
+  .main-menu-collapsed .desktop-sidebar nav button span,
+  .main-menu-collapsed .desktop-sidebar nav button b,
   .main-menu-collapsed .sidebar-live,
-  .main-menu-collapsed .sidebar-profile { display: none; }
-  .main-menu-collapsed .content-shell { margin-left: 64px; }
+  .main-menu-collapsed .sidebar-profile div,
+  .main-menu-collapsed .sidebar-profile > svg { display: none; }
+  .main-menu-collapsed .desktop-sidebar nav { flex: 1; min-height: 272px; gap: 8px; margin-top: 24px; }
+  .main-menu-collapsed .desktop-sidebar nav button { justify-content: center; flex-shrink: 0; height: 48px;
+    padding: 0; border-radius: 10px; }
+  .main-menu-collapsed .desktop-sidebar nav button > svg { width: 23px; height: 23px; }
+  .main-menu-collapsed .desktop-sidebar nav .sidebar-nav-settings { margin-top: auto; }
+  .main-menu-collapsed .sidebar-profile { display: flex; justify-content: center; flex-shrink: 0; padding: 6px 0; }
+  .main-menu-collapsed .content-shell { margin-left: 72px; }
 }
 .desktop-topbar { height: 88px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(28px, 4vw, 58px); border-bottom: 1px solid rgba(218, 229, 223, .85); background: rgba(244, 247, 245, .86); backdrop-filter: blur(18px); }
 .desktop-topbar > div:first-child { display: flex; align-items: baseline; gap: 18px; }

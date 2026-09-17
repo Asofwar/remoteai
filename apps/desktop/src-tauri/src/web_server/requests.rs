@@ -54,18 +54,15 @@ fn handle_invoke_request(app: AppHandle, mut request: Request, security: &WebReq
         respond_text(request, StatusCode(405), "Method not allowed");
         return;
     }
-    let access = match security.authorize(&request) {
-        Ok(access) => access,
-        Err(status) => {
-            let message = if status == StatusCode(403) {
-                "Request origin is not allowed"
-            } else {
-                "A valid LAN access key is required"
-            };
-            respond_text(request, status, message);
-            return;
-        }
-    };
+    if let Err(status) = security.authorize(&request) {
+        let message = if status == StatusCode(403) {
+            "Request origin is not allowed"
+        } else {
+            "A valid LAN access key is required"
+        };
+        respond_text(request, status, message);
+        return;
+    }
     if !request.headers().iter().any(|header| {
         header.field.equiv("Content-Type") && header.value.as_str().starts_with("application/json")
     }) {
@@ -121,14 +118,6 @@ fn handle_invoke_request(app: AppHandle, mut request: Request, security: &WebReq
             return;
         }
     };
-    if !access.allows_command(&invocation.command) {
-        respond_text(
-            request,
-            StatusCode(403),
-            "This action is not available over LAN access",
-        );
-        return;
-    }
     let response = match dispatch_command(app, &invocation.command, invocation.args) {
         Ok(result) => WebInvokeResponse {
             ok: true,

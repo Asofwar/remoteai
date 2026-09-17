@@ -464,3 +464,22 @@ fn explicit_missing_counters_do_not_reuse_earlier_partial_counts() {
     assert_eq!(usage.output_tokens, None);
     assert_eq!(usage.total_tokens, None);
 }
+
+#[test]
+fn clipboard_selection_returns_only_the_requested_secret() {
+    let mut state = ManagerStateFile::default();
+    save_key(&mut state, input("first", None)).unwrap();
+    save_key(&mut state, input("second", None)).unwrap();
+    state.local_proxy_lan_api_keys[0].enabled = false;
+    let first = &state.local_proxy_lan_api_keys[0];
+    let second = &state.local_proxy_lan_api_keys[1];
+    assert_eq!(
+        selected_key_secret(&state, Some(&first.id)).unwrap(),
+        first.api_key
+    );
+    assert_eq!(selected_key_secret(&state, None).unwrap(), second.api_key);
+    assert!(matches!(
+        selected_key_secret(&state, Some("missing")),
+        Err(LanKeyError::NotFound)
+    ));
+}

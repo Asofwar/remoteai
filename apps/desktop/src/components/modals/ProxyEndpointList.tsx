@@ -1,3 +1,4 @@
+import { copyText } from "../../utils/clipboard";
 import { Button } from "antd";
 import { Copy } from "lucide-react";
 import { LOOPBACK_IPV4 } from "../../api/proxyEndpoints";
@@ -16,7 +17,7 @@ export function ProxyEndpointList({ endpoints, port, listenOnAllInterfaces, noti
   const { addresses, loading, failed } = endpoints;
   const copyEndpoint = async (endpoint: string) => {
     try {
-      await navigator.clipboard.writeText(endpoint);
+      await copyText(endpoint);
       notify(t("providers.proxy.endpointCopied"));
     } catch {
       notify(t("providers.proxy.endpointCopyFailed"));

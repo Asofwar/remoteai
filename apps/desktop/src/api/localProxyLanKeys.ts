@@ -1,5 +1,6 @@
 import type { LocalProxyLanApiKey, LocalProxyLanApiKeyInput } from "../types";
-import { hasLocalBackend, invoke } from "./backend";
+import { copyText } from "../utils/clipboard";
+import { hasLocalBackend, isHostedWebApp, invoke } from "./backend";
 import { previewCopyLocalProxyLanApiKey, previewDeleteLocalProxyLanApiKey,
   previewLocalProxyLanApiKeys, previewSaveLocalProxyLanApiKey } from "./localProxyLanKeysPreview";
 
@@ -20,5 +21,9 @@ export async function deleteLocalProxyLanApiKey(id: string): Promise<LocalProxyL
 
 export async function copyLocalProxyLanApiKey(id: string): Promise<void> {
   if (!hasLocalBackend) return previewCopyLocalProxyLanApiKey(id);
+  if (isHostedWebApp) {
+    const secret = await invoke<string>("copy_local_proxy_lan_api_key", { id });
+    return copyText(secret);
+  }
   return invoke<void>("copy_local_proxy_lan_api_key", { id });
 }

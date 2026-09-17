@@ -1,3 +1,4 @@
+import { copyText } from "../utils/clipboard";
 import { invoke as invokeTauri } from "@tauri-apps/api/core";
 import { hasDirectChatInput } from "../../../../shared/remote-chat/uploadMode";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -108,8 +109,7 @@ export const isHostedWebApp = document
   .querySelector('meta[name="codex-switch-runtime"]')
   ?.getAttribute("content") === "hosted";
 export const hasLocalBackend = isDesktopApp || isHostedWebApp;
-export const canManageCodexConnection = isDesktopApp || (isHostedWebApp
-  && ["localhost", "127.0.0.1", "[::1]", "::1"].includes(window.location.hostname));
+export const canManageCodexConnection = hasLocalBackend;
 
 export async function syncCodexNotification(message: string): Promise<boolean> {
   if (!isDesktopApp) return false;
@@ -1824,7 +1824,11 @@ export async function importCodexThreads(
   return invoke<CodexThreadBundleResult>("unpack_codex_threads", { homeId, importPath, sessionIds });
 }
 
-export function copyWebProxyLanApiKey(): Promise<void> {
+export async function copyWebProxyLanApiKey(): Promise<void> {
+  if (isHostedWebApp) {
+    const secret = await invoke<string>("copy_web_proxy_lan_api_key");
+    return copyText(secret);
+  }
   return invoke<void>("copy_web_proxy_lan_api_key");
 }
 

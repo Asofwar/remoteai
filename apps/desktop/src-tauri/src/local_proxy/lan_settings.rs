@@ -97,12 +97,24 @@ fn copy_local_proxy_lan_api_key_blocking<R: Runtime>(
 ) -> Result<(), String> {
     let paths = resolve_paths(&app).map_err(|_| "暂时无法读取 API Key。".to_string())?;
     let state = try_read_state(&paths).map_err(|_| "暂时无法读取 API Key。".to_string())?;
-    let keys = lan_keys::configured_keys(&state);
-    let key = keys
-        .iter()
-        .find(|key| id.as_deref().map(|id| key.id == id).unwrap_or(key.enabled))
-        .ok_or_else(|| "这个 API Key 已不存在，请刷新后重试。".to_string())?;
+    let secret = lan_keys::selected_key_secret(&state, id.as_deref())
+        .map_err(|error| error.to_string())?;
     app.clipboard()
-        .write_text(&key.api_key)
+        .write_text(secret)
         .map_err(|_| "暂时无法复制 API Key，请稍后重试。".to_string())
+}
+
+/// Return only the selected secret to an authenticated browser for its local clipboard.
+pub(crate) async fn read_local_proxy_lan_api_key<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    id: Option<String>,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let paths = resolve_paths(&app).map_err(|_| lan_keys::LanKeyError::Unavailable)?;
+        let state = try_read_state(&paths).map_err(|_| lan_keys::LanKeyError::Unavailable)?;
+        lan_keys::selected_key_secret(&state, id.as_deref())
+    })
+    .await
+    .map_err(|_| lan_keys::LanKeyError::Unavailable.to_string())?
+    .map_err(|error| error.to_string())
 }

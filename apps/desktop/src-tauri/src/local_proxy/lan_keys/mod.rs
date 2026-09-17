@@ -62,6 +62,17 @@ pub(super) fn configured_keys(state: &ManagerStateFile) -> Vec<LocalProxyLanApiK
     keys
 }
 
+pub(super) fn selected_key_secret(
+    state: &ManagerStateFile,
+    id: Option<&str>,
+) -> Result<String, LanKeyError> {
+    configured_keys(state)
+        .into_iter()
+        .find(|key| id.map(|id| key.id == id).unwrap_or(key.enabled))
+        .map(|key| key.api_key)
+        .ok_or(LanKeyError::NotFound)
+}
+
 pub(super) fn migrate_legacy_key(state: &mut ManagerStateFile) {
     state.local_proxy_lan_api_keys = configured_keys(state);
     state.local_proxy_lan_api_key = None;

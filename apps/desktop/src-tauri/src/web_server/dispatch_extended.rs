@@ -91,7 +91,7 @@ fn dispatch_extended_command(app: AppHandle, command: &str, args: Value) -> Resu
             ),
         )),
         "copy_local_proxy_lan_api_key" => {
-            serialize(block_on(crate::local_proxy::copy_local_proxy_lan_api_key(
+            serialize(block_on(crate::local_proxy::read_local_proxy_lan_api_key(
                 app, argument(&args, "id")?,
             )))
         }

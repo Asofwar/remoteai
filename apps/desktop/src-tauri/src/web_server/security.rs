@@ -8,12 +8,6 @@ const WEB_LAN_API_KEY_BYTES: usize = 32;
 const WEB_LAN_API_KEY_PREFIX: &str = "csw_";
 const AUTHORIZATION_BEARER_PREFIX: &str = "bearer ";
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum WebRequestAccess {
-    Loopback,
-    Lan,
-}
-
 #[derive(Clone)]
 struct WebRequestSecurity {
     lan_api_key: Option<Arc<str>>,
@@ -29,26 +23,21 @@ impl WebRequestSecurity {
         })
     }
 
-    fn authorize(&self, request: &Request) -> Result<WebRequestAccess, StatusCode> {
+    // The access key grants the same administration rights as local access.
+    fn authorize(&self, request: &Request) -> Result<(), StatusCode> {
         if request
             .remote_addr()
             .is_some_and(|address| address.ip().is_loopback())
         {
-            return Ok(WebRequestAccess::Loopback);
+            return Ok(());
         }
         if !same_origin_request(request) {
             return Err(StatusCode(403));
         }
         let expected = self.lan_api_key.as_deref().ok_or(StatusCode(401))?;
         request_has_valid_api_key(request, expected)
-            .then_some(WebRequestAccess::Lan)
+            .then_some(())
             .ok_or(StatusCode(401))
-    }
-}
-
-impl WebRequestAccess {
-    fn allows_command(self, command: &str) -> bool {
-        self == Self::Loopback || LAN_COMMAND_ALLOWLIST.contains(&command)
     }
 }
 
@@ -183,78 +172,3 @@ fn request_header<'a>(request: &'a Request, name: &str) -> Option<&'a str> {
         .find(|header| header.field.as_str().as_str().eq_ignore_ascii_case(name))
         .map(|header| header.value.as_str())
 }
-
-const LAN_COMMAND_ALLOWLIST: &[&str] = &[
-    // Authenticated clients may sign in and upload accounts without reading host files or clipboard.
-    "cloud_login",
-    "cloud_logout",
-    "cloud_register",
-    "cloud_request_registration_code",
-    "cloud_sync_accounts",
-    "cloud_push_accounts",
-    "cloud_push_account",
-    "cloud_pull_account",
-    "import_account_json_text",
-    "refresh_usage",
-    // The authenticated browser GUI controls Codex on this host using its existing approval flow.
-    "codex_gui_connect",
-    "codex_gui_account_selection",
-    "codex_gui_switch_account",
-    "codex_gui_model_settings",
-    "codex_gui_context_settings",
-    "codex_gui_set_context_settings",
-    "codex_gui_set_model_settings",
-    "codex_gui_auto_switch_settings",
-    "codex_gui_set_auto_switch_settings",
-    "codex_gui_request",
-    "codex_gui_respond",
-    "codex_gui_git",
-    "codex_gui_undo",
-    "codex_gui_delete_thread",
-    "codex_gui_events",
-    "codex_gui_usage_summary",
-    "codex_gui_cli_status",
-    "codex_gui_cli_release",
-    "codex_gui_cli_install",
-    "fetch_cloud_announcement",
-    "fetch_cloud_currency_rates",
-    "fetch_cloud_faqs",
-    "fetch_cloud_notifications",
-    "get_app_info",
-    "get_app_settings",
-    "get_cloud_auth_state",
-    "get_codex_connection_status",
-    "get_dream_skin_community_page",
-    "get_dream_skin_market",
-    "get_dream_skin_resources_status",
-    "get_dream_skin_status",
-    // Authenticated browsers can use the same proxy lifecycle controls as the desktop UI.
-    "start_local_proxy",
-    "stop_local_proxy",
-    "stop_local_proxy_without_migrating",
-    "get_local_proxy_status",
-    "get_official_model_context_settings",
-    "list_local_proxy_ipv4_addresses",
-    "get_recent_proxy_session_latency",
-    "list_account_token_usage",
-    "list_account_quota_history",
-    "list_accounts",
-    "list_aggregate_apis",
-    "list_daily_token_usage",
-    "list_error_logs",
-    "list_market_skills",
-    "list_prompt_plugins",
-    "list_official_plugins",
-    "list_provider_token_usage",
-    "list_providers",
-    "list_proxy_session_requests",
-    "get_proxy_conversation_attachment",
-    "list_proxy_sessions",
-    "list_token_usage_entries",
-    "list_token_usage_entries_since",
-    "list_token_usage_breakdown",
-    "query_provider_balance",
-    "query_provider_usage",
-    // Notification logging only appends bounded, sanitized text and does not change app settings.
-    "record_toast_log",
-];

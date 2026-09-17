@@ -54,7 +54,6 @@ import type {
 } from "../../../types";
 import { accountExpirationDate } from "../../../utils/expiration";
 import { maskAccountEmail } from "../../../utils/accountPrivacy";
-import { initials } from "../../../utils/format";
 import { formatCompactTokenCount } from "../../../utils/tokenContext";
 import { shouldShowUsageError } from "../../../utils/usageErrors";
 import {
@@ -76,6 +75,7 @@ import {
 import { TokenCostColumnTitle, useTokenCostDisplaySettings } from "../../TokenCostUnitSettings";
 import { AccountNoteModal } from "../../modals/AccountNoteModal";
 import { AccountExpandedPanel } from "../AccountExpandedPanel";
+import { AccountAvatar } from "../AccountAvatar";
 import { AccountCardAutoSwitchSettings } from "../AccountCardAutoSwitchSettings";
 import { AccountGroupCell, ConcurrentRoutingControl } from "../AccountGroupControls";
 import { AccountUseActionIcon } from "../AccountUseActionIcon";
@@ -662,9 +662,9 @@ export function AccountTable({
       render: (_, account) => (
         <div className="account-cell">
           <div className="table-avatar-wrap">
-            <div className={`table-avatar${isAccountDisabled(account, hotSwitchEnabled) ? " disabled-avatar" : ""}`}>
-              {isAccountDisabled(account, hotSwitchEnabled) ? t("table.disabled") : initials(account.email)}
-            </div>
+            <AccountAvatar email={account.email} disabled={isAccountDisabled(account, hotSwitchEnabled)}
+              officialAuthActive={openaiAuthAccountId === account.id} busy={openaiAuthBusy} variant="table"
+              onClearOfficialAuth={() => requestOpenaiAuthAccountChange(null)} t={t} />
             {concurrentRoutingActive && account.autoSwitchEnabled
               && (accountConversationCounts[account.id] ?? 0) > 0 && (
               <span className="account-conversation-count"
@@ -1287,9 +1287,9 @@ export function AccountTable({
             }}>
             <div className="card-topline" />
             <header className="account-head">
-              <div className={`avatar${isDisabled ? " disabled-avatar" : ""}`}>
-                {isDisabled ? t("table.disabled") : initials(account.email)}
-              </div>
+              <AccountAvatar email={account.email} disabled={isDisabled}
+                officialAuthActive={openaiAuthAccountId === account.id} busy={openaiAuthBusy} variant="card"
+                onClearOfficialAuth={() => requestOpenaiAuthAccountChange(null)} t={t} />
               <div className="identity">
                 <div className="identity-line">
                   <CopyableAccountEmail email={account.email}

@@ -11,16 +11,19 @@ type OfficialAuthAccountChangeOptions = {
 export function confirmOfficialAuthAccountChange({
   accountId, currentAccountId, onConfirm, t,
 }: OfficialAuthAccountChangeOptions) {
-  if (accountId === null || currentAccountId !== null) {
+  if (accountId === currentAccountId) return;
+  if (accountId !== null && currentAccountId !== null) {
     onConfirm(accountId);
     return;
   }
 
+  const clearing = accountId === null;
   Modal.confirm({
-    title: t("providers.proxy.openaiAuthConfirmTitle"),
-    content: <span className="compact-confirm-copy">{t("providers.proxy.openaiAuthConfirmDescription")}</span>,
+    title: t(clearing ? "providers.proxy.openaiAuthClearTitle" : "providers.proxy.openaiAuthConfirmTitle"),
+    content: <span className="compact-confirm-copy">{t(clearing
+      ? "providers.proxy.openaiAuthClearDescription" : "providers.proxy.openaiAuthConfirmDescription")}</span>,
     centered: true,
-    okText: t("providers.proxy.openaiAuthConfirmButton"),
+    okText: t(clearing ? "providers.proxy.openaiAuthClearButton" : "providers.proxy.openaiAuthConfirmButton"),
     cancelText: t("table.cancel"),
     okType: "primary",
     okButtonProps: { danger: true },

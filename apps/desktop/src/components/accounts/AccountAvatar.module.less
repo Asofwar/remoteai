@@ -1,0 +1,27 @@
+.loginAvatar {
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--green-dark);
+    outline-offset: 2px;
+  }
+
+  &:disabled { cursor: wait; }
+}
+
+.loginLabel {
+  background: linear-gradient(110deg, #087e8b 0%, #435cdb 45%, #a533ac 75%, #c44763 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  font-family: Manrope, sans-serif;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.table .loginLabel { font-size: 8px; }
+.card .loginLabel { font-size: 11px; }

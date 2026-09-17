@@ -88,7 +88,7 @@ Codex GUI 是内置的图形化对话工作区。选择项目后，用自然语�
 - 提供按周热力图和趋势图，以及 Token 类型、Provider、模型和账号消耗排行。
 - 上游返回 429 时按 1、3、5 秒逐渐增加等待时间并自动重试，默认最多持续 1 分钟；达到时限后按设置自动禁用账号，再向客户端返回最后一次 429。
 - 在官方账号模式下，可在额度耗尽后刷新账号、选择主用量窗口使用率最低的可用账号并切换凭据。
-- 桌面客户端可在运行界面的同时启动仅监听本机的网页版，也支持 `--headless --port` 无界面运行。
+- 桌面客户端可同时启动网页版，默认仅监听本机，也支持通过访问密钥进行远程管理和 `--headless --port` 无界面运行。
 - 内置 Skills 市场，可搜索、安装社区 Skill；登录云端账号后可发布或更新自己的版本化 Skill 包。
 - 内置 [Computer Use 电脑助手](docs/computer-use-plugin.md)，让 Codex GUI 操作 Windows 和 Mac 应用，支持按 Codex Home 安装、停用和卸载。
 - 内置 300+ 套 Dream Skin 主题预设，支持一键应用、自定义背景、外观调整和恢复。
@@ -111,7 +111,30 @@ Codex GUI 是内置的图形化对话工作区。选择项目后，用自然语�
 
 ## 快速开始
 
+### Linux 安装包用户
+
+从 [Releases](https://github.com/piperhex/codex-switch/releases) 下载 Linux x64 `.deb` 包，
+将下面的文件名替换为实际下载的文件名：
+
+```bash
+sudo apt update
+sudo apt install "./codex-switch.deb"
+csw
+```
+
+纯命令行 Ubuntu 服务器需通过虚拟显示启动：
+
+```bash
+sudo apt install xvfb xauth dbus-x11 xdg-utils
+xvfb-run -a dbus-run-session -- csw --headless --port=18080
+```
+
+默认访问地址为 `http://127.0.0.1:18080`。安装包使用者无需安装 Node.js 或 Rust。
+后台服务、开机自启、远程网页访问、代理 Key 和常见问题请参阅 [Linux 安装与使用](docs/linux.md)。
+
 ### 前置要求
+
+以下要求用于从源码开发和构建。
 
 - Node.js 18 或更高版本
 - npm
@@ -197,6 +220,10 @@ npm run check
 
 启动 PC 本地代理后，在代理设置中添加 API Key，再开启“监听局域网”。可为不同设备或使用者分别添加 Key，设置名称、启用状态和总额度（USD）；额度留空表示不限，填 `0` 表示暂时没有可用额度。已有的局域网 Key 会保留。
 
+首次使用时，点击“添加 Key”，填写名称并保存，密钥留空可自动生成。
+列表为空或没有已启用的 Key 时，“监听局域网”开关会变灰。
+保存后可在对应条目旁复制代理 API Key；该 Key 与网页登录的访问密钥不同。
+
 每个 Key 旁会显示累计 Token、预估成本和剩余额度。成本按请求结束时的模型价格设置累计，调价只影响后续请求；清理会话或 Token 历史不会重置这些累计数据。额度用完后不再接受新的生成请求，已经开始的请求会继续完成，因此累计成本可能超过设定额度。
 
 若部分请求未返回完整用量，Key 会标记为“用量待确认”，设有额度的 Key 会暂停新请求。管理员核对成本并调整额度后，可在编辑时勾选确认以恢复使用；已确认的累计用量会保留。
@@ -246,6 +273,9 @@ csw.exe --headless --port=18080
 
 启动后通过 `http://127.0.0.1:18080` 访问。`--headless` 必须与 `--port` 同时使用，端口范围为 `1-65535`。
 
+Linux 使用 `csw` 命令；无桌面服务器的启动方法见 [Linux 安装与使用](docs/linux.md)。
+启用网页局域网监听后，持有网页版访问密钥的用户拥有完整管理权限；需要调用模型的设备应使用单独的代理 API Key。
+
 系统托盘菜单可以显示控制台、切换账号、重启 ChatGPT 或退出。悬浮用量球展示当前账号的主用量窗口：左键会刷新该账号，悬停可展开，支持拖动位置，并在右键菜单中提供相同的快捷操作。
 
 可在设置页添加、编辑、启用或停用多个 Codex Home。所有已启用目录会同时接收账号与 Provider 配置；
@@ -275,6 +305,7 @@ docs/                架构和开发文档
 
 更多文档：
 
+- [Linux 安装与使用](docs/linux.md)
 - [架构与数据流](docs/architecture.md)
 - [开发与调试](docs/development.md)
 - [Bilibili PC 端与手机端使用教程合集规划](docs/bilibili-usage-series-plan.md)
@@ -304,7 +335,7 @@ Codex Switch 使用 [Apache License 2.0](LICENSE)，与官方 [OpenAI Codex](htt
 ## 当前限制
 
 - OAuth 回调会优先使用本地端口 `1455`，失败后回退到 `1457`。
-- 第三方 Provider 的新增、编辑和密钥管理仍仅支持桌面端；移动端与独立 Web 端可远程切换指定 PC 的官方模型或已同步 Provider。远程启用 Provider 时，目标 PC 必须正在运行本地代理。
+- 桌面端及其提供的网页版支持 Provider 管理；移动端与独立 Web 端可远程切换指定 PC 的官方模型或已同步 Provider。远程启用 Provider 时，目标 PC 必须正在运行本地代理。
 - macOS 发布构建采用临时签名；除非在 CI 配置 Apple Developer 签名与公证凭据，否则不会完成公证。
 - 已发布的 iOS `.app.zip` 未签名，仅为 CI 构建产物，不能直接作为 App Store 安装包使用。
 - 内嵌登录依赖 WebView 与身份提供商策略；若失败，请使用系统浏览器登录。

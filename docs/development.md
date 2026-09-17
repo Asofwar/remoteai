@@ -1,5 +1,8 @@
 # Development and Debugging
 
+For installed Linux packages, headless servers, systemd, and proxy setup, see
+[Linux installation and usage (Chinese)](linux.md). The dependencies below are for building from source.
+
 ## Environment Setup
 
 Install Node.js, npm, the latest stable Rust toolchain, and the Tauri 2 dependencies for your platform. Then install project dependencies:

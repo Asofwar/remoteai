@@ -47,8 +47,8 @@ export function ChatSettingsPage({ api, canManage }: Props) {
     <div className="chat-policy-heading">
       <Typography.Title level={2}>{t('nav.chatSettings')}</Typography.Title>
       <Typography.Text type="secondary">{zh
-        ? '统一管理手机 App 和网页的聊天设置，保存后会自动同步到已连接的设备。'
-        : 'Manage chat settings for the mobile app and web. Changes sync to connected devices.'}
+        ? '统一管理 Codex GUI、手机 App 和网页的聊天设置。各项设置的生效时间见下方说明。'
+        : 'Manage chat settings for Codex GUI, mobile and web. See each section for when changes take effect.'}
       </Typography.Text>
       <Typography.Text type="secondary">{zh
         ? '传输大小和图片压缩设置仅用于 Relay，P2P 直连不受这些限制。'

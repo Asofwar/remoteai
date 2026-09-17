@@ -40,6 +40,8 @@ pub(crate) mod scheduled_tasks;
 #[cfg(test)]
 mod tests;
 mod text_preview;
+mod title_generation;
+mod title_worker;
 pub(crate) mod undo;
 pub(crate) mod upload_policy;
 pub(crate) mod usage;
@@ -153,6 +155,7 @@ pub(crate) async fn codex_gui_request(
 async fn execute_request(state: &GuiState, request: GuiRequest) -> Result<GuiResponse> {
     let client = connected(state).await?;
     match request {
+        GuiRequest::GenerateTitle(options) => return client.generate_title(options).await,
         GuiRequest::FileOpen(options) => {
             return Arc::clone(&state.downloads.0).open(&client, options).await
         }

@@ -50,9 +50,9 @@ export interface PermissionDefinition {
 
 export const PERMISSION_CATALOG: readonly PermissionDefinition[] = [
   { code: Permission.ChatSettingsRead, group: 'content', name: 'Read chat settings',
-    description: 'View mobile and web chat limits.' },
+    description: 'View GUI title settings and mobile and web chat limits.' },
   { code: Permission.ChatSettingsManage, group: 'content', name: 'Manage chat settings',
-    description: 'Configure mobile and web chat limits.' },
+    description: 'Configure GUI title generation and mobile and web chat limits.' },
   { code: Permission.SelfAccountsRead, group: 'self-service', name: 'Read own accounts', description: 'View accounts assigned or synchronized to the current user.' },
   { code: Permission.SelfAccountsWrite, group: 'self-service', name: 'Manage own accounts', description: 'Update account metadata owned by the current user.' },
   { code: Permission.OfficialAccountMetadataWrite, group: 'official-accounts', name: 'Edit official account metadata', description: 'Update notes and expiration dates for official pool accounts assigned to the current user.' },

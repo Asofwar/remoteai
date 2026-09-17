@@ -107,6 +107,7 @@ export interface ThreadTokenUsage {
   modelContextWindow?: number | null;
 }
 export interface EventParams {
+  threadName?: string | null;
   serverName?: string;
   _meta?: { tool_params?: Record<string, unknown> };
   userMessageIndex?: number;
@@ -219,6 +220,8 @@ export type Request =
       model?: string; effort?: string; cwd?: string; skills?: SkillReference[]; attachments?: AttachmentReference[] }
   | { operation: "read" | "archive" | "unarchive" | "compact"; threadId: string }
   | { operation: "rename"; threadId: string; name: string }
+  | { operation: "generateTitle"; threadId: string; prompt: string;
+      settings: import('../../../../../shared/chat/titleSettings').TitleSettings }
   | { operation: "interrupt"; threadId: string; turnId: string };
 
 export interface MessageInput {

@@ -16,6 +16,7 @@ import { DetailsWorkspace } from "./codexGui/DetailsWorkspace";
 import { ConversationChangesButton } from "./codexGui/ConversationChangesButton";
 import { useGuiLayout } from "./codexGui/useGuiLayout";
 import { useConversationReadState } from "./codexGui/useConversationReadState";
+import { useTitleSettings } from "./codexGui/useTitleSettings";
 import styles from "./codexGui/styles.module.less";
 import { WorkspaceOperationContext } from "./codexGui/workspaceOperationContext";
 import type { AggregateApi, Provider } from "../types";
@@ -69,6 +70,7 @@ function Workspace({ active, accountPicker, providers, aggregateApis, windowCont
   const [collapsed, setCollapsed] = useState(() => window.innerWidth < 900);
   const installer = useCliInstaller(active, controller);
   useEffect(retainGuiSession, [controller]);
+  useTitleSettings(active, controller.titles.settings);
   const models = useMemo(() => providerModels(providers, aggregateApis), [providers, aggregateApis]);
   useEffect(() => { controller.setProviderModels(models); }, [controller, models]);
   useEffect(() => {

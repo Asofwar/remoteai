@@ -1,6 +1,6 @@
-import type { ChatPolicy } from '../../../../shared/remote-chat/policy';
+import { CHAT_POLICY_FIELDS } from '../../../../shared/remote-chat/policy';
 type Copy = [string, string];
-export interface PolicyField { key: keyof ChatPolicy; label: Copy; hint: Copy; unit: Copy }
+export interface PolicyField { key: keyof typeof CHAT_POLICY_FIELDS; label: Copy; hint: Copy; unit: Copy }
 export interface PolicySection { key: string; title: Copy; hint: Copy; fields: PolicyField[] }
 export const POLICY_SECTIONS: PolicySection[] = [
   { key: 'relay', title: ['Relay 传输', 'Relay transfer'],

@@ -1,6 +1,7 @@
 import { Card, Form, InputNumber, Typography } from 'antd';
 import { CHAT_POLICY_FIELDS } from '../../../../shared/remote-chat/policy';
 import { POLICY_SECTIONS, type PolicyField } from './chatPolicyFields';
+import { TitleSettingsFields } from './TitleSettingsFields';
 
 function SettingField({ field, language }: { field: PolicyField; language: 0 | 1 }) {
   const { min, max } = CHAT_POLICY_FIELDS[field.key];
@@ -27,6 +28,7 @@ function SettingField({ field, language }: { field: PolicyField; language: 0 | 1
 export function ChatSettingsFields({ zh, loading }: { zh: boolean; loading: boolean }) {
   const language = zh ? 0 : 1;
   return <div className="chat-policy-grid">
+    <TitleSettingsFields zh={zh} loading={loading} />
     {POLICY_SECTIONS.map((section) => <Card key={section.key} loading={loading}
       className={'chat-policy-section chat-policy-' + section.key}>
       <div className="chat-policy-section-heading">

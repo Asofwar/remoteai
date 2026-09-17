@@ -1,0 +1,39 @@
+import { test, expect } from '@playwright/test';
+import { titleBackend } from './thread-titles-backend';
+
+test('titles follow admin settings and tab activations while replies and polling remain responsive', async ({ page }) => {
+  const backend = titleBackend();
+  await backend.attach(page.context());
+  try {
+    await page.goto('/e2e/thread-titles-harness.html');
+    await expect.poll(backend.reads).toBe(1);
+    await page.getByRole('textbox', { name: '聊天消息' }).fill('生成一个熊骑车的 SVG 动画');
+    await page.getByRole('button', { name: '发送', exact: true }).click();
+    await expect.poll(() => backend.titleRequests.length).toBe(1);
+    expect(backend.titleRequests[0].settings).toEqual({ model: 'admin-title-model', effort: 'medium' });
+    await expect(page.getByRole('status', { name: '回复状态' })).toHaveText('正在回复');
+    await expect(page.getByRole('button', { name: '生成一个熊骑车的 SVG 动画' })).toBeVisible();
+    const beats = Number(await page.getByLabel('刷新次数').textContent());
+    await page.getByRole('textbox', { name: '聊天消息' }).fill('起名等待期间仍能输入');
+    await expect.poll(async () => Number(await page.getByLabel('刷新次数').textContent())).toBeGreaterThan(beats);
+    await expect(page.getByText('正在刷新用量')).toBeVisible();
+    backend.finish('熊骑车 SVG 动画');
+    await expect(page.getByRole('button', { name: '熊骑车 SVG 动画' })).toBeVisible();
+    expect(backend.reads()).toBe(1);
+    backend.configure({ model: 'next-model', effort: 'low' });
+    await page.getByRole('button', { name: '离开 GUI' }).click();
+    await page.getByRole('button', { name: '打开 GUI' }).click();
+    await expect.poll(backend.reads).toBe(2);
+    await page.getByRole('button', { name: '新对话', exact: true }).click();
+    await page.getByRole('textbox', { name: '聊天消息' }).fill('第二个任务');
+    await page.getByRole('button', { name: '发送', exact: true }).click();
+    await expect.poll(() => backend.titleRequests.length).toBe(2);
+    expect(backend.titleRequests[1].settings).toEqual({ model: 'next-model', effort: 'low' });
+    backend.finish(null);
+    await expect(page.getByRole('button', { name: '第二个任务' })).toBeVisible();
+    await page.getByRole('button', { name: '熊骑车 SVG 动画' }).click();
+    await expect(page.getByLabel('当前对话')).toHaveText('thread-1');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect(backend.reads()).toBe(2);
+  } finally { backend.release(); }
+});

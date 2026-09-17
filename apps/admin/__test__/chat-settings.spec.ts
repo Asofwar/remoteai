@@ -8,8 +8,22 @@ import { ChatSettingsService } from '@/modules/chat-settings/chat-settings.servi
 import { ChatSettingsEntity } from '@/modules/chat-settings/chat-settings.entity';
 import type { AuthUser } from '@/common/decorators/user.decorator';
 import { AdminAuditLogEntity } from '@/modules/admin/entities/admin-audit-log.entity';
+import { TitleSettingsController } from '@/modules/chat-settings/title-settings.controller';
 
 describe('chat settings', () => {
+  it('defaults legacy title settings and validates administrator model preferences', async () => {
+    const { titleSettings: _title, ...legacy } = DEFAULT_CHAT_POLICY;
+    expect(parseChatPolicy(legacy).titleSettings).toEqual({ model: 'gpt-5.6-luna', effort: 'low' });
+    const titleSettings = { model: 'custom/model-v2', effort: 'medium' };
+    const policy = parseChatPolicy({ ...legacy, titleSettings });
+    expect(policy.titleSettings).toEqual(titleSettings);
+    for (const value of [null, {}, { model: '', effort: 'low' }, { model: 'valid', effort: 'unknown' },
+      { model: 'invalid model', effort: 'low' }]) {
+      expect(() => parseChatPolicy({ ...legacy, titleSettings: value })).toThrow();
+    }
+    const service = { read: async () => policy } as ChatSettingsService;
+    expect(await new TitleSettingsController(service).read()).toEqual(titleSettings);
+  });
   it.each(['relayMaxMbPerSecond', 'relayMaxFramesPerSecond'] as const)(
     'defaults missing relay limits to unlimited and validates configured values: %s', (key) => {
       const previous = { ...DEFAULT_CHAT_POLICY };

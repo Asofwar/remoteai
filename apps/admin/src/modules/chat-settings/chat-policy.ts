@@ -1,3 +1,5 @@
+import { DEFAULT_TITLE_SETTINGS, parseTitleSettings, type TitleSettings } from './title-settings';
+
 /** Public numeric contract shared by the admin form, chat clients and desktop host. */
 export const CHAT_POLICY_FIELDS = {
   relayMaxMbPerSecond: { min: -1, max: undefined, default: -1 },
@@ -15,15 +17,19 @@ export const CHAT_POLICY_FIELDS = {
   fileDownloadMaxMb: { min: 1, max: undefined, default: 20 },
 } as const;
 
-export type ChatPolicy = { [K in keyof typeof CHAT_POLICY_FIELDS]: number };
-export const DEFAULT_CHAT_POLICY = Object.fromEntries(Object.entries(CHAT_POLICY_FIELDS)
-  .map(([key, field]) => [key, field.default])) as ChatPolicy;
+export type NumericChatPolicy = { [K in keyof typeof CHAT_POLICY_FIELDS]: number };
+export type ChatPolicy = NumericChatPolicy & { titleSettings: TitleSettings };
+export const DEFAULT_CHAT_POLICY: ChatPolicy = {
+  ...Object.fromEntries(Object.entries(CHAT_POLICY_FIELDS)
+    .map(([key, field]) => [key, field.default])) as NumericChatPolicy,
+  titleSettings: DEFAULT_TITLE_SETTINGS,
+};
 
 export function parseChatPolicy(value: unknown): ChatPolicy {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('请填写完整的聊天设置。');
   const record = value as Record<string, unknown>;
   const policy = { ...DEFAULT_CHAT_POLICY };
-  for (const key of Object.keys(CHAT_POLICY_FIELDS) as (keyof ChatPolicy)[]) {
+  for (const key of Object.keys(CHAT_POLICY_FIELDS) as (keyof NumericChatPolicy)[]) {
     const field = CHAT_POLICY_FIELDS[key];
     // Older saved policies and coordinators do not include these later additions.
     const optional = field.default === -1 || key === 'videoPreviewMaxMb'
@@ -35,5 +41,6 @@ export function parseChatPolicy(value: unknown): ChatPolicy {
     }
     policy[key] = number;
   }
+  policy.titleSettings = parseTitleSettings(record.titleSettings);
   return policy;
 }

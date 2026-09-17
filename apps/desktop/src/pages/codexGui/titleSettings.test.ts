@@ -1,0 +1,38 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { loadCloudAuthState } from '../../api/backend';
+import { GuiTitleSettings } from './titleSettings';
+
+vi.mock('../../api/backend', () => ({ DEFAULT_CLOUD_BASE_URL: 'https://default.test', loadCloudAuthState: vi.fn() }));
+const fetcher = vi.fn();
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.stubGlobal('fetch', fetcher);
+  vi.mocked(loadCloudAuthState).mockResolvedValue({ baseUrl: 'https://configured.test/' } as never);
+});
+afterEach(() => vi.unstubAllGlobals());
+
+it('fetches once on each refresh, bypasses the cache and reuses the settings for every title', async () => {
+  fetcher.mockResolvedValue({ ok: true, json: async () => ({ model: 'custom-model', effort: 'medium' }) });
+  const settings = new GuiTitleSettings();
+  await settings.refresh();
+  expect(await settings.snapshot()).toEqual({ model: 'custom-model', effort: 'medium' });
+  await settings.snapshot();
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(fetcher).toHaveBeenCalledWith('https://configured.test/chat/title-settings',
+    expect.objectContaining({ cache: 'no-store' }));
+  await settings.refresh();
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
+it('uses defaults offline and retains the last valid configuration on later failures', async () => {
+  const settings = new GuiTitleSettings();
+  fetcher.mockRejectedValueOnce(new Error('offline'));
+  await settings.refresh();
+  expect(await settings.snapshot()).toEqual({ model: 'gpt-5.6-luna', effort: 'low' });
+  fetcher.mockResolvedValueOnce({ ok: true, json: async () => ({ model: 'custom', effort: 'high' }) });
+  await settings.refresh();
+  fetcher.mockResolvedValueOnce({ ok: true, json: async () => ({ model: '', effort: 'invalid' }) });
+  await settings.refresh();
+  expect(await settings.snapshot()).toEqual({ model: 'custom', effort: 'high' });
+});

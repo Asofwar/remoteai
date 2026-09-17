@@ -3,6 +3,8 @@ mod context_capacity;
 mod context_change;
 mod live_settings;
 mod plugin_refresh;
+#[path = "title_service.rs"]
+mod title_service;
 
 use std::{
     collections::HashMap,
@@ -31,9 +33,13 @@ use super::{
 };
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
+const MAX_CONCURRENT_TITLE_JOBS: usize = 2;
 type Pending = HashMap<u64, oneshot::Sender<Result<Value>>>;
 
 pub(super) struct Client {
+    title_jobs: Mutex<std::collections::HashSet<String>>,
+    title_writes: Mutex<()>,
+    title_slots: tokio::sync::Semaphore,
     pub(super) home: PathBuf,
     pub(super) projectless_root: PathBuf,
     writer: Mutex<ChildStdin>,
@@ -82,6 +88,9 @@ impl Client {
         let writer = process.stdin.take().ok_or(GuiError::Startup)?;
         let stdout = process.stdout.take().ok_or(GuiError::Startup)?;
         let client = Arc::new(Self {
+            title_jobs: Mutex::default(),
+            title_writes: Mutex::default(),
+            title_slots: tokio::sync::Semaphore::new(MAX_CONCURRENT_TITLE_JOBS),
             home,
             projectless_root,
             writer: Mutex::new(writer),
@@ -122,6 +131,10 @@ impl Client {
     }
 
     pub(super) async fn request(&self, method: &str, mut params: Value) -> Result<Value> {
+        if method == "thread/name/set" {
+            let _guard = self.title_writes.lock().await;
+            return self.request_raw(method, params).await;
+        }
         super::home::scope_thread_request(method, &mut params);
         if method == "turn/interrupt" {
             return self.interrupt_with_context(params).await;

@@ -140,6 +140,13 @@ function syncThreadPreview(state: GuiState, thread: Thread): Thread[] {
 }
 
 export function reduceEvent(state: GuiState, event: GuiEvent): GuiState {
+  if (event.method === 'thread/name/updated' && event.params.threadId && event.params.threadName !== undefined) {
+    const { threadId, threadName: name } = event.params;
+    const current = state.conversations[threadId];
+    return { ...state, threads: state.threads.map((thread) => thread.id === threadId ? { ...thread, name } : thread),
+      conversations: current ? { ...state.conversations,
+        [threadId]: { ...current, thread: { ...current.thread, name } } } : state.conversations };
+  }
   if (event.method === "computerUse/setup") {
     return { ...state, computerUseSetup: event.params.computerUseSetup };
   }

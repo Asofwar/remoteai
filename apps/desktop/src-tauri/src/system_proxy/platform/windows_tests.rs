@@ -5,8 +5,39 @@ use std::{
     time::{Duration, Instant},
 };
 use windows_sys::Win32::Networking::WinHttp::{
+    ERROR_WINHTTP_LOGIN_FAILURE, ERROR_WINHTTP_UNABLE_TO_DOWNLOAD_SCRIPT,
     WINHTTP_ACCESS_TYPE_NAMED_PROXY, WINHTTP_ACCESS_TYPE_NO_PROXY, WINHTTP_PROXY_INFO,
 };
+
+#[test]
+fn automatic_proxy_discovery_allows_caching_and_retries_only_authentication_challenges() {
+    let config = SystemProxyConfig {
+        auto_detect: true,
+        ..Default::default()
+    };
+    let mut options = auto_proxy_options(&config, None).unwrap();
+    let mut attempts = Vec::new();
+    let result = lookup_with_auth_retry(&mut options, |options| {
+        attempts.push(options.fAutoLogonIfChallenged);
+        if attempts.len() == 1 {
+            Err(ERROR_WINHTTP_LOGIN_FAILURE)
+        } else {
+            Ok(())
+        }
+    });
+    assert!(result.is_ok());
+    assert_eq!(attempts, [0, 1]);
+
+    let mut options = auto_proxy_options(&config, None).unwrap();
+    let mut attempts = 0;
+    let result = lookup_with_auth_retry(&mut options, |options| {
+        attempts += 1;
+        assert_eq!(options.fAutoLogonIfChallenged, 0);
+        Err(ERROR_WINHTTP_UNABLE_TO_DOWNLOAD_SCRIPT)
+    });
+    assert_eq!(result, Err(ERROR_WINHTTP_UNABLE_TO_DOWNLOAD_SCRIPT));
+    assert_eq!(attempts, 1);
+}
 
 #[test]
 fn winhttp_access_type_and_bypass_are_respected() {

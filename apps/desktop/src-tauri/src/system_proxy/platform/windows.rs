@@ -51,23 +51,33 @@ pub(in crate::system_proxy) fn windows_auto_proxy_for(
     config: &SystemProxyConfig,
     target: &Url,
 ) -> Option<ProxyDecision> {
-    use std::ptr;
-
-    use windows_sys::Win32::{
-        Foundation::GlobalFree,
-        Networking::WinHttp::{
-            WinHttpCloseHandle, WinHttpGetProxyForUrl, WinHttpOpen, WINHTTP_ACCESS_TYPE_NO_PROXY,
-            WINHTTP_PROXY_INFO,
-        },
-    };
-
-    let mut url = target.as_str().encode_utf16().collect::<Vec<_>>();
-    url.push(0);
+    let url = target
+        .as_str()
+        .encode_utf16()
+        .chain([0])
+        .collect::<Vec<_>>();
     let auto_config_url = config
         .auto_config_url
         .as_deref()
         .map(|value| value.encode_utf16().chain([0]).collect::<Vec<_>>());
     let mut options = auto_proxy_options(config, auto_config_url.as_deref())?;
+    query_auto_proxy(&url, &mut options, target)
+}
+
+fn query_auto_proxy(
+    url: &[u16],
+    options: &mut windows_sys::Win32::Networking::WinHttp::WINHTTP_AUTOPROXY_OPTIONS,
+    target: &Url,
+) -> Option<ProxyDecision> {
+    use std::ptr;
+
+    use windows_sys::Win32::{
+        Foundation::GetLastError,
+        Networking::WinHttp::{
+            WinHttpCloseHandle, WinHttpGetProxyForUrl, WinHttpOpen, WINHTTP_ACCESS_TYPE_NO_PROXY,
+            WINHTTP_PROXY_INFO,
+        },
+    };
 
     // Safety: null strings select a direct WinHTTP session and all arguments outlive the call.
     let session = unsafe {
@@ -83,16 +93,27 @@ pub(in crate::system_proxy) fn windows_auto_proxy_for(
         return None;
     }
     let mut info = WINHTTP_PROXY_INFO::default();
-    // Safety: the session, URL, options, and output storage remain valid for the synchronous call.
-    let resolved = unsafe { WinHttpGetProxyForUrl(session, url.as_ptr(), &mut options, &mut info) };
+    let resolved = lookup_with_auth_retry(options, |options| {
+        // Safety: the session, URL, options, and output storage outlive this synchronous call.
+        if unsafe { WinHttpGetProxyForUrl(session, url.as_ptr(), options, &mut info) } != 0 {
+            Ok(())
+        } else {
+            // Safety: GetLastError reads this thread's error immediately after the failed call.
+            Err(unsafe { GetLastError() })
+        }
+    });
     // Safety: `session` is a valid WinHTTP handle and is closed exactly once.
     unsafe {
         WinHttpCloseHandle(session);
     }
-    if resolved == 0 {
-        return None;
-    }
-    let proxy = proxy_decision(&info, target);
+    let proxy = resolved.ok().and_then(|()| proxy_decision(&info, target));
+    free_proxy_info(&info);
+    proxy
+}
+
+fn free_proxy_info(info: &windows_sys::Win32::Networking::WinHttp::WINHTTP_PROXY_INFO) {
+    use windows_sys::Win32::Foundation::GlobalFree;
+
     // Safety: these non-null strings were allocated by WinHTTP and are released exactly once.
     unsafe {
         if !info.lpszProxy.is_null() {
@@ -102,7 +123,23 @@ pub(in crate::system_proxy) fn windows_auto_proxy_for(
             GlobalFree(info.lpszProxyBypass.cast());
         }
     }
-    proxy
+}
+
+fn lookup_with_auth_retry(
+    options: &mut windows_sys::Win32::Networking::WinHttp::WINHTTP_AUTOPROXY_OPTIONS,
+    mut lookup: impl FnMut(
+        &mut windows_sys::Win32::Networking::WinHttp::WINHTTP_AUTOPROXY_OPTIONS,
+    ) -> Result<(), u32>,
+) -> Result<(), u32> {
+    use windows_sys::Win32::Networking::WinHttp::ERROR_WINHTTP_LOGIN_FAILURE;
+
+    match lookup(options) {
+        Err(ERROR_WINHTTP_LOGIN_FAILURE) => {
+            options.fAutoLogonIfChallenged = 1;
+            lookup(options)
+        }
+        result => result,
+    }
 }
 
 fn auto_proxy_options(
@@ -113,10 +150,9 @@ fn auto_proxy_options(
         WINHTTP_AUTOPROXY_AUTO_DETECT, WINHTTP_AUTOPROXY_CONFIG_URL, WINHTTP_AUTOPROXY_OPTIONS,
         WINHTTP_AUTO_DETECT_TYPE_DHCP, WINHTTP_AUTO_DETECT_TYPE_DNS_A,
     };
-    let mut options = WINHTTP_AUTOPROXY_OPTIONS {
-        fAutoLogonIfChallenged: 1,
-        ..Default::default()
-    };
+    // Automatic logon disables WinHTTP's shared PAC/WPAD cache. Enable it only after
+    // an authentication challenge, as recommended by Microsoft's AutoProxy Cache guidance.
+    let mut options = WINHTTP_AUTOPROXY_OPTIONS::default();
     if let Some(url) = auto_config_url {
         options.dwFlags = WINHTTP_AUTOPROXY_CONFIG_URL;
         options.lpszAutoConfigUrl = url.as_ptr();

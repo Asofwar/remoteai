@@ -164,11 +164,24 @@ fn redact_paths(value: &str) -> String {
     let mut output = String::new();
     let mut cursor = 0;
     for (start, _) in value.char_indices() {
-        if start < cursor || !is_path_start(value, start) {
+        if start < cursor {
+            continue;
+        }
+        let is_url = ["http://", "https://", "file://"].iter().any(|prefix| {
+            value[start..]
+                .get(..prefix.len())
+                .is_some_and(|candidate| candidate.eq_ignore_ascii_case(prefix))
+        });
+        if !is_url && !is_path_start(value, start) {
             continue;
         }
         output.push_str(&value[cursor..start]);
-        output.push_str("[本地路径已隐藏]");
+        // Hide the complete URL before its scheme suffix can be mistaken for a Windows drive.
+        output.push_str(if is_url {
+            HIDDEN
+        } else {
+            "[本地路径已隐藏]"
+        });
         let quote = value[..start]
             .chars()
             .next_back()

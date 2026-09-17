@@ -193,7 +193,7 @@ pub(super) fn post_device_event<R: Runtime>(
             "eventType": event_type,
         }))
         .send()
-        .map_err(|error| format!("Device event report failed: {error}"))?;
+        .map_err(|error| request_error("Device event report", error))?;
     if !response.status().is_success() {
         return Err(response_error("Device event report", response));
     }
@@ -297,7 +297,7 @@ pub(crate) async fn cloud_request_registration_code<R: Runtime>(
             .post(endpoint(&settings, "/auth/register/code")?)
             .json(&json!({ "email": email }))
             .send()
-            .map_err(|error| format!("Verification code request failed: {error}"))?;
+            .map_err(|error| request_error("Verification code request", error))?;
         if !response.status().is_success() {
             return Err(response_error("Verification code request", response));
         }
@@ -332,7 +332,7 @@ pub(super) async fn cloud_authenticate<R: Runtime>(
             .post(endpoint(&settings, path)?)
             .json(&payload)
             .send()
-            .map_err(|error| format!("{action} failed: {error}"))?;
+            .map_err(|error| request_error(action, error))?;
         if !response.status().is_success() {
             return Err(response_error(action, response));
         }

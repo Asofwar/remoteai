@@ -206,6 +206,21 @@ fn basic_authorization_redacts_the_scheme_and_complete_credential() {
 }
 
 #[test]
+fn network_urls_are_hidden_without_being_misidentified_as_local_paths() {
+    for scheme in ["http", "https"] {
+        let input = format!(
+            "Cloud login failed: error sending request for url \
+             ({scheme}://private-user:private-password@example.com/auth/login?token=private-token)"
+        );
+        let message = sanitize::message(&input).unwrap();
+        assert!(message.contains("[已隐藏]"), "{message}");
+        assert!(!message.contains("本地路径"), "{message}");
+        assert!(!message.contains("private"), "{message}");
+        assert!(!message.contains("example.com"), "{message}");
+    }
+}
+
+#[test]
 fn cookie_headers_redact_every_cookie_value() {
     for field in ["Cookie", "Set-Cookie"] {
         let value = sanitize::message(&format!(

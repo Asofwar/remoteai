@@ -257,7 +257,7 @@ pub(super) fn refresh_cloud_token<R: Runtime>(
         .post(endpoint(settings, "/auth/refresh")?)
         .json(&json!({ "refreshToken": refresh_token }))
         .send()
-        .map_err(|error| format!("Cloud token refresh failed: {error}"))?;
+        .map_err(|error| request_error("Cloud token refresh", error))?;
     if !response.status().is_success() {
         if refresh_rejection_expires_cloud_session(response.status()) {
             let server_error = response_error("Cloud token refresh", response);
@@ -384,7 +384,7 @@ pub(super) fn cloud_request<R: Runtime>(
         }
         let response = request
             .send()
-            .map_err(|error| format!("Cloud request failed: {error}"))?;
+            .map_err(|error| request_error("Cloud request", error))?;
         if response.status() != StatusCode::UNAUTHORIZED || attempt == 1 {
             return Ok(response);
         }

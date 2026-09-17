@@ -208,7 +208,7 @@ it("does not load local endpoints or executable URLs as Markdown images", async 
   expect(container.textContent).toContain("暂不支持预览");
 });
 
-it("places the real send time and copy action outside the user bubble and copies only message text", async () => {
+it("places the real send date and time beside the copy action outside the user bubble", async () => {
   const startedAt = 1788873505;
   const value = conversation({ ...thread, turns: [{ id: "timed", status: "completed", startedAt,
     items: [items[0]] }] });
@@ -220,7 +220,7 @@ it("places the real send time and copy action outside the user bubble and copies
   const time = article.querySelector("time")!;
   const copy = article.querySelector<HTMLButtonElement>('[aria-label="复制消息"]')!;
   expect(time.dateTime).toBe(new Date(startedAt * 1000).toISOString());
-  expect(time.textContent).toMatch(/^\d{2}:\d{2}$/);
+  expect(time.textContent).toMatch(/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}$/);
   expect(bubble.contains(time)).toBe(false);
   expect(bubble.contains(copy)).toBe(false);
   expect(time.parentElement).toBe(copy.parentElement);

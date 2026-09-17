@@ -159,6 +159,7 @@
 .userMessageActions { display: flex; justify-content: flex-end; align-items: center; gap: 10px;
   min-height: 28px; padding: 3px 2px 0; opacity: 0; pointer-events: none;
   color: var(--gui-muted); font-size: calc(var(--gui-font-size, 14px) - 2px);
+  > time { white-space: nowrap; font-variant-numeric: tabular-nums; }
   > button { color: inherit; } }
 @media (hover: none) { .userMessageActions { opacity: 1; pointer-events: auto; } }
 .agentMessage { min-width: 0; line-height: 1.8; font-size: var(--gui-font-size, 14px); }

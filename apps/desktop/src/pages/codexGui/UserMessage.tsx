@@ -14,7 +14,10 @@ import userStyles from "./UserMessage.module.less";
 import styles from "./styles.module.less";
 
 const MILLISECONDS_PER_SECOND = 1000;
-const timeFormatter = new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const sentAtFormatter = new Intl.DateTimeFormat("zh-CN", {
+  year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+});
 
 export function UserMessage({ item, startedAt, onEdit, editDisabled = false }: {
   item: Item; startedAt?: number | null; onEdit?: SubmitMessageEdit; editDisabled?: boolean;
@@ -51,7 +54,7 @@ export function UserMessage({ item, startedAt, onEdit, editDisabled = false }: {
     </div>}
     {!editing && <div className={styles.userMessageActions}>
       {sentAt && <time dateTime={sentAt.toISOString()} title={sentAt.toLocaleString("zh-CN")}>
-        {timeFormatter.format(sentAt)}
+        {sentAtFormatter.format(sentAt)}
       </time>}
       <CopyButton text={text} />
       {onEdit && !editing && <Button type="text" size="small" aria-label="编辑消息" disabled={editDisabled}

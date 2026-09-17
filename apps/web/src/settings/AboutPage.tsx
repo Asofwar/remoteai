@@ -1,4 +1,5 @@
-import { ArrowLeft, Box, FileText, Github, Globe, Zap } from 'lucide-react';
+import { ArrowLeft, Box, FileText, Github, Globe } from 'lucide-react';
+import { BrandMark } from '../components/BrandMark';
 import { SettingsRow } from './SettingsRow';
 import { version } from '../../../../package.json';
 
@@ -7,7 +8,7 @@ export function AboutPage({ onBack }: { onBack: () => void }) {
     <header className="settings-navigation"><button type="button" className="icon-button"
       aria-label="返回设置" onClick={onBack}><ArrowLeft size={22} /></button><h1>关于</h1></header>
     <section className="settings-group about-identity">
-      <span className="brand-mark"><Zap size={28} fill="currentColor" /></span>
+      <BrandMark />
       <div><h2>Codex Switch <small>Web</small></h2><p>v{version}</p></div>
       <p>管理账号用量，随时连接桌面设备。</p>
     </section>

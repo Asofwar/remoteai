@@ -39,7 +39,7 @@ button.settings-row:hover, .settings-profile:hover { background: #fafcfc; }
 .settings-navigation h1 { font-size: 23px; }
 .about-page { max-width: 850px; margin: 0 auto; }
 .about-identity { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; padding: 24px; }
-.about-identity .brand-mark { width: 58px; height: 58px; border-radius: 16px; }
+.about-identity .brand-mark { width: 58px; height: 58px; }
 .about-identity h2 { font-size: 23px; }
 .about-identity h2 small { color: #848d9f; font-size: 13px; }
 .about-identity p { margin-top: 7px; color: #848d9f; font-size: 14px; }

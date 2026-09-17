@@ -127,10 +127,12 @@ test('keeps desktop chat beside independently collapsible menus and remembers th
     await expect(page.getByRole('button', { name: '暂停生成' })).toBeVisible();
     await page.getByRole('textbox', { name: '聊天消息' }).fill('保留未发送草稿');
     await page.getByRole('button', { name: '收起主菜单' }).click();
-    await expect(page.locator('.desktop-sidebar')).toBeHidden();
+    await expect(page.locator('.desktop-sidebar nav')).toBeHidden();
+    await expect(page.locator('.desktop-sidebar').getByRole('button', { name: '展开主菜单' })).toBeVisible();
     await expect(sidebar).toBeVisible();
     await header.getByRole('button', { name: '收起聊天列表' }).click();
     await expect(sidebar).toHaveCount(0);
+    await screenshot(page, info, 'desktop-collapsed-menus');
     const text = await page.locator('.chat-markdown').last().innerText();
     await expect.poll(() => page.locator('.chat-markdown').last().innerText()).not.toBe(text);
     await page.getByRole('button', { name: '打开聊天列表' }).click();

@@ -22,7 +22,7 @@ html:has(.app-shell.chat-active), body:has(.app-shell.chat-active) { overscroll-
   order: -1; display: flex; flex-direction: column; flex: 0 0 clamp(240px, 23vw, 300px);
   min-height: 0; min-width: 0; border-right: 1px solid var(--chat-border); background: #f8faf9;
 }
-.chat-sidebar-heading { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px 0; }
+.chat-sidebar-heading { display: flex; align-items: center; min-height: 64px; padding: 12px 16px; }
 .chat-sidebar .chat-thread-controls { padding: 12px 14px; }
 .chat-drawer .ant-drawer-body { display: flex; flex-direction: column; padding: 0; min-height: 0; }
 .chat-drawer .ant-drawer-content { border-radius: 0 20px 20px 0; }
@@ -211,7 +211,6 @@ html:has(.app-shell.chat-active), body:has(.app-shell.chat-active) { overscroll-
 .chat-image img { display: block; width: 100%; max-height: 420px; object-fit: contain; }
 .chat-image-notice { display: inline-block; max-width: 400px; color: #6f8177; font-size: 13px; }
 @media (max-width: 860px) {
-  .desktop-menu-toggle { display: none; }
   .chat-active .content-shell { padding-bottom: 0; }
   .chat-active .mobile-tabbar { position: static; flex-shrink: 0; }
   .chat-header { padding-top: max(12px, env(safe-area-inset-top)); }

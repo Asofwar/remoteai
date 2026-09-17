@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { PanelLeft } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import type { AuthSession, RemoteDevice } from '../types';
 import { ChatApproval } from './ChatApproval';
 import { ChatComposer } from './ChatComposer';
@@ -27,9 +27,9 @@ import { useChatDrawerSwipe } from './useChatDrawerSwipe';
 import type { ChatProject } from './types';
 import './chat.css';
 
-interface Props { session: AuthSession; devices: RemoteDevice[]; active: boolean; menuControl: ReactNode }
+interface Props { session: AuthSession; devices: RemoteDevice[]; active: boolean }
 
-export function ChatPage({ session, devices, active, menuControl }: Props) {
+export function ChatPage({ session, devices, active }: Props) {
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const device = devices.find((entry) => entry.deviceId === deviceId)
     ?? devices.find((entry) => entry.online) ?? devices[0];
@@ -37,11 +37,11 @@ export function ChatPage({ session, devices, active, menuControl }: Props) {
   useChatViewport(active);
   return <section className="chat-page" hidden={!active} aria-label="Codex 聊天">
     <ConnectedChat key={`${session.baseUrl}:${session.email}:${device?.deviceId ?? ''}`} session={session}
-      device={device} devices={devices} active={active} chooseDevice={setDeviceId} menuControl={menuControl} />
+      device={device} devices={devices} active={active} chooseDevice={setDeviceId} />
   </section>;
 }
 
-function ConnectedChat({ session, device, devices, active, chooseDevice, menuControl }: Props & {
+function ConnectedChat({ session, device, devices, active, chooseDevice }: Props & {
   device?: RemoteDevice; chooseDevice: (id: string) => void;
 }) {
   const { state, controller } = useChat(session, device?.deviceId ?? '', active && Boolean(device));
@@ -49,6 +49,7 @@ function ConnectedChat({ session, device, devices, active, chooseDevice, menuCon
   const desktop = useDesktopLayout();
   const [sidebar, setSidebar] = usePanelVisibility('chat-list');
   const listOpen = desktop ? sidebar : drawer;
+  const ListToggleIcon = listOpen ? PanelLeftClose : PanelLeftOpen;
   const closeList = () => { if (desktop) setSidebar(false); else setDrawer(false); };
   const selectedFromList = () => { if (!desktop) setDrawer(false); };
   const [pickingDevice, setPickingDevice] = useState(false);
@@ -73,10 +74,9 @@ function ConnectedChat({ session, device, devices, active, chooseDevice, menuCon
     enabled={active && !state.selectedArchived}>
     <div className="chat-conversation">
     <header className="chat-header">
-      {menuControl}
       <button type="button" className="chat-back" aria-label={listOpen ? '收起聊天列表' : '打开聊天列表'}
         aria-expanded={listOpen} onClick={() => { if (desktop) setSidebar(!sidebar); else setDrawer(!drawer); }}>
-        <PanelLeft size={21} /></button>
+        <ListToggleIcon size={21} /></button>
       <div className="chat-grow"><h2>{state.selected ? threadPresentation(state.selected, state.sidebar).title : '新聊天'}</h2>
         <ChatConnectionInfo state={state} controller={controller} device={device} active={active}
           chooseDevice={() => setPickingDevice(true)} /></div>

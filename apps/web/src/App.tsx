@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Dialog, Form, Input, PullToRefresh, SafeArea, SpinLoading, TabBar, Toast } from "antd-mobile";
 import { Dropdown, Tooltip, type MenuProps } from "antd";
 import { ChevronRight, CircleGauge, Laptop, LayoutDashboard, LogOut, Menu, MonitorCog,
-  MessageSquare, PanelLeft, RefreshCw, Server, Settings, ShieldCheck, Sparkles, Zap } from "lucide-react";
+  MessageSquare, PanelLeftClose, PanelLeftOpen, RefreshCw, Server, Settings, ShieldCheck, Sparkles } from "lucide-react";
 import { defaultApiBaseUrl, deviceStatusWebSocketUrl, getActiveSession, parseDeviceStatusMessage } from "./api";
 import { useAppDispatch, useAppSelector } from "./hooks";
 import { bootstrapApp, clearAuthError, clearDataError, deviceSocketMessage, pageChanged, refreshAll,
@@ -10,6 +10,7 @@ import { bootstrapApp, clearAuthError, clearDataError, deviceSocketMessage, page
   switchDeviceProvider, switchDeviceProviderGroup } from "./store";
 import type { AppPage, RemoteDevice } from "./types";
 import { AdaptiveSheet } from "./components/AdaptiveSheet";
+import { BrandMark } from "./components/BrandMark";
 import { DeviceManagementList } from "./devices/DeviceManagementList";
 import { useRemoteModelRestartPrompt } from "./devices/useRemoteModelRestartPrompt";
 import { RemoteModelSwitchSheet } from "./components/RemoteModelSwitchSheet";
@@ -52,7 +53,7 @@ function LoginView() {
   return <main className="login-page">
     <section className="login-story">
       <div className="story-grid" />
-      <div className="brand-lockup light"><span className="brand-mark"><Zap size={21} fill="currentColor" /></span><b>Codex Switch</b></div>
+      <div className="brand-lockup light"><BrandMark /><b>Codex Switch</b></div>
       <div className="story-copy">
         <span className="eyebrow"><Sparkles size={14} /> 随时掌握每个账号</span>
         <h1>离开电脑，也能<br />从容切换。</h1>
@@ -67,7 +68,7 @@ function LoginView() {
     </section>
     <section className="login-panel">
       <div className="mobile-login-brand brand-lockup">
-        <span className="brand-mark"><Zap size={21} fill="currentColor" /></span>
+        <BrandMark />
         <b>Codex Switch</b><span className="login-web-badge">Web</span>
       </div>
       <div className="login-form-wrap">
@@ -323,17 +324,22 @@ function AppShell() {
     totp: <TotpPage manager={totpManager} />, settings: <SettingsPage totpManager={totpManager} />,
   };
   const shellClass = `app-shell${page === 'chat' ? ' chat-active' : ''}${menuVisible ? '' : ' main-menu-collapsed'}`;
+  const MenuToggleIcon = menuVisible ? PanelLeftClose : PanelLeftOpen;
   return <div className={shellClass}>
     <aside className="desktop-sidebar">
-      <div className="brand-lockup"><span className="brand-mark"><Zap size={21} fill="currentColor" /></span><b>Codex Switch</b></div>
+      <div className="desktop-sidebar-heading">
+        <div className="brand-lockup"><BrandMark />
+          <b>Codex Switch</b></div>
+        <button type="button" className="main-menu-toggle" aria-label={menuVisible ? '收起主菜单' : '展开主菜单'}
+          aria-expanded={menuVisible} onClick={() => setMenuVisible(value => !value)}>
+          <MenuToggleIcon size={20} /></button>
+      </div>
       <nav>{navItems.map((item) => <button key={item.key} type="button" className={page === item.key ? "active" : ""} onClick={() => dispatch(pageChanged(item.key))}><item.icon size={19} /><span>{item.label}</span>{item.key === "devices" && onlineCount ? <b>{onlineCount}</b> : null}</button>)}</nav>
       <div className="sidebar-live"><span><i /> 服务已连接</span><p>安心管理账号与设备</p></div>
       <Dropdown menu={{ items: userMenu }} trigger={["click"]}><button type="button" className="sidebar-profile"><span>{(profile?.email || session?.email || "U").slice(0, 2).toUpperCase()}</span><div><strong>{profile?.email || session?.email}</strong><small>{profile?.roleName || (profile?.role === "admin" ? "管理员" : "用户")}</small></div><Menu size={17} /></button></Dropdown>
     </aside>
     <div className="content-shell">
       {page !== 'chat' && <header className="desktop-topbar"><div>
-        <button type="button" className="icon-button" aria-label={menuVisible ? '收起主菜单' : '展开主菜单'}
-          aria-expanded={menuVisible} onClick={() => setMenuVisible(value => !value)}><PanelLeft size={18} /></button>
         <span>{navItems.find((item) => item.key === page)?.label}</span><strong>{pageDescriptions[page]}</strong></div>
         <div><Tooltip title="刷新全部数据"><button className="icon-button" type="button"
           onClick={() => void dispatch(refreshAll())}>
@@ -342,9 +348,7 @@ function AppShell() {
             { month: "long", day: "numeric", weekday: "short" }).format(new Date())}</span></div></header>}
       <main className="main-content">
         {session && <ChatPage key={session.baseUrl + session.email} session={session} devices={devices}
-          active={page === "chat"} menuControl={<button type="button" className="chat-back desktop-menu-toggle"
-            aria-label={menuVisible ? '收起主菜单' : '展开主菜单'} aria-expanded={menuVisible}
-            onClick={() => setMenuVisible(value => !value)}><Menu size={21} /></button>} />}
+          active={page === "chat"} />}
         {page !== "chat" && otherPages[page]}
       </main>
     </div>
@@ -356,6 +360,7 @@ export default function App() {
   const dispatch = useAppDispatch();
   const { session, initialized } = useAppSelector((state) => state.auth);
   useEffect(() => { void dispatch(bootstrapApp()); }, [dispatch]);
-  if (!initialized) return <div className="boot-screen"><span className="brand-mark"><Zap size={22} fill="currentColor" /></span><SpinLoading color="primary" /><p>正在打开 Codex Switch</p></div>;
+  if (!initialized) return <div className="boot-screen"><BrandMark /><SpinLoading color="primary" />
+    <p>正在打开 Codex Switch</p></div>;
   return session ? <AppShell /> : <LoginView />;
 }

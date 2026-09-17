@@ -24,6 +24,8 @@ test.beforeEach(async ({ page, request }, info) => {
   await page.getByPlaceholder('输入登录密码').fill('local-test');
   await page.getByRole('button', { name: '登录并查看' }).click();
   await expect(page.locator('.app-shell')).toBeVisible();
+  // The shell appears before sign-in finishes loading dashboard data; reloading then cancels login.
+  await expect(page.getByText('欢迎回来', { exact: true })).toBeVisible();
 });
 
 

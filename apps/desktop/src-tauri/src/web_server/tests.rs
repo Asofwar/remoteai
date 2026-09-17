@@ -95,6 +95,33 @@ mod tests {
     }
 
     #[test]
+    fn lan_clients_can_control_proxy_lifecycle_without_changing_network_exposure() {
+        let access = WebRequestAccess::Lan;
+        for command in ["start_local_proxy", "stop_local_proxy", "stop_local_proxy_without_migrating"] {
+            assert!(access.allows_command(command), "{command}");
+        }
+        for command in [
+            "set_local_proxy_listen_on_all_interfaces",
+            "set_web_proxy_listen_on_all_interfaces",
+            "set_network_proxy",
+        ] {
+            assert!(!access.allows_command(command), "{command}");
+        }
+    }
+
+    #[test]
+    fn lan_model_context_settings_are_read_only() {
+        let access = WebRequestAccess::Lan;
+        assert!(access.allows_command("get_official_model_context_settings"));
+        for command in [
+            "set_official_model_context_window",
+            "set_gpt_5_6_sol_context_window",
+        ] {
+            assert!(!access.allows_command(command), "{command}");
+        }
+    }
+
+    #[test]
     fn lan_api_keys_are_random_and_constant_time_comparison_rejects_variants() {
         let first = generate_web_lan_api_key();
         let second = generate_web_lan_api_key();

@@ -228,7 +228,12 @@ const LAN_COMMAND_ALLOWLIST: &[&str] = &[
     "get_dream_skin_market",
     "get_dream_skin_resources_status",
     "get_dream_skin_status",
+    // Authenticated browsers can use the same proxy lifecycle controls as the desktop UI.
+    "start_local_proxy",
+    "stop_local_proxy",
+    "stop_local_proxy_without_migrating",
     "get_local_proxy_status",
+    "get_official_model_context_settings",
     "list_local_proxy_ipv4_addresses",
     "get_recent_proxy_session_latency",
     "list_account_token_usage",

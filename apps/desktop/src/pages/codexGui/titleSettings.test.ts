@@ -36,3 +36,14 @@ it('uses defaults offline and retains the last valid configuration on later fail
   await settings.refresh();
   expect(await settings.snapshot()).toEqual({ model: 'custom', effort: 'high' });
 });
+
+it.each([
+  { ok: false, status: 404 },
+  { ok: true, json: async () => { throw new SyntaxError('Legacy server returned HTML'); } },
+  { ok: true, json: async () => ({}) },
+])('falls back to Luna when the admin title endpoint has not been deployed: %j', async (response) => {
+  fetcher.mockResolvedValue(response);
+  const settings = new GuiTitleSettings();
+  await settings.refresh();
+  expect(await settings.snapshot()).toEqual({ model: 'gpt-5.6-luna', effort: 'low' });
+});

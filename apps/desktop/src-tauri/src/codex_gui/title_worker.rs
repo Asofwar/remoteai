@@ -118,7 +118,7 @@ impl Worker {
                 continue;
             }
             if message.get("error").is_some() {
-                return Err(GuiError::Rpc);
+                return Err(GuiError::from_rpc(&message["error"]));
             }
             return message.get("result").cloned().ok_or(GuiError::Rpc);
         }

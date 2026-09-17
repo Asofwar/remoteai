@@ -104,23 +104,101 @@ async fn real_cli_generates_a_private_title_with_configured_model_and_effort() {
         "settings": {"model": "gpt-5.6-luna", "effort": "low"}}),
     )
     .unwrap();
-    let result = generate(
-        Executable {
-            path: binary.into(),
-            version: "0.154.0".into(),
-        },
-        root.clone(),
-        &request,
-    )
-    .await;
+    let binary = Executable {
+        path: binary.into(),
+        version: "0.154.0".into(),
+    };
+    let result = name_first_turn(&binary, &root, request).await;
     stop.store(true, Ordering::Release);
     worker.join().unwrap();
     remove_fixture(&root);
     assert_eq!(result.unwrap(), "熊骑车 SVG 动画");
     let bodies = bodies.lock().unwrap();
-    let body = bodies.first().expect("the CLI must contact the fixture");
+    assert_eq!(bodies.first().unwrap()["model"], "gpt-6-astra");
+    let body = bodies.last().expect("the CLI must contact the fixture");
     assert_eq!(body["model"], "gpt-5.6-luna");
     assert_eq!(body["reasoning"]["effort"], "low");
     assert_eq!(body["text"]["format"]["type"], "json_schema");
     assert!(body["tools"].as_array().is_none_or(Vec::is_empty));
+    assert_eq!(
+        bodies.len(),
+        2,
+        "the first turn and private naming each issue one request"
+    );
+}
+
+async fn start_conversation(
+    binary: &Executable,
+    root: &std::path::Path,
+    request: &mut TitleRequest,
+) -> Result<Worker> {
+    let mut worker = Worker::spawn(binary, root)?;
+    worker
+        .rpc("initialize", identity::initialize_params(&binary.version))
+        .await?;
+    worker.write(json!({"method": "initialized"})).await?;
+    let mut params =
+        title_generation::start_params(&request.settings, &platform::execution_path(root));
+    params["ephemeral"] = json!(false);
+    params["model"] = json!("gpt-6-astra");
+    let thread = worker.rpc("thread/start", params).await?;
+    request.thread_id = thread["thread"]["id"]
+        .as_str()
+        .ok_or(GuiError::Rpc)?
+        .to_owned();
+    let mut turn = title_generation::turn_params(&request.thread_id, request);
+    turn["model"] = json!("gpt-6-astra");
+    worker.rpc("turn/start", turn).await?;
+    Ok(worker)
+}
+
+async fn name_first_turn(
+    binary: &Executable,
+    root: &std::path::Path,
+    mut request: TitleRequest,
+) -> Result<String> {
+    let worker = tokio::sync::Mutex::new(start_conversation(binary, root, &mut request).await?);
+    // Exercise the real CLI at the same point as the GUI: immediately after turn/start acknowledges.
+    let result = async {
+        let original = crate::codex_gui::title_read::when_ready(|| async {
+            worker
+                .lock()
+                .await
+                .rpc("thread/read", json!({"threadId": request.thread_id}))
+                .await
+        })
+        .await?;
+        assert!(title_generation::explicit_title(&original["thread"]).is_none());
+        let title = generate(
+            Executable {
+                path: binary.path.clone(),
+                version: binary.version.clone(),
+            },
+            root.to_owned(),
+            &request,
+        )
+        .await?;
+        let mut worker = worker.lock().await;
+        worker
+            .rpc(
+                "thread/name/set",
+                json!({"threadId": request.thread_id, "name": title}),
+            )
+            .await?;
+        let saved = worker
+            .rpc("thread/read", json!({"threadId": request.thread_id}))
+            .await?;
+        assert_eq!(saved["thread"]["name"], title);
+        assert_eq!(saved["thread"]["preview"], request.prompt);
+        Ok(title)
+    }
+    .await;
+    worker
+        .lock()
+        .await
+        .process
+        .kill()
+        .await
+        .map_err(|_| GuiError::Disconnected)?;
+    result
 }

@@ -1,6 +1,25 @@
 import { test, expect } from '@playwright/test';
 import { titleBackend } from './thread-titles-backend';
 
+test('an older admin server still generates titles with Luna while chat and polling stay responsive', async ({ page }) => {
+  const backend = titleBackend(404);
+  await backend.attach(page.context());
+  try {
+    await page.goto('/e2e/thread-titles-harness.html');
+    await page.getByRole('textbox', { name: '聊天消息' }).fill('这是一个标题自动生成的测试对话');
+    await page.getByRole('button', { name: '发送', exact: true }).click();
+    await expect.poll(() => backend.titleRequests.length).toBe(1);
+    expect(backend.titleRequests[0].settings).toEqual({ model: 'gpt-5.6-luna', effort: 'low' });
+    await expect(page.getByRole('status', { name: '回复状态' })).toHaveText('正在回复');
+    const beats = Number(await page.getByLabel('刷新次数').textContent());
+    await page.getByRole('textbox', { name: '聊天消息' }).fill('仍能输入');
+    await expect.poll(async () => Number(await page.getByLabel('刷新次数').textContent())).toBeGreaterThan(beats);
+    backend.finish('对话标题生成测试');
+    await expect(page.getByRole('button', { name: '对话标题生成测试' })).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  } finally { backend.release(); }
+});
+
 test('titles follow admin settings and tab activations while replies and polling remain responsive', async ({ page }) => {
   const backend = titleBackend();
   await backend.attach(page.context());

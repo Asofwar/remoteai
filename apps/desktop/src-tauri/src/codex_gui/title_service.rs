@@ -24,13 +24,25 @@ impl Client {
         {
             return Ok(skipped());
         }
-        let existing = self
-            .request_raw("thread/read", json!({"threadId": request.thread_id}))
-            .await?;
-        if explicit_title(&existing["thread"]).is_some() {
-            return Ok(skipped());
+        let result = self.generate_unclaimed_title(&request).await;
+        if let Err(error) = &result {
+            self.title_jobs.lock().await.remove(&request.thread_id);
+            eprintln!("Codex GUI title generation failed: {error}");
         }
-        let title = self.title_candidate(&request).await?;
+        result
+    }
+
+    async fn generate_unclaimed_title(&self, request: &TitleRequest) -> Result<GuiResponse> {
+        let existing = crate::codex_gui::title_read::when_ready(|| {
+            self.request_raw("thread/read", json!({"threadId": request.thread_id}))
+        })
+        .await?;
+        if explicit_title(&existing["thread"]).is_some() {
+            return Ok(GuiResponse {
+                data: json!({"title": null}),
+            });
+        }
+        let title = self.title_candidate(request).await?;
         self.save_generated_title(&request.thread_id, title).await
     }
 

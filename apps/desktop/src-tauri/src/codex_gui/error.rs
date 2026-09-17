@@ -42,6 +42,8 @@ pub(super) enum GuiError {
     Timeout,
     #[error("Codex 未能完成操作，请检查当前账户、模型和 Codex 配置。")]
     Rpc,
+    #[error("对话正在准备，请稍后重试。")]
+    ThreadNotReady,
     #[error("Codex 暂时无法启动，请检查 Codex 配置后重试。")]
     Startup,
     #[error("暂时无法访问 GitHub，请检查网络后重试。")]
@@ -52,6 +54,21 @@ pub(super) enum GuiError {
     Install,
     #[error("Codex 正在下载，请稍候。")]
     Installing,
+}
+
+impl GuiError {
+    pub(super) fn from_rpc(error: &serde_json::Value) -> Self {
+        let message = error["message"].as_str().unwrap_or_default();
+        // A first turn can be acknowledged before the CLI flushes its rollout metadata.
+        if message.starts_with("failed to read thread:")
+            && message.contains("rollout at ")
+            && message.ends_with(" is empty")
+        {
+            Self::ThreadNotReady
+        } else {
+            Self::Rpc
+        }
+    }
 }
 
 pub(super) type Result<T> = std::result::Result<T, GuiError>;

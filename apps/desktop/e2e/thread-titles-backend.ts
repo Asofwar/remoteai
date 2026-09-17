@@ -1,7 +1,7 @@
 import type { BrowserContext } from '@playwright/test';
 import type { GuiEvent, Thread } from '../src/pages/codexGui/types';
 
-export function titleBackend() {
+export function titleBackend(settingsStatus = 200) {
   let settings = { model: 'admin-title-model', effort: 'medium' };
   let settingsReads = 0;
   let sequence = 0;
@@ -45,7 +45,7 @@ export function titleBackend() {
   async function attach(context: BrowserContext) {
     await context.route('https://title-config.test/chat/title-settings', (route) => {
       settingsReads += 1;
-      return route.fulfill({ json: settings, headers: { 'Access-Control-Allow-Origin': '*' } });
+      return route.fulfill({ status: settingsStatus, json: settings, headers: { 'Access-Control-Allow-Origin': '*' } });
     });
     await context.route('**/__codex_switch__/api/invoke', async (route) => {
       const { command, args = {} } = route.request().postDataJSON();

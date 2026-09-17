@@ -241,7 +241,7 @@ impl Client {
         } else if let Some(id) = value["id"].as_u64() {
             if let Some(sender) = self.pending.lock().await.remove(&id) {
                 let result = if value.get("error").is_some() {
-                    Err(GuiError::Rpc)
+                    Err(GuiError::from_rpc(&value["error"]))
                 } else {
                     Ok(value["result"].clone())
                 };

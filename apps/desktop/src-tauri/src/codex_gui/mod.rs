@@ -41,6 +41,7 @@ pub(crate) mod scheduled_tasks;
 mod tests;
 mod text_preview;
 mod title_generation;
+mod title_read;
 mod title_worker;
 pub(crate) mod undo;
 pub(crate) mod upload_policy;

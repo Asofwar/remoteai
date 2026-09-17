@@ -177,7 +177,8 @@ html:has(.app-shell.chat-active), body:has(.app-shell.chat-active) { overscroll-
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   color: var(--chat-green); text-align: right; font-size: 13px;
 }
-.chat-setting-entry > span:last-child { color: var(--chat-muted); font-size: 22px; }
+.chat-setting-entry > span:last-child { color: var(--chat-muted); }
+.chat-setting-entry > span:last-child[aria-hidden="true"] { font-size: 22px; }
 .chat-setting-options { max-height: 60vh; overflow: auto; }
 .chat-setting-option { color: var(--chat-green); }
 .chat-setting-option[aria-checked="true"] { border-color: var(--chat-green); background: var(--chat-pale); }

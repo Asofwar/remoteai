@@ -12,7 +12,9 @@ export function turnErrorNotice(turn: Turn) {
   return '连接暂时中断，Codex 正在重试…';
 }
 
-export function ChatTurnSummary({ turn, onOpen }: { turn: Turn; onOpen: (panel: TurnPanel) => void }) {
+export function ChatTurnSummary({ turn, onOpen, hideStopped = false }: {
+  turn: Turn; onOpen: (panel: TurnPanel) => void; hideStopped?: boolean;
+}) {
   const files = completedTurnFiles(turn);
   const generated = [...new Set(turn.items.filter(item => item.type === 'imageGeneration'
     && item.status === 'completed' && !item.failure).map(generatedImageSource).filter(Boolean))];
@@ -33,7 +35,7 @@ export function ChatTurnSummary({ turn, onOpen }: { turn: Turn; onOpen: (panel: 
         <span className="chat-ellipsis">{path}</span></button>)}
       {paths.length > 3 && <button type="button" onClick={() => onOpen('changes')}>再显示 {paths.length - 3} 个文件</button>}
     </div>}
-    {turn.status === 'interrupted' && <p className="chat-muted">已停止生成</p>}
+    {turn.status === 'interrupted' && !hideStopped && <p className="chat-muted">已停止生成</p>}
     {(turn.error || turn.retryError || turn.status === 'failed') && <button type="button"
       className="chat-error-notice" aria-label="查看报错详情" onClick={() => onOpen('error')}>
       {turnErrorNotice(turn)} <u>查看报错详情</u></button>}

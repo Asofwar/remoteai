@@ -6,6 +6,7 @@ import { isInlineImage, localImageSource } from '../../../../shared/chat/imageSo
 import { ChatCodeBlock } from './ChatCodeBlock';
 import { ChatImage } from './ChatImage';
 import { ChatFileLink } from './ChatFileLink';
+import { ChatMarkdownTable } from './ChatMarkdownTable';
 
 function textContent(children: ReactNode): string {
   return Children.toArray(children).map(child => {
@@ -14,23 +15,32 @@ function textContent(children: ReactNode): string {
   }).join('');
 }
 
+function codeBlock(children: ReactNode, desktop = false) {
+  const code = Children.toArray(children).find(child => isValidElement(child));
+  const language = isValidElement<{ className?: string }>(code)
+    ? code.props.className?.replace(/^language-/, '') : '';
+  return <ChatCodeBlock text={textContent(children).replace(/\n$/, '')} language={language} desktop={desktop} />;
+}
+
 const components: Components = {
   a: ({ children, href }) => <ChatFileLink href={href}>{children}</ChatFileLink>,
   img: ({ src, alt }) => <ChatImage source={src} description={alt || '图片'} />,
-  pre: ({ children }) => {
-    const code = Children.toArray(children).find(child => isValidElement(child));
-    const language = isValidElement<{ className?: string }>(code)
-      ? code.props.className?.replace(/^language-/, '') : '';
-    return <ChatCodeBlock text={textContent(children).replace(/\n$/, '')} language={language} />;
-  },
+  pre: ({ children }) => codeBlock(children),
 };
 
-export function ChatMarkdown({ text, process = false }: { text: string; process?: boolean }) {
+const desktopComponents: Components = { ...components,
+  pre: ({ children }) => codeBlock(children, true),
+  table: ({ children }) => <ChatMarkdownTable>{children}</ChatMarkdownTable> };
+
+export function ChatMarkdown({ text, process = false, desktop = false }: {
+  text: string; process?: boolean; desktop?: boolean;
+}) {
   return <div className={`chat-markdown${process ? ' chat-process-prose' : ''}`}>
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} urlTransform={(url, key) => {
-      if (/^https?:\/\//i.test(url)) return url;
-      if (key === 'href' && parseFileReference(url)) return url;
-      return key === 'src' && (isInlineImage(url) || localImageSource(url)) ? url : '';
-    }}>{text}</ReactMarkdown>
+    <ReactMarkdown remarkPlugins={[remarkGfm]} components={desktop ? desktopComponents : components}
+      urlTransform={(url, key) => {
+        if (/^https?:\/\//i.test(url)) return url;
+        if (key === 'href' && parseFileReference(url)) return url;
+        return key === 'src' && (isInlineImage(url) || localImageSource(url)) ? url : '';
+      }}>{text}</ReactMarkdown>
   </div>;
 }

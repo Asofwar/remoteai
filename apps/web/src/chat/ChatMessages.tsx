@@ -5,22 +5,33 @@ import { useConversationEntries } from '../../../../shared/chat/useConversationE
 import { findWorkEntry, type TurnEntry, type WorkEntry } from '../../../../shared/chat/turnPresentation';
 import { formatTurnDuration, turnElapsedMs } from '../../../desktop/src/pages/codexGui/turnTiming';
 import { AdaptiveSheet } from '../components/AdaptiveSheet';
+import { useDesktopLayout } from '../useDesktopLayout';
 import { useHistoryScroll } from './useHistoryScroll';
 import { ChatMessage } from './ChatMessage';
 import { ChatToolDetails } from './ChatToolDetails';
 import { ChatTurnDetails } from './ChatTurnDetails';
 import { ChatTurnSummary, type TurnPanel } from './ChatTurnSummary';
+import { ChatTurnTiming, desktopTimeline } from './ChatTurnTiming';
+import { ChatSelectionQuote } from './ChatSelectionQuote';
 import './messages.css';
+import './desktopMessages.css';
 
 type Selection = { type: 'work'; id: string } | { type: 'item'; id: string; workId?: string }
   | { type: 'turn'; id: string; panel: TurnPanel };
 
-function WorkSummary({ entry, open, inline }: {
+function WorkSummary({ entry, open, inline, desktop }: {
   entry: WorkEntry; open: () => void; inline: (id: string, value: boolean) => void;
+  desktop: boolean;
 }) {
   const running = entry.turn.status === 'inProgress';
   const elapsed = entry.timed ? turnElapsedMs(entry.turn, 0) : null;
   const label = elapsed == null ? (running ? '正在处理' : '处理过程') : `用时 ${formatTurnDuration(elapsed)}`;
+  if (desktop) return <div className="chat-work-summary chat-desktop-work">
+    <button type="button" aria-label={`查看处理过程，${entry.items.length} 项活动`} aria-expanded={entry.inline}
+      onClick={() => inline(entry.turn.id, !entry.inline)}>
+      {entry.timed ? <ChatTurnTiming turn={entry.turn} fallback="处理过程" /> : '处理过程'}
+      <ChevronRight size={14} /></button>
+  </div>;
   return <div className="chat-work-summary">
     <button type="button" aria-label={`查看处理过程，${entry.items.length} 项活动`} onClick={open}>
       {label}<ChevronRight size={14} /></button>
@@ -30,27 +41,32 @@ function WorkSummary({ entry, open, inline }: {
   </div>;
 }
 
-function TimelineEntry({ entry, open, inline }: {
+function TimelineEntry({ entry, open, inline, desktop }: {
   entry: TurnEntry; open: (selection: Selection) => void; inline: (id: string, value: boolean) => void;
+  desktop: boolean;
 }) {
   if (entry.kind === 'duration') {
+    if (desktop) return <p className="chat-turn-duration"><ChatTurnTiming turn={entry.turn} /></p>;
     const elapsed = turnElapsedMs(entry.turn, 0);
     return elapsed == null ? null : <p className="chat-turn-duration">用时 {formatTurnDuration(elapsed)}</p>;
   }
-  if (entry.kind === 'summary') return <ChatTurnSummary turn={entry.turn}
+  if (entry.kind === 'summary') return <ChatTurnSummary turn={entry.turn} hideStopped={desktop}
     onOpen={panel => open({ type: 'turn', id: entry.turn.id, panel })} />;
-  if (entry.kind === 'work') return <WorkSummary entry={entry} inline={inline}
+  if (entry.kind === 'work') return <WorkSummary entry={entry} inline={inline} desktop={desktop}
     open={() => open({ type: 'work', id: entry.id })} />;
-  return <ChatMessage item={entry.item} process={entry.kind === 'process'}
+  return <ChatMessage item={entry.item} process={entry.kind === 'process'} desktop={desktop}
+    onInspect={() => inline(entry.turn.id, true)}
     onOpen={id => { if (entry.kind === 'process') inline(entry.turn.id, true); open({ type: 'item', id }); }}
     running={entry.turn.status === 'inProgress' && entry.item.status !== 'completed'} />;
 }
 
 export function ChatMessages(props: ChatMessagesProps) {
+  const desktop = useDesktopLayout();
   const { thread, loading, loadingMore, hasMore, offline } = props;
   const turns = useMemo(() => (thread?.turns ?? []).map(turn => offline && turn.status === 'inProgress'
     ? { ...turn, status: 'cached' } : turn), [thread?.turns, offline]);
   const { entries, setInline } = useConversationEntries(turns);
+  const timeline = useMemo(() => desktop ? desktopTimeline(entries) : entries, [desktop, entries]);
   const scroll = useHistoryScroll(props);
   const [selection, setSelection] = useState<Selection | null>(null);
   const work = selection?.type === 'work' ? findWorkEntry(entries, selection.id) : undefined;
@@ -61,19 +77,23 @@ export function ChatMessages(props: ChatMessagesProps) {
   const close = () => setSelection(null);
   return <>
     <div className="chat-message-region">
+      <ChatSelectionQuote root={scroll.content} selected={thread?.id ?? null} enabled={desktop} />
       <div ref={scroll.list} className="chat-scroll chat-messages" aria-label="聊天记录" onScroll={scroll.onScroll}>
-        <div ref={scroll.content} className={`chat-message-content${!entries.length ? ' is-empty' : ''}`}>
+        <div ref={scroll.content} className={`chat-message-content${!entries.length ? ' is-empty' : ''}`}
+          onClickCapture={desktop ? scroll.pauseFollowing : undefined}>
           {(hasMore || (loading && !entries.length)) && <div className="chat-history-more">
             {loadingMore || (loading && !entries.length)
               ? <span role="status" className="chat-processing"><span className="chat-spinner" />正在加载聊天记录…</span>
               : <button type="button" className="chat-text-action" onClick={scroll.more}>加载更早的消息</button>}
           </div>}
-          {entries.map(entry => <div key={entry.id}
+          {timeline.map(entry => <div key={entry.id}
             data-message-id={'item' in entry ? entry.item.id : entry.id} className={`chat-entry-${entry.kind}`}>
-            <TimelineEntry entry={entry} open={setSelection} inline={setInline} />
+            <TimelineEntry entry={entry} open={setSelection} inline={setInline} desktop={desktop} />
           </div>)}
           {!entries.length && !loading && <div className="chat-empty"><Terminal size={28} className="chat-empty-glyph" />
-            <h2>想一起完成什么？</h2><p className="chat-muted">直接提问，或选择一个项目开始任务。</p></div>}
+            <h2>想一起完成什么？</h2><p className="chat-muted">直接提问，或选择一个项目开始任务。</p>
+            {desktop && <div className="chat-empty-suggestions"><span>理解代码</span><span>实现功能</span>
+              <span>排查问题</span></div>}</div>}
         </div>
       </div>
       {scroll.showBottom && entries.length > 0 && <button type="button" className="chat-scroll-bottom"

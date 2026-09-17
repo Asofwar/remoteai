@@ -57,5 +57,6 @@ export function useHistoryScroll({ thread, loadingMore, hasMore, loadOlder }: Ch
     setShowBottom(false);
     list.current?.scrollTo({ top: list.current.scrollHeight, behavior: 'smooth' });
   };
-  return { list, content, onScroll, more, showBottom, toBottom };
+  const pauseFollowing = () => { following.current = false; };
+  return { list, content, onScroll, more, showBottom, toBottom, pauseFollowing };
 }

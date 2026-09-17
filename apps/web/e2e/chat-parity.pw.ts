@@ -32,20 +32,27 @@ test('renders rich replies, folded work, nested output, file previews and reply 
     await page.getByRole('button', { name: '显示更多内容' }).click();
   }
   await expect(page.getByText('OUTPUT_END', { exact: false }).last()).toBeVisible();
-  await page.getByRole('button', { name: '返回上一层' }).click();
+  const desktop = info.project.name === 'desktop';
+  if (desktop) await page.getByRole('button', { name: /执行命令.*npm test/ }).click();
+  else await page.getByRole('button', { name: '返回上一层' }).click();
   await expect(page.getByRole('button', { name: /执行命令.*npm test/ })).toBeVisible();
   await page.getByRole('button', { name: /preview/ }).click();
-  await expect(page.getByRole('heading', { name: '工具结果' })).toBeVisible();
+  if (!desktop) await expect(page.getByRole('heading', { name: '工具结果' })).toBeVisible();
   await expect(page.getByRole('img', { name: '工具返回的图片' })).toBeVisible();
-  await closeSheet(page);
-  await page.getByRole('button', { name: /查看处理过程/ }).click();
+  if (desktop) await page.getByRole('button', { name: /preview/ }).click();
+  else {
+    await closeSheet(page);
+    await page.getByRole('button', { name: /查看处理过程/ }).click();
+  }
   await page.getByRole('button', { name: /^文件修改/ }).click();
-  await expect(page.locator('.ant-drawer-right .chat-diff')).toBeVisible();
+  await expect(page.locator(desktop ? '.chat-messages .chat-diff' : '.ant-drawer-right .chat-diff')).toBeVisible();
   await page.locator('.chat-diff-file summary').first().click();
   await expect(page.locator('.chat-diff-line.remove').first()).toBeVisible();
-  await page.getByRole('button', { name: '返回上一层' }).click();
+  if (desktop) await page.getByRole('button', { name: /^文件修改/ }).click();
+  else await page.getByRole('button', { name: '返回上一层' }).click();
   await expect(page.getByRole('button', { name: /^文件修改/ })).toBeVisible();
-  await closeSheet(page);
+  if (desktop) await page.getByRole('button', { name: /查看处理过程/ }).click();
+  else await closeSheet(page);
   await page.getByRole('button', { name: /查看本轮修改：3 个文件/ }).click();
   await expect(page.locator('.ant-drawer-right .chat-diff')).toBeVisible();
   await expect(page.locator('.chat-diff > section')).toHaveCount(2);

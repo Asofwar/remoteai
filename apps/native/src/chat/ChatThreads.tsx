@@ -25,8 +25,7 @@ export function ChatThreads({ state, controller, newChat, openSearch, select, pr
         <Text style={styles.subtitle}>{state.archived ? '已归档 ▾' : '最近聊天 ▾'}</Text>
       </Pressable>
     </View>
-    <ChatThreadList state={state} newChat={newChat} select={select} bottomInset={footerHeight}
-      refresh={() => { void controller.list(); }} loadMore={() => { void controller.list({ more: true }); }} />
+    <ChatThreadList state={state} controller={controller} newChat={newChat} select={select} bottomInset={footerHeight} />
     <View style={listStyles.footer} pointerEvents="box-none"
       onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}>
       <Pressable accessibilityRole="button" accessibilityLabel="新聊天" disabled={state.sending}

@@ -3,6 +3,7 @@ import { LoaderCircle, Plus, RefreshCw, Search } from 'lucide-react';
 import type { ChatController, ChatProject, ChatState } from './types';
 import { threadPresentation } from '../../../../shared/remote-chat/sidebar';
 import { useThreadGroups } from '../../../../shared/remote-chat/client/useThreadGroups';
+import { useThreadListScroll } from './useThreadListScroll';
 
 interface Props {
   state: ChatState; controller: ChatController; newChat: (project?: ChatProject) => void; onClose: () => void;
@@ -11,6 +12,7 @@ interface Props {
 
 export function ChatThreads({ state, controller, newChat, onClose, openSearch, profile }: Props) {
   const { groups, toggle } = useThreadGroups(state);
+  const pagination = useThreadListScroll(state, controller);
   const ready = state.ready;
   return <>
     <div className="chat-padded chat-thread-controls">
@@ -24,7 +26,7 @@ export function ChatThreads({ state, controller, newChat, onClose, openSearch, p
           onClick={() => { void controller.list(); }}><RefreshCw size={17} /></button>
       </div>
     </div>
-    <div className="chat-scroll chat-thread-list" aria-busy={state.loading}>
+    <div ref={pagination.list} className="chat-scroll chat-thread-list" aria-busy={state.loading}>
       {groups.map((group) =>
         <section className="chat-project-group" aria-label={group.label} key={group.cwd}>
           <div className="chat-project-heading">
@@ -49,8 +51,12 @@ export function ChatThreads({ state, controller, newChat, onClose, openSearch, p
         </section>)}
       {!state.threads.length && <p className="chat-empty chat-muted">
         {ready ? '暂时没有聊天' : '连接电脑后查看聊天'}</p>}
-      {state.cursor && <button type="button" className="chat-button" disabled={!ready || state.loading}
-        onClick={() => { void controller.list({ more: true }); }}>加载更多</button>}
+      <div ref={pagination.end} className="chat-thread-pagination">
+        {pagination.loadingMore && <span role="status" className="chat-muted chat-row">
+          <LoaderCircle size={16} className="chat-spinner" aria-hidden="true" />正在加载…</span>}
+        {state.cursor && pagination.failed && <button type="button" className="chat-button"
+          disabled={!ready || state.loading} onClick={pagination.retry}>加载失败，点击重试</button>}
+      </div>
     </div>
     <div className="chat-drawer-footer"><button className="chat-new-button" type="button"
       disabled={state.sending} onClick={() => newChat()}><Plus size={20} />新聊天</button>{profile}</div>

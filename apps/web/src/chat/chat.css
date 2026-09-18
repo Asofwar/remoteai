@@ -116,6 +116,7 @@ html:has(.app-shell.chat-active), body:has(.app-shell.chat-active) { overscroll-
 .chat-search { padding: 0 8px 0 12px; border: 1px solid var(--chat-border); border-radius: 12px; background: white; }
 .chat-search input { width: 100%; min-width: 0; border: 0; background: transparent; color: inherit; font-size: 16px; }
 .chat-thread-list { flex: 1; }
+.chat-thread-pagination { min-height: 44px; display: flex; align-items: center; justify-content: center; }
 .chat-empty {
   min-height: 200px;
   display: grid;

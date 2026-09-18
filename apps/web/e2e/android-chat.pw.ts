@@ -30,13 +30,15 @@ async function keyboardAndBackground(device: AndroidDevice, page: Page, request:
   await device.screenshot({ path: test.info().outputPath('android-keyboard.png') });
   await page.bringToFront();
   await expect.poll(() => page.evaluate(() => document.visibilityState)).toBe('visible');
+  const connections = (await state(request)).mobileConnections;
   await device.shell('input keyevent KEYCODE_HOME');
   await expect.poll(() => page.evaluate(() => document.visibilityState)).toBe('hidden');
-  await expect.poll(async () => (await state(request)).connectedMobiles).toBe(0);
+  await expect.poll(async () => (await state(request)).connectedMobiles).toBe(1);
   await device.shell('am start -n com.android.chrome/com.google.android.apps.chrome.Main');
   await expect(page.getByRole('status').filter({ hasText: /P2P|Relay/ }))
     .toBeVisible({ timeout: 16_000 });
   await expect(page.getByRole('textbox', { name: '聊天消息' })).toHaveValue('Android Chrome keyboard check');
+  expect((await state(request)).mobileConnections).toBe(connections);
 }
 
 test('Android Chrome runs the H5 chat journey with the real soft keyboard and background recovery',

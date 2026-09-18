@@ -40,14 +40,19 @@ export function useChat(session: AuthSession, deviceId: string, active: boolean)
     };
   }, []);
   useEffect(() => {
-    if (!active || !foreground) return;
+    // Keep the session and pending requests alive when another page or browser tab is shown.
+    if (!deviceId) return;
     controller.start();
     return () => controller.stop();
-  }, [active, foreground, controller]);
+  }, [deviceId, controller]);
+  useEffect(() => {
+    if (active && foreground && deviceId) controller.connectNow();
+  }, [active, foreground, deviceId, controller]);
   useEffect(() => {
     if (!active || !foreground || (state.mode !== 'direct' && state.mode !== 'relay')) return;
+    void controller.refreshSelected();
     const timer = window.setInterval(() => { void controller.refreshSelected(); }, HISTORY_REFRESH_MS);
     return () => window.clearInterval(timer);
   }, [active, foreground, controller, state.mode]);
-  return { controller, state };
+  return { controller, state, foreground };
 }

@@ -44,7 +44,7 @@ export function ChatPage({ session, devices, active }: Props) {
 function ConnectedChat({ session, device, devices, active, chooseDevice }: Props & {
   device?: RemoteDevice; chooseDevice: (id: string) => void;
 }) {
-  const { state, controller } = useChat(session, device?.deviceId ?? '', active && Boolean(device));
+  const { state, controller, foreground } = useChat(session, device?.deviceId ?? '', active && Boolean(device));
   const [drawer, setDrawer] = useState(false);
   const desktop = useDesktopLayout();
   const [sidebar, setSidebar] = usePanelVisibility('chat-list');
@@ -65,8 +65,8 @@ function ConnectedChat({ session, device, devices, active, chooseDevice }: Props
   const approvals = state.approvals.filter((event) => event.params.threadId === state.selected?.id);
   const newChat = (project?: ChatProject) => { if (!state.sending) { controller.back(project); setDrawer(false); } };
   useEffect(() => {
-    controller.setViewing(active && (desktop || !drawer) && !pickingDevice && !searching && !tokenSummary);
-  }, [active, desktop, drawer, pickingDevice, searching, tokenSummary, controller]);
+    controller.setViewing(active && foreground && (desktop || !drawer) && !pickingDevice && !searching && !tokenSummary);
+  }, [active, foreground, desktop, drawer, pickingDevice, searching, tokenSummary, controller]);
   useEffect(() => {
     if (!active) { setDrawer(false); setPickingDevice(false); setSearching(false); setTokenSummary(false); }
   }, [active]);

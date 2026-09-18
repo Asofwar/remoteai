@@ -7,6 +7,7 @@ import { imageEditorJourney } from './chat-image-editor';
 import { composerLayout } from './chat-composer';
 import { projectPickerJourney } from './chat-project-picker';
 import { clipboardJourney } from './chat-clipboard';
+import { backgroundJourney } from './chat-background';
 
 test.beforeEach(async ({ page, request }, info) => {
   // Login can open chat immediately; install the network fault before any peer is created.
@@ -85,6 +86,8 @@ test('syncs PC chats over direct transport, supports actions and reconnects with
   async ({ page, request }, info) => chatJourney({ page, request, info }));
 
 for (const relay of [false, true]) {
+  test(`keeps chat connected across browser tabs and app pages over ${relay ? 'relay' : 'direct'}`,
+    async ({ page, request }) => backgroundJourney(page, request, relay));
   test(`selects a computer folder for a new chat over ${relay ? 'relay' : 'direct'}`,
     async ({ page, request }) => projectPickerJourney({ page, request, relay }));
   test(`sends album photos over ${relay ? 'relay' : 'direct'}`,
@@ -99,7 +102,7 @@ test('keeps the PC chat after login renewal and disconnects on logout', async ({
   await openChatList(page);
   await page.getByRole('button', { name: /移动端聊天体验/ }).click();
   await navigate(page, '账号');
-  await expect.poll(async () => (await state(request)).connectedMobiles).toBe(0);
+  await expect.poll(async () => (await state(request)).connectedMobiles).toBe(1);
   let expired = false;
   await page.route('**/auth/me', (route) => {
     if (expired) return route.continue();
@@ -107,6 +110,7 @@ test('keeps the PC chat after login renewal and disconnects on logout', async ({
     return route.fulfill({ status: 401, json: {} });
   });
   const refreshed = page.waitForResponse((response) => response.url().endsWith('/auth/refresh'));
+  await request.post(`${fixtureUrl}/test/disconnect`);
   await navigate(page, '聊天');
   expect((await refreshed).status()).toBe(200);
   await expect(page.getByRole('status').filter({ hasText: 'P2P' })).toBeVisible({ timeout: 15_000 });

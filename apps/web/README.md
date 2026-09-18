@@ -84,3 +84,12 @@ API 请求保持同源并携带 `Authorization: Bearer <JWT>`；`/sync`、`/devi
 
 如果 Web 使用独立域名并从根路径发布，可在构建容器时设置
 `VITE_WEB_BASE_PATH=/`，并通过 Kong 的 Host 路由将该域名指向 Web 服务。
+
+## 搜索与分享信息
+
+`index.html` 包含页面标题、简介、规范网址、Open Graph / Twitter 分享信息及 `WebApplication`
+结构化数据。分享图使用 `public/codex-switch.png`，复用项目现有的 512px 应用图标。
+
+这些网址默认指向官方站点 `https://codex.onepiper.cloud/web/`。使用自己的域名或部署路径时，
+请在构建前同步修改 `index.html` 中的规范网址、`og:url`、分享图网址及结构化数据中的网址；
+`VITE_WEB_BASE_PATH` 只控制资源路径，不会改写这些绝对网址。

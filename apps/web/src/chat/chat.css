@@ -232,7 +232,4 @@ html:has(.app-shell.chat-active), body:has(.app-shell.chat-active) { overscroll-
 }
 @media (min-width: 861px) {
   .chat-thread-controls, .chat-thread-list { width: 100%; max-width: 940px; margin: 0 auto; }
-  .chat-processing-status {
-    width: calc(100% - 56px); max-width: 900px; margin-inline: auto; padding-inline: 0;
-  }
 }

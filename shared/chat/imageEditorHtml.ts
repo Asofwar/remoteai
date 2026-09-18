@@ -6,12 +6,20 @@ const COLORS = [['#ef4444', '红色'], ['#facc15', '黄色'], ['#22c55e', '绿�
   ['#3b82f6', '蓝色'], ['#ffffff', '白色'], ['#111111', '黑色']];
 
 /** A local canvas editor shared by the phone WebView and browser. No remote content is loaded. */
-export function imageEditorHtml(dataUrl: string) {
+export function imageEditorHtml(dataUrl: string, translate = (text: string) => text, language = 'zh-CN') {
   validateChatImages([dataUrl]);
   const policy = getChatPolicy();
+  const label = (text: string) => translate(text).replace(/[&<>"']/g, character =>
+    `&#${character.charCodeAt(0)};`);
   const config = JSON.stringify({ dataUrl, targetBytes: policy.imageTargetKb * KIB,
-    maxEdge: policy.imageMaxEdge }).replace(/</g, '\\u003c');
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+    maxEdge: policy.imageMaxEdge, labels: {
+      saving: translate('正在保存…'),
+      saveFailed: translate('图片保存失败，请撤销部分标注后重试。'),
+      unavailable: translate('图片无法编辑，请重新打开后再试。'),
+      hint: translate('在图片上拖动画标注，完成后即可发送。'),
+      readFailed: translate('图片无法读取，请重新选择。'),
+    } }).replace(/</g, '\\u003c');
+  return `<!doctype html><html lang="${language === 'en' ? 'en' : 'zh-CN'}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:;
   script-src 'unsafe-inline'; style-src 'unsafe-inline'">
@@ -37,19 +45,19 @@ canvas { display: block; touch-action: none; }
 #notice { max-width: 400px; margin: 6px auto 0; font-size: 13px; text-align: center; color: #ccc; }
 footer { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
 </style></head><body>
-<header><button id="cancel">取消</button><strong>图片标注</strong><button id="done" disabled>完成</button></header>
-<main id="stage"><canvas aria-label="图片标注画布"></canvas></main>
+<header><button id="cancel">${label('取消')}</button><strong>${label('图片标注')}</strong><button id="done" disabled>${label('完成')}</button></header>
+<main id="stage"><canvas aria-label="${label('图片标注画布')}"></canvas></main>
 <footer><div class="row" id="tools">
-<button data-tool="pen" aria-pressed="true">画笔</button>
-<button data-tool="arrow" aria-pressed="false">箭头</button>
-<button data-tool="rectangle" aria-pressed="false">方框</button>
-<button id="undo" disabled>撤销</button><button id="redo" disabled>重做</button>
+<button data-tool="pen" aria-pressed="true">${label('画笔')}</button>
+<button data-tool="arrow" aria-pressed="false">${label('箭头')}</button>
+<button data-tool="rectangle" aria-pressed="false">${label('方框')}</button>
+<button id="undo" disabled>${label('撤销')}</button><button id="redo" disabled>${label('重做')}</button>
 </div><div class="row">
-${COLORS.map(([color, label], index) => `<button class="color" data-color="${color}" aria-label="${label}"
+${COLORS.map(([color, colorLabel], index) => `<button class="color" data-color="${color}" aria-label="${label(colorLabel)}"
   aria-pressed="${index === 0}"><span style="background:${color}"></span></button>`).join('')}
-<select id="width" aria-label="画笔粗细"><option value="3">细</option>
-<option value="6" selected>中</option><option value="10">粗</option></select>
-</div><p id="notice" role="status">正在加载图片…</p></footer>
+<select id="width" aria-label="${label('画笔粗细')}"><option value="3">${label('细')}</option>
+<option value="6" selected>${label('中')}</option><option value="10">${label('粗')}</option></select>
+</div><p id="notice" role="status">${label('正在加载图片…')}</p></footer>
 <script>const config = ${config};${imageEditorScript}</script></body></html>`;
 }
 

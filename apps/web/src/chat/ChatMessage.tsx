@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../i18n';
 import { memo } from 'react';
 import { Quote } from 'lucide-react';
 import type { Item } from './types';
@@ -15,6 +16,7 @@ export const ChatMessage = memo(function ChatMessage({ item, onOpen, process = f
   item: Item; onOpen: (id: string) => void; process?: boolean; running?: boolean; onQuote?: () => void;
   desktop?: boolean; onInspect?: () => void;
 }) {
+  useLanguage();
   const text = questionMessageText(item);
   if (!['userMessage', 'agentMessage'].includes(item.type)) {
     return <ChatActivity item={item} onOpen={onOpen} running={running && item.status === 'inProgress'}
@@ -36,7 +38,7 @@ export const ChatMessage = memo(function ChatMessage({ item, onOpen, process = f
       {!desktop && images.map((source, index) => <ChatImage key={index} source={source} />)}
     </div> : <ChatMarkdown text={text} process={process} desktop={desktop} />}
     {!!text.trim() && !running && !(desktop && process) && <div className="chat-message-actions" data-quote-exclude>
-      <ChatCopyButton text={text} label={user ? '复制消息' : '复制回复'} />
+      <ChatCopyButton text={text} label={user ? t("复制消息") : t("复制回复")} />
       <ChatQuoteButton messageId={item.id} text={text} role={user ? 'user' : 'assistant'} onQuote={onQuote} />
     </div>}
   </article>;

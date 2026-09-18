@@ -15,12 +15,12 @@ export interface SidebarSnapshot {
 }
 export const emptySidebar = (): SidebarSnapshot => ({ revision: -1, threads: {}, readState: {} });
 
-export function threadPresentation(thread: Thread, sidebar: SidebarSnapshot) {
+export function threadPresentation(thread: Thread, sidebar: SidebarSnapshot, translate = (text: string) => text) {
   const entry = sidebar.threads[thread.id];
   const cwd = entry?.cwd ?? thread.cwd;
   return {
-    cwd, title: entry?.title || thread.name || thread.preview || '新聊天',
-    projectName: entry?.projectName || cwd?.split(/[\\/]/).filter(Boolean).at(-1) || '最近',
+    cwd, title: entry?.title || thread.name || thread.preview || translate('新聊天'),
+    projectName: entry?.projectName || cwd?.split(/[\\/]/).filter(Boolean).at(-1) || translate('最近'),
     running: entry?.running ?? (thread.status?.type === 'active'
       || thread.turns?.some((turn) => turn.status === 'inProgress') === true),
     unread: sidebar.readState[thread.id]?.unread ?? false,

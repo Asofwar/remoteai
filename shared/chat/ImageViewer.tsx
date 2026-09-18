@@ -8,9 +8,11 @@ interface Props {
   download?: (url: string) => void;
   contextMenu?: (event: MouseEvent, url: string) => void;
   feedback?: string;
+  translate?: (text: string) => string;
 }
 
-export function ImageViewer({ thumbnail, description, load, close, download, contextMenu, feedback }: Props) {
+export function ImageViewer({ thumbnail, description, load, close, download, contextMenu, feedback,
+  translate = (text: string) => text }: Props) {
   const image = useImageViewer(load);
   const [downloadError, setDownloadError] = useState('');
   const [transform, setTransform] = useState(INITIAL_TRANSFORM);
@@ -40,28 +42,28 @@ export function ImageViewer({ thumbnail, description, load, close, download, con
         onError={image.fail} style={{ transform: `translate(${transform.x}px, ${transform.y}px) `
           + `rotate(${transform.rotation}deg) scale(${transform.scale})` }} />
     </div>
-    <button type="button" className="cs-image-close" aria-label="关闭图片" onClick={close}>×</button>
+    <button type="button" className="cs-image-close" aria-label={translate('关闭图片')} onClick={close}>×</button>
     {download && <button type="button" className="cs-image-download" disabled={!image.url || image.error}
       onClick={() => {
         if (!image.url) return;
         setDownloadError('');
         try { download(image.url); }
-        catch (error) { setDownloadError(error instanceof Error ? error.message : '下载失败，请重试。'); }
-      }}>下载图片</button>}
+        catch (error) { setDownloadError(error instanceof Error ? error.message : translate('下载失败，请重试。')); }
+      }}>{translate('下载图片')}</button>}
     <div className="cs-image-toolbar">
-      <button type="button" aria-label="缩小图片" onClick={() => setTransform((v) => ({ ...v,
+      <button type="button" aria-label={translate('缩小图片')} onClick={() => setTransform((v) => ({ ...v,
         scale: clampZoom(v.scale / 1.5) }))}>−</button>
-      <button type="button" aria-label="还原图片" onClick={() => setTransform(INITIAL_TRANSFORM)}>
+      <button type="button" aria-label={translate('还原图片')} onClick={() => setTransform(INITIAL_TRANSFORM)}>
         {Math.round(transform.scale * 100)}%</button>
-      <button type="button" aria-label="放大图片" onClick={() => setTransform((v) => ({ ...v,
+      <button type="button" aria-label={translate('放大图片')} onClick={() => setTransform((v) => ({ ...v,
         scale: clampZoom(v.scale * 1.5) }))}>+</button>
-      <button type="button" aria-label="旋转图片" onClick={() => setTransform((v) => ({ ...v,
+      <button type="button" aria-label={translate('旋转图片')} onClick={() => setTransform((v) => ({ ...v,
         rotation: (v.rotation + 90) % 360 }))}>↻</button>
     </div>
-    {!image.url && !image.error && <div className="cs-image-status" role="status">正在加载原图…</div>}
+    {!image.url && !image.error && <div className="cs-image-status" role="status">{translate('正在加载原图…')}</div>}
     {downloadError && <div className="cs-image-status" role="status">{downloadError}</div>}
     {feedback && <div className="cs-image-status" role="status">{feedback}</div>}
-    {image.error && <div className="cs-image-status" role="status">原图加载失败
-      <button type="button" onClick={image.retry}>重试</button></div>}
+    {image.error && <div className="cs-image-status" role="status">{translate('原图加载失败')}
+      <button type="button" onClick={image.retry}>{translate('重试')}</button></div>}
   </dialog>;
 }

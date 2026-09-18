@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { useState } from 'react';
 
 const STORAGE_PREFIX = 'codex-switch.web.dismissed-questions:';
@@ -19,7 +20,7 @@ export function useDismissedQuestions(scope: string) {
     try {
       localStorage.setItem(key, JSON.stringify([...next]));
       setDismissed(next); setError('');
-    } catch { setError('暂时无法删除，请重试。'); }
+    } catch { setError(t("暂时无法删除，请重试。")); }
   };
   return { dismissed, dismiss, error };
 }

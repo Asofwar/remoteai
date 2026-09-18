@@ -1,3 +1,5 @@
+import { getLocale, t, useLanguage } from './i18n';
+import { profileRole } from './i18n/profile';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Dialog, Form, Input, PullToRefresh, SafeArea, SpinLoading, TabBar, Toast } from "antd-mobile";
 import { Dropdown, Tooltip, type MenuProps } from "antd";
@@ -24,13 +26,14 @@ import { ChatPage } from "./chat/ChatPage";
 import { usePanelVisibility } from "./useDesktopLayout";
 
 const PULL_REFRESH_TEXT = {
-  pulling: "下拉刷新",
-  canRelease: "释放立即刷新",
-  refreshing: "正在刷新…",
-  complete: "刷新完成",
+  get pulling() { return t("下拉刷新"); },
+  get canRelease() { return t("释放立即刷新"); },
+  get refreshing() { return t("正在刷新…"); },
+  get complete() { return t("刷新完成"); },
 } as const;
 
 function LoginView() {
+  useLanguage();
   const dispatch = useAppDispatch();
   const { submitting, error } = useAppSelector((state) => state.auth);
   const [baseUrl, setBaseUrl] = useState(defaultApiBaseUrl);
@@ -41,12 +44,12 @@ function LoginView() {
 
   const submit = async () => {
     if (!email.trim() || !password) {
-      Toast.show({ icon: "fail", content: "请填写邮箱和密码" });
+      Toast.show({ icon: "fail", content: t("请填写邮箱和密码") });
       return;
     }
     try {
       await dispatch(signIn({ baseUrl, email, password })).unwrap();
-      Toast.show({ icon: "success", content: "欢迎回来" });
+      Toast.show({ icon: "success", content: t("欢迎回来") });
     } catch {
       // The Redux state renders the actionable server error.
     }
@@ -57,16 +60,16 @@ function LoginView() {
       <div className="story-grid" />
       <div className="brand-lockup light"><BrandMark /><b>Codex Switch</b></div>
       <div className="story-copy">
-        <span className="eyebrow"><Sparkles size={14} /> 随时掌握每个账号</span>
-        <h1>离开电脑，也能<br />从容切换。</h1>
-        <p>一处查看账号用量、设备在线状态，并远程切换桌面端正在使用的账号。</p>
+        <span className="eyebrow"><Sparkles size={14} />  {t("随时掌握每个账号")}</span>
+        <h1>{t("离开电脑，也能")}<br />{t("从容切换。")}</h1>
+        <p>{t("一处查看账号用量、设备在线状态，并远程切换桌面端正在使用的账号。")}</p>
         <div className="story-points">
-          <span><CircleGauge size={17} /> 实时用量</span>
-          <span><MonitorCog size={17} /> 远程控制</span>
-          <span><ShieldCheck size={17} /> 安全登录</span>
+          <span><CircleGauge size={17} />  {t("实时用量")}</span>
+          <span><MonitorCog size={17} />  {t("远程控制")}</span>
+          <span><ShieldCheck size={17} />  {t("安全登录")}</span>
         </div>
       </div>
-      <small>随时连接，自在切换</small>
+      <small>{t("随时连接，自在切换")}</small>
     </section>
     <section className="login-panel">
       <div className="mobile-login-brand brand-lockup">
@@ -74,37 +77,37 @@ function LoginView() {
         <b>Codex Switch</b><span className="login-web-badge">Web</span>
       </div>
       <div className="login-form-wrap">
-        <span className="login-kicker">云端控制台</span>
-        <h2>欢迎回来</h2>
-        <p className="login-intro">登录云端账号，随时管理用量与设备。</p>
+        <span className="login-kicker">{t("云端控制台")}</span>
+        <h2>{t("欢迎回来")}</h2>
+        <p className="login-intro">{t("登录云端账号，随时管理用量与设备。")}</p>
         <Form className="login-form" layout="vertical" footer={<div className="login-actions">
           <Button className="login-register" color="primary" fill="outline" size="large"
-            type="button" onClick={() => setShowRegistration(true)}>注册</Button>
-          <Button block color="primary" size="large" loading={submitting} onClick={submit}>登录并查看</Button>
+            type="button" onClick={() => setShowRegistration(true)}>{t("注册")}</Button>
+          <Button block color="primary" size="large" loading={submitting} onClick={submit}>{t("登录并查看")}</Button>
         </div>}>
-          <Form.Item label="邮箱">
+          <Form.Item label={t("邮箱")}>
             <Input value={email} onChange={(value) => { setEmail(value); dispatch(clearAuthError()); }}
               type="email" inputMode="email" autoCapitalize="none"
-              aria-label="邮箱" autoComplete="email" placeholder="name@example.com" clearable />
+              aria-label={t("邮箱")} autoComplete="email" placeholder="name@example.com" clearable />
           </Form.Item>
-          <Form.Item label="密码">
+          <Form.Item label={t("密码")}>
             <Input value={password} onChange={(value) => { setPassword(value); dispatch(clearAuthError()); }}
-              type="password" aria-label="密码" autoComplete="current-password" placeholder="输入登录密码"
+              type="password" aria-label={t("密码")} autoComplete="current-password" placeholder={t("输入登录密码")}
               onEnterPress={() => void submit()} clearable />
           </Form.Item>
           <button type="button" className="server-toggle" aria-expanded={showServer}
             aria-controls="login-server" onClick={() => setShowServer((value) => !value)}>
-            <Server size={15} /> {showServer ? "收起服务器设置" : "连接其他服务器"} <ChevronRight size={14} />
+            <Server size={15} /> {showServer ? t("收起服务器设置") : t("连接其他服务器")} <ChevronRight size={14} />
           </button>
           <div id="login-server" hidden={!showServer}>
-            {showServer ? <Form.Item label="服务器地址" help="使用自己的服务器时填写，通常无需修改。">
-              <Input value={baseUrl} onChange={setBaseUrl} type="url" inputMode="url" aria-label="服务器地址"
+            {showServer ? <Form.Item label={t("服务器地址")} help={t("使用自己的服务器时填写，通常无需修改。")}>
+              <Input value={baseUrl} onChange={setBaseUrl} type="url" inputMode="url" aria-label={t("服务器地址")}
                 autoCapitalize="none" placeholder="https://api.example.com" clearable />
             </Form.Item> : null}
           </div>
-          {error ? <div className="form-error" role="alert">{error}</div> : null}
+          {error ? <div className="form-error" role="alert">{t(error)}</div> : null}
         </Form>
-        <div className="login-security"><ShieldCheck size={16} /><span>安全连接，安心管理你的账号。</span></div>
+        <div className="login-security"><ShieldCheck size={16} /><span>{t("安全连接，安心管理你的账号。")}</span></div>
       </div>
     </section>
     <RegistrationSheet open={showRegistration} onClose={() => setShowRegistration(false)} />
@@ -112,6 +115,7 @@ function LoginView() {
 }
 
 function DevicesPage() {
+  useLanguage();
   const dispatch = useAppDispatch();
   const {
     accounts,
@@ -138,21 +142,21 @@ function DevicesPage() {
   const deleteDevice = async (device: RemoteDevice) => {
     if (device.online || deletingDeviceId) return;
     const confirmed = await Dialog.confirm({
-      title: "删除这台设备？",
-      content: `“${device.name}”再次登录桌面端后仍会重新出现在这里。`,
-      confirmText: "删除设备",
+      title: t("删除这台设备？"),
+      content: t("“{value1}”再次登录桌面端后仍会重新出现在这里。", { value1: device.name }),
+      confirmText: t("删除设备"),
     });
     if (!confirmed) return;
     try {
       await dispatch(removeDevice(device.deviceId)).unwrap();
-      Toast.show({ icon: "success", content: "设备已删除" });
+      Toast.show({ icon: "success", content: t("设备已删除") });
     } catch { /* Global toast */ }
   };
 
   const switchOfficialModel = async (deviceId: string, accountId: string) => {
     try {
       const result = await dispatch(switchDeviceAccount({ deviceId, accountId })).unwrap();
-      Toast.show({ icon: "success", content: "已切换到官方模型" });
+      Toast.show({ icon: "success", content: t("已切换到官方模型") });
       if (result.result.requiresRestart) {
         window.setTimeout(() => void promptModelRestart(deviceId), 0);
       }
@@ -165,7 +169,7 @@ function DevicesPage() {
   const switchProviderModel = async (deviceId: string, providerId: string) => {
     try {
       const result = await dispatch(switchDeviceProvider({ deviceId, providerId })).unwrap();
-      Toast.show({ icon: "success", content: "已切换到第三方 Provider" });
+      Toast.show({ icon: "success", content: t("已切换到第三方 Provider") });
       if (result.result.requiresRestart) {
         window.setTimeout(() => void promptModelRestart(deviceId), 0);
       }
@@ -178,7 +182,7 @@ function DevicesPage() {
   const switchProviderGroup = async (deviceId: string, group: string) => {
     try {
       const result = await dispatch(switchDeviceProviderGroup({ deviceId, group })).unwrap();
-      Toast.show({ icon: "success", content: `已启动分组“${group}”` });
+      Toast.show({ icon: "success", content: t("已启动分组“{value1}”", { value1: group }) });
       if (result.result.requiresRestart) {
         window.setTimeout(() => void promptModelRestart(deviceId), 0);
       }
@@ -210,8 +214,8 @@ function DevicesPage() {
       onSwitchProvider={switchProviderModel}
       onSwitchProviderGroup={switchProviderGroup}
     />
-    <AdaptiveSheet open={Boolean(authDevice)} title="代理登录态账号"
-      subtitle={authDevice ? `${authDevice.name} · 选择后会重启 ChatGPT/Codex` : undefined}
+    <AdaptiveSheet open={Boolean(authDevice)} title={t("代理登录态账号")}
+      subtitle={authDevice ? t("{value1} · 选择后会重启 ChatGPT/Codex", { value1: authDevice.name }) : undefined}
       onClose={() => setAuthDeviceId(null)}>
       <div className="select-list account-select-list">{accounts.map((account) => {
         const current = authDevice?.openaiAuthAccountId === account.id;
@@ -222,13 +226,13 @@ function DevicesPage() {
                 deviceId: authDevice!.deviceId,
                 accountId: account.id,
               })).unwrap();
-              Toast.show({ icon: "success", content: "代理登录态已更新" });
+              Toast.show({ icon: "success", content: t("代理登录态已更新") });
               setAuthDeviceId(null);
             } catch { /* Global toast */ }
           }}>
           <span className="account-initial">{account.email.slice(0, 2).toUpperCase()}</span>
           <span><strong>{account.email}</strong><small>{account.plan || "ChatGPT"}</small></span>
-          {current ? <b className="current-pill">当前</b> : <ChevronRight size={18} />}
+          {current ? <b className="current-pill">{t("当前")}</b> : <ChevronRight size={18} />}
         </button>;
       })}</div>
     </AdaptiveSheet>
@@ -236,14 +240,15 @@ function DevicesPage() {
 }
 
 const navItems: Array<{ key: AppPage; label: string; icon: typeof LayoutDashboard }> = [
-  { key: "chat", label: "聊天", icon: MessageSquare },
-  { key: "accounts", label: "账号", icon: LayoutDashboard },
-  { key: "devices", label: "设备", icon: Laptop },
+  { key: "chat", get label() { return t("聊天"); }, icon: MessageSquare },
+  { key: "accounts", get label() { return t("账号"); }, icon: LayoutDashboard },
+  { key: "devices", get label() { return t("设备"); }, icon: Laptop },
   { key: "totp", label: "2FA", icon: ShieldCheck },
-  { key: "settings", label: "设置", icon: Settings },
+  { key: "settings", get label() { return t("设置"); }, icon: Settings },
 ];
 
 function AppShell() {
+  useLanguage();
   const [menuVisible, setMenuVisible] = usePanelVisibility('main-menu');
   const dispatch = useAppDispatch();
   const { session } = useAppSelector((state) => state.auth);
@@ -254,7 +259,7 @@ function AppShell() {
 
   useEffect(() => {
     if (!error) return;
-    Toast.show({ icon: "fail", content: error });
+    Toast.show({ icon: "fail", content: t(error) });
     dispatch(clearDataError());
   }, [dispatch, error]);
 
@@ -316,15 +321,15 @@ function AppShell() {
   }, [dispatch, session]);
 
   const userMenu: MenuProps["items"] = [
-    { key: "settings", label: "账户设置", icon: <Settings size={16} />, onClick: () => dispatch(pageChanged("settings")) },
-    ...(profile?.role === "admin" ? [{ key: "admin", label: "管理员控制台", icon: <ShieldCheck size={16} />, onClick: () => window.location.assign(`${session?.baseUrl ?? window.location.origin}/admin`) }] : []),
+    { key: "settings", label: t("账户设置"), icon: <Settings size={16} />, onClick: () => dispatch(pageChanged("settings")) },
+    ...(profile?.role === "admin" ? [{ key: "admin", label: t("管理员控制台"), icon: <ShieldCheck size={16} />, onClick: () => window.location.assign(`${session?.baseUrl ?? window.location.origin}/admin`) }] : []),
     { type: "divider" as const },
-    { key: "logout", label: "退出登录", danger: true, icon: <LogOut size={16} />, onClick: () => void dispatch(signOut()) },
+    { key: "logout", label: t("退出登录"), danger: true, icon: <LogOut size={16} />, onClick: () => void dispatch(signOut()) },
   ];
 
   const pageDescriptions: Record<Exclude<AppPage, 'chat'>, string> = {
-    accounts: "欢迎回来，今天也保持从容。",
-    devices: "查看并控制你的桌面设备。", totp: "管理并同步你的 2FA 验证码。", settings: "管理偏好与账户安全。",
+    accounts: t("欢迎回来，今天也保持从容。"),
+    devices: t("查看并控制你的桌面设备。"), totp: t("管理并同步你的 2FA 验证码。"), settings: t("管理偏好与账户安全。"),
   };
   const otherPages = {
     accounts: <AccountsPage />, devices: <DevicesPage />,
@@ -337,7 +342,7 @@ function AppShell() {
       <div className="desktop-sidebar-heading">
         <div className="brand-lockup"><BrandMark />
           <b>Codex Switch</b></div>
-        <button type="button" className="main-menu-toggle" aria-label={menuVisible ? '收起主菜单' : '展开主菜单'}
+        <button type="button" className="main-menu-toggle" aria-label={menuVisible ? t("收起主菜单") : t("展开主菜单")}
           aria-expanded={menuVisible} onClick={() => setMenuVisible(value => !value)}>
           <MenuToggleIcon size={20} /></button>
       </div>
@@ -350,13 +355,13 @@ function AppShell() {
           {item.key === "devices" && onlineCount ? <b>{onlineCount}</b> : null}
         </button>
       </Tooltip>)}</nav>
-      <div className="sidebar-live"><span><i /> 服务已连接</span><p>安心管理账号与设备</p></div>
-      <Tooltip placement="right" title={menuVisible ? undefined : '账户菜单'}>
+      <div className="sidebar-live"><span><i />  {t("服务已连接")}</span><p>{t("安心管理账号与设备")}</p></div>
+      <Tooltip placement="right" title={menuVisible ? undefined : t("账户菜单")}>
         <Dropdown menu={{ items: userMenu }} trigger={["click"]}>
-          <button type="button" className="sidebar-profile" aria-label="账户菜单">
+          <button type="button" className="sidebar-profile" aria-label={t("账户菜单")}>
             <span>{(profile?.email || session?.email || "U").slice(0, 2).toUpperCase()}</span>
             <div><strong>{profile?.email || session?.email}</strong>
-              <small>{profile?.roleName || (profile?.role === "admin" ? "管理员" : "用户")}</small></div>
+              <small>{profileRole(profile)}</small></div>
             <Menu size={17} />
           </button>
         </Dropdown>
@@ -365,10 +370,10 @@ function AppShell() {
     <div className="content-shell">
       {page !== 'chat' && <header className="desktop-topbar"><div>
         <span>{navItems.find((item) => item.key === page)?.label}</span><strong>{pageDescriptions[page]}</strong></div>
-        <div><Tooltip title="刷新全部数据"><button className="icon-button" type="button"
+        <div><Tooltip title={t("刷新全部数据")}><button className="icon-button" type="button"
           onClick={() => void dispatch(refreshAll())}>
           <RefreshCw size={18} className={refreshing ? "spin" : ""} /></button></Tooltip>
-          <span className="topbar-date">{new Intl.DateTimeFormat("zh-CN",
+          <span className="topbar-date">{new Intl.DateTimeFormat(getLocale(),
             { month: "long", day: "numeric", weekday: "short" }).format(new Date())}</span></div></header>}
       <main className="main-content">
         {session && <ChatPage key={session.baseUrl + session.email} session={session} devices={devices}
@@ -381,10 +386,11 @@ function AppShell() {
 }
 
 export default function App() {
+  useLanguage();
   const dispatch = useAppDispatch();
   const { session, initialized } = useAppSelector((state) => state.auth);
   useEffect(() => { void dispatch(bootstrapApp()); }, [dispatch]);
   if (!initialized) return <div className="boot-screen"><BrandMark /><SpinLoading color="primary" />
-    <p>正在打开 Codex Switch</p></div>;
+    <p>{t("正在打开 Codex Switch")}</p></div>;
   return session ? <AppShell /> : <LoginView />;
 }

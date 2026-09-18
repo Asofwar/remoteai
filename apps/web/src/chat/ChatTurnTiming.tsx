@@ -1,6 +1,8 @@
+import { t, useLanguage } from '../i18n';
 import { useEffect, useState } from 'react';
 import type { Turn } from './types';
-import { formatTurnDuration, SECOND_MS, turnElapsedMs } from '../../../desktop/src/pages/codexGui/turnTiming';
+import { SECOND_MS, turnElapsedMs } from '../../../desktop/src/pages/codexGui/turnTiming';
+import { formatTurnDuration } from './formatters';
 import type { TurnEntry } from '../../../../shared/chat/turnPresentation';
 
 /** Keep the turn status before its response, including interrupted turns without timing data. */
@@ -16,6 +18,7 @@ export function desktopTimeline(entries: TurnEntry[]): TurnEntry[] {
 }
 
 export function ChatTurnTiming({ turn, fallback = '' }: { turn: Turn; fallback?: string }) {
+  useLanguage();
   const [now, setNow] = useState(Date.now);
   const running = turn.status === 'inProgress';
   useEffect(() => {
@@ -24,7 +27,7 @@ export function ChatTurnTiming({ turn, fallback = '' }: { turn: Turn; fallback?:
     return () => window.clearInterval(timer);
   }, [turn.id, running]);
   const elapsed = turnElapsedMs(turn, now);
-  if (turn.status === 'interrupted') return <>已停止生成{elapsed != null && ` · 用时 ${formatTurnDuration(elapsed)}`}</>;
+  if (turn.status === 'interrupted') return <>{t("已停止生成")}{elapsed != null && t(" · 用时 {value1}", { value1: formatTurnDuration(elapsed) })}</>;
   if (elapsed == null) return <>{fallback}</>;
-  return <>{running ? '已处理' : '用时'} {formatTurnDuration(elapsed)}</>;
+  return <>{running ? t("已处理") : t("用时")} {formatTurnDuration(elapsed)}</>;
 }

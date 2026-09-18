@@ -17,8 +17,12 @@ const accounts = [57, 100, 12, null].map((remaining, index) => ({
     resetsAt: Math.floor(Date.now() / 1000) + 7200 },
   secondary: { remainingPercent: 77, usedPercent: 23 }, fetchedAt: now, apiExpiresAt: '2027-10-01' },
 }));
-const devices = [{ deviceId: 'sample-pc', name: '我的工作电脑', platform: 'Windows', online: true,
-  activeAccountId: accounts[0].id, capabilities: [], lastSeenAt: now, localProxyRunning: false }];
+const devices = [
+  { deviceId: 'sample-pc', name: '我的工作电脑', platform: 'Windows', online: true,
+    activeAccountId: accounts[0].id, capabilities: [], lastSeenAt: now, localProxyRunning: false },
+  { deviceId: 'offline-pc', name: '备用电脑', platform: 'Windows', online: false,
+    activeAccountId: accounts[0].id, capabilities: [], lastSeenAt: now, localProxyRunning: false },
+];
 let credits = [{ issuedAt: now, expiresAt: '2027-12-31' }];
 let vault = { entries: ['GitHub', 'OpenAI', 'AWS'].map((issuer, index) => ({
   id: `totp-${index}`, issuer, accountName: `review-${index}@example.test`, secret: 'JBSWY3DPEHPK3PXP',

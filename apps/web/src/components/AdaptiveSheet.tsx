@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../i18n';
 import { Drawer, Grid, Modal } from "antd";
 import { Popup, SafeArea } from "antd-mobile";
 import type { ReactNode } from "react";
@@ -23,22 +24,23 @@ export function AdaptiveSheet({
   width = 520,
   presentation = "adaptive",
 }: AdaptiveSheetProps) {
+  useLanguage();
   const screens = Grid.useBreakpoint();
   const back = onBack && <button type="button" className="sheet-close" onClick={onBack}
-    aria-label="返回上一层">‹</button>;
+    aria-label={t("返回上一层")}>‹</button>;
   const heading = <div className="modal-heading"><strong>{title}</strong>
     {subtitle ? <span>{subtitle}</span> : null}</div>;
   const titleContent = onBack
     ? <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>{back}{heading}</div> : heading;
   if (presentation === "drawer") {
     return <Drawer open={open} title={titleContent} placement="right" width={`min(${width}px, 100vw)`}
-      onClose={onClose} destroyOnHidden closable={{ 'aria-label': '关闭', placement: 'end' }}>
+      onClose={onClose} destroyOnHidden closable={{ 'aria-label': t("关闭"), placement: 'end' }}>
       {children}
     </Drawer>;
   }
   if (screens.md) {
     return <Modal open={open} onCancel={onClose} footer={null} width={width} centered destroyOnClose
-      closable={{ 'aria-label': '关闭' }}
+      closable={{ 'aria-label': t("关闭") }}
       title={titleContent}>
       {children}
     </Modal>;
@@ -47,7 +49,7 @@ export function AdaptiveSheet({
     <div className="sheet-handle" />
     <div className="sheet-header">{back}<div style={onBack ? { flex: 1 } : undefined}>
       <h2>{title}</h2>{subtitle ? <p>{subtitle}</p> : null}</div>
-      <button type="button" className="sheet-close" onClick={onClose} aria-label="关闭">×</button></div>
+      <button type="button" className="sheet-close" onClick={onClose} aria-label={t("关闭")}>×</button></div>
     <div className="adaptive-sheet-content">{children}</div>
     <SafeArea position="bottom" />
   </Popup>;

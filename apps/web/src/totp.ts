@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { TotpAlgorithm, TotpEntry, TotpTombstone, TotpVault } from './types';
 
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -8,7 +9,7 @@ function decodeBase32(value: string) {
   let bits = '';
   for (const character of normalized) {
     const index = BASE32_ALPHABET.indexOf(character);
-    if (index < 0) throw new Error('2FA 密钥格式不正确');
+    if (index < 0) throw new Error(t("2FA 密钥格式不正确"));
     bits += index.toString(2).padStart(5, '0');
   }
   const bytes = new Uint8Array(Math.floor(bits.length / 8));
@@ -21,7 +22,7 @@ function decodeBase32(value: string) {
 export function normalizeTotpSecret(value: string) {
   const normalized = value.toUpperCase().replace(/[\s=-]/g, '');
   if (!normalized || !/^[A-Z2-7]+$/.test(normalized)) {
-    throw new Error('2FA 密钥格式不正确');
+    throw new Error(t("2FA 密钥格式不正确"));
   }
   decodeBase32(normalized);
   return normalized;
@@ -30,7 +31,7 @@ export function normalizeTotpSecret(value: string) {
 export function parseOtpAuthUri(value: string) {
   const url = new URL(value.trim());
   if (url.protocol !== 'otpauth:' || url.hostname !== 'totp') {
-    throw new Error('只支持 TOTP 二维码');
+    throw new Error(t("只支持 TOTP 二维码"));
   }
   const label = decodeURIComponent(url.pathname.replace(/^\//, ''));
   const separator = label.indexOf(':');
@@ -39,9 +40,9 @@ export function parseOtpAuthUri(value: string) {
   const algorithm = (url.searchParams.get('algorithm') || 'SHA1').toUpperCase();
   const digits = Number(url.searchParams.get('digits') || 6);
   const period = Number(url.searchParams.get('period') || 30);
-  if (!['SHA1', 'SHA256', 'SHA512'].includes(algorithm)) throw new Error('不支持该算法');
-  if (digits !== 6 && digits !== 8) throw new Error('验证码位数必须是 6 或 8');
-  if (!Number.isInteger(period) || period < 15 || period > 120) throw new Error('验证码周期无效');
+  if (!['SHA1', 'SHA256', 'SHA512'].includes(algorithm)) throw new Error(t("不支持该算法"));
+  if (digits !== 6 && digits !== 8) throw new Error(t("验证码位数必须是 6 或 8"));
+  if (!Number.isInteger(period) || period < 15 || period > 120) throw new Error(t("验证码周期无效"));
   return {
     issuer: url.searchParams.get('issuer')?.trim() || issuerFromLabel,
     accountName,

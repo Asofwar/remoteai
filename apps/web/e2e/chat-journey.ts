@@ -177,10 +177,12 @@ async function recoverConnection({ page, request, info, transport }: Journey) {
   await ready(page, transport);
   await expect.poll(() => operationCount(request, 'syncHistory')).toBeGreaterThan(reads);
   expect(await operationCount(request, 'send')).toBe(sent);
+  const connections = (await state(request)).mobileConnections;
   await navigate(page, '账号');
-  await expect.poll(async () => (await state(request)).connectedMobiles).toBe(0);
+  await expect.poll(async () => (await state(request)).connectedMobiles).toBe(1);
   await navigate(page, '聊天');
   await ready(page, transport);
+  expect((await state(request)).mobileConnections).toBe(connections);
   await expect(page.getByRole('heading', { name: '移动端聊天体验', exact: true })).toBeVisible();
   await request.post(`${fixtureUrl}/test/fallback`);
   await expect(page.getByRole('status').filter({ hasText: 'Relay' })).toBeVisible();

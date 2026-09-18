@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { downloadFile, type DownloadTarget } from '../../../../shared/remote-chat/fileDownload';
 import { MIB } from '../../../../shared/remote-chat/policy';
 import type { FileClient } from '../../../../shared/remote-chat/fileDownload';
@@ -30,7 +31,7 @@ export async function loadVideoPreview(options: {
             url = URL.createObjectURL(new Blob([await handle.getFile()], { type: info.mimeType })); },
           dispose: async () => { if (!completed) await writable.abort(); } } satisfies DownloadTarget;
       }
-      if (info.size > MEMORY_PREVIEW_LIMIT) throw new Error('视频较大，请下载后播放。');
+      if (info.size > MEMORY_PREVIEW_LIMIT) throw new Error(t("视频较大，请下载后播放。"));
       const parts: Uint8Array[] = [];
       return { write: async data => { parts.push(decode(data)); },
         finish: async () => { url = URL.createObjectURL(new Blob(parts, { type: info.mimeType })); },

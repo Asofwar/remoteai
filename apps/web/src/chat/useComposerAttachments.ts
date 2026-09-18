@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { useEffect, useRef, useState } from 'react';
 import type { AttachmentReference, ComposerPlugin } from '../../../desktop/src/pages/codexGui/attachmentTypes';
 import { remoteAttachments } from '../../../../shared/remote-chat/composerAttachments';
@@ -6,7 +7,7 @@ import { checkFileUploadSize } from '../../../../shared/remote-chat/policy';
 function readFile(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error('文件无法读取，请重新选择。'));
+    reader.onerror = () => reject(new Error(t("文件无法读取，请重新选择。")));
     reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
     reader.readAsDataURL(file);
   });
@@ -43,13 +44,13 @@ export function useComposerAttachments({ threadId, sending }: { threadId: string
       if (current === generation.current) setItems(existing => [...existing, ...additions]);
     } catch (cause) {
       if (current === generation.current) setError(cause instanceof Error && /文件|附件/.test(cause.message)
-        ? cause.message : '文件添加失败，请重新选择。');
+        ? cause.message : t("文件添加失败，请重新选择。"));
     } finally { picking.current = false; if (mounted.current) setBusy(false); }
   };
   const add = (item: AttachmentReference) => {
     if (sending || picking.current) return;
     try { setItems(remoteAttachments([...items.filter(entry => entry.path !== item.path), item])); setError(''); }
-    catch { setError('每条消息最多添加 8 个文件或插件。'); }
+    catch { setError(t("每条消息最多添加 8 个文件或插件。")); }
   };
   return { items, busy, error, pick, add,
     addPlugin: (plugin: ComposerPlugin) => add({ kind: 'plugin', name: plugin.interface?.displayName || plugin.name,

@@ -151,23 +151,23 @@ function exportImage() {
 done.addEventListener('click', () => {
   if (!ready || current) return;
   done.disabled = true;
-  notice.textContent = '正在保存…';
+  notice.textContent = config.labels.saving;
   // Let the saving state paint before encoding on the WebView thread.
   setTimeout(() => {
     try { send({ type: 'save', dataUrl: exportImage() }); }
-    catch { notice.textContent = '图片保存失败，请撤销部分标注后重试。'; }
+    catch { notice.textContent = config.labels.saveFailed; }
     finally { done.disabled = false; }
   }, 30);
 });
 image.onload = () => {
-  if (!context) { notice.textContent = '图片无法编辑，请重新打开后再试。'; return; }
+  if (!context) { notice.textContent = config.labels.unavailable; return; }
   canvas.width = image.naturalWidth;
   canvas.height = image.naturalHeight;
   ready = true;
   fit(); render();
-  notice.textContent = '在图片上拖动画标注，完成后即可发送。';
+  notice.textContent = config.labels.hint;
 };
-image.onerror = () => { notice.textContent = '图片无法读取，请重新选择。'; };
+image.onerror = () => { notice.textContent = config.labels.readFailed; };
 new ResizeObserver(fit).observe(stage);
 image.src = config.dataUrl;
 `;

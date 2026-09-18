@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../i18n';
 import { useState } from 'react';
 import { ChevronRight, FileText, Lightbulb, Search, Terminal, Users, Wrench } from 'lucide-react';
 import { ChatToolContent } from './ChatToolContent';
@@ -7,16 +8,16 @@ import { commandPreview } from '../../../../shared/chat/commandPreview';
 import { collaborationSummary, isCollaborationActivity }
   from '../../../desktop/src/pages/codexGui/collaborationActivity';
 
-const STATUS: Record<string, string> = { inProgress: '进行中', completed: '已完成', failed: '失败',
-  declined: '已拒绝', interrupted: '已停止' };
+const STATUS: Record<string, string> = { get inProgress() { return t("进行中"); }, get completed() { return t("已完成"); }, get failed() { return t("失败"); },
+  get declined() { return t("已拒绝"); }, get interrupted() { return t("已停止"); } };
 
 function activityLabel(item: Item) {
-  if (isCollaborationActivity(item)) return collaborationSummary(item);
+  if (isCollaborationActivity(item)) return collaborationSummary(item, t);
   if (item.type === 'commandExecution') {
     const action = item.commandActions?.find(entry => entry.type !== 'unknown');
-    const labels: Record<string, string> = { read: '读取文件', listFiles: '浏览文件', search: '搜索代码' };
-    return action ? `${labels[action.type] || '执行命令'} · ${action.name || action.query || action.path || ''}`
-      : ['执行命令', commandPreview(item.command ?? ''), item.status === 'interrupted' ? '已停止' : '']
+    const labels: Record<string, string> = { read: t("读取文件"), listFiles: t("浏览文件"), search: t("搜索代码") };
+    return action ? `${labels[action.type] || t("执行命令")} · ${action.name || action.query || action.path || ''}`
+      : [t("执行命令"), commandPreview(item.command ?? ''), item.status === 'interrupted' ? t("已停止") : '']
         .filter(Boolean).join(' · ');
   }
   if (item.type === 'reasoning') return [...item.summary ?? [], messageContent(item)]
@@ -24,13 +25,14 @@ function activityLabel(item: Item) {
   const detail = item.type === 'fileChange'
     ? item.changes?.map(change => change.path.split(/[\\/]/).at(-1)).join('、')
     : item.query || item.tool || item.review || item.text || item.path;
-  return [messageLabel(item), detail, STATUS[item.status ?? '']].filter(Boolean).join(' · ');
+  return [t(messageLabel(item)), detail, STATUS[item.status ?? '']].filter(Boolean).join(' · ');
 }
 
 export function ChatActivity({ item, onOpen, running, inline = false, onInspect }: {
   item: Item; onOpen: (id: string) => void; running?: boolean;
   inline?: boolean; onInspect?: () => void;
 }) {
+  useLanguage();
   const [expanded, setExpanded] = useState(false);
   const label = activityLabel(item).slice(0, 160).replace(/\s+/g, ' ').trim();
   if (!label) return null;

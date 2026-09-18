@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { configureStore, createAsyncThunk, createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import {
   apiJson,
@@ -54,7 +55,7 @@ const messageOf = (error: unknown) => {
   if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
     return error.message;
   }
-  return "发生未知错误";
+  return t("发生未知错误");
 };
 
 export const bootstrapApp = createAsyncThunk("auth/bootstrap", async () => {

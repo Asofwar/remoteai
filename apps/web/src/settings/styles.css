@@ -22,8 +22,9 @@ button.settings-row:hover, .settings-profile:hover { background: #fafcfc; }
 .settings-row-icon.blue { color: #1496ef; background: #eff9ff; }
 .settings-row-icon.orange { color: #ed9405; background: #fff6e6; }
 .settings-row-icon.gray { color: #343b45; background: #f1f3f6; }
-.settings-row-label { flex-shrink: 0; color: #202637; font-size: 15px; }
-.settings-row-value { flex: 1; min-width: 0; overflow: hidden; color: #848d9f; font-size: 13px;
+.settings-row-label { min-width: 0; flex: 1; color: #202637; font-size: 15px; overflow-wrap: anywhere; }
+.settings-language-options .settings-row { justify-content: space-between; }
+.settings-row-value { flex: 0 1 auto; max-width: 55%; min-width: 0; overflow: hidden; color: #848d9f; font-size: 13px;
   text-overflow: ellipsis; text-align: right; white-space: nowrap; }
 .settings-row > svg { flex-shrink: 0; color: #848d9f; }
 .settings-logout.adm-button { max-width: 400px; margin: 36px auto 0; min-height: 48px;

@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Toast } from 'antd-mobile';
 import { fetchTotpVault, putTotpVault } from './api';
@@ -61,7 +62,7 @@ export function useTotpVault(session: AuthSession | null) {
       const remote = await putTotpVault(next);
       persist(activeSession, mergeTotpVaults(vaultRef.current, remote));
     } catch {
-      Toast.show({ icon: 'fail', content: '云端同步失败，本机密钥已保留，请稍后重试' });
+      Toast.show({ icon: 'fail', content: t("云端同步失败，本机密钥已保留，请稍后重试") });
     } finally {
       setSyncing(false);
     }

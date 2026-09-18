@@ -25,15 +25,17 @@ export function collaborationStatus(status?: string): string {
   return STATUS_LABELS[status ?? ""] ?? "状态待更新";
 }
 
-export function collaborationSummary(item: Item): string {
+export function collaborationSummary(item: Item, translate = (text: string) => text): string {
   if (item.type === "subAgentActivity") {
-    return `${ACTIVITY_LABELS[item.kind ?? ""] ?? "协作进度更新"} · ${collaborationTaskName(item)}`;
+    const label = translate(ACTIVITY_LABELS[item.kind ?? ""] ?? "协作进度更新");
+    return `${label} · ${item.agentPath ? collaborationTaskName(item) : translate("协作任务")}`;
   }
   const label = TOOL_LABELS[item.tool ?? ""] ?? "协作任务";
   const count = new Set([...item.receiverThreadIds ?? [], ...Object.keys(item.agentsStates ?? {})]).size;
   const status = item.tool === "wait" && item.status === "completed"
     ? "本次等待结束" : item.status && collaborationStatus(item.status);
-  return [label, count ? `${count} 个任务` : undefined, status].filter(Boolean).join(" · ");
+  return [translate(label), count ? `${count} ${translate("个任务")}` : undefined, status && translate(status)]
+    .filter(Boolean).join(" · ");
 }
 
 /** Older collaboration items carry one agentStatus instead of an agentsStates map. */

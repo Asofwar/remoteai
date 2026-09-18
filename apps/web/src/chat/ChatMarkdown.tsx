@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../i18n';
 import { Children, isValidElement, type ReactNode } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -24,7 +25,7 @@ function codeBlock(children: ReactNode, desktop = false) {
 
 const components: Components = {
   a: ({ children, href }) => <ChatFileLink href={href}>{children}</ChatFileLink>,
-  img: ({ src, alt }) => <ChatImage source={src} description={alt || '图片'} />,
+  img: ({ src, alt }) => <ChatImage source={src} description={alt || t("图片")} />,
   pre: ({ children }) => codeBlock(children),
 };
 
@@ -35,6 +36,7 @@ const desktopComponents: Components = { ...components,
 export function ChatMarkdown({ text, process = false, desktop = false }: {
   text: string; process?: boolean; desktop?: boolean;
 }) {
+  useLanguage();
   return <div className={`chat-markdown${process ? ' chat-process-prose' : ''}`}>
     <ReactMarkdown remarkPlugins={[remarkGfm]} components={desktop ? desktopComponents : components}
       urlTransform={(url, key) => {

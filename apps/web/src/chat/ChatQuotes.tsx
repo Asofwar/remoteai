@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../i18n';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Quote, X } from 'lucide-react';
 import { Toast } from 'antd-mobile';
@@ -15,6 +16,7 @@ export const useChatQuotes = () => useContext(Context);
 export function ChatQuotesProvider({ scope, children, sending, enabled }: {
   scope: string | null; children: ReactNode; sending: boolean; enabled: boolean;
 }) {
+  useLanguage();
   const [quotes, setQuotes] = useState<ChatQuote[]>([]);
   const previous = useRef(scope);
   useEffect(() => {
@@ -35,20 +37,22 @@ export function ChatQuotesProvider({ scope, children, sending, enabled }: {
 }
 
 export function ChatQuoteButton({ messageId, text, role, onQuote }: ChatQuote & { onQuote?: () => void }) {
+  useLanguage();
   const context = useChatQuotes();
   if (!context || !text.trim()) return null;
-  return <button type="button" className="chat-text-action" aria-label="引用回复"
+  return <button type="button" className="chat-text-action" aria-label={t("引用回复")}
     onMouseDown={event => event.preventDefault()} onClick={() => {
       const selection = window.getSelection()?.toString().trim();
       context.add({ messageId, text: selection && text.includes(selection) ? selection : text, role });
       onQuote?.();
-    }}><Quote size={15} /><span>引用</span></button>;
+    }}><Quote size={15} /><span>{t("引用")}</span></button>;
 }
 
 export function ComposerQuotes({ disabled }: { disabled: boolean }) {
+  useLanguage();
   const context = useChatQuotes();
   return <div className="chat-composer-capsules">{context?.quotes.map(quote =>
     <span className="chat-capsule" key={quoteKey(quote)}><Quote size={15} />
-      <span title={quote.text}>{quote.text}</span><button type="button" aria-label="移除引用" disabled={disabled}
+      <span title={quote.text}>{quote.text}</span><button type="button" aria-label={t("移除引用")} disabled={disabled}
         onClick={() => context.remove(quote)}><X size={14} /></button></span>)}</div>;
 }

@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent } from 'react';
 import { useChatDraft } from '../../../../shared/remote-chat/client/useChatDraft';
 import { useQueueEditor } from '../../../../shared/remote-chat/client/useQueueEditor';
@@ -75,8 +76,8 @@ export function useComposerState(props: ComposerProps) {
       validateUploadedFiles(submitted);
       const size = draft.images.reduce((total, image) => total + image.url.length, 0)
         + submitted.reduce((total, item) => total + (item.data?.length ?? 0), 0);
-      if (size > chatAttachmentDataLimit()) throw new Error('附件总大小过大，请减少照片或文件后再试。');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '文件无法发送，请重新选择。'); return; }
+      if (size > chatAttachmentDataLimit()) throw new Error(t("附件总大小过大，请减少照片或文件后再试。"));
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t("文件无法发送，请重新选择。")); return; }
     setError('');
     const text = replyWithQuotes(action === 'continue' ? CONTINUE_MESSAGE : draft.text, submittedQuotes);
     if (await draft.submit({ text, attachments: submitted, goalMode: goalMode.enabled })) {

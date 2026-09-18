@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../i18n';
 import { useEffect, useState } from 'react';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import type { AuthSession, RemoteDevice } from '../types';
@@ -30,12 +31,13 @@ import './chat.css';
 interface Props { session: AuthSession; devices: RemoteDevice[]; active: boolean }
 
 export function ChatPage({ session, devices, active }: Props) {
+  useLanguage();
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const device = devices.find((entry) => entry.deviceId === deviceId)
     ?? devices.find((entry) => entry.online) ?? devices[0];
   useEffect(() => { if (!deviceId && device) setDeviceId(device.deviceId); }, [deviceId, device?.deviceId]);
   useChatViewport(active);
-  return <section className="chat-page" hidden={!active} aria-label="Codex 聊天">
+  return <section className="chat-page" hidden={!active} aria-label={t("Codex 聊天")}>
     <ConnectedChat key={`${session.baseUrl}:${session.email}:${device?.deviceId ?? ''}`} session={session}
       device={device} devices={devices} active={active} chooseDevice={setDeviceId} />
   </section>;
@@ -44,6 +46,7 @@ export function ChatPage({ session, devices, active }: Props) {
 function ConnectedChat({ session, device, devices, active, chooseDevice }: Props & {
   device?: RemoteDevice; chooseDevice: (id: string) => void;
 }) {
+  useLanguage();
   const { state, controller, foreground } = useChat(session, device?.deviceId ?? '', active && Boolean(device));
   const [drawer, setDrawer] = useState(false);
   const desktop = useDesktopLayout();
@@ -74,18 +77,18 @@ function ConnectedChat({ session, device, devices, active, chooseDevice }: Props
     enabled={active && !state.selectedArchived}>
     <div className="chat-conversation">
     <header className="chat-header">
-      <button type="button" className="chat-back" aria-label={listOpen ? '收起聊天列表' : '打开聊天列表'}
+      <button type="button" className="chat-back" aria-label={listOpen ? t("收起聊天列表") : t("打开聊天列表")}
         aria-expanded={listOpen} onClick={() => { if (desktop) setSidebar(!sidebar); else setDrawer(!drawer); }}>
         <ListToggleIcon size={21} /></button>
-      <div className="chat-grow"><h2>{state.selected ? threadPresentation(state.selected, state.sidebar).title : '新聊天'}</h2>
+      <div className="chat-grow"><h2>{state.selected ? threadPresentation(state.selected, state.sidebar, t).title : t("新聊天")}</h2>
         <ChatConnectionInfo state={state} controller={controller} device={device} active={active}
           chooseDevice={() => setPickingDevice(true)} /></div>
       {state.selected && state.selectedArchived && <button type="button" className="chat-button"
         disabled={!ready || running}
         onClick={() => { void controller.archive().then(() => setDrawer(true)); }}>
-        恢复</button>}
+        {t("恢复")}</button>}
     </header>
-    {!!state.error && <p role="alert" className="chat-error">{state.error}</p>}
+    {!!state.error && <p role="alert" className="chat-error">{t(state.error)}</p>}
     <ChatImageContext.Provider value={{ threadId: state.selected?.id ?? null, ready, load: controller.imagePreview }}>
       <ChatFileContext.Provider value={{ threadId: state.selected?.id ?? null, ready, client: controller.files,
         load: controller.textPreview }}>
@@ -122,7 +125,7 @@ function ConnectedChat({ session, device, devices, active, chooseDevice }: Props
     <ChatSidebar desktop={desktop} open={listOpen} onClose={closeList}>
       <ChatThreads state={state} controller={controller} newChat={newChat} onClose={selectedFromList}
         openSearch={() => setSearching(true)} profile={<ChatProfileMenu client={controller.guiAccounts}
-          deviceName={device?.name ?? '选择电脑'} email={session.email} ready={ready}
+          deviceName={device?.name ?? t("选择电脑")} email={session.email} ready={ready}
           chooseDevice={() => { setDrawer(false); setPickingDevice(true); }}
           openTokenSummary={() => { setDrawer(false); setTokenSummary(true); }} />} />
     </ChatSidebar>

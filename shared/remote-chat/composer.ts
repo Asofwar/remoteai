@@ -21,11 +21,11 @@ export const EFFORT_LABELS: Record<string, string> = {
   none: '无', minimal: '极低', low: '低', medium: '中', high: '高', xhigh: '极高', max: '最高', ultra: 'Ultra',
 };
 
-export function composerLabel(models: Model[], settings: ComposerSettings) {
+export function composerLabel(models: Model[], settings: ComposerSettings, translate = (text: string) => text) {
   const model = models.find((entry) => entry.model === settings.model);
   const name = model?.displayName || settings.model;
-  if (!name) return '正在同步模型…';
-  const effort = EFFORT_LABELS[settings.effort] || settings.effort;
+  if (!name) return translate('正在同步模型…');
+  const effort = translate(EFFORT_LABELS[settings.effort] || settings.effort);
   return effort ? `${name} · ${effort}` : name;
 }
 export const ACCESS_OPTIONS = [

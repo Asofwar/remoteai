@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../i18n';
 import { ChevronRight } from "lucide-react";
 import type { AccountSummary, RemoteDevice, RemoteProviderSummary } from "../types";
 import { AdaptiveSheet } from "./AdaptiveSheet";
@@ -25,6 +26,7 @@ export function RemoteModelSwitchSheet({
   onSwitchProvider,
   onSwitchProviderGroup,
 }: RemoteModelSwitchSheetProps) {
+  useLanguage();
   const busy = Boolean(switchingAccountId || switchingProviderId);
   const providerSupported = device?.capabilities?.includes("provider-switch") ?? false;
   const providerAvailable = providerSupported && Boolean(device?.localProxyRunning);
@@ -44,12 +46,12 @@ export function RemoteModelSwitchSheet({
     if (await onSwitchProviderGroup(device.deviceId, group)) onClose();
   };
 
-  return <AdaptiveSheet open={Boolean(device)} title="切换模型"
-    subtitle={device ? `${device.name} · 选择这台 PC 使用的模型来源` : undefined}
+  return <AdaptiveSheet open={Boolean(device)} title={t("切换模型")}
+    subtitle={device ? t("{value1} · 选择这台 PC 使用的模型来源", { value1: device.name }) : undefined}
     onClose={onClose}>
     <div className="model-switch-section">
-      <h3>官方模型</h3>
-      {!accounts.length ? <p className="model-switch-empty">暂无已同步的官方账号。</p>
+      <h3>{t("官方模型")}</h3>
+      {!accounts.length ? <p className="model-switch-empty">{t("暂无已同步的官方账号。")}</p>
         : <div className="select-list account-select-list">{accounts.map((account) => {
           const current = !device?.activeProviderId
             && !device?.activeProviderGroup
@@ -57,19 +59,19 @@ export function RemoteModelSwitchSheet({
           return <button type="button" disabled={busy || !device?.online || current}
             key={`account:${account.id}`} onClick={() => void selectAccount(account.id)}>
             <span className="account-initial">O</span><span><strong>{account.email}</strong>
-              <small>官方模型 · {account.plan || "ChatGPT"}</small></span>
+              <small>{t("官方模型 ·")} {account.plan || "ChatGPT"}</small></span>
             {switchingAccountId === account.id
-              ? <span className="model-switch-loading">切换中</span>
-              : current ? <b className="current-pill">当前</b> : <ChevronRight size={18} />}
+              ? <span className="model-switch-loading">{t("切换中")}</span>
+              : current ? <b className="current-pill">{t("当前")}</b> : <ChevronRight size={18} />}
           </button>;
         })}</div>}
     </div>
 
     <div className="model-switch-section">
-      <div className="model-switch-heading"><h3>第三方 Provider</h3>
-        {!providerSupported ? <span>请先更新 PC 端</span>
-          : !device?.localProxyRunning ? <span>请先在 PC 端启动本地代理</span> : null}</div>
-      {!providers.length ? <p className="model-switch-empty">暂无已同步的第三方 Provider。</p>
+      <div className="model-switch-heading"><h3>{t("第三方 Provider")}</h3>
+        {!providerSupported ? <span>{t("请先更新 PC 端")}</span>
+          : !device?.localProxyRunning ? <span>{t("请先在 PC 端启动本地代理")}</span> : null}</div>
+      {!providers.length ? <p className="model-switch-empty">{t("暂无已同步的第三方 Provider。")}</p>
         : <div className="select-list account-select-list">
           {groups.map((group) => {
             const count = providers.filter((provider) => provider.group === group).length;
@@ -78,10 +80,10 @@ export function RemoteModelSwitchSheet({
               || !groupSupported || current} key={`group:${group}`}
               onClick={() => void selectProviderGroup(group)}>
               <span className="account-initial provider-initial">G</span><span>
-                <strong>{group}</strong><small>同时启用 {count} 个 API</small></span>
+                <strong>{group}</strong><small>{t("同时启用")} {count}  {t("个 API")}</small></span>
               {switchingProviderId === `group:${group}`
-                ? <span className="model-switch-loading">切换中</span>
-                : current ? <b className="current-pill">当前分组</b> : <ChevronRight size={18} />}
+                ? <span className="model-switch-loading">{t("切换中")}</span>
+                : current ? <b className="current-pill">{t("当前分组")}</b> : <ChevronRight size={18} />}
             </button>;
           })}
           {providers.map((provider) => {
@@ -90,15 +92,14 @@ export function RemoteModelSwitchSheet({
               disabled={busy || !device?.online || !providerAvailable || current}
               key={`provider:${provider.id}`} onClick={() => void selectProvider(provider.id)}>
               <span className="account-initial provider-initial">P</span><span>
-                <strong>{provider.name}</strong><small>{provider.model || "由 Codex 选择模型"}</small></span>
+                <strong>{provider.name}</strong><small>{provider.model || t("由 Codex 选择模型")}</small></span>
               {switchingProviderId === provider.id
-                ? <span className="model-switch-loading">切换中</span>
-                : current ? <b className="current-pill">当前</b> : <ChevronRight size={18} />}
+                ? <span className="model-switch-loading">{t("切换中")}</span>
+                : current ? <b className="current-pill">{t("当前")}</b> : <ChevronRight size={18} />}
             </button>;
           })}</div>}
     </div>
     <p className="model-switch-footer">
-      在官方模型与第三方 Provider 之间切换后，需要重启 ChatGPT/Codex 才能加载当前模型。
-    </p>
+      {t("在官方模型与第三方 Provider 之间切换后，需要重启 ChatGPT/Codex 才能加载当前模型。")}</p>
   </AdaptiveSheet>;
 }

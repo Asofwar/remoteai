@@ -4,6 +4,7 @@ import { Check, Hand, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { ACCESS_OPTIONS } from '../../../../shared/remote-chat/composer';
 import { t, useLanguage } from '../i18n';
 import { ChatUsage } from './ChatUsage';
+import { ComposerContext } from './ComposerContext';
 import type { ComposerProps } from './composerProps';
 
 const ACCESS_ICONS = { 'read-only': Hand, 'workspace-write': ShieldCheck, 'danger-full-access': ShieldAlert };
@@ -57,13 +58,14 @@ export function ComposerAccess({ selection, settingsBusy, updateSettings, before
   </Popover>;
 }
 
-export function ComposerDesktopStatus({ props, showSettings, settingsOpen }: {
-  props: ComposerProps; showSettings: () => void; settingsOpen: boolean;
+export function ComposerDesktopStatus({ props, beforeOpen }: {
+  props: ComposerProps; beforeOpen: () => void;
 }) {
   useLanguage();
   return <div className="chat-composer-status">
-    <ChatUsage read={props.readUsage} active={props.active && !settingsOpen} ready={props.ready}
-      tokenUsage={props.tokenUsage} inline onContextSettings={showSettings} />
+    <ChatUsage read={props.readUsage} active={props.active} ready={props.ready} inline
+      contextControl={<ComposerContext tokenUsage={props.tokenUsage} threadId={props.threadId}
+        contextSettings={props.contextSettings} ready={props.ready} beforeOpen={beforeOpen} />} />
     {props.selection.speed !== undefined && <label className="chat-composer-speed">
       <span>{t('快速模式')}</span><Switch size="small" aria-label={t('快速模式')}
         checked={props.selection.speed === 'fast'} loading={props.settingsBusy}

@@ -184,6 +184,13 @@ function queueHost(thread: Thread, link: ChatLink) {
 
 export function changeDemoSidebar(action: string, link: ChatLink) {
   sidebarLink = link;
+  if (action === 'context-usage') {
+    const tokens = { totalTokens: 14550, inputTokens: 14000, cachedInputTokens: 0,
+      outputTokens: 550, reasoningOutputTokens: 0 };
+    welcome.tokenUsage = { total: tokens, last: tokens, modelContextWindow: 258400 };
+    notify(link, { method: 'thread/tokenUsage/updated',
+      params: { threadId: welcome.id, tokenUsage: welcome.tokenUsage } });
+  }
   if (action === 'group-preview') seedThreadGroups(link);
   if (action === 'history-pages') seedDemoHistory(welcome);
   if (action === 'history-compact') seedDemoCompactHistory(welcome);

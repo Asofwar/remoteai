@@ -26,8 +26,6 @@
     min-width: 0; font-size: 12px; line-height: 20px; }
   .chat-composer-usage { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
   .chat-composer-usage strong { cursor: help; }
-  .chat-composer-usage button { display: grid; place-items: center; width: 20px; height: 20px;
-    padding: 0; border: 0; background: transparent; color: var(--chat-muted); }
   .chat-composer-speed { display: inline-flex; align-items: center; gap: 7px;
     color: var(--chat-muted); white-space: nowrap; }
   .chat-composer-speed .ant-switch-checked { background: var(--chat-green); }

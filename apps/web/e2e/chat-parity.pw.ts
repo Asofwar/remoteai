@@ -136,15 +136,34 @@ test('sends skills, plugin and file capsules and keeps goal controls removable',
 
 test('changes context capacity and opens profile, account picker and token summary', async ({ page, request }, info) => {
   await selectChat(page);
-  await page.getByRole('button', { name: /聊天设置/ }).click();
-  await page.getByRole('button', { name: '对话上下文设置', exact: true }).click();
-  await page.getByRole('button', { name: '400K', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: '上下文容量（K Token）' })).toHaveValue('400');
+  const desktop = info.project.name === 'desktop';
+  if (desktop) {
+    await page.getByRole('button', { name: '查看上下文用量' }).click();
+    const context = page.getByRole('dialog', { name: '背景信息窗口' });
+    await expect(context).toContainText('暂无上下文用量');
+    await request.post(`${fixtureUrl}/test/sidebar`, { data: { action: 'context-usage' } });
+    await expect(context).toContainText('6% 已用（剩余 94%）');
+    await expect(context).toContainText('已用 14.6K Token，共 258.4K');
+    await screenshot(page, info, 'context-window');
+    await page.getByRole('button', { name: '设置当前对话的上下文容量' }).click();
+    await page.getByRole('combobox', { name: '上下文容量（K Token）' }).click();
+    await page.locator('.ant-select-item-option').getByText('400K', { exact: true }).click();
+  } else {
+    await page.getByRole('button', { name: /聊天设置/ }).click();
+    await page.getByRole('button', { name: '对话上下文设置', exact: true }).click();
+    await page.getByRole('button', { name: '400K', exact: true }).click();
+  }
+  await expect(page.getByRole(desktop ? 'combobox' : 'textbox', { name: '上下文容量（K Token）' })).toHaveValue('400');
   await screenshot(page, info, 'context-capacity');
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await expect.poll(async () => (await state(request)).operations.findLast(entry =>
     entry.operation === 'contextSettingsWrite')?.settings).toEqual({ capacity: 400000 });
-  await closeSheet(page);
+  if (desktop) {
+    await expect(page.getByRole('dialog', { name: '对话上下文设置' })).toHaveCount(0);
+    await page.getByRole('button', { name: '查看上下文用量' }).click();
+    await expect(page.getByRole('dialog', { name: '背景信息窗口' })).toContainText('对话设置：400K Token');
+    await page.keyboard.press('Escape');
+  } else await closeSheet(page);
   await openChatList(page);
   await page.getByRole('button', { name: '打开头像菜单' }).click();
   await page.getByRole('button', { name: '切换账户', exact: true }).click();

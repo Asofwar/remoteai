@@ -6,7 +6,7 @@ export async function composerLayout(page: Page) {
   const input = page.getByRole('textbox', { name: '聊天消息' });
   const send = page.getByRole('button', { name: '发送消息' });
   const add = page.getByRole('button', { name: '添加内容', exact: true });
-  const settings = page.getByRole('button', { name: /聊天设置/ });
+  const settings = page.locator('.chat-model');
   const desktop = page.viewportSize()!.width > 860;
   await expect(settings).toBeVisible();
   if (desktop) {
@@ -37,8 +37,13 @@ export async function composerLayout(page: Page) {
   });
   await expect(settings).toBeVisible();
   await settings.click();
-  await expect(page.getByRole('button', { name: '设置推理强度' })).toBeVisible();
-  await page.getByRole('button', { name: '关闭', exact: true }).last().click();
+  if (desktop) {
+    await expect(page.getByRole('slider', { name: '推理强度' })).toBeVisible();
+    await page.keyboard.press('Escape');
+  } else {
+    await expect(page.getByRole('button', { name: '设置推理强度' })).toBeVisible();
+    await page.getByRole('button', { name: '关闭', exact: true }).last().click();
+  }
   await page.evaluate(() => {
     Reflect.deleteProperty(window.visualViewport!, 'height');
     window.visualViewport!.dispatchEvent(new Event('resize'));

@@ -4,6 +4,7 @@ import { sidebarJourney } from './chat-sidebar';
 import { existingChatSettings } from './chat-existing-settings';
 import { groupPreviewJourney } from './chat-group-preview';
 import { openChatSettings } from './chat-helpers';
+import { chooseSetting, closeChatSettings, expectComposerSelection, isDesktop } from './chat-settings';
 
 interface Journey { page: Page; request: APIRequestContext; info: TestInfo; transport?: 'direct' | 'either' }
 const ready = (page: Page, transport?: Journey['transport']) => expect(page.getByRole('status')
@@ -32,7 +33,7 @@ async function settingsAndContinue({ page, request }: Journey) {
   await chooseSetting(page, '模型', '测试模型');
   await chooseSetting(page, '推理强度', '高');
   await chooseSetting(page, '访问权限', '请求批准');
-  await click(page.getByRole('button', { name: '关闭', exact: true }).last());
+  await closeChatSettings(page);
   await send(page, 'slow task');
   await expect(page.getByRole('button', { name: '暂停生成' })).toBeVisible();
   const input = page.getByRole('textbox', { name: '聊天消息' });
@@ -42,13 +43,6 @@ async function settingsAndContinue({ page, request }: Journey) {
   await settled(page);
   expect((await state(request)).operations.filter((entry) => entry.operation === 'send').at(-1))
     .toMatchObject({ text: '请继续完成刚才中断的任务。', model: 'test-model', effort: 'high', access: 'read-only' });
-}
-
-async function chooseSetting(page: Page, label: string, value: string) {
-  await click(page.getByRole('button', { name: `设置${label}`, exact: true }));
-  await click(page.getByRole('radio', { name: value, exact: true }));
-  await expect(page.getByRole('button', { name: `设置${label}`, exact: true })).toBeVisible();
-  await expect(page.getByRole('radio')).toHaveCount(0);
 }
 
 async function approvals({ page, request, info }: Journey) {
@@ -142,17 +136,20 @@ async function synchronizeComposer({ page, request, info }: Journey) {
   } });
   await expect.poll(async () => (await state(request)).composer.settings.model).toBe('second-model');
   await openChatSettings(page);
-  await expect(page.locator('.chat-setting-entry')).toHaveCount(4);
-  await expect(page.getByRole('button', { name: '设置速度模式', exact: true })).toBeVisible();
-  await expect(page.getByRole('radio')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '设置模型' })).toContainText('第二模型');
-  await expect(page.getByRole('button', { name: '设置推理强度' })).toContainText('极高');
-  await screenshot(page, info, '05-settings-menu');
-  await click(page.getByRole('button', { name: '设置模型' }));
-  await expect(page.getByRole('radio', { name: '第二模型', exact: true })).toBeChecked();
-  await screenshot(page, info, '06-model-drawer');
-  await click(page.getByRole('button', { name: '返回上一层' }));
-  await expect(page.getByRole('button', { name: '设置模型' })).toBeVisible();
+  if (isDesktop(page)) await expectComposerSelection(page);
+  else {
+    await expect(page.locator('.chat-setting-entry')).toHaveCount(4);
+    await expect(page.getByRole('button', { name: '设置速度模式', exact: true })).toBeVisible();
+    await expect(page.getByRole('radio')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '设置模型' })).toContainText('第二模型');
+    await expect(page.getByRole('button', { name: '设置推理强度' })).toContainText('极高');
+    await screenshot(page, info, '05-settings-menu');
+    await click(page.getByRole('button', { name: '设置模型' }));
+    await expect(page.getByRole('radio', { name: '第二模型', exact: true })).toBeChecked();
+    await screenshot(page, info, '06-model-drawer');
+    await click(page.getByRole('button', { name: '返回上一层' }));
+    await expect(page.getByRole('button', { name: '设置模型' })).toBeVisible();
+  }
   for (const [label, access] of [['请求批准', 'read-only'], ['帮我批准', 'workspace-write'],
     ['完全访问', 'danger-full-access']]) {
     await chooseSetting(page, '访问权限', label);
@@ -160,7 +157,7 @@ async function synchronizeComposer({ page, request, info }: Journey) {
   }
   await chooseSetting(page, '模型', '测试模型');
   await chooseSetting(page, '推理强度', '高');
-  await click(page.getByRole('button', { name: '关闭', exact: true }).last());
+  await closeChatSettings(page);
   await send(page, 'send with synced settings');
   await settled(page);
   expect((await state(request)).operations.filter((entry) => entry.operation === 'send').at(-1))

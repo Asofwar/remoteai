@@ -2,10 +2,11 @@ import { t, useLanguage } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUp, ChevronDown, File, Pause, Play, Plus, SlidersHorizontal, Square, Target, X, Zap } from 'lucide-react';
 import { COMPOSER_ACTION_LABELS } from '../../../../shared/remote-chat/composerAction';
-import { composerLabel, EFFORT_LABELS } from '../../../../shared/remote-chat/composer';
+import { composerLabel } from '../../../../shared/remote-chat/composer';
 import { formatTokens } from '../../../../shared/remote-chat/usage';
 import { useDesktopLayout } from '../useDesktopLayout';
 import { ComposerAccess, ComposerDesktopStatus } from './ComposerDesktopControls';
+import { ComposerModelPicker } from './ComposerModelPicker';
 import { ChatSettings } from './ChatSettings';
 import { ChatAttachmentPreviews } from './ChatAttachments';
 import { pickChatImages } from './pickChatImages';
@@ -42,6 +43,7 @@ export function ChatComposer(props: ComposerProps) {
   useEffect(() => { if (!active) { setSettings(false); setAdding(false); setProjectFiles(null); } }, [active]);
   useEffect(() => { setSettings(false); setAdding(false); setProjectFiles(null); }, [threadId]);
   useEffect(() => { setProjectFiles(null); }, [cwd]);
+  useEffect(() => { if (desktop) setSettings(false); }, [desktop]);
   useEffect(() => {
     if (!adding && !menu.open) return;
     const close = (event: PointerEvent) => {
@@ -71,7 +73,6 @@ export function ChatComposer(props: ComposerProps) {
   };
   const ActionIcon = { send: ArrowUp, pause: desktop ? Square : Pause, continue: Play }[action];
   const label = composerLabel(models, selection, t);
-  const modelName = models.find(model => model.model === selection.model)?.displayName || selection.model;
   const closeMenus = () => { menu.close(); setAdding(false); };
   const showSettings = () => { closeMenus(); setSettings(true); };
   const placeholder = desktop ? t('描述任务，或输入 / 选择命令和技能…') : t('发消息…');
@@ -143,16 +144,17 @@ export function ChatComposer(props: ComposerProps) {
             {(goalMode.enabled || goal) && <span className="chat-goal-capsule"><Target size={15} /><span>{t("目标")}</span>
               <button type="button" aria-label={t("退出目标模式")} disabled={sending || goalBusy || (!!goal && !ready)}
                 onClick={state.removeGoal}><X size={13} /></button></span>}
-            {desktop && <ComposerDesktopStatus props={props} showSettings={showSettings} settingsOpen={settings} />}
-            <button type="button" className="chat-model" onPointerDown={event => event.preventDefault()}
+            {desktop && <ComposerDesktopStatus key={`status:${threadId}:${cwd}:${active}`} props={props}
+              beforeOpen={closeMenus} />}
+            {desktop ? <ComposerModelPicker key={`model:${threadId}:${cwd}:${active}`} models={models}
+              selection={selection} updateSettings={updateSettings} beforeOpen={closeMenus} />
+              : <button type="button" className="chat-model" onPointerDown={event => event.preventDefault()}
               aria-label={t("{value1}{value2}，聊天设置", { value1: label, value2: selection.speed === 'fast' ? t("，快速模式") : '' })}
               onClick={showSettings}>
-              {desktop && <><span>{modelName || t('正在同步模型…')}</span>
-                <span className="chat-model-effort">{t(EFFORT_LABELS[selection.effort] || selection.effort)}</span></>}
-              {!desktop && compact && <SlidersHorizontal size={20} />}
-              {!desktop && !compact && <><span>{label}</span>
+              {compact && <SlidersHorizontal size={20} />}
+              {!compact && <><span>{label}</span>
                 {selection.speed === 'fast' && <Zap size={14} aria-label={t("快速模式")} />}<ChevronDown size={12} /></>}
-            </button>
+            </button>}
             <button type="submit" className="chat-composer-submit" aria-label={t(COMPOSER_ACTION_LABELS[action])}
               onPointerDown={event => event.preventDefault()} aria-busy={state.pausing || sending} disabled={actionDisabled}>
               <ActionIcon size={desktop ? 18 : 22}
@@ -170,7 +172,7 @@ export function ChatComposer(props: ComposerProps) {
       load={loadFiles} close={() => setProjectFiles(null)} choose={file => {
         attachments.add({ kind: 'file', name: file.name, path: file.path }); setProjectFiles(null);
       }} />}
-    {settings && <ChatSettings models={models} selection={selection} threadId={threadId}
+    {!desktop && settings && <ChatSettings models={models} selection={selection} threadId={threadId}
       contextSettings={props.contextSettings} readUsage={readUsage} tokenUsage={tokenUsage}
       saving={settingsBusy} error={settingsError} ready={ready}
       updateSettings={updateSettings} onClose={() => setSettings(false)} />}

@@ -8,6 +8,7 @@ import { composerLayout, desktopComposer } from './chat-composer';
 import { projectPickerJourney } from './chat-project-picker';
 import { clipboardJourney } from './chat-clipboard';
 import { backgroundJourney } from './chat-background';
+import { modelPickerJourney } from './chat-model-picker';
 
 test.beforeEach(async ({ page, request }, info) => {
   // Login can open chat immediately; install the network fault before any peer is created.
@@ -31,6 +32,10 @@ test.beforeEach(async ({ page, request }, info) => {
 
 
 test('keeps composer icons below single and multiline drafts', async ({ page }) => composerLayout(page));
+test('uses the PC model picker and keeps the mobile settings unchanged', async ({ page, request }, info) => {
+  test.skip(info.project.name !== 'desktop', 'Desktop model picker interaction');
+  await modelPickerJourney(page, request, info);
+});
 test('uses desktop composer controls and Enter shortcuts while streaming', async ({ page, request }, info) => {
   test.skip(info.project.name !== 'desktop', 'Desktop composer interaction');
   await desktopComposer(page, request, info);
@@ -66,6 +71,15 @@ for (const [code, message] of [[4004, '电脑的聊天连接尚未就绪。'], [
 test('syncs request speed with the PC and shows a lightning indicator only in fast mode', async ({ page, request }) => {
   await connect(page);
   await expect(page.getByRole('status').filter({ hasText: /P2P|Relay/ })).toBeVisible({ timeout: 16_000 });
+  if (page.viewportSize()!.width > 860) {
+    const speed = page.getByRole('switch', { name: '快速模式' });
+    await speed.click();
+    await expect.poll(async () => (await state(request)).composer.settings.speed).toBe('fast');
+    await expect(speed).toBeChecked();
+    await request.post(`${fixtureUrl}/test/composer`, { data: { speed: 'normal' } });
+    await expect(speed).not.toBeChecked();
+    return;
+  }
   await openChatSettings(page);
   await page.getByRole('button', { name: '设置速度模式', exact: true }).click();
   await page.getByRole('radio', { name: '快速模式', exact: true }).click();

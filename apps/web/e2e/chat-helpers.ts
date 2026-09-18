@@ -44,6 +44,7 @@ export async function settled(page: Page) {
   await expect(page.getByRole('textbox', { name: '聊天消息' })).toHaveValue('');
 }
 export async function openChatSettings(page: Page) {
+  if ((page.viewportSize()?.width ?? 0) > 860) return;
   await page.getByRole('textbox', { name: '聊天消息' }).click();
   const emulateKeyboard = !beforeClick.has(page);
   if (emulateKeyboard) await page.evaluate(() => {

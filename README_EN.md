@@ -10,6 +10,15 @@ and mobile companion to manage accounts across devices.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE) [![Release](https://img.shields.io/github/v/release/piperhex/codex-switch)](https://github.com/piperhex/codex-switch/releases)
 
+## Codex Web
+
+Open [Codex Web](https://codex.onepiper.cloud/web/) to connect to your computer and use Codex in your browser.
+
+Before using it, install the [Codex Switch desktop app](https://github.com/piperhex/codex-switch/releases),
+then open **Codex GUI** and follow the installation prompts.
+Keep the desktop app running and your computer online. Sign in to the web app with the same cloud account
+as the desktop app, then connect to your computer to get started.
+
 ## Screenshots
 
 ### Codex GUI coding assistant

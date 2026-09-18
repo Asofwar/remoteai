@@ -3,6 +3,14 @@
 面向手机浏览器的 Codex Switch Web 客户端，同时提供宽屏桌面布局。移动交互使用
 Ant Design Mobile，桌面增强使用 Ant Design，应用状态由 Redux Toolkit 管理。
 
+## 在线使用
+
+访问 [Codex Web](https://codex.onepiper.cloud/web/)。
+
+使用前，请先安装 [Codex Switch PC 端](https://github.com/piperhex/codex-switch/releases)，
+再打开 **Codex GUI**，按页面提示完成安装。
+保持 PC 端运行并联网，在网页端登录与 PC 端相同的云端账号，即可连接电脑开始使用。
+
 ## 本地运行
 
 先启动后端，再从仓库根目录运行：

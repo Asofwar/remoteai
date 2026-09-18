@@ -5,6 +5,9 @@ export const settingsColors = {
   green: '#00c98b', blue: '#008cff', orange: '#ff9900', danger: '#f0182c',
 };
 
+// Leave room for Android font descenders and fallback glyphs inside the text view.
+const textInsets = { includeFontPadding: true, paddingVertical: 2 };
+
 export const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: settingsColors.canvas },
   scroll: { flexGrow: 1 },
@@ -18,10 +21,10 @@ export const styles = StyleSheet.create({
     width: 34, height: 34, borderRadius: 17, backgroundColor: '#9df0df',
     alignItems: 'center', justifyContent: 'center',
   },
-  avatarText: { color: '#00392f', fontSize: 18, fontWeight: '600' },
+  avatarText: { ...textInsets, color: '#00392f', fontSize: 18, lineHeight: 26, fontWeight: '600' },
   profileCopy: { flex: 1, minWidth: 0 },
-  profileName: { color: settingsColors.ink, fontSize: 19, fontWeight: '700' },
-  caption: { color: settingsColors.muted, fontSize: 14, marginTop: 5 },
+  profileName: { ...textInsets, color: settingsColors.ink, fontSize: 19, lineHeight: 28, fontWeight: '700' },
+  caption: { ...textInsets, color: settingsColors.muted, fontSize: 14, lineHeight: 22, marginTop: 5 },
   row: { flexDirection: 'row', alignItems: 'center', paddingLeft: 22, gap: 15, minHeight: 56 },
   icon: { width: 32, height: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   rowContent: {
@@ -30,8 +33,11 @@ export const styles = StyleSheet.create({
   },
   divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: settingsColors.border },
   profileDivider: { height: StyleSheet.hairlineWidth, backgroundColor: settingsColors.border, marginLeft: 96 },
-  label: { color: settingsColors.ink, fontSize: 16, flexShrink: 0 },
-  value: { color: settingsColors.muted, fontSize: 15, flex: 1, minWidth: 0, textAlign: 'right' },
+  label: { ...textInsets, color: settingsColors.ink, fontSize: 16, lineHeight: 24, flexShrink: 0 },
+  value: {
+    ...textInsets, color: settingsColors.muted, fontSize: 15, lineHeight: 23,
+    flex: 1, minWidth: 0, textAlign: 'right',
+  },
   spacer: { flex: 1, minWidth: 0 },
   pressed: { opacity: 0.6 },
   footer: {
@@ -42,11 +48,11 @@ export const styles = StyleSheet.create({
     minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
     borderRadius: 10, borderWidth: 1, borderColor: '#ffd4db', backgroundColor: '#fff2f4', padding: 10,
   },
-  logoutText: { color: settingsColors.danger, fontSize: 17, fontWeight: '600' },
+  logoutText: { ...textInsets, color: settingsColors.danger, fontSize: 17, lineHeight: 26, fontWeight: '600' },
   sheetBody: { width: '100%', maxWidth: 400, alignSelf: 'center', gap: 12, paddingVertical: 8 },
   hint: { color: settingsColors.muted, fontSize: 14, lineHeight: 21 },
   error: { color: settingsColors.danger, fontSize: 14, lineHeight: 21 },
-  detailLabel: { color: settingsColors.ink, fontSize: 15, fontWeight: '600' },
+  detailLabel: { ...textInsets, color: settingsColors.ink, fontSize: 15, lineHeight: 23, fontWeight: '600' },
   detailValue: { color: settingsColors.muted, fontSize: 15, lineHeight: 23 },
   input: {
     minHeight: 48, borderWidth: 1, borderColor: '#dce2e6', borderRadius: 10,

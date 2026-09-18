@@ -16,7 +16,14 @@ let root: Root;
 let props: ComponentProps<typeof ChatComposer>;
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false }));
+  vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({
+    matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }));
+  vi.stubGlobal('ResizeObserver', class {
+    observe = vi.fn();
+    unobserve = vi.fn();
+    disconnect = vi.fn();
+  });
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
   props = { models: [], selection: { model: 'astra', effort: 'high', access: 'workspace-write' },
     readUsage: vi.fn(),

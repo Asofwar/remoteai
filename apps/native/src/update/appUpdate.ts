@@ -2,6 +2,7 @@ import * as Application from 'expo-application';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import appConfig from '../../app.json';
+import { getAndroidDownloadStatus } from './androidDownloadStatus';
 import {
   normalizedVersion,
   parseVersion,
@@ -13,6 +14,7 @@ export { versionFromReleaseMetadata } from './version';
 const RELEASE_API_URL = 'https://api.github.com/repos/piperhex/codex-switch/releases/latest';
 const UPDATE_METADATA_KEY = 'codex-switch.mobile.android-update.v1';
 const APK_MIME_TYPE = 'application/vnd.android.package-archive';
+const DOWNLOAD_RETRY_MESSAGE = '下载未完成，请重新下载。';
 
 export const RELEASES_URL = 'https://github.com/piperhex/codex-switch/releases';
 export const CURRENT_APP_VERSION =
@@ -74,6 +76,7 @@ type DownloadListener = (state: AndroidUpdateDownloadState) => void;
 
 let downloadState: AndroidUpdateDownloadState = { status: 'idle' };
 let activeDownload: Promise<string> | null = null;
+let stateRefresh: Promise<AndroidUpdateDownloadState> | null = null;
 const downloadListeners = new Set<DownloadListener>();
 
 function comparePrerelease(left: string[], right: string[]) {
@@ -201,6 +204,7 @@ async function readStoredAndroidUpdate(): Promise<StoredAndroidUpdate | null> {
       typeof value.version !== 'string'
       || typeof value.path !== 'string'
       || typeof value.expectedSize !== 'number'
+      || !Number.isFinite(value.expectedSize)
     ) {
       return null;
     }
@@ -210,36 +214,48 @@ async function readStoredAndroidUpdate(): Promise<StoredAndroidUpdate | null> {
   }
 }
 
-async function storedUpdateIsComplete(stored: StoredAndroidUpdate) {
+async function storedUpdateIsComplete(stored: StoredAndroidUpdate, successful = false) {
   const util = await blobUtil();
   if (!await util.fs.exists(stored.path)) return false;
-  if (stored.expectedSize <= 0) return true;
   const stat = await util.fs.stat(stored.path);
-  return Number(stat.size) === stored.expectedSize;
+  const size = Number(stat.size);
+  if (stored.expectedSize <= 0) return successful && size > 0;
+  return size === stored.expectedSize;
 }
 
-export async function refreshAndroidUpdateDownloadState() {
-  if (Platform.OS !== 'android' || activeDownload) return downloadState;
+async function restoreAndroidUpdateDownloadState(): Promise<AndroidUpdateDownloadState> {
   const stored = await readStoredAndroidUpdate();
   if (!stored) {
-    publishDownloadState({ status: 'idle' });
-    return downloadState;
+    return downloadState.status === 'failed' ? downloadState : { status: 'idle' };
   }
   if (compareAppVersions(stored.version, CURRENT_APP_VERSION) <= 0) {
     await SecureStore.deleteItemAsync(UPDATE_METADATA_KEY);
-    publishDownloadState({ status: 'idle' });
-    return downloadState;
+    return { status: 'idle' };
   }
   try {
-    if (await storedUpdateIsComplete(stored)) {
-      publishDownloadState({ status: 'downloaded', version: stored.version, path: stored.path });
-    } else {
-      publishDownloadState({ status: 'downloading', version: stored.version });
+    const status = await getAndroidDownloadStatus(stored.path);
+    if (status === 'pending' || status === 'running' || status === 'paused') {
+      return { status: 'downloading', version: stored.version };
+    }
+    if (status !== 'failed' && await storedUpdateIsComplete(stored, status === 'successful')) {
+      return { status: 'downloaded', version: stored.version, path: stored.path };
     }
   } catch {
-    publishDownloadState({ status: 'downloading', version: stored.version });
+    // A failed status/file check must not leave the only download action disabled.
   }
-  return downloadState;
+  return { status: 'failed', version: stored.version, message: DOWNLOAD_RETRY_MESSAGE };
+}
+
+export function refreshAndroidUpdateDownloadState(): Promise<AndroidUpdateDownloadState> {
+  if (Platform.OS !== 'android' || activeDownload) return Promise.resolve(downloadState);
+  if (stateRefresh) return stateRefresh;
+  const previousState = downloadState;
+  stateRefresh = restoreAndroidUpdateDownloadState().then((nextState) => {
+    // A new download may have started while storage or the system query was pending.
+    if (!activeDownload && downloadState === previousState) publishDownloadState(nextState);
+    return downloadState;
+  }).finally(() => { stateRefresh = null; });
+  return stateRefresh;
 }
 
 export async function startAndroidUpdateDownload(release: AppRelease) {
@@ -251,6 +267,8 @@ export async function startAndroidUpdateDownload(release: AppRelease) {
   publishDownloadState({ status: 'downloading', version: release.version });
   activeDownload = (async () => {
     try {
+      // Let recovery finish its storage cleanup before recording the new attempt.
+      await stateRefresh;
       const util = await blobUtil();
       const safeVersion = release.version.replace(/[^0-9A-Za-z.-]/g, '-');
       const path = `${util.fs.dirs.DownloadDir}/CodexSwitch-update-${safeVersion}-${Date.now()}.apk`;

@@ -14,7 +14,7 @@ function DownloadStatus({ update }: { update: UpdateState }) {
   </View>;
   if (state.status === 'failed') return <View style={styles.status}>
     <Text style={[styles.statusTitle, styles.error]}>v{state.version} 下载失败</Text>
-    <Text style={styles.detail}>请检查网络后重试。</Text>
+    <Text style={styles.detail}>下载未完成，请检查网络后点击“重新下载”。</Text>
   </View>;
   return <View style={styles.status}>
     <Text style={styles.statusTitle}>v{state.version} 已下载</Text>

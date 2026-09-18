@@ -12,7 +12,8 @@ function updateAction(update: UpdateState) {
   if (downloadState.status === 'downloading') return { label: '下载中', busy: true };
   if (checking) return { label: '检查中', busy: true };
   if (updateCheck?.updateAvailable) {
-    return { label: '更新', onPress: () => update.beginDownload(updateCheck.release) };
+    return { label: downloadState.status === 'failed' ? '重新下载' : '更新',
+      onPress: () => update.beginDownload(updateCheck.release) };
   }
   if (update.error) return { label: '重试', onPress: () => void update.checkForUpdate() };
   return { label: updateCheck ? '已是最新' : '检查更新', current: Boolean(updateCheck),

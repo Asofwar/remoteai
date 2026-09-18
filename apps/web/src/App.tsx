@@ -11,6 +11,7 @@ import { bootstrapApp, clearAuthError, clearDataError, deviceSocketMessage, page
 import type { AppPage, RemoteDevice } from "./types";
 import { AdaptiveSheet } from "./components/AdaptiveSheet";
 import { BrandMark } from "./components/BrandMark";
+import { RegistrationSheet } from "./components/RegistrationSheet";
 import { DeviceManagementList } from "./devices/DeviceManagementList";
 import { useRemoteModelRestartPrompt } from "./devices/useRemoteModelRestartPrompt";
 import { RemoteModelSwitchSheet } from "./components/RemoteModelSwitchSheet";
@@ -36,6 +37,7 @@ function LoginView() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showServer, setShowServer] = useState(false);
+  const [showRegistration, setShowRegistration] = useState(false);
 
   const submit = async () => {
     if (!email.trim() || !password) {
@@ -75,7 +77,11 @@ function LoginView() {
         <span className="login-kicker">云端控制台</span>
         <h2>欢迎回来</h2>
         <p className="login-intro">登录云端账号，随时管理用量与设备。</p>
-        <Form className="login-form" layout="vertical" footer={<Button block color="primary" size="large" loading={submitting} onClick={submit}>登录并查看</Button>}>
+        <Form className="login-form" layout="vertical" footer={<div className="login-actions">
+          <Button className="login-register" color="primary" fill="outline" size="large"
+            type="button" onClick={() => setShowRegistration(true)}>注册</Button>
+          <Button block color="primary" size="large" loading={submitting} onClick={submit}>登录并查看</Button>
+        </div>}>
           <Form.Item label="邮箱">
             <Input value={email} onChange={(value) => { setEmail(value); dispatch(clearAuthError()); }}
               type="email" inputMode="email" autoCapitalize="none"
@@ -101,6 +107,7 @@ function LoginView() {
         <div className="login-security"><ShieldCheck size={16} /><span>安全连接，安心管理你的账号。</span></div>
       </div>
     </section>
+    <RegistrationSheet open={showRegistration} onClose={() => setShowRegistration(false)} />
   </main>;
 }
 

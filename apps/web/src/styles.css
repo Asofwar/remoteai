@@ -86,6 +86,26 @@ h1, h2, h3, .brand-lockup { font-family: "Manrope", "PingFang SC", "Microsoft Ya
 .login-form .adm-input:focus-within, .password-form .adm-input:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px rgba(11, 155, 124, 0.09); }
 .login-form .adm-form-footer, .password-form .adm-form-footer { padding: 5px 0 0; }
 .login-form .adm-button, .password-form .adm-button { height: 52px; border-radius: 13px; font-weight: 800; box-shadow: 0 12px 25px rgba(11, 155, 124, 0.16); }
+.login-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+.login-form .login-actions .login-register { box-shadow: none; }
+.registration-guide { width: 100%; max-width: 400px; margin: 0 auto; padding-bottom: 12px; }
+.registration-guide p { color: var(--muted); font-size: 14px; line-height: 1.75; overflow-wrap: anywhere; }
+.registration-guide p + p { margin-top: 8px; }
+.registration-download {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 11px;
+  color: #fff;
+  background: var(--green);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.registration-download:hover { color: #fff; background: #087560; }
 .server-toggle { display: flex; align-items: center; gap: 7px; margin: -3px 0 20px; padding: 0; border: 0; color: #5d7168; background: none; cursor: pointer; font-size: 12px; font-weight: 700; }
 .server-toggle svg:last-child { margin-left: auto; transition: transform .2s ease; }
 .server-toggle[aria-expanded="true"] svg:last-child { transform: rotate(90deg); }

@@ -1,10 +1,12 @@
 import { createContext, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Keyboard, Text } from 'react-native';
 import type { FileReference } from '../../../../shared/chat/fileReference';
+import { localImageSource } from '../../../../shared/chat/imageSources';
 import type { TextPreview } from '../../../../shared/remote-chat/textPreview';
 import { BottomSheet } from '../components/BottomSheet';
 import { SheetScrollView } from '../components/SheetScrollView';
 import { ChatCodeBlock } from './ChatCodeBlock';
+import { ChatImageFilePreview } from './ChatImageFilePreview';
 import { fileLanguage } from './ChatCodeHighlight';
 import { styles } from './styles';
 
@@ -26,9 +28,11 @@ interface Props {
   files: FileClient;
 }
 
-function FilePreview({ file, threadId, ready, load, files, close }: Omit<Props, 'children'> & {
+type PreviewProps = Omit<Props, 'children'> & {
   file: FileReference; close: () => void;
-}) {
+};
+
+function FilePreview({ file, threadId, ready, load, files, close }: PreviewProps) {
   const [result, setResult] = useState<TextPreview>();
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -66,14 +70,19 @@ function FilePreview({ file, threadId, ready, load, files, close }: Omit<Props, 
   </BottomSheet>;
 }
 
+function FilePreviewContent(props: PreviewProps) {
+  const { file, threadId, ready, videos, files, close } = props;
+  if (localImageSource(file.path)) return <ChatImageFilePreview path={file.path} close={close} />;
+  if (isVideoPath(file.path)) return <VideoViewer path={file.path} threadId={threadId}
+    ready={ready} client={videos} files={files} close={close} />;
+  return <FilePreview {...props} />;
+}
+
 export function ChatFileProvider({ children, ...options }: Props) {
   const [file, setFile] = useState<FileReference | null>(null);
   const open = useCallback((value: FileReference) => { Keyboard.dismiss(); setFile(value); }, []);
   return <ChatFileContext.Provider value={open}>
     {children}
-    {file && (isVideoPath(file.path)
-      ? <VideoViewer key={file.path} path={file.path} threadId={options.threadId}
-        ready={options.ready} client={options.videos} files={options.files} close={() => setFile(null)} />
-      : <FilePreview key={file.path} {...options} file={file} close={() => setFile(null)} />)}
+    {file && <FilePreviewContent key={file.path} {...options} file={file} close={() => setFile(null)} />}
   </ChatFileContext.Provider>;
 }

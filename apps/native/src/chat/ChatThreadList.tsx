@@ -2,7 +2,7 @@ import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View } fro
 import type { ChatProject, ChatState, Thread } from './types';
 import { threadPresentation } from '../../../../shared/remote-chat/sidebar';
 import { useThreadGroups } from '../../../../shared/remote-chat/client/useThreadGroups';
-import { useThreadPagination } from '../../../../shared/remote-chat/client/useThreadPagination';
+import { useThreadListScroll } from './useThreadListScroll';
 import type { ChatController } from './controller';
 import { palette, styles } from './styles';
 
@@ -13,22 +13,19 @@ interface Props {
 }
 
 const LIST_BOTTOM_SPACING = 16;
-const LOAD_MORE_THRESHOLD = 0.5;
 
 export function ChatThreadList({ state, newChat, select, controller, bottomInset }: Props) {
   const { groups, toggle } = useThreadGroups(state);
-  const pagination = useThreadPagination(state, controller);
+  const layoutKey = JSON.stringify(groups.map(group => [group.cwd, group.data.length, group.canToggle]));
+  const pagination = useThreadListScroll(state, controller, layoutKey);
   const ready = state.ready;
   return (
     <SectionList style={styles.fill} sections={groups} keyExtractor={(thread) => thread.id}
       contentContainerStyle={[listStyles.content, { paddingBottom: bottomInset + LIST_BOTTOM_SPACING }]}
       stickySectionHeadersEnabled={false} keyboardShouldPersistTaps="handled"
       refreshing={state.loading && !pagination.loadingMore} onRefresh={() => { void controller.list(); }}
-      onEndReached={() => pagination.setNearEnd(true)} onEndReachedThreshold={LOAD_MORE_THRESHOLD}
-      onScroll={({ nativeEvent: { contentOffset, contentSize, layoutMeasurement } }) => {
-        pagination.setNearEnd(contentSize.height - contentOffset.y - layoutMeasurement.height
-          <= layoutMeasurement.height * LOAD_MORE_THRESHOLD);
-      }} scrollEventThrottle={16}
+      onLayout={pagination.onLayout} onContentSizeChange={pagination.onContentSizeChange}
+      onScroll={pagination.onScroll} scrollEventThrottle={16}
       renderSectionHeader={({ section }) => <View style={styles.row}>
         <Text accessibilityRole="header" numberOfLines={1} style={[listStyles.project, styles.fill]}>
           {section.label}</Text>

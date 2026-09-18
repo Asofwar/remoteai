@@ -47,9 +47,17 @@ html:has(.app-shell.chat-active), body:has(.app-shell.chat-active) { overscroll-
 .chat-account-choices, .chat-search-results { max-height: 50dvh; }
 .chat-drawer .chat-thread-list, .chat-sidebar .chat-thread-list { padding: 0 14px 16px; }
 .chat-drawer .chat-project-group h3, .chat-sidebar .chat-project-group h3 {
-  color: var(--chat-muted); font-size: 12px; margin: 12px 10px;
+  color: var(--chat-muted); font-size: 12px; margin: 0;
 }
 .chat-project-heading { display: flex; align-items: center; gap: 6px; }
+.chat-project-toggle {
+  display: flex; align-items: center; gap: 6px; width: 100%; min-height: 44px; padding: 10px;
+  border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit;
+  text-align: left; cursor: pointer;
+}
+.chat-project-toggle svg { flex-shrink: 0; }
+.chat-project-toggle:hover { background: var(--chat-pale); }
+.chat-project-toggle:focus-visible { outline: 2px solid var(--chat-green); outline-offset: -2px; }
 .chat-project-heading .chat-back { color: var(--chat-muted); flex-shrink: 0; }
 .chat-project-heading .chat-back:disabled { opacity: .4; cursor: default; }
 .chat-thread {

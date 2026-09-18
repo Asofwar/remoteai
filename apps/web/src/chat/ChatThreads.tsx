@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { LoaderCircle, Plus, RefreshCw, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, LoaderCircle, Plus, RefreshCw, Search } from 'lucide-react';
 import type { ChatController, ChatProject, ChatState } from './types';
 import { threadPresentation } from '../../../../shared/remote-chat/sidebar';
 import { useThreadGroups } from '../../../../shared/remote-chat/client/useThreadGroups';
@@ -11,7 +11,7 @@ interface Props {
 }
 
 export function ChatThreads({ state, controller, newChat, onClose, openSearch, profile }: Props) {
-  const { groups, toggle } = useThreadGroups(state);
+  const { groups, toggle, toggleCollapse } = useThreadGroups(state);
   const pagination = useThreadListScroll(state, controller);
   const ready = state.ready;
   return <>
@@ -30,7 +30,13 @@ export function ChatThreads({ state, controller, newChat, onClose, openSearch, p
       {groups.map((group) =>
         <section className="chat-project-group" aria-label={group.label} key={group.cwd}>
           <div className="chat-project-heading">
-            <h3 className="chat-grow chat-ellipsis">{group.label}</h3>
+            <h3 className="chat-grow"><button type="button" className="chat-project-toggle"
+              aria-expanded={!group.collapsed} aria-label={`${group.collapsed ? '展开项目' : '折叠项目'}：${group.label}`}
+              onClick={() => toggleCollapse(group.cwd)}>
+              {group.collapsed ? <ChevronRight size={14} aria-hidden="true" />
+                : <ChevronDown size={14} aria-hidden="true" />}
+              <span className="chat-ellipsis">{group.label}</span>
+            </button></h3>
             {group.cwd && <button type="button" className="chat-back" aria-label={`在 ${group.label} 中新建对话`}
               disabled={state.sending} onClick={() => newChat(group)}><Plus size={18} aria-hidden="true" /></button>}
           </div>

@@ -3,19 +3,26 @@ import { previewThreads, THREAD_GROUP_PREVIEW_COUNT } from '../../chat/threadGro
 import { projectThreadGroups } from '../sidebar';
 import type { ChatState } from './types';
 
+function toggleProject(previous: Set<string>, cwd: string) {
+  const next = new Set(previous);
+  if (next.has(cwd)) next.delete(cwd);
+  else next.add(cwd);
+  return next;
+}
+
 export function useThreadGroups(state: ChatState) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const filtering = Boolean(state.search.trim());
   const groups = useMemo(() => projectThreadGroups(state.threads, state.sidebar).map((group) => {
     const showAll = filtering || expanded.has(group.cwd);
-    return { ...group, expanded: showAll, canToggle: !filtering && group.data.length > THREAD_GROUP_PREVIEW_COUNT,
-      data: showAll ? group.data : previewThreads(group.data, state.selected?.id ?? null) };
-  }), [state.threads, state.sidebar, state.selected?.id, filtering, expanded]);
-  const toggle = (cwd: string) => setExpanded((previous) => {
-    const next = new Set(previous);
-    if (next.has(cwd)) next.delete(cwd);
-    else next.add(cwd);
-    return next;
-  });
-  return { groups, toggle };
+    const isCollapsed = collapsed.has(group.cwd);
+    const visibleThreads = showAll ? group.data : previewThreads(group.data, state.selected?.id ?? null);
+    return { ...group, expanded: showAll, collapsed: isCollapsed,
+      canToggle: !isCollapsed && !filtering && group.data.length > THREAD_GROUP_PREVIEW_COUNT,
+      data: isCollapsed ? [] : visibleThreads };
+  }), [state.threads, state.sidebar, state.selected?.id, filtering, expanded, collapsed]);
+  const toggle = (cwd: string) => setExpanded(previous => toggleProject(previous, cwd));
+  const toggleCollapse = (cwd: string) => setCollapsed(previous => toggleProject(previous, cwd));
+  return { groups, toggle, toggleCollapse };
 }

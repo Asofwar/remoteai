@@ -1,4 +1,5 @@
 import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
 import type { ChatProject, ChatState, Thread } from './types';
 import { threadPresentation } from '../../../../shared/remote-chat/sidebar';
 import { useThreadGroups } from '../../../../shared/remote-chat/client/useThreadGroups';
@@ -15,7 +16,7 @@ interface Props {
 const LIST_BOTTOM_SPACING = 16;
 
 export function ChatThreadList({ state, newChat, select, controller, bottomInset }: Props) {
-  const { groups, toggle } = useThreadGroups(state);
+  const { groups, toggle, toggleCollapse } = useThreadGroups(state);
   const layoutKey = JSON.stringify(groups.map(group => [group.cwd, group.data.length, group.canToggle]));
   const pagination = useThreadListScroll(state, controller, layoutKey);
   const ready = state.ready;
@@ -27,8 +28,12 @@ export function ChatThreadList({ state, newChat, select, controller, bottomInset
       onLayout={pagination.onLayout} onContentSizeChange={pagination.onContentSizeChange}
       onScroll={pagination.onScroll} scrollEventThrottle={16}
       renderSectionHeader={({ section }) => <View style={styles.row}>
-        <Text accessibilityRole="header" numberOfLines={1} style={[listStyles.project, styles.fill]}>
-          {section.label}</Text>
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: !section.collapsed }}
+          accessibilityLabel={`${section.collapsed ? '展开项目' : '折叠项目'}：${section.label}`}
+          style={[listStyles.projectToggle, styles.fill]} onPress={() => toggleCollapse(section.cwd)}>
+          <Feather name={section.collapsed ? 'chevron-right' : 'chevron-down'} size={14} color={palette.muted} />
+          <Text numberOfLines={1} style={[listStyles.project, styles.fill]}>{section.label}</Text>
+        </Pressable>
         {!!section.cwd && <Pressable accessibilityRole="button" accessibilityLabel={`在 ${section.label} 中新建对话`}
           disabled={state.sending} style={[listStyles.add, state.sending && styles.disabled]}
           onPress={() => newChat(section)}><Text style={listStyles.plus}>＋</Text></Pressable>}
@@ -70,8 +75,8 @@ export function ChatThreadList({ state, newChat, select, controller, bottomInset
 const listStyles = StyleSheet.create({
   content: { paddingHorizontal: 14 },
   pagination: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  project: { color: palette.muted, fontSize: 12, lineHeight: 18, fontWeight: '600',
-    paddingHorizontal: 10, marginVertical: 12 },
+  projectToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 10 },
+  project: { color: palette.muted, fontSize: 12, lineHeight: 18, fontWeight: '600' },
   add: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   plus: { color: palette.muted, fontSize: 22 },
   thread: { minHeight: 46, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center',

@@ -1,7 +1,16 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState, type WheelEvent } from 'react';
 import type { ChatMessagesProps } from '../../../../shared/remote-chat/client/messageProps';
 
 const EDGE_DISTANCE = 100;
+
+function canScrollUp(target: EventTarget, container: HTMLElement) {
+  let element = target instanceof Element ? target : null;
+  while (element && element !== container) {
+    if (element.scrollTop > 0 && /^(auto|scroll)$/.test(getComputedStyle(element).overflowY)) return true;
+    element = element.parentElement;
+  }
+  return false;
+}
 
 export function useHistoryScroll({ thread, loadingMore, hasMore, loadOlder }: ChatMessagesProps) {
   const list = useRef<HTMLDivElement>(null);
@@ -52,11 +61,17 @@ export function useHistoryScroll({ thread, loadingMore, hasMore, loadOlder }: Ch
     setShowBottom(!following.current);
     if (upward && node.scrollTop < EDGE_DISTANCE) more();
   };
+  const onWheel = (event: WheelEvent<HTMLDivElement>) => {
+    if (event.deltaY >= 0 || event.ctrlKey || event.defaultPrevented || event.currentTarget.scrollTop > 0) return;
+    if (canScrollUp(event.target, event.currentTarget)) return;
+    // At the top (including short histories), upward wheels do not produce a scroll event.
+    more();
+  };
   const toBottom = () => {
     following.current = true;
     setShowBottom(false);
     list.current?.scrollTo({ top: list.current.scrollHeight, behavior: 'smooth' });
   };
   const pauseFollowing = () => { following.current = false; };
-  return { list, content, onScroll, more, showBottom, toBottom, pauseFollowing };
+  return { list, content, onScroll, onWheel, more, showBottom, toBottom, pauseFollowing };
 }

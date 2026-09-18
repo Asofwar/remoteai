@@ -83,7 +83,8 @@ export function ChatMessages(props: ChatMessagesProps) {
   return <>
     <div className="chat-message-region">
       <ChatSelectionQuote root={scroll.content} selected={thread?.id ?? null} enabled={desktop} />
-      <div ref={scroll.list} className="chat-scroll chat-messages" aria-label={t("聊天记录")} onScroll={scroll.onScroll}>
+      <div ref={scroll.list} className="chat-scroll chat-messages" aria-label={t("聊天记录")}
+        onScroll={scroll.onScroll} onWheel={scroll.onWheel}>
         <div ref={scroll.content} className={`chat-message-content${!entries.length ? ' is-empty' : ''}`}
           onClickCapture={desktop ? scroll.pauseFollowing : undefined}>
           {(hasMore || (loading && !entries.length)) && <div className="chat-history-more">

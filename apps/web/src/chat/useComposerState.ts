@@ -50,9 +50,21 @@ export function useComposerState(props: ComposerProps) {
   useEffect(() => { if (active && ready && threadId) void goals.load(threadId); }, [goals, threadId, active, ready]);
   useEffect(() => { setError(''); }, [threadId]);
   useLayoutEffect(() => {
-    if (!menu.input.current || !active) return;
-    menu.input.current.style.height = 'auto';
-    menu.input.current.style.height = `${menu.input.current.scrollHeight}px`;
+    const input = menu.input.current;
+    if (!input || !active) return;
+    const resize = () => {
+      input.style.height = 'auto';
+      input.style.height = `${input.scrollHeight}px`;
+    };
+    resize();
+    let width = input.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (input.clientWidth === width) return;
+      width = input.clientWidth;
+      resize();
+    });
+    observer.observe(input);
+    return () => observer.disconnect();
   }, [draft.text, active, menu.input]);
   const previousQuoteCount = useRef(0);
   const quoteCount = quotes?.quotes.length ?? 0;

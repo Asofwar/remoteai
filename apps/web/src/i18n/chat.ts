@@ -1,4 +1,10 @@
 export const chat = {
+  "描述任务，或输入 / 选择命令和技能…": "Describe a task, or type / for commands and skills…",
+  "Enter 发送 · Shift + Enter 换行": "Enter to send · Shift + Enter for a new line",
+  "应如何批准操作？": "How should actions be approved?",
+  "访问权限：{value1}": "Access: {value1}",
+  "查看上下文用量": "View context usage",
+  "预估费用": "Estimated cost",
   "进行中": "In progress",
   "已完成": "Completed",
   "失败": "Failed",

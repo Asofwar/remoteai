@@ -4,7 +4,7 @@ import { chatJourney } from './chat-journey';
 import { historyJourney } from './chat-history';
 import { attachmentJourney } from './chat-attachments';
 import { imageEditorJourney } from './chat-image-editor';
-import { composerLayout } from './chat-composer';
+import { composerLayout, desktopComposer } from './chat-composer';
 import { projectPickerJourney } from './chat-project-picker';
 import { clipboardJourney } from './chat-clipboard';
 import { backgroundJourney } from './chat-background';
@@ -31,6 +31,10 @@ test.beforeEach(async ({ page, request }, info) => {
 
 
 test('keeps composer icons below single and multiline drafts', async ({ page }) => composerLayout(page));
+test('uses desktop composer controls and Enter shortcuts while streaming', async ({ page, request }, info) => {
+  test.skip(info.project.name !== 'desktop', 'Desktop composer interaction');
+  await desktopComposer(page, request, info);
+});
 test('pastes text, images and files without replacing the draft',
   async ({ page, request }) => clipboardJourney(page, request));
 

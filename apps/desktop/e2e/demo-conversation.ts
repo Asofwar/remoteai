@@ -58,6 +58,8 @@ export function demoResponse(request: RpcRequest, link: ChatLink): unknown {
   if (request.method === 'connect') return [...approvals.values()].map(({ event }) => event);
   const input = (request.body ?? {}) as Record<string, unknown>;
   operations.push({ ...input, method: request.method });
+  if (input.operation === 'usageSummary') return { totalTokens: 123456, estimatedCostUsd: 1.25,
+    primaryRemainingPercent: 75, primaryRemainingAggregated: false, providerEstimatedCost: null };
   if (input.operation === 'tokenSummary') return demoTokenSummary(input);
   if (request.method === 'respond') return respond(input);
   if (input.operation === 'models') return { data: demoComposer().models, nextCursor: null, composer: demoComposer() };

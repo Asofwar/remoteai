@@ -73,7 +73,7 @@ test('handles disabled and empty results and dismisses with Escape', async ({ pa
     await expect(input).toBeFocused();
   }
   expect(await operationCount(request, 'send')).toBe(0);
-  await input.press('Enter');
+  await input.press('Shift+Enter');
   await expect(input).toHaveValue('/no-such-skill\n');
 });
 

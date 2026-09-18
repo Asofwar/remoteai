@@ -40,8 +40,8 @@ export function ChatPhotoEditor({ photo, save, close }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#161616' },
+  container: { flex: 1, backgroundColor: '#f1f3f6' },
   notice: { padding: 12, maxWidth: 400, alignSelf: 'center' },
-  error: { color: '#fca5a5', textAlign: 'center' },
+  error: { color: '#b42318', textAlign: 'center' },
   close: { minHeight: 44, justifyContent: 'center' },
 });

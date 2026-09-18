@@ -27,7 +27,7 @@ export function ChatImageEditor({ image, save, close }: {
     return () => window.removeEventListener('message', receive);
   }, [save, close]);
   return <Modal open centered footer={null} title={null} closable={false} maskClosable={false}
-    onCancel={close} width={900} className="chat-image-editor" destroyOnClose
+    onCancel={close} width={1120} className="chat-image-editor" wrapClassName="chat-image-editor-wrap" destroyOnClose
     transitionName="" maskTransitionName="">
     {/* Only our own editor and validated image data are embedded. Keeping the local origin lets
         Chromium deliver pointer gestures reliably; the document CSP blocks all external content. */}

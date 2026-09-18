@@ -22,6 +22,7 @@ import { ProjectPicker } from "./ProjectPicker";
 import { SkillInput, type SkillInputHandle } from "./SkillInput";
 import { compactCommand } from "./composerOptions";
 import { QueuedMessages } from "./QueuedMessages";
+import { RunningChangesSummary } from "./RunningChangesSummary";
 import styles from "./styles.module.less";
 
 export interface ComposerHandle { addQuote: (quote: ReplyQuote) => boolean }
@@ -81,6 +82,7 @@ export const Composer = forwardRef<ComposerHandle, {
     if (restored) skillInput.current?.focus();
   };
   return <div className={styles.composerWrap}>
+    <RunningChangesSummary value={current} />
     {state.selected && <QueuedMessages threadId={state.selected} messages={queuedMessages}
       running={running} connected={state.connection === "ready"} queue={controller.queue}
       editDisabled={disabled || reading || !active} onEdit={editQueuedMessage} />}

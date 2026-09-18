@@ -5,7 +5,7 @@ import { MessageItem } from "./MessageItem";
 import { TurnDuration } from "./TurnDuration";
 import { TurnPlan } from "./TurnPlan";
 import { TurnDiff } from "./TurnDiff";
-import { changedFiles, parseDiff } from "./diff";
+import { useTurnChangedFiles } from "./useTurnChangedFiles";
 import { visibleContinuationItems } from "./continuation";
 import styles from "./styles.module.less";
 import { GeneratedImages } from "./GeneratedImages";
@@ -29,10 +29,8 @@ export const TurnMessage = memo(function TurnMessage({ turn, running, active, fo
         visible.has(item.id) && (group.type !== "work" || hasVisibleProcessContent(item))) }))
       .filter((group) => group.items.length > 0);
   }, [turn.items, followsInterruption, visibleItems]);
-  const netFiles = useMemo(() => parseDiff(turn.diff ?? ""), [turn.diff]);
-  const files = useMemo(() => turn.diff ? netFiles : turn.items
-    .filter((item) => item.type === "fileChange" && !["declined", "failed", "inProgress"].includes(item.status ?? ""))
-    .flatMap((item) => changedFiles(item.changes ?? [])), [turn.diff, turn.items, netFiles]);
+  const files = useTurnChangedFiles(turn);
+  const showChanges = !running && turn.status !== "inProgress" && files.length > 0;
   const responseIndex = groups.findIndex((group) => group.items[0].type !== "userMessage");
   return <div className={styles.turn} data-turn-id={turn.id}>
     {groups.map((group, index) => <Fragment key={group.key}>
@@ -50,7 +48,7 @@ export const TurnMessage = memo(function TurnMessage({ turn, running, active, fo
     {responseIndex === -1 && !running && <TurnDuration turn={turn} running={running} active={active} />}
     <GeneratedImages items={visibleItems} />
     <TurnPlan turn={turn} />
-    {files.length > 0 && <TurnDiff files={files} title={turn.diff ? "本轮修改" : "文件修改记录"}
+    {showChanges && <TurnDiff files={files} title={turn.diff ? "本轮修改" : "文件修改记录"}
       threadId={threadId} turnId={turn.id}
       disabled={running || turn.status === "inProgress" || Boolean(editDisabled)} />}
     <RequestErrorNotice turn={turn} />

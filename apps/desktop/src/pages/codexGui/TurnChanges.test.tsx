@@ -4,7 +4,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { DetailsContext } from "./detailsContext";
 import { TurnMessage } from "./TurnMessage";
-import type { Item, Turn } from "./types";
+import { RunningChangesSummary } from "./RunningChangesSummary";
+import type { Conversation, Item, Turn } from "./types";
 
 let root: Root;
 let container: HTMLDivElement;
@@ -28,44 +29,56 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-async function render(items: Item[], extra: Partial<Turn> = {}) {
+async function render(items: Item[], extra: Partial<Turn> = {}, previous: Turn[] = []) {
   const turn: Turn = { id: "turn", status: "inProgress", items, ...extra };
+  const value: Conversation = { thread: { id: "thread", cwd: "", preview: "", updatedAt: 1 },
+    turns: [...previous, turn], activeTurn: turn.status === "inProgress" ? turn.id : null, tokens: 0, error: "" };
   await act(async () => root.render(<DetailsContext.Provider value={panel}>
     <TurnMessage turn={turn} running={turn.status === "inProgress"} active={false} />
+    <RunningChangesSummary value={value} />
   </DetailsContext.Provider>));
 }
 
 function cards() { return container.querySelectorAll("section[aria-label]"); }
+function badge() { return container.querySelector<HTMLButtonElement>('button[aria-label*="个文件已更改"]'); }
 
 it("shows only the final summary when item edits and the net diff describe the same files", async () => {
   await render([edit, { id: "command", type: "commandExecution", command: "npm test", status: "failed" }],
-    { diff: netDiff });
+    { diff: netDiff, status: "completed" });
   expect(cards()).toHaveLength(1);
   expect(cards()[0].getAttribute("aria-label")).toBe("本轮修改");
   expect(cards()[0].closest("details")).toBeNull();
   expect(cards()[0].textContent).toContain("src/example.ts");
   expect(cards()[0].textContent).not.toContain("F:");
   expect(cards()[0].textContent).toContain("+2−1");
-  expect(container.textContent).toContain("运行失败 npm test");
   await act(async () => (cards()[0].querySelector("button") as HTMLButtonElement).click());
   expect(panel.open).toHaveBeenCalledWith(expect.objectContaining({
     title: "本轮修改", files: [expect.objectContaining({ path: "src/example.ts", raw: netDiff })],
   }));
 });
 
-it("updates one summary as edits accumulate, the net diff arrives, and the turn finishes", async () => {
+it("updates a compact summary during edits and shows the file list only when the turn finishes", async () => {
   await render([edit]);
-  expect(cards()).toHaveLength(1);
+  expect(cards()).toHaveLength(0);
+  expect(badge()?.textContent).toBe("1 个文件已更改+2−1");
+  await act(async () => badge()!.click());
+  expect(panel.open).toHaveBeenCalledWith(expect.objectContaining({
+    title: "本轮修改", files: [expect.objectContaining({ path: "F:\\project\\src\\example.ts" })],
+  }));
   const second: Item = { ...edit, id: "second",
     changes: [{ path: "src/other.ts", kind: { type: "add" }, diff: "other" }] };
   await render([edit, second]);
-  expect(cards()).toHaveLength(1);
-  expect(cards()[0].textContent).toContain("已编辑 2 个文件");
+  expect(cards()).toHaveLength(0);
+  expect(badge()?.textContent).toBe("2 个文件已更改+3−1");
   await render([edit, second], { diff: netDiff });
-  expect(cards()).toHaveLength(1);
-  expect(cards()[0].textContent).toContain("已编辑 1 个文件");
+  expect(cards()).toHaveLength(0);
+  expect(badge()?.textContent).toBe("1 个文件已更改+2−1");
+  expect(panel.update).toHaveBeenLastCalledWith(expect.objectContaining({
+    files: [expect.objectContaining({ path: "src/example.ts", raw: netDiff })],
+  }));
   await render([edit, second, { id: "answer", type: "agentMessage", phase: "final_answer", text: "完成" }],
     { diff: netDiff, status: "completed" });
+  expect(badge()).toBeNull();
   expect(cards()).toHaveLength(1);
   expect(container.querySelector("article")!.compareDocumentPosition(cards()[0])
     & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -74,9 +87,31 @@ it("updates one summary as edits accumulate, the net diff arrives, and the turn 
 it("keeps pending, failed, and declined edits as activities without claiming applied changes", async () => {
   await render(["inProgress", "failed", "declined"].map((status) => ({ ...edit, id: status, status })));
   expect(cards()).toHaveLength(0);
+  expect(badge()).toBeNull();
   expect(container.textContent).toContain("进行中");
   const group = container.querySelector<HTMLDetailsElement>("[data-activity-group] > details")!;
   await act(async () => { group.open = true; group.dispatchEvent(new Event("toggle")); });
   expect(container.textContent).toContain("失败");
   expect(container.textContent).toContain("已拒绝");
+});
+
+it("counts repeated edits to the same path as one file", async () => {
+  await render([edit, { ...edit, id: "edit-again" }]);
+  expect(badge()?.textContent).toBe("1 个文件已更改+4−2");
+});
+
+it.each(["interrupted", "failed"])("shows the applied changes as a list after a %s turn", async (status) => {
+  await render([edit]);
+  await render([edit], { status });
+  expect(badge()).toBeNull();
+  expect(cards()).toHaveLength(1);
+  expect(cards()[0].textContent).toContain("已编辑 1 个文件");
+});
+
+it("does not carry earlier changes into a new turn or a conversation without changes", async () => {
+  await render([edit]);
+  await render([], {}, [{ id: "previous", status: "completed", items: [edit], diff: netDiff }]);
+  expect(badge()).toBeNull();
+  await render([], { id: "other-conversation-turn" });
+  expect(badge()).toBeNull();
 });

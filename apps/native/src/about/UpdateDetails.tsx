@@ -1,9 +1,9 @@
 import { Text, View } from 'react-native';
 import type { useAppUpdate } from './useAppUpdate';
 import { styles } from './styles';
+import { ReleaseNotes } from './ReleaseNotes';
 
 type UpdateState = ReturnType<typeof useAppUpdate>;
-const MAX_RELEASE_NOTES_LENGTH = 900;
 
 function DownloadStatus({ update }: { update: UpdateState }) {
   const state = update.downloadState;
@@ -26,9 +26,6 @@ function ReleaseDetails({ update }: { update: UpdateState }) {
   const result = update.updateCheck;
   if (!result) return null;
   const { release, updateAvailable } = result;
-  const notes = release.notes.replace(/\r/g, '').trim() || '本次版本未提供更新说明。';
-  const compactNotes = notes.length > MAX_RELEASE_NOTES_LENGTH
-    ? `${notes.slice(0, MAX_RELEASE_NOTES_LENGTH).trimEnd()}…` : notes;
   return <View style={styles.status}>
     <View style={styles.statusHeading}>
       <Text style={styles.statusTitle}>最新版本 v{release.version}</Text>
@@ -37,7 +34,7 @@ function ReleaseDetails({ update }: { update: UpdateState }) {
     {release.publishedAt ? <Text style={styles.detail}>
       发布于 {new Date(release.publishedAt).toLocaleDateString('zh-CN')}
     </Text> : null}
-    {updateAvailable ? <Text style={styles.detail}>{compactNotes}</Text> : null}
+    {updateAvailable ? <ReleaseNotes text={release.notes} /> : null}
   </View>;
 }
 

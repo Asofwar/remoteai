@@ -41,6 +41,7 @@ export function ChatComposer(props: ComposerProps) {
       if (!dock.current?.contains(event.target as Node)) { setAdding(false); menu.close(); }
     };
     const keydown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.keyCode === 229) return;
       if (event.key === 'Escape') { setAdding(false); menu.close(); }
     };
     document.addEventListener('pointerdown', close);
@@ -64,6 +65,7 @@ export function ChatComposer(props: ComposerProps) {
   const ActionIcon = { send: ArrowUp, pause: Pause, continue: Play }[action];
   const label = composerLabel(models, selection);
   return <div className="chat-composer-dock" ref={dock} onKeyDown={event => {
+    if (event.defaultPrevented || event.nativeEvent.isComposing || event.keyCode === 229) return;
     if (event.key === 'Escape') { setAdding(false); menu.close(); }
   }}>
     {queue && <ChatQueue {...queue} {...state.queueEditor} />}
@@ -82,11 +84,13 @@ export function ChatComposer(props: ComposerProps) {
       {(draft.picking || attachments.busy) && <p role="status" className="chat-muted">正在添加附件…</p>}
       <ChatUploadProgress progress={uploadProgress} reconnecting={!ready} />
       {(adding || menu.open) && <div className="chat-composer-popover" onKeyDown={event => {
+        if (event.defaultPrevented || event.nativeEvent.isComposing || event.keyCode === 229) return;
         if (event.key === 'Escape') { setAdding(false); menu.close(); menu.input.current?.focus(); }
       }}>{adding ? <ComposerAddMenu busy={busy} choose={chooseAdd} />
         : menu.plugins ? <ComposerPluginMenu catalog={catalog} query={menu.query} load={readCatalog}
+          input={menu.input} close={menu.close}
           chooseSkill={menu.choose} choosePlugin={plugin => { attachments.addPlugin(plugin); menu.consumeTrigger(); }} />
-          : <ChatCommandMenu catalog={catalog} query={menu.query} skillsOnly={menu.skillsOnly}
+          : <ChatCommandMenu catalog={catalog} query={menu.query} skillsOnly={menu.skillsOnly} input={menu.input}
             compactReason={props.compactReason} choose={menu.choose} compact={() => { void menu.runCompact(); }}
             goal={() => { menu.consumeTrigger(); goalMode.enter(); }} close={menu.close} />}</div>}
       <div className="chat-composer-field">
@@ -107,8 +111,9 @@ export function ChatComposer(props: ComposerProps) {
               end: event.currentTarget.selectionEnd })}
             placeholder={ready ? (goalMode.enabled ? '描述想完成的目标…' : '发消息…') : '连接后发消息'}
             onKeyDown={event => {
+              if (event.defaultPrevented || event.nativeEvent.isComposing || event.keyCode === 229) return;
               if (event.key === 'Escape') { menu.close(); setAdding(false); return; }
-              if (event.key !== 'Enter' || event.nativeEvent.isComposing || !(event.ctrlKey || event.metaKey)) return;
+              if (event.key !== 'Enter' || !(event.ctrlKey || event.metaKey)) return;
               event.preventDefault(); void state.submit();
             }} />
         </div>

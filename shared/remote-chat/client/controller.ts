@@ -28,6 +28,7 @@ import { createGuiAccountsClient } from './guiAccounts';
 import { createContextSettingsClient } from './contextSettings';
 import type { UsageSummary } from '../usage';
 import { TOKEN_SUMMARY_OPERATION, type ReadTokenSummary } from '../tokenSummary';
+import { decodeTokenSummary, QUOTA_HISTORY_FORMAT, type TokenSummaryResponse } from '../tokenSummaryCodec';
 import { initialChatState, type ApprovalReply, type ChatProject, type ChatState, type GuiEvent,
   type ListResponse, type Request, type SendInput, type SkillsResponse, type Thread } from './types';
 
@@ -96,7 +97,9 @@ export class ChatController {
   readonly contextSettings = createContextSettingsClient(<T>(body: unknown) =>
     this.connection.request<T>('request', body));
   readTokenSummary: ReadTokenSummary = (weeks) =>
-    this.connection.request('request', { operation: TOKEN_SUMMARY_OPERATION, weeks });
+    this.connection.request<TokenSummaryResponse>('request', {
+      operation: TOKEN_SUMMARY_OPERATION, weeks, quotaHistoryFormat: QUOTA_HISTORY_FORMAT,
+    }).then(decodeTokenSummary);
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
   subscribeEvents = (listener: (event: GuiEvent) => void) => {
     this.eventListeners.add(listener);

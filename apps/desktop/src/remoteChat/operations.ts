@@ -23,6 +23,7 @@ import { guiConnectionError } from '../../../../shared/remote-chat/connectionErr
 import { invoke } from '../api/backend';
 import type { UsageSummary } from '../../../../shared/remote-chat/usage';
 import { TOKEN_SUMMARY_OPERATION } from '../../../../shared/remote-chat/tokenSummary';
+import { encodeTokenSummary, QUOTA_HISTORY_FORMAT } from '../../../../shared/remote-chat/tokenSummaryCodec';
 import { readTokenSummary } from './tokenSummary';
 import { CONTEXT_READ_OPERATION, CONTEXT_WRITE_OPERATION } from '../../../../shared/remote-chat/contextSettings';
 import { contextSettingsRequest } from './contextSettings';
@@ -102,7 +103,8 @@ export class ChatOperations {
       return contextSettingsRequest(body);
     }
     if (request.method === 'request' && body.operation === TOKEN_SUMMARY_OPERATION) {
-      return readTokenSummary(body.weeks);
+      const summary = await readTokenSummary(body.weeks);
+      return body.quotaHistoryFormat === QUOTA_HISTORY_FORMAT ? encodeTokenSummary(summary) : summary;
     }
     if (request.method === 'request' && body.operation === 'usageSummary') {
       return invoke<UsageSummary>('codex_gui_usage_summary');

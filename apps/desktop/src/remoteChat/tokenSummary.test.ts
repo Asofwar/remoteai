@@ -4,6 +4,9 @@ import * as backend from '../api/backend';
 import { readTokenSummary } from './tokenSummary';
 import { ChatOperations } from './operations';
 import { LONG_CONTEXT_COST_STORAGE_KEY, DEFAULT_LONG_CONTEXT_COST_SETTINGS } from '../utils/tokenCostLongContext';
+import { ChatController } from '../../../../shared/remote-chat/client/controller';
+import { QUOTA_HISTORY_FORMAT } from '../../../../shared/remote-chat/tokenSummaryCodec';
+import type { RpcRequest } from '../../../../shared/remote-chat/protocol';
 
 vi.mock('../api/backend', () => ({ loadAppSettings: vi.fn(), loadTokenUsageEntries: vi.fn(),
   loadDailyTokenUsage: vi.fn(), loadTokenUsageBreakdown: vi.fn(), loadAccountQuotaHistory: vi.fn(), invoke: vi.fn() }));
@@ -55,4 +58,41 @@ it('allows a phone range without changing PC preferences and retains successful 
   expect(summary.rankings.providers).toEqual([['Work', 150]]);
   expect(summary.errors).toEqual({ usage: false, analytics: true, quota: false });
   expect(JSON.stringify(summary)).not.toContain('private path');
+});
+
+it.each([false, true])('loads unchanged charts through the phone controller (legacy desktop: %s)', async (legacy) => {
+  const quotaHistory = [{ accountId: 'account', accountLabel: '账户', points: [
+    { ts: 100, primaryRemainingPercent: 80, secondaryRemainingPercent: null,
+      primaryResetAt: 1000, secondaryResetAt: null },
+    { ts: 105, primaryRemainingPercent: 80, secondaryRemainingPercent: null,
+      primaryResetAt: 1000, secondaryResetAt: null },
+  ] }];
+  vi.mocked(backend.loadAccountQuotaHistory).mockResolvedValue(quotaHistory);
+  const operations = new ChatOperations();
+  const request = vi.fn(async (method: RpcRequest['method'], body?: unknown) => {
+    const response = await operations.execute({ kind: 'request', id: 'phone-summary', method,
+      body: legacy ? { operation: 'tokenSummary', weeks: 1 } : body });
+    expect(response.error).toBeUndefined();
+    expect(response.data).toMatchObject(legacy ? { quotaHistory } : { quotaHistoryFormat: QUOTA_HISTORY_FORMAT });
+    return response.data;
+  });
+  const controller = new ChatController(() => ({
+    request: <T>(method: RpcRequest['method'], body?: unknown) => request(method, body) as Promise<T>,
+    start() {}, stop() {},
+  }));
+  const summary = await controller.readTokenSummary(1);
+  expect(request).toHaveBeenCalledWith('request', {
+    operation: 'tokenSummary', weeks: 1, quotaHistoryFormat: QUOTA_HISTORY_FORMAT,
+  });
+  expect(summary.quotaHistory).toEqual(quotaHistory);
+  expect(summary.weeks).toBe(1);
+  expect(summary).not.toHaveProperty('quotaHistoryFormat');
+});
+
+it('keeps legacy responses for clients without a supported history format', async () => {
+  const response = await new ChatOperations().execute({ kind: 'request', id: 'legacy-summary', method: 'request',
+    body: { operation: 'tokenSummary', quotaHistoryFormat: 'future-format' } });
+  expect(response.error).toBeUndefined();
+  expect(response.data).toHaveProperty('quotaHistory', []);
+  expect(response.data).not.toHaveProperty('quotaHistoryFormat');
 });

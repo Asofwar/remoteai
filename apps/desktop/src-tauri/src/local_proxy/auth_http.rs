@@ -105,6 +105,7 @@ fn should_skip_header(name: &str, skip_auth: bool) -> bool {
             | ANTHROPIC_BRIDGE_HEADER
             | LOCAL_PROXY_ACTOR_AUTHORIZATION_HEADER
             | crate::codex_config::LOCAL_PROXY_REQUEST_PURPOSE_HEADER
+            | crate::codex_config::HELP_ACCOUNT_REVISION_HEADER
     ) || (skip_auth
         && matches!(
             name,

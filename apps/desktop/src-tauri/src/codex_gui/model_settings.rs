@@ -177,6 +177,19 @@ pub(crate) async fn codex_gui_model_settings(
         .map_err(|error| error.to_string())
 }
 
+pub(super) fn read_draft(app: &AppHandle) -> Result<Option<ModelSelection>> {
+    let state = app.state::<ModelSettingsState>();
+    let _guard = state
+        .storage
+        .lock()
+        .map_err(|_| ModelSettingsError::Storage)?;
+    let root = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| ModelSettingsError::Storage)?;
+    Ok(read(&root, None)?.selection)
+}
+
 /// Persist a host-created conversation's choice before its first turn, leaving the draft unchanged.
 pub(super) async fn persist_created(
     app: AppHandle,

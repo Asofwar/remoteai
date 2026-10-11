@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { HelpAssistant } from "../helpAssistant/HelpAssistant";
 import { Button, ConfigProvider, Dropdown, Modal, theme as antdTheme } from "antd";
 import enUS from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
@@ -1628,6 +1629,8 @@ export function DashboardApp() {
               language={language} t={t} />
           </section>
         </main>
+
+        <HelpAssistant language={language} page={page} onOpenCodex={() => setPage("codexGui")} />
 
         {showLogin && <LoginModal onClose={() => setShowLogin(false)} onWebSession={startWebSessionLogin}
           onStart={startLogin}

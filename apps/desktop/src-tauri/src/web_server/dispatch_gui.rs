@@ -3,6 +3,12 @@ fn dispatch_gui_command(app: AppHandle, command: &str, args: Value) -> Result<Va
     use tauri::Manager;
 
     match command {
+        "remote_ai_help_status" => serialize(block_on(codex_gui::help_assistant::remote_ai_help_status(
+            app.clone(), app.state::<GuiState>(),
+        ))),
+        "remote_ai_help_ask" => serialize(block_on(codex_gui::help_assistant::remote_ai_help_ask(
+            app.clone(), app.state::<GuiState>(), argument(&args, "request")?,
+        ))),
         "codex_gui_queue_read" => serialize(block_on(codex_gui::queue_store::codex_gui_queue_read(app))),
         "codex_gui_queue_save" => serialize(block_on(codex_gui::queue_store::codex_gui_queue_save(
             app, argument(&args, "snapshot")?,

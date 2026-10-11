@@ -1,0 +1,108 @@
+.root {
+  position: fixed;
+  right: max(22px, env(safe-area-inset-right));
+  bottom: max(22px, env(safe-area-inset-bottom));
+  z-index: 950;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.6;
+  button { cursor: pointer; }
+  button:disabled { cursor: default; opacity: .5; }
+}
+.launcher {
+  width: 62px;
+  height: 62px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d9eaff;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 6px 24px #234e7e26;
+  position: relative;
+  margin-left: auto;
+  img { width: 60px; height: 60px; object-fit: cover; border-radius: 21px; transform: scale(1.05); }
+  &:hover, &:focus-visible { box-shadow: 0 8px 28px #2776c43d; }
+  &:hover .tooltip, &:focus-visible .tooltip { opacity: 1; }
+}
+.tooltip {
+  position: absolute;
+  right: 72px;
+  width: max-content;
+  max-width: min(240px, calc(100vw - 110px));
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--ink);
+  opacity: 0;
+  pointer-events: none;
+  overflow-wrap: anywhere;
+}
+.panel {
+  position: absolute;
+  bottom: 76px;
+  right: 0;
+  width: min(392px, calc(100vw - 32px));
+  max-width: 400px;
+  height: min(610px, calc(100dvh - 140px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: 0 14px 60px #132d4b30;
+  outline: none;
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--line);
+  > div { flex: 1; min-width: 0; }
+  strong { font-size: 14px; }
+  small { display: block; color: var(--muted); font-size: 11px; }
+  button { display: grid; place-items: center; border: 0; border-radius: 8px;
+    padding: 6px; background: transparent; color: var(--muted); }
+  button:hover { background: var(--green-soft); }
+}
+.avatar { display: block; width: 38px; height: 38px; border-radius: 12px; overflow: hidden;
+  img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.2); } }
+.body { flex: 1; min-height: 0; padding: 16px; overflow-y: auto; overscroll-behavior: contain; }
+.welcome { h3 { margin: 2px 0 7px; font-size: 16px; } p { color: var(--muted); margin: 0 0 15px; } }
+.suggestions { display: grid; gap: 8px;
+  button { text-align: left; color: var(--ink); border: 1px solid var(--line); border-radius: 10px;
+    padding: 9px 11px; background: transparent; overflow-wrap: anywhere; }
+  button:hover { background: var(--green-soft); }
+}
+.messages { display: flex; flex-direction: column; gap: 13px; overflow-wrap: anywhere; }
+.question { align-self: flex-end; max-width: 92%; border-radius: 12px 12px 3px 12px;
+  padding: 9px 12px; background: var(--green-soft); white-space: pre-wrap; }
+.answer { max-width: 100%; line-height: 1.75;
+  p { margin: 0 0 9px; } ul, ol { padding-left: 20px; }
+  pre { overflow-x: auto; padding: 9px; border-radius: 8px; background: var(--green-soft); }
+  code { font-size: 12px; } table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+  td, th { border: 1px solid var(--line); padding: 5px; }
+}
+.sources { color: var(--muted); font-size: 11px; summary { cursor: pointer; } div { margin-top: 4px; } }
+.thinking, .status { color: var(--muted); font-size: 12px; }
+.notice { margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 11px;
+  p { margin: 0 0 9px; } > div { display: flex; gap: 8px; flex-wrap: wrap; }
+  button { display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border: 1px solid var(--line);
+    border-radius: 7px; background: transparent; color: var(--ink); font-size: 12px; }
+  .primary { background: var(--green-dark); color: #fff; border-color: transparent; }
+}
+.composer { padding: 12px 14px; border-top: 1px solid var(--line);
+  textarea { display: block; width: 100%; resize: none; padding: 10px 11px; font: inherit; color: var(--ink);
+    border: 1px solid var(--line); border-radius: 10px; background: transparent; }
+  textarea:focus { outline: 2px solid var(--green-accent); outline-offset: 1px; }
+}
+.composerFooter { display: flex; align-items: center; gap: 12px; margin-top: 9px;
+  small { flex: 1; font-size: 10px; color: var(--muted); line-height: 1.5; } }
+.send { flex: 0 0 32px; height: 32px; display: grid; place-items: center; border: 0;
+  border-radius: 10px; background: var(--green-dark); color: white; }
+@media (max-width: 480px) {
+  .root { right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); }
+}

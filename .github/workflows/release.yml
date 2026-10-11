@@ -135,7 +135,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
             libxdo-dev libssl-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils \
-            squashfs-tools xvfb xauth dbus-x11 x11-utils protobuf-compiler libprotobuf-dev clang cmake
+            squashfs-tools xvfb xauth dbus-x11 x11-utils protobuf-compiler libprotobuf-dev clang cmake strace
 
       # Ubuntu 22.04 ships protoc 3.12; EasyTier requires stable proto3 optional support.
       - name: Install Linux connectivity protocol compiler
@@ -193,6 +193,7 @@ jobs:
           # Cross-compilation targets can share a runner host, but need separate caches.
           key: desktop-${{ matrix.name }}
           cache-bin: false
+          cache-on-failure: true
           workspaces: |
             apps/desktop/src-tauri
             apps/desktop/src-tauri/installer-helper
@@ -200,16 +201,28 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Run checks
-        if: runner.os != 'Linux'
-        run: npm run check
+      - name: Diagnose Linux peer discovery
+        if: runner.os == 'Linux' && inputs.linux_only
+        shell: bash
+        run: |
+          set -euo pipefail
+          ip -brief address
+          ip route
+          sudo iptables -S
+          sudo ip6tables -S
+          strace -f -e trace=network -s 96 -o "$RUNNER_TEMP/linux-peer-network.log" \
+            cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml \
+              native_seed_serves_verified_cache_over_a_discovered_direct_connection -- --nocapture
 
-      # Native network tests each create several multithreaded runtimes.
-      # Bound concurrency on the smaller Linux runner without omitting any checks.
-      - name: Run Linux checks
-        if: runner.os == 'Linux'
-        env:
-          RUST_TEST_THREADS: '2'
+      - name: Upload Linux peer diagnostic trace
+        if: always() && runner.os == 'Linux' && inputs.linux_only
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-peer-network
+          path: ${{ runner.temp }}/linux-peer-network.log
+          if-no-files-found: ignore
+
+      - name: Run checks
         run: npm run check
 
       - name: Prepare desktop video runtime

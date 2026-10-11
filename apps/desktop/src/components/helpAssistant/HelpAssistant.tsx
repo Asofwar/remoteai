@@ -1,26 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUp, Plus, RotateCw, X } from 'lucide-react';
+import { ArrowUp, Plus, X } from 'lucide-react';
 import type { Language } from '../../i18n';
 import type { DashboardPage } from '../dashboard/DashboardNavigation';
 import { helpCopy } from './copy';
 import { MAX_QUESTION_LENGTH } from './types';
 import { useHelpAssistant } from './useHelpAssistant';
 import { HelpMessages } from './HelpMessages';
+import { HelpSetupNotice } from './HelpSetupNotice';
+import { useHelpSetup } from './useHelpSetup';
 import assistantIcon from './assistant-icon.jpg';
 import styles from './helpAssistant.module.less';
 
 export function HelpAssistant(props: { language: Language; page: DashboardPage; onOpenCodex: () => void }) {
   const [open, setOpen] = useState(false);
   const assistant = useHelpAssistant({ open, page: props.page });
+  const setup = useHelpSetup(assistant.refresh);
   const copy = helpCopy(props.language);
   const trigger = useRef<HTMLButtonElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const panel = useRef<HTMLElement>(null);
-  const ready = assistant.status === 'ready';
-  const setupRequired = assistant.status && !ready;
-  const notice = setupRequired ? copy.errors[assistant.status as Exclude<typeof assistant.status, 'ready' | undefined>]
-    : assistant.error && copy.errors[assistant.error];
+  const ready = assistant.status === 'ready' && !setup.phase;
   const close = () => { setOpen(false); trigger.current?.focus(); };
 
   useEffect(() => {
@@ -47,12 +47,9 @@ export function HelpAssistant(props: { language: Language; page: DashboardPage; 
         </div>}
         <HelpMessages messages={assistant.messages} pending={assistant.pending} copy={copy} />
         {assistant.checking && <p className={styles.status} role="status">{copy.checking}</p>}
-        {notice && <div className={styles.notice} role="alert"><p>{notice}</p>
-          <div>{setupRequired && <button type="button" className={styles.primary}
-            onClick={() => { close(); props.onOpenCodex(); }}>{copy.setup}</button>}
-            <button type="button" disabled={assistant.checking} onClick={() => void assistant.refresh()}>
-              <RotateCw size={13} />{copy.retry}</button></div>
-        </div>}
+        <HelpSetupNotice status={assistant.status} error={assistant.error} checking={assistant.checking}
+          copy={copy} setup={setup} refresh={assistant.refresh}
+          onSelectAccount={() => { close(); props.onOpenCodex(); }} />
       </div>
       <form className={styles.composer} onSubmit={(event) => { event.preventDefault(); void assistant.send(); }}>
         <textarea ref={input} value={assistant.draft} onChange={(event) => assistant.setDraft(event.target.value)}

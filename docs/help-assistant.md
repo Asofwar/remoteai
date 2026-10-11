@@ -6,9 +6,11 @@ preserves the current help conversation in memory. The panel starts a fresh conv
 application restart; it does not create or restore a regular Codex conversation.
 
 The assistant requires the GUI-managed Codex installation, a live initialized GUI connection and
-an account selected in Codex. Missing prerequisites show a compact explanation and an **Open Codex**
-action, where the normal installation and account picker remain available. It never silently installs,
-initializes or selects an account. Each question rechecks these prerequisites.
+an account selected in Codex. **Install now** downloads and installs Codex directly inside the assistant,
+shows progress and enables it without switching pages. An existing installation has an **Enable assistant**
+action instead. Both reuse the normal installation/connection commands and preserve any live GUI connection.
+Installation and initialization happen only after a click; opening the assistant does not start either.
+The user still chooses their account in Codex using **Choose account**. Each question rechecks prerequisites.
 
 ## Evidence and privacy
 

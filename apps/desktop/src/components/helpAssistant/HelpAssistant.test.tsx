@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { invoke } from '../../api/backend';
 import { subscribeGuiEvent } from '../../pages/codexGui/webEvents';
 import { HelpAssistant } from './HelpAssistant';
-import { helpError, messageHistory, type HelpAvailability, type HelpMessage, type HelpStatus } from './types';
+import { helpError, messageHistory, type HelpAvailability, type HelpMessage } from './types';
 import type { DashboardPage } from '../dashboard/DashboardNavigation';
 
 vi.mock('../../api/backend', () => ({ hasLocalBackend: true, invoke: vi.fn() }));
@@ -59,12 +59,11 @@ it('adds one quiet global launcher and preserves answers across sidebar pages', 
   });
 });
 
-it.each<HelpStatus>(['installRequired', 'initializeRequired', 'accountRequired'])
-('guides %s to Codex without submitting a request', async (status) => {
-  availability = { status };
+it('opens account selection without submitting a request', async () => {
+  availability = { status: 'accountRequired' };
   await render(); await open();
   expect(input().disabled).toBe(true);
-  const setup = [...document.querySelectorAll('button')].find((item) => item.textContent === '前往 Codex')!;
+  const setup = [...document.querySelectorAll('button')].find((item) => item.textContent === '选择账户')!;
   await act(async () => setup.click());
   expect(openCodex).toHaveBeenCalledOnce();
   expect(document.querySelector('[role="dialog"]')).toBeNull();

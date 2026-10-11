@@ -16,6 +16,7 @@ export function useHelpAssistant(options: { open: boolean; page: DashboardPage }
   const [checking, setChecking] = useState(false);
   const busy = useRef(false);
   const statusFlight = useRef(false);
+  const refreshAgain = useRef(false);
   const generation = useRef(0);
   const nextId = useRef(0);
   const accountRevision = useRef<number>();
@@ -23,18 +24,21 @@ export function useHelpAssistant(options: { open: boolean; page: DashboardPage }
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; generation.current++; }; }, []);
 
   const refresh = useCallback(async () => {
-    if (statusFlight.current) return;
+    if (statusFlight.current) { refreshAgain.current = true; return; }
     statusFlight.current = true;
     setChecking(true);
     try {
-      const result: HelpAvailability = hasLocalBackend
-        ? await invoke<HelpAvailability>('remote_ai_help_status') : { status: 'installRequired' };
-      if (!mounted.current) return;
-      if (accountRevision.current !== undefined && accountRevision.current !== result.accountRevision) {
-        generation.current++; setMessages([]);
-      }
-      accountRevision.current = result.accountRevision;
-      setStatus(result.status); setError(undefined);
+      do {
+        refreshAgain.current = false;
+        const result: HelpAvailability = hasLocalBackend
+          ? await invoke<HelpAvailability>('remote_ai_help_status') : { status: 'installRequired' };
+        if (!mounted.current) return;
+        if (accountRevision.current !== undefined && accountRevision.current !== result.accountRevision) {
+          generation.current++; setMessages([]);
+        }
+        accountRevision.current = result.accountRevision;
+        setStatus(result.status); setError(undefined);
+      } while (refreshAgain.current);
     } catch (failure) {
       if (mounted.current) { setStatus(undefined); setError(helpError(failure)); }
     } finally {

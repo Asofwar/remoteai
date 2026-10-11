@@ -19,12 +19,19 @@ async function expectReadableQuestion(panel: Locator) {
 }
 
 async function mockBackend(page: Page, options: { status?: string; wait?: Promise<void> } = {}) {
-  const stats = { asks: 0, polls: 0 };
+  const stats = { asks: 0, polls: 0, installs: 0, connections: 0 };
+  let status = options.status ?? 'ready';
   await page.route('https://fonts.googleapis.com/**', (route) => route.abort());
   await page.route('**/__codex_switch__/api/invoke', async (route) => {
     const { command } = route.request().postDataJSON() as { command: string };
     let result: unknown = {};
-    if (command === 'remote_ai_help_status') result = { status: options.status ?? 'ready', accountRevision: 7 };
+    if (command === 'remote_ai_help_status') result = { status, accountRevision: 7 };
+    if (command === 'codex_gui_cli_status') result = { version: null, release: null };
+    if (command === 'codex_gui_cli_release') result = { version: '0.99.0', size: 100 };
+    if (command === 'codex_gui_cli_install') {
+      stats.installs++; status = 'initializeRequired'; result = { version: '0.99.0' };
+    }
+    if (command === 'codex_gui_connect') { stats.connections++; status = 'accountRequired'; result = []; }
     if (command === 'codex_gui_events') result = { cursor: { streamId: 'test', sequence: 0 }, reset: false, events: [] };
     if (command === 'get_proxy_session_unlimited_conversation') result = false;
     if (command === 'list_proxy_sessions') { stats.polls++; result = []; }
@@ -76,15 +83,35 @@ test('help remains responsive during requests and session polling on every sideb
   await page.screenshot({ path: '../../.codex-tmp/help-answer-narrow-dark.png', animations: 'disabled' });
 });
 
-for (const status of ['installRequired', 'initializeRequired', 'accountRequired']) {
-  test(`help guides ${status} without answering`, async ({ page }) => {
+for (const status of ['installRequired', 'initializeRequired']) {
+  test(`help resolves ${status} in place before choosing an account`, async ({ page }) => {
     const stats = await mockBackend(page, { status });
     await page.goto('/e2e/help-assistant-harness.html');
     await page.getByRole('button', { name: '问题解答助手', exact: true }).click();
     const panel = page.getByRole('dialog');
     await expect(panel.getByRole('textbox')).toBeDisabled();
-    await panel.getByRole('button', { name: '前往 Codex', exact: true }).click();
+    const action = status === 'installRequired' ? '立即安装' : '启用助手';
+    await expect(panel.getByRole('button', { name: action, exact: true })).toBeVisible();
+    if (status === 'installRequired') {
+      await page.screenshot({ path: '../../.codex-tmp/help-direct-install.png', animations: 'disabled' });
+    }
+    expect(stats.installs).toBe(0);
+    await panel.getByRole('button', { name: action, exact: true }).click();
+    await expect(panel.getByRole('button', { name: '选择账户', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Current page')).toHaveText('accounts');
+    expect(stats.installs).toBe(status === 'installRequired' ? 1 : 0);
+    expect(stats.connections).toBe(1);
+    await panel.getByRole('button', { name: '选择账户', exact: true }).click();
     await expect(page.getByLabel('Current page')).toHaveText('codexGui');
     expect(stats.asks).toBe(0);
   });
 }
+
+test('help guides account selection without installing or answering', async ({ page }) => {
+  const stats = await mockBackend(page, { status: 'accountRequired' });
+  await page.goto('/e2e/help-assistant-harness.html');
+  await page.getByRole('button', { name: '问题解答助手', exact: true }).click();
+  await page.getByRole('button', { name: '选择账户', exact: true }).click();
+  await expect(page.getByLabel('Current page')).toHaveText('codexGui');
+  expect(stats.installs).toBe(0); expect(stats.connections).toBe(0); expect(stats.asks).toBe(0);
+});

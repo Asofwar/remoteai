@@ -27,6 +27,7 @@ pub(crate) mod file_stream;
 mod fork_tests;
 pub(crate) mod git;
 mod goals;
+pub(crate) mod help_assistant;
 mod home;
 mod icons;
 mod identity;
@@ -88,6 +89,7 @@ pub(crate) struct GuiState {
     pub(crate) proxy: crate::local_proxy::gui_runtime::GuiProxyRuntime,
     pub(crate) upload_policy: Arc<upload_policy::UploadPolicyStore>,
     client: Mutex<Option<Arc<Client>>>,
+    help_request: Mutex<()>,
     activity: Arc<tokio::sync::RwLock<()>>,
     videos: Arc<file_stream::FileStreams>,
     downloads: DownloadStreams,

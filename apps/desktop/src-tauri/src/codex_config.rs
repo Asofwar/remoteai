@@ -10,6 +10,8 @@ pub(crate) const LOCAL_PROXY_ACTOR_AUTHORIZATION_HEADER: &str = "x-openai-actor-
 pub(crate) const LOCAL_PROXY_REQUEST_PURPOSE_HEADER: &str = "x-codex-switch-request-purpose";
 pub(crate) const TITLE_GENERATION_REQUEST_PURPOSE: &str = "title-generation";
 pub(crate) const PREDICTION_REQUEST_PURPOSE: &str = "next-prompt-suggestion";
+pub(crate) const HELP_REQUEST_PURPOSE: &str = "remote-ai-help";
+pub(crate) const HELP_ACCOUNT_REVISION_HEADER: &str = "x-remote-ai-help-account-revision";
 pub(crate) const LOCAL_PROXY_PROVIDER_ID: &str = "codex-switch-local";
 
 const OFFICIAL_PROVIDER_ID: &str = "openai";

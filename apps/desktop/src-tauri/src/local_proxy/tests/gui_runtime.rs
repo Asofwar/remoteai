@@ -1,6 +1,57 @@
 // The external speed is process-wide; tests that mutate it must not race one another.
 static GUI_SPEED_TEST_LOCK: Mutex<()> = Mutex::new(());
 
+#[test]
+fn help_requests_use_only_gui_selection_and_do_not_inherit_custom_prompts() {
+    use crate::codex_config::{HELP_ACCOUNT_REVISION_HEADER, HELP_REQUEST_PURPOSE, LOCAL_PROXY_REQUEST_PURPOSE_HEADER};
+    use crate::codex_gui::account_selection;
+    let _guard = GUI_SPEED_TEST_LOCK.lock().unwrap();
+    let upstream = Server::http("127.0.0.1:0").unwrap();
+    let fixture = GuiRuntimeFixture::new(&upstream);
+    let selection = account_selection::snapshot(fixture.app.handle()).unwrap();
+    let paths = resolve_paths(fixture.app.handle()).unwrap();
+    write_state(&paths, &ManagerStateFile::default()).unwrap();
+    let prompt_path = fixture.app.path().app_data_dir().unwrap().join("codex-gui-system-prompts.json");
+    crate::storage::write_json_atomic(&prompt_path, &json!({
+        "filterEnabled": true, "filterRules": ["Original help instructions"],
+        "injectionEnabled": true, "injectionPrompts": ["private custom prompt"]
+    })).unwrap();
+    let worker = thread::spawn(move || {
+        let mut request = upstream.recv_timeout(Duration::from_secs(5)).unwrap().unwrap();
+        let body: Value = serde_json::from_reader(request.as_reader()).unwrap();
+        assert_eq!(body["instructions"], "Original help instructions");
+        assert!(!body.to_string().contains("private custom prompt"));
+        assert!(!request.headers().iter().any(|header| header.field.as_str().as_str()
+            .eq_ignore_ascii_case(HELP_ACCOUNT_REVISION_HEADER)));
+        runtime_upstream_reply(request, "default");
+    });
+    let response = gui_runtime_client().post(format!("{}/responses", fixture.base_url))
+        .bearer_auth(crate::codex_config::LOCAL_PROXY_TOKEN)
+        .header(LOCAL_PROXY_REQUEST_PURPOSE_HEADER, HELP_REQUEST_PURPOSE)
+        .header(HELP_ACCOUNT_REVISION_HEADER, selection.revision.to_string())
+        .json(&json!({"model": "gpt-5.6-sol", "input": "help", "stream": false,
+            "instructions": "Original help instructions"})).send().unwrap();
+    assert!(response.status().is_success(), "{}", response.status());
+    worker.join().unwrap();
+    assert_eq!(account_selection::snapshot(fixture.app.handle()).unwrap().revision, selection.revision);
+}
+
+#[test]
+fn help_requests_reject_a_stale_selection_without_contacting_the_provider() {
+    use crate::codex_config::{HELP_ACCOUNT_REVISION_HEADER, HELP_REQUEST_PURPOSE, LOCAL_PROXY_REQUEST_PURPOSE_HEADER};
+    let _guard = GUI_SPEED_TEST_LOCK.lock().unwrap();
+    let upstream = Server::http("127.0.0.1:0").unwrap();
+    let fixture = GuiRuntimeFixture::new(&upstream);
+    let selection = crate::codex_gui::account_selection::snapshot(fixture.app.handle()).unwrap();
+    let response = gui_runtime_client().post(format!("{}/responses", fixture.base_url))
+        .bearer_auth(crate::codex_config::LOCAL_PROXY_TOKEN)
+        .header(LOCAL_PROXY_REQUEST_PURPOSE_HEADER, HELP_REQUEST_PURPOSE)
+        .header(HELP_ACCOUNT_REVISION_HEADER, (selection.revision + 1).to_string())
+        .json(&json!({"model": "gpt-5.6-sol", "input": "help", "stream": false})).send().unwrap();
+    assert!(!response.status().is_success());
+    assert!(upstream.recv_timeout(Duration::from_millis(50)).unwrap().is_none());
+}
+
 struct GuiRuntimeFixture {
     app: tauri::App<tauri::test::MockRuntime>,
     root: PathBuf,

@@ -201,6 +201,12 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # Each peer test runs several native engines. Keep unrelated test cases from
+      # competing for discovery on Linux; concurrency within each test stays intact.
+      - name: Isolate Linux test cases
+        if: runner.os == 'Linux'
+        run: echo "RUST_TEST_THREADS=1" >> "$GITHUB_ENV"
+
       - name: Diagnose Linux peer discovery
         if: runner.os == 'Linux' && inputs.linux_only
         shell: bash
@@ -210,6 +216,7 @@ jobs:
           ip route
           sudo iptables -S
           sudo ip6tables -S
+          cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --no-run
           strace -f -e trace=network -s 96 -o "$RUNNER_TEMP/linux-peer-network.log" \
             cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml \
               native_seed_serves_verified_cache_over_a_discovered_direct_connection -- --nocapture

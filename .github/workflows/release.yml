@@ -7,6 +7,10 @@ on:
         description: "Existing release tag, for example v0.1.0"
         required: true
         type: string
+      linux_only:
+        description: "Rebuild Linux packages for an existing draft release"
+        type: boolean
+        default: false
   push:
     tags:
       - "v*"
@@ -103,35 +107,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: macos-aarch64
-            platform: macos-latest
-            releasePlatform: macos
-            args: "--target aarch64-apple-darwin"
-            rustTargets: "aarch64-apple-darwin,x86_64-apple-darwin"
-          - name: macos-x86_64
-            platform: macos-latest
-            releasePlatform: macos
-            args: "--target x86_64-apple-darwin"
-            rustTargets: "aarch64-apple-darwin,x86_64-apple-darwin"
-          - name: ubuntu-x86_64
-            platform: ubuntu-22.04
-            releasePlatform: linux
-            args: ""
-            rustTargets: ""
-          - name: windows-x86_64
-            # The desktop video helper requires the Visual Studio 2022 generator.
-            platform: windows-2022
-            releasePlatform: windows
-            args: ""
-            rustTargets: ""
-            msvcArch: "amd64"
-          - name: windows-aarch64
-            platform: windows-2022
-            releasePlatform: windows
-            args: "--target aarch64-pc-windows-msvc"
-            rustTargets: "aarch64-pc-windows-msvc"
-            msvcArch: "amd64_arm64"
+        # The Windows video helper requires Visual Studio 2022.
+        include: >-
+          ${{ fromJSON(inputs.linux_only && '[
+            {"name":"ubuntu-x86_64","platform":"ubuntu-22.04","releasePlatform":"linux","args":"","rustTargets":""}
+          ]' || '[
+            {"name":"macos-aarch64","platform":"macos-latest","releasePlatform":"macos",
+             "args":"--target aarch64-apple-darwin","rustTargets":"aarch64-apple-darwin,x86_64-apple-darwin"},
+            {"name":"macos-x86_64","platform":"macos-latest","releasePlatform":"macos",
+             "args":"--target x86_64-apple-darwin","rustTargets":"aarch64-apple-darwin,x86_64-apple-darwin"},
+            {"name":"ubuntu-x86_64","platform":"ubuntu-22.04","releasePlatform":"linux","args":"","rustTargets":""},
+            {"name":"windows-x86_64","platform":"windows-2022","releasePlatform":"windows",
+             "args":"","rustTargets":"","msvcArch":"amd64"},
+            {"name":"windows-aarch64","platform":"windows-2022","releasePlatform":"windows",
+             "args":"--target aarch64-pc-windows-msvc","rustTargets":"aarch64-pc-windows-msvc","msvcArch":"amd64_arm64"}
+          ]') }}
 
     steps:
       - name: Checkout
@@ -211,6 +201,15 @@ jobs:
         run: npm ci
 
       - name: Run checks
+        if: runner.os != 'Linux'
+        run: npm run check
+
+      # Native network tests each create several multithreaded runtimes.
+      # Bound concurrency on the smaller Linux runner without omitting any checks.
+      - name: Run Linux checks
+        if: runner.os == 'Linux'
+        env:
+          RUST_TEST_THREADS: '2'
         run: npm run check
 
       - name: Prepare desktop video runtime
@@ -286,6 +285,7 @@ jobs:
           done
 
   native-android:
+    if: ${{ !inputs.linux_only }}
     name: Build Android APK
     needs: create-release
     runs-on: ubuntu-latest
@@ -432,6 +432,7 @@ jobs:
           fail_on_unmatched_files: true
 
   native-ios:
+    if: ${{ !inputs.linux_only }}
     name: Build iOS app
     needs: create-release
     # React Native 0.79's fmt pod is not compatible with Xcode 26 yet.
@@ -526,12 +527,14 @@ jobs:
           fail_on_unmatched_files: true
 
   dream-skin-resources:
+    if: ${{ !inputs.linux_only }}
     name: Publish Dream Skin resources
     uses: ./.github/workflows/dream-skin-resources.yml
     with:
       ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
   coze-runtime:
+    if: ${{ !inputs.linux_only }}
     name: Publish independent Coze runtime
     uses: ./.github/workflows/coze-runtime.yml
     with:
@@ -539,6 +542,7 @@ jobs:
     secrets: inherit
 
   publish-release:
+    if: ${{ !inputs.linux_only }}
     name: Publish GitHub Release
     needs:
       - create-release

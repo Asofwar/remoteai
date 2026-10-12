@@ -51,6 +51,8 @@ impl Client {
         let settings = context_settings::for_thread(self.app.clone(), id.to_owned())
             .await
             .map_err(|_| GuiError::ContextSettings)?;
+        let model_params = self.context_model_params(id, &params).await?;
+        let settings = self.effective_context(&settings, &model_params).await?;
         if *applied != settings && self.reload_context(id, &settings, &applied).await? {
             *applied = settings;
         }

@@ -214,7 +214,7 @@ fn gpt_5_6_sol_context_window_validation_uses_whole_k_increments() {
 }
 
 #[test]
-fn official_model_context_window_uses_the_lower_of_global_and_model_override() {
+fn official_model_context_window_prefers_model_override_over_global() {
     let overrides = std::collections::BTreeMap::from([
         ("gpt-5.6-sol".to_string(), 128_000),
         ("gpt-5.5".to_string(), 400_000),
@@ -226,7 +226,7 @@ fn official_model_context_window_uses_the_lower_of_global_and_model_override() {
     );
     assert_eq!(
         effective_official_context_window(272_000, &overrides, "gpt-5.5"),
-        272_000
+        400_000
     );
     assert_eq!(
         effective_official_context_window(1_050_000, &overrides, "gpt-5.6-sol"),

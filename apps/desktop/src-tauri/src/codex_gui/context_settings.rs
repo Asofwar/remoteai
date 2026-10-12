@@ -27,7 +27,7 @@ type Result<T> = std::result::Result<T, ContextSettingsError>;
 #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ContextSettings {
-    capacity: Option<u64>,
+    pub(super) capacity: Option<u64>,
 }
 
 /// Reports whether a running conversation continued after applying its capacity.

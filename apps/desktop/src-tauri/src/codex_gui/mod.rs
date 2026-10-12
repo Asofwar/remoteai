@@ -38,6 +38,7 @@ mod image_thumbnail;
 mod images;
 mod mcp_approval;
 mod message_edit;
+pub(crate) mod model_context;
 pub(crate) mod model_settings;
 pub(crate) mod notification_navigation;
 mod notifications;

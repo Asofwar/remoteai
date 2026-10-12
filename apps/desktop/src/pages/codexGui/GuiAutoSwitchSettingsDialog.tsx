@@ -9,10 +9,12 @@ import { GuiAppearanceSettings } from "./GuiAppearanceSettings";
 import { GuiThemeSettings } from "./GuiThemeSettings";
 import { GuiSkinSettings } from "./GuiSkinSettings";
 import { GuiSystemPromptSettings } from "./GuiSystemPromptSettings";
+import { GuiModelContextSettings } from "./GuiModelContextSettings";
 import styles from "./GuiAutoSwitchSettingsDialog.module.less";
 
 const sections = [
   { key: "accounts", label: "自动切号", icon: ArrowLeftRight },
+  { key: "context", label: "上下文", icon: MessageSquareText },
   { key: "appearance", label: "界面", icon: Type },
   { key: "theme", label: "主题", icon: Palette },
   { key: "skin", label: "皮肤", icon: Image },
@@ -32,6 +34,7 @@ export function GuiAutoSwitchSettingsDialog({ accounts, providers, privacyMode, 
   };
   const panels = {
     accounts: <GuiAutoSwitchPanel editor={editor} accounts={accounts} providers={providers} privacyMode={privacyMode} />,
+    context: tab === "context" && <GuiModelContextSettings />,
     appearance: <GuiAppearanceSettings />,
     theme: <GuiThemeSettings />,
     skin: tab === "skin" && <GuiSkinSettings />,

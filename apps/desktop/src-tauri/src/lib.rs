@@ -342,6 +342,8 @@ pub fn run() {
             codex_gui::queue_store::codex_gui_queue_save,
             codex_gui::context_settings::codex_gui_context_settings,
             codex_gui::context_settings::codex_gui_set_context_settings,
+            codex_gui::model_context::codex_gui_model_context_settings,
+            codex_gui::model_context::codex_gui_set_model_context,
             codex_gui::model_settings::codex_gui_set_model_settings,
             codex_gui::auto_switch_settings::codex_gui_auto_switch_settings,
             codex_gui::auto_switch_settings::codex_gui_set_auto_switch_settings,

@@ -192,9 +192,7 @@ fn effective_official_context_window(
     model_context_windows
         .get(model)
         .copied()
-        .map_or(global_context_window, |override_window| {
-            global_context_window.min(override_window)
-        })
+        .unwrap_or(global_context_window)
 }
 
 #[cfg(test)]

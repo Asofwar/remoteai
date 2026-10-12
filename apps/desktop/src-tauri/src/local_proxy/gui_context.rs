@@ -1,7 +1,10 @@
 //! GUI conversations report their own effective capacity, independently of account-page limits.
 use super::*;
 
-pub(super) fn model_catalog(mut payload: UpstreamPayload) -> Result<UpstreamPayload, String> {
+pub(super) fn model_catalog(
+    mut payload: UpstreamPayload,
+    customize: impl FnOnce(&mut Value) -> Result<(), String>,
+) -> Result<UpstreamPayload, String> {
     if !(200..300).contains(&payload.status) {
         return Ok(payload);
     }
@@ -15,6 +18,7 @@ pub(super) fn model_catalog(mut payload: UpstreamPayload) -> Result<UpstreamPayl
     {
         return Err("暂时无法读取 Codex GUI 模型列表，请重试。".to_string());
     }
+    customize(&mut catalog)?;
     allow_conversation_capacity(&mut catalog);
     let bytes = serde_json::to_vec(&catalog).map_err(|error| error.to_string())?;
     replace_model_catalog_etags(&mut payload.response_headers, &bytes);
@@ -107,7 +111,9 @@ mod tests {
     #[test]
     fn empty_catalogs_are_not_successful_responses_that_replace_cli_cache() {
         for catalog in [json!({"models": []}), json!({}), json!({"models": null})] {
-            let error = model_catalog(catalog_payload(catalog)).err().unwrap();
+            let error = model_catalog(catalog_payload(catalog), |_| Ok(()))
+                .err()
+                .unwrap();
             assert_eq!(error, "暂时无法读取 Codex GUI 模型列表，请重试。");
         }
     }
@@ -116,7 +122,7 @@ mod tests {
     fn nonempty_catalogs_keep_their_models_and_reach_cli_cache() {
         let payload =
             catalog_payload(json!({"models": [{"slug": "model", "max_context_window": 100}]}));
-        let mut result = model_catalog(payload).ok().unwrap();
+        let mut result = model_catalog(payload, |_| Ok(())).ok().unwrap();
         assert_eq!(result.status, 200);
         let bytes = read_official_model_catalog_body(&mut result.body).unwrap();
         let catalog: Value = serde_json::from_slice(&bytes).unwrap();

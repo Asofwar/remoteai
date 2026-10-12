@@ -25,19 +25,20 @@ impl Client {
         let previous = context_settings::for_thread(self.app.clone(), id.to_owned())
             .await
             .map_err(|_| GuiError::ContextSettings)?;
-        if *applied == *settings && previous == *settings {
-            return Ok(ContextUpdate::Applied);
-        }
         let stops = state.stops.load(Ordering::Acquire);
         let snapshot = self.context_snapshot(id).await?;
+        let effective = self.effective_context(settings, &snapshot).await?;
+        if *applied == effective && previous == *settings {
+            return Ok(ContextUpdate::Applied);
+        }
         let continuation =
             continuation_params(id, &snapshot, state.last_start.lock().await.as_ref());
         let interrupted = self.pause_for_context(id, &snapshot).await?;
-        if !self.reload_context(id, settings, &applied).await? {
+        if !self.reload_context(id, &effective, &applied).await? {
             return Err(GuiError::Busy);
         }
-        self.persist_context_change(id, settings, &previous).await?;
-        *applied = settings.clone();
+        self.persist_context_change(id, settings, &applied).await?;
+        *applied = effective;
         if !interrupted {
             return Ok(ContextUpdate::Applied);
         }

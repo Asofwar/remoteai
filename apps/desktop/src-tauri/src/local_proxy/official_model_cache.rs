@@ -30,6 +30,15 @@ pub(super) fn with_fallback<R: Runtime>(
     prefer_cache(fetch(app), official)
 }
 
+/// Fetch the same validated Admin catalog used for official GUI model discovery.
+pub(crate) fn admin_model_catalog<R: Runtime>(app: &AppHandle<R>) -> Result<Value, String> {
+    let payload = fetch(app).map_err(|error| error.to_string())?;
+    let UpstreamBody::Buffered(bytes) = payload.body else {
+        return Err("Model catalog is unavailable".to_owned());
+    };
+    serde_json::from_slice(&bytes).map_err(|error| error.to_string())
+}
+
 fn prefer_cache(
     cached: Result<UpstreamPayload, CatalogError>,
     official: impl FnOnce() -> Result<UpstreamPayload, String>,

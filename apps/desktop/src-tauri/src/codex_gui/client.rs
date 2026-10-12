@@ -6,6 +6,7 @@ mod coze;
 mod deletion;
 mod idle_threads;
 mod live_settings;
+mod model_context;
 mod plugin_refresh;
 mod predictions;
 #[path = "title_service.rs"]
@@ -193,6 +194,9 @@ impl Client {
         }
         if method == "turn/start" {
             self.refresh_plugins().await?;
+        }
+        if method == "thread/start" {
+            return self.start_with_context(params).await;
         }
         if matches!(method, "thread/resume" | "turn/start") {
             return self.request_with_context(method, params).await;

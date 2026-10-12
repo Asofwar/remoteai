@@ -82,9 +82,13 @@ fn models<R: Runtime>(
 ) -> Result<UpstreamPayload, String> {
     if let ActiveTarget::Provider(provider) = target {
         if !providers::uses_upstream_official_models(provider) {
-            return super::gui_context::model_catalog(provider_models_payload_with_image_route(
-                provider, false,
-            ));
+            return super::gui_context::model_catalog(
+                provider_models_payload_with_image_route(provider, false),
+                |catalog| {
+                    crate::codex_gui::model_context::prepare_catalog(request.app, catalog, false)
+                        .map_err(|error| error.to_string())
+                },
+            );
         }
     }
     let catalog_url = catalog_url(request.url, || {
@@ -102,7 +106,10 @@ fn models<R: Runtime>(
         session_id: None,
         account_id_override: account_id,
     })?;
-    super::gui_context::model_catalog(payload)
+    super::gui_context::model_catalog(payload, |catalog| {
+        crate::codex_gui::model_context::prepare_catalog(request.app, catalog, true)
+            .map_err(|error| error.to_string())
+    })
 }
 
 fn catalog_url(

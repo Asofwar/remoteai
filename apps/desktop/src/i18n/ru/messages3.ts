@@ -385,7 +385,7 @@ export const messages3 = {
   "table.modelContextWindowSaveError": "Не удалось сохранить контекстное окно. Попробуйте еще раз.",
   "table.modelContextGlobal": "Контекст официальных моделей",
   "table.modelContextSettings": "Настройки контекста модели",
-  "table.modelContextSettingsHint": "Эффективное значение — это нижнее из глобальных и специфичных для модели пределов.",
+  "table.modelContextSettingsHint": "Настройка модели имеет приоритет. Если она не задана, используется общее значение.",
   "table.modelContextRemove": "Удалить настройку для модели",
   "table.modelContextAddPlaceholder": "Название модели"
 } as const;

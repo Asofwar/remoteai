@@ -30,6 +30,14 @@ fn dispatch_gui_command(app: AppHandle, command: &str, args: Value) -> Result<Va
                 app, argument(&args, "threadId")?, argument(&args, "settings")?,
             ),
         )),
+        "codex_gui_model_context_settings" => serialize(block_on(
+            codex_gui::model_context::codex_gui_model_context_settings(app),
+        )),
+        "codex_gui_set_model_context" => serialize(block_on(
+            codex_gui::model_context::codex_gui_set_model_context(
+                app, argument(&args, "model")?, argument(&args, "capacity")?,
+            ),
+        )),
         "codex_gui_scheduled_tasks" => serialize(block_on(
             codex_gui::scheduled_tasks::codex_gui_scheduled_tasks(app, argument(&args, "request")?),
         )),

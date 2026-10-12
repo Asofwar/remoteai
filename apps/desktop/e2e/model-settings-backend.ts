@@ -8,6 +8,8 @@ export function modelSettingsBackend(liveUpdate?: ModelSettingsSnapshot["liveUpd
   const saved = new Map<string | null, ModelSettingsSnapshot>();
   const events: { name: string; payload: unknown }[] = [];
   const sends: Record<string, unknown>[] = [];
+  const contextDefaults: Record<string, number> = { first: 128_000, second: 400_000 };
+  const contextOverrides: Record<string, number> = {};
   const usage: (() => void)[] = [];
   const pendingModels: (() => void)[] = [];
   let modelsPaused = false;
@@ -25,11 +27,21 @@ export function modelSettingsBackend(liveUpdate?: ModelSettingsSnapshot["liveUpd
     await context.route("**/__codex_switch__/api/invoke", async (route) => {
       const { command, args } = route.request().postDataJSON() as {
         command: string; args: { threadId?: string; selection: ModelSelection;
-          cursor?: { sequence: number }; request: Record<string, unknown>; snapshot: QueueSnapshot; speed: RequestSpeed };
+          cursor?: { sequence: number }; request: Record<string, unknown>; snapshot: QueueSnapshot; speed: RequestSpeed;
+          model: string; capacity: number | null };
       };
       let result: unknown = {};
       const threadId = args.threadId ?? null;
       if (command === "codex_gui_connect") result = [];
+      if (command === "codex_gui_auto_switch_settings") result = { enabled: false, switchOnQuotaExhaustion: true,
+        minimumRemainingPercent: 0, mode: "sequential", fallbackProviderId: null, accounts: [] };
+      if (command === "codex_gui_set_model_context") {
+        if (args.capacity === null) delete contextOverrides[args.model];
+        else contextOverrides[args.model] = args.capacity;
+      }
+      if (["codex_gui_model_context_settings", "codex_gui_set_model_context"].includes(command)) {
+        result = { defaults: contextDefaults, overrides: contextOverrides, usingCachedDefaults: false };
+      }
       if (command === 'codex_gui_set_request_speed') {
         speed = args.speed;
         events.push({ name: 'codex-gui-request-settings-changed', payload: { speed } });
@@ -77,7 +89,8 @@ export function modelSettingsBackend(liveUpdate?: ModelSettingsSnapshot["liveUpd
       await route.fulfill({ json: { ok: true, result } });
     });
   }
-  return { attach, sends, modelRequests: () => modelRequests, pauseModels: () => { modelsPaused = true; },
+  return { attach, sends, contextDefaults, contextOverrides,
+    modelRequests: () => modelRequests, pauseModels: () => { modelsPaused = true; },
     emptyModels: (empty: boolean) => { modelsEmpty = empty; },
     addModel: (model: string) => models.push({ ...models[0], id: model, model, displayName: model, isDefault: false }),
     releaseModels: () => { modelsPaused = false; pendingModels.splice(0).forEach((resolve) => resolve()); },

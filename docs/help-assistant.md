@@ -5,6 +5,11 @@ help entry. The supplied robot image is bundled locally. Opening, minimizing or 
 preserves the current help conversation in memory. The panel starts a fresh conversation after an
 application restart; it does not create or restore a regular Codex conversation.
 
+Right-click the launcher and choose **Hide assistant**, or toggle **Settings → Appearance → Help assistant →
+Show assistant button**. The preference is saved locally for this desktop/browser and defaults to visible.
+Hiding closes the panel without clearing the current conversation, draft, attachments or pending answer.
+Turning it back on restores the launcher; click it to continue. The context menu also supports Shift+F10.
+
 The assistant requires the GUI-managed Codex installation, a live initialized GUI connection and
 an account selected in Codex. **Install now** downloads and installs Codex directly inside the assistant,
 shows progress and enables it without switching pages. An existing installation has an **Enable assistant**
@@ -63,6 +68,8 @@ Rust tests cover input bounds, credential exclusion, retrieval, request isolatio
 and the loopback transport. Frontend tests cover prerequisite guidance, conversation persistence,
 duplicate submission prevention, failure recovery and safe Markdown rendering. Build with the normal
 desktop TypeScript/Vite pipeline; run Rust formatting, tests and Clippy before release.
+Visibility tests cover saved preferences, settings/menu synchronization, keyboard access, storage errors
+and preserving drafts and pending answers while hidden.
 
 From `apps/desktop`, run `npm run test:chat:e2e -- help-assistant.pw.ts` for the browser regression.
 It checks all sidebar entries, responsive interaction during a pending answer and session polling,

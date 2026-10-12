@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { message } from 'antd';
 import { Plus, X } from 'lucide-react';
 import type { Language } from '../../i18n';
+import { useHelpAssistantVisibility } from '../../hooks/useHelpAssistantVisibility';
 import type { DashboardPage } from '../dashboard/DashboardNavigation';
 import { helpCopy } from './copy';
 import { HelpComposer } from './HelpComposer';
+import { HelpLauncher } from './HelpLauncher';
 import { useHelpAssistant } from './useHelpAssistant';
 import { HelpMessages } from './HelpMessages';
 import { HelpSetupNotice } from './HelpSetupNotice';
@@ -13,7 +16,9 @@ import assistantIcon from './assistant-icon.jpg';
 import styles from './helpAssistant.module.less';
 
 export function HelpAssistant(props: { language: Language; page: DashboardPage; onOpenCodex: () => void }) {
-  const [open, setOpen] = useState(false);
+  const { visible, setVisible } = useHelpAssistantVisibility();
+  const [expanded, setExpanded] = useState(false);
+  const open = visible && expanded;
   const assistant = useHelpAssistant({ open, page: props.page });
   const setup = useHelpSetup(assistant.refresh);
   const copy = helpCopy(props.language);
@@ -21,12 +26,16 @@ export function HelpAssistant(props: { language: Language; page: DashboardPage; 
   const input = useRef<HTMLTextAreaElement>(null);
   const panel = useRef<HTMLElement>(null);
   const ready = assistant.status === 'ready' && !setup.phase;
-  const close = () => { setOpen(false); trigger.current?.focus(); };
+  const close = () => { setExpanded(false); trigger.current?.focus(); };
+
+  useEffect(() => { if (!visible) setExpanded(false); }, [visible]);
 
   useEffect(() => {
     if (!open) return;
     if (ready) input.current?.focus(); else panel.current?.focus();
   }, [open, ready]);
+
+  if (!visible) return null;
 
   return createPortal(<div className={styles.root}>
     {open && <section id="remote-ai-help" ref={panel} tabIndex={-1} className={styles.panel} role="dialog"
@@ -55,10 +64,10 @@ export function HelpAssistant(props: { language: Language; page: DashboardPage; 
       <HelpComposer copy={copy} input={input} draft={assistant.draft} setDraft={assistant.setDraft}
         disabled={!ready || Boolean(assistant.pending)} attachments={assistant.attachments} send={assistant.send} />
     </section>}
-    <button ref={trigger} type="button" className={styles.launcher} aria-label={open ? copy.close : copy.title}
-      aria-expanded={open} aria-controls="remote-ai-help" onClick={() => open ? close() : setOpen(true)}>
-      <img src={assistantIcon} alt="" />
-      {!open && <span className={styles.tooltip}>{copy.title}</span>}
-    </button>
+    <HelpLauncher copy={copy} open={open} trigger={trigger} onToggle={() => open ? close() : setExpanded(true)}
+      onHide={() => {
+        if (!setVisible(false)) void message.error({ content: copy.visibilitySaveError,
+          style: { maxWidth: 400, marginInline: 'auto' } });
+      }} />
   </div>, document.body);
 }

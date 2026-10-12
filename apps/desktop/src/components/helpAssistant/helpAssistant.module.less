@@ -25,6 +25,10 @@
   &:hover, &:focus-visible { box-shadow: 0 8px 28px #2776c43d; }
   &:hover .tooltip, &:focus-visible .tooltip { opacity: 1; }
 }
+.launcherMenu {
+  max-width: min(400px, calc(100vw - 32px));
+  :global(.ant-dropdown-menu-title-content) { white-space: normal; overflow-wrap: anywhere; }
+}
 .tooltip {
   position: absolute;
   right: 72px;

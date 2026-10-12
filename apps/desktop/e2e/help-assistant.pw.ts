@@ -117,6 +117,49 @@ test('help guides account selection without installing or answering', async ({ p
 });
 
 for (const width of [1440, 390]) {
+  test(`help visibility menu and settings stay in sync at ${width}px`, async ({ page }) => {
+    await mockBackend(page);
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/e2e/help-assistant-harness.html');
+    const launcher = page.locator('button[aria-controls="remote-ai-help"]');
+    const menu = page.getByRole('menu');
+    await launcher.click({ button: 'right' });
+    await expect(menu).toBeVisible();
+    const bounds = (await menu.boundingBox())!;
+    expect(bounds.width).toBeLessThanOrEqual(400);
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(900);
+    await page.screenshot({ path: `../../.codex-tmp/help-hide-menu-${width}.png`, animations: 'disabled' });
+    await page.keyboard.press('Escape');
+    await expect(menu).not.toBeVisible();
+    await expect(launcher).toBeFocused();
+    await launcher.press('Shift+F10');
+    await expect(menu).toBeVisible();
+    await page.getByRole('button', { name: 'Click 0', exact: true }).click();
+    await expect(menu).not.toBeVisible();
+    await launcher.click();
+    await page.getByRole('textbox').fill('保留这条草稿');
+    await launcher.click({ button: 'right' });
+    await page.getByRole('menuitem', { name: '隐藏助手', exact: true }).click();
+    await expect(launcher).toHaveCount(0);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await page.getByRole('button', { name: '设置', exact: true }).click();
+    const toggle = page.getByRole('switch', { name: '显示助手入口' });
+    await expect(toggle).not.toBeChecked();
+    await page.screenshot({ path: `../../.codex-tmp/help-visibility-settings-${width}.png`, animations: 'disabled' });
+    await toggle.click(); await launcher.click();
+    await expect(page.getByRole('textbox')).toHaveValue('保留这条草稿');
+    await launcher.click(); await toggle.click();
+    await page.reload();
+    await expect(launcher).toHaveCount(0);
+    await page.getByRole('button', { name: '设置', exact: true }).click();
+    await expect(toggle).not.toBeChecked(); await toggle.click();
+    await page.reload();
+    await expect(launcher).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
+
   test(`help composer expands on any input and sends images at ${width}px`, async ({ page }) => {
     const stats = await mockBackend(page);
     await page.setViewportSize({ width, height: 900 });

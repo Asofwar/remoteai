@@ -5,6 +5,7 @@ import type { HelpImageError } from './useHelpImages';
 
 interface HelpCopy {
   title: string; subtitle: string; close: string; clear: string; placeholder: string;
+  hide: string; visibilityLabel: string; visibilityDescription: string; visibilitySaveError: string;
   send: string; thinking: string; checking: string; retry: string;
   addImage: string; removeImage: string; image: string; readingImages: string;
   imageErrors: Record<HelpImageError, string>;
@@ -16,6 +17,9 @@ interface HelpCopy {
 
 const copies: Record<Language, HelpCopy> = {
   zh: {
+    hide: '隐藏助手', visibilityLabel: '显示助手入口',
+    visibilityDescription: '在页面右下角显示问题解答助手，也可右键入口隐藏。',
+    visibilitySaveError: '未能保存显示设置，请重试。',
     title: '问题解答助手', subtitle: 'Remote AI 使用帮助', close: '收起助手', clear: '新对话',
     placeholder: '想了解 Remote AI 的什么功能？', send: '发送', thinking: '正在查找答案…',
     checking: '正在检查是否可以使用…', retry: '重新检查',
@@ -44,6 +48,9 @@ const copies: Record<Language, HelpCopy> = {
     },
   },
   en: {
+    hide: 'Hide assistant', visibilityLabel: 'Show assistant button',
+    visibilityDescription: 'Show the help assistant in the bottom-right corner. Right-click its button to hide it.',
+    visibilitySaveError: 'Could not save the display setting. Please try again.',
     title: 'Help assistant', subtitle: 'Remote AI help', close: 'Minimize help', clear: 'New chat',
     placeholder: 'What would you like to know about Remote AI?', send: 'Send', thinking: 'Finding an answer…',
     checking: 'Checking availability…', retry: 'Check again',
@@ -73,6 +80,9 @@ const copies: Record<Language, HelpCopy> = {
     },
   },
   ru: {
+    hide: 'Скрыть помощника', visibilityLabel: 'Показывать кнопку помощника',
+    visibilityDescription: 'Помощник в правом нижнем углу. Чтобы скрыть его, нажмите на кнопку правой кнопкой мыши.',
+    visibilitySaveError: 'Не удалось сохранить настройку отображения. Попробуйте ещё раз.',
     title: 'Помощник', subtitle: 'Помощь по Remote AI', close: 'Свернуть', clear: 'Новый чат',
     placeholder: 'Что вы хотите узнать о Remote AI?', send: 'Отправить', thinking: 'Ищу ответ…',
     checking: 'Проверяю доступность…', retry: 'Проверить снова',

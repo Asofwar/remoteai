@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ConfigProvider } from 'antd';
 import { HelpAssistant } from '../src/components/helpAssistant/HelpAssistant';
+import { HelpAssistantSettingsCard } from '../src/pages/settings/HelpAssistantSettingsCard';
+import settingsStyles from '../src/pages/SettingsPage/index.module.less';
 import { DashboardNavigation, type DashboardPage } from '../src/components/dashboard/DashboardNavigation';
 import { ProxySessionManager } from '../src/components/ProxySessionManager';
 import { translate, type Translate } from '../src/i18n';
@@ -28,6 +30,9 @@ function Harness() {
         <h2>Remote AI</h2><output aria-label="Current page">{page}</output>
         <p><button onClick={() => setClicks((value) => value + 1)}>Click {clicks}</button></p>
         <button onClick={() => setDark((value) => !value)}>Toggle theme</button>
+        {page === 'settings' && <div className={settingsStyles.styleScope}>
+          <HelpAssistantSettingsCard language="zh" />
+        </div>}
         <div style={{ height: 250 }}><ProxySessionManager t={translateText} /></div>
       </main>
     </div>

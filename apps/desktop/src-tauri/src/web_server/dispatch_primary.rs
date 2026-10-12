@@ -81,6 +81,11 @@ fn dispatch_command(app: AppHandle, command: &str, args: Value) -> Result<Value,
         "set_sse_idle_timeout" => serialize(block_on(crate::local_proxy::sse_idle_timeout::set_sse_idle_timeout(
             app, argument(&args, "settings")?,
         ))),
+        "set_response_header_timeout" => serialize(block_on(
+            crate::local_proxy::response_header_timeout::set_response_header_timeout(
+                app, argument(&args, "settings")?,
+            ),
+        )),
         "set_upstream_429_retry_timeout" => serialize(block_on(
             crate::local_proxy::set_upstream_429_retry_timeout(
                 app,

@@ -131,6 +131,10 @@ export const messages3 = {
   "settings.sseIdleTimeout.description": "Применяется к ответам через прокси. Отключите ограничение, чтобы дождаться ответа даже при долгом обдумывании. Изменение действует для новых запросов.",
   "settings.sseIdleTimeout.enabled": "Ограничить ожидание без новых данных",
   "settings.sseIdleTimeout.duration": "Максимальное ожидание без новых данных",
+  "settings.responseHeaderTimeout.title": "Ожидание начала ответа",
+  "settings.responseHeaderTimeout.description": "Сколько ждать начала ответа после отправки запроса. "
+    + "По умолчанию — 10 минут. Изменение действует для новых запросов.",
+  "settings.responseHeaderTimeout.duration": "Максимальное ожидание начала ответа",
   "settings.upstream429Retry.title": "Повторные запросы при ограничении частоты",
   "settings.upstream429Retry.description": "При HTTP 429 запрос повторяется через 1, 3, 5 секунд, затем пауза увеличивается. По умолчанию попытки продолжаются одну минуту. После этого, если включено автоматическое отключение, аккаунт исключается и возвращается последняя ошибка.",
   "settings.upstream429Retry.label": "Максимальное время повтора",

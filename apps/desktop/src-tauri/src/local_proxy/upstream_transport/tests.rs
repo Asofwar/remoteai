@@ -229,3 +229,6 @@ fn active_response_outlives_header_deadline_but_idle_read_still_times_out() {
 
 #[path = "sse_tests.rs"]
 mod sse;
+
+#[path = "header_timeout_tests.rs"]
+mod header_timeout;

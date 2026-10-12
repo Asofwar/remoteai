@@ -56,6 +56,8 @@ fn diagnostic_export_metadata<R: Runtime>(app: &tauri::AppHandle<R>) -> String {
         "retainedFiles": 2,
         "retryTimeoutSeconds": settings.as_ref().map(|value| value.upstream_429_retry_timeout_seconds),
         "sseIdleTimeout": settings.as_ref().map(|value| value.sse_idle_timeout),
+        "responseHeaderTimeoutSeconds": settings.as_ref().map(|value| value.response_header_timeout)
+            .unwrap_or_default().duration().as_secs(),
         "responseIdleTimeoutSeconds": UPSTREAM_RESPONSE_IDLE_TIMEOUT.as_secs(),
         "connectTimeoutSeconds": UPSTREAM_CONNECT_TIMEOUT.as_secs()
     });

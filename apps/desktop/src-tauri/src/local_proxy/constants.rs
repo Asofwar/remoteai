@@ -59,8 +59,8 @@ use crate::{
 };
 
 const OFFICIAL_CODEX_BASE_URL: &str = "https://chatgpt.com/backend-api/codex";
-// Forwarded uploads, response headers, and individual response reads receive independent
-// budgets. Credential and model-catalog requests also use this as their blocking timeout.
+// Upload inactivity and non-streaming response reads have independent budgets.
+// Response headers and SSE reads use separate settings; credential requests use this limit.
 const UPSTREAM_RESPONSE_IDLE_TIMEOUT: Duration = Duration::from_secs(120);
 const UPSTREAM_CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
 const UPSTREAM_TIMEOUT_ATTEMPT_LIMIT: usize = 3;

@@ -27,7 +27,7 @@ impl Default for Timeouts {
         Self {
             upload_idle: super::UPSTREAM_RESPONSE_IDLE_TIMEOUT,
             upload_total: MAX_UPLOAD_DURATION,
-            response_headers: super::UPSTREAM_RESPONSE_IDLE_TIMEOUT,
+            response_headers: super::response_header_timeout::current(),
             response_idle: super::UPSTREAM_RESPONSE_IDLE_TIMEOUT,
             sse_response_idle: super::sse_idle_timeout::current(),
         }

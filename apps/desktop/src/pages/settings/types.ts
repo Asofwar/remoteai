@@ -14,6 +14,7 @@ import type {
 export interface SettingsPageProps {
   providers: Provider[];
   sseIdleTimeout: ReturnType<typeof import("../../hooks/useSseIdleTimeout").useSseIdleTimeout>;
+  responseHeaderTimeout: ReturnType<typeof import("../../hooks/useResponseHeaderTimeout").useResponseHeaderTimeout>;
   info: AppInfo | null;
   autoUpdateEnabled: boolean;
   onAutoUpdateChange: (enabled: boolean) => void;

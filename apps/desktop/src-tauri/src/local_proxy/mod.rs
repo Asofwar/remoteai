@@ -34,6 +34,7 @@ mod official_model_request;
 pub(crate) use official_model_cache::admin_model_catalog;
 mod quota_detection;
 mod quota_sse;
+pub(crate) mod response_header_timeout;
 mod responses_lite;
 pub(crate) mod session_metrics;
 mod session_titles;

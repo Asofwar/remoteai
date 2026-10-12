@@ -54,6 +54,8 @@ pub(crate) struct AppSettings {
     pub(crate) upstream_429_retry_timeout_seconds: u64,
     #[serde(default)]
     pub(crate) sse_idle_timeout: SseIdleTimeoutSettings,
+    #[serde(default)]
+    pub(crate) response_header_timeout: ResponseHeaderTimeoutSettings,
     /// Records the one-time migration from the legacy five-minute retry default.
     #[serde(default)]
     pub(crate) upstream_429_retry_timeout_migrated: bool,
@@ -287,6 +289,7 @@ impl Default for AppSettings {
             upstream_429_retry_timeout_seconds: default_upstream_429_retry_timeout_seconds(),
             upstream_429_retry_timeout_migrated: false,
             sse_idle_timeout: SseIdleTimeoutSettings::default(),
+            response_header_timeout: ResponseHeaderTimeoutSettings::default(),
             show_usage_network_errors: false,
             gpt_5_6_sol_context_window: default_gpt_5_6_sol_context_window(),
             official_model_context_windows: std::collections::BTreeMap::new(),

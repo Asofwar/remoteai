@@ -521,6 +521,7 @@ export interface AppSettings {
   autoDisableStatusCodes?: number[];
   upstream429RetryTimeoutSeconds?: number;
   sseIdleTimeout?: import("./api/sseIdleTimeout").SseIdleTimeoutSettings;
+  responseHeaderTimeout?: import("./api/responseHeaderTimeout").ResponseHeaderTimeoutSettings;
   showUsageNetworkErrors?: boolean;
   gpt56SolContextWindow?: number;
   officialModelContextWindows?: Record<string, number>;

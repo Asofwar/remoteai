@@ -7,7 +7,9 @@ fn handle_proxy_request<R: Runtime>(
     session_id: Option<&str>,
     session_request_id: Option<u64>,
 ) -> Result<UpstreamPayload, String> {
-    let _timeout_scope = sse_idle_timeout::RequestScope::enter(read_app_settings(app)?.sse_idle_timeout);
+    let settings = read_app_settings(app)?;
+    let _timeout_scope = sse_idle_timeout::RequestScope::enter(settings.sse_idle_timeout);
+    let _header_timeout_scope = response_header_timeout::RequestScope::enter(settings.response_header_timeout);
     let body = request_chat_usage(method, url, body);
     if let Some(url) = gui_routing::upstream_path(url) {
         return gui_routing::handle(gui_routing::GuiProxyRequest {

@@ -31,7 +31,7 @@ function focusEditor(node: HTMLDivElement, saved: Range | null): Range {
 export const SkillInput = forwardRef<SkillInputHandle, {
   value: ComposerText; draftKey: string; cwd: string; active: boolean; connected: boolean; disabled: boolean;
   placeholder: string; onChange: (value: ComposerText) => void;
-  suggestion?: string; onUserInput?: () => void;
+  suggestion?: string; onUserInput?: () => void; onInputEnd?: () => void;
   compact?: CompactCommand;
   goal?: GoalCommand;
   conversations?: Pick<GuiState, "selected" | "threads" | "conversations">;
@@ -42,7 +42,7 @@ export const SkillInput = forwardRef<SkillInputHandle, {
   onPasteKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
 }>(function SkillInput({ value, draftKey, cwd, active, connected, disabled, placeholder,
   compact, goal, conversations, onConversation, onCoze, editing, onChange, onPaste, onPasteKeyDown, onSend,
-  suggestion, onUserInput }, ref) {
+  suggestion, onUserInput, onInputEnd }, ref) {
   const editor = useRef<HTMLDivElement>(null);
   const savedCaret = useRef<Range | null>(null);
   const composing = useRef(false);
@@ -54,7 +54,7 @@ export const SkillInput = forwardRef<SkillInputHandle, {
   const open = Boolean(trigger) && active && !disabled && (!isConversation || Boolean(onConversation))
     && (!isCoze || Boolean(onCoze));
   const ghost = useSuggestionInput({ editor, value, text: suggestion,
-    enabled: active && connected && !disabled && !open && !editing, onChange, onUserInput });
+    enabled: active && connected && !disabled && !open && !editing, onChange, onUserInput, onInputEnd });
   const catalog = useComposerSkills({ cwd, active: open && !isConversation && !isCoze, connected });
   const coze = useComposerCoze(open && isCoze && connected);
   const query = trigger?.query.toLocaleLowerCase() ?? "";
@@ -108,8 +108,10 @@ export const SkillInput = forwardRef<SkillInputHandle, {
   };
   const change = () => {
     if (!editor.current) return;
-    ghost.dismiss();
-    onChange(readEditor(editor.current));
+    const value = readEditor(editor.current);
+    if (value.text || value.mentions.length) ghost.dismiss();
+    else ghost.restore();
+    onChange(value);
     inspect();
   };
   const choose = (option: ComposerOption) => {
@@ -126,8 +128,7 @@ export const SkillInput = forwardRef<SkillInputHandle, {
     onPasteKeyDown?.(event);
     if (composing.current || event.nativeEvent.isComposing || event.keyCode === 229) return;
     if (!open && ghost.keyDown(event)) return;
-    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey
-      || ['Backspace', 'Delete', 'Escape'].includes(event.key)) ghost.dismiss();
+    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) ghost.dismiss();
     const menuKey = ["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key);
     if (open && menuKey && !(event.key === "Enter" && event.shiftKey)) {
       event.preventDefault();

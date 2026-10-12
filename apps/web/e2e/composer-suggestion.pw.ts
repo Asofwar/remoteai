@@ -32,7 +32,7 @@ for (const dark of [false, true]) test('fills a wrapped suggestion only after ac
     await expect(page.getByLabel('已发送')).toHaveText(suggestion);
     expect(requests).toHaveLength(1);
   });
-test('stays responsive during prediction and rejects the result after input', async ({ page }) => {
+test('stays responsive during prediction and restores the result after clearing input', async ({ page }) => {
   let release!: () => void;
   const wait = new Promise<void>(resolve => { release = resolve; });
   const requests = await open(page, { wait });
@@ -44,8 +44,23 @@ test('stays responsive during prediction and rejects the result after input', as
     await expect.poll(async () => Number(await page.getByLabel('刷新次数').textContent())).toBeGreaterThan(beat);
   } finally { release(); }
   await input.clear();
-  await expect(page.getByRole('button', { name: '填入建议', exact: true })).toHaveCount(0);
-  await input.press('Tab'); await expect(input).toHaveValue('');
+  await expect(page.getByRole('button', { name: '填入建议', exact: true })).toBeVisible();
+  await input.press('Tab'); await expect(input).toHaveValue(suggestion);
+});
+
+test('retains a suggestion after idle refreshes, draft clearing, and page reload', async ({ page }) => {
+  const requests = await open(page);
+  const input = page.getByRole('textbox', { name: '聊天消息' });
+  const accept = page.getByRole('button', { name: '填入建议', exact: true });
+  await expect(accept).toBeVisible();
+  const beat = Number(await page.getByLabel('刷新次数').textContent());
+  await expect.poll(async () => Number(await page.getByLabel('刷新次数').textContent())).toBeGreaterThan(beat + 20);
+  await expect(accept).toBeVisible();
+  await input.fill('自己的草稿'); await expect(accept).toHaveCount(0);
+  await input.clear(); await expect(accept).toBeVisible();
+  await accept.click(); await input.clear(); await expect(accept).toBeVisible();
+  await page.reload(); await expect(accept).toBeVisible();
+  expect(requests).toHaveLength(1);
 });
 test('dismisses on IME composition and preserves the user draft', async ({ page }) => {
   await open(page);

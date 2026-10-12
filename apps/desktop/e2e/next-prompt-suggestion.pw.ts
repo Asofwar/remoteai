@@ -91,7 +91,7 @@ for (const dark of [false, true]) {
   });
 }
 
-test('typing remains responsive while prediction is pending and rejects the late result', async ({ page }) => {
+test('typing remains responsive and clearing the draft restores the pending suggestion', async ({ page }) => {
   let release!: () => void;
   const wait = new Promise<void>(resolve => { release = resolve; });
   const calls = await mockBackend(page, wait);
@@ -105,8 +105,8 @@ test('typing remains responsive while prediction is pending and rejects the late
   } finally { release(); }
   await expect.poll(() => calls.filter(call => call.operation === 'suggestNextPrompt').length).toBe(1);
   await editor.clear();
-  await expect(page.getByTestId('next-prompt-suggestion')).toHaveCount(0);
-  await editor.press('Tab'); await expect(editor).toHaveText('');
+  await expect(page.getByTestId('next-prompt-suggestion')).toBeVisible();
+  await editor.press('Tab'); await expect(editor).toHaveText(text);
 });
 
 for (const width of [390, 1440]) test.describe(`touchscreen composer (${width}px)`, () => {
@@ -147,6 +147,6 @@ for (const width of [390, 1440]) test.describe(`touchscreen composer (${width}px
     await expect(editor).toHaveText('a');
     await expect(ghost).toHaveCount(0);
     await editor.clear();
-    await expect(ghost).toHaveCount(0);
+    await expect(ghost).toBeVisible();
   });
 });

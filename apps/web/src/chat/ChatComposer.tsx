@@ -147,8 +147,10 @@ export function ChatComposer(props: ComposerProps) {
           <textarea ref={menu.input} aria-label={t("聊天消息")} value={draft.text} maxLength={100_000} rows={1}
             readOnly={state.queueEditor.loading}
             onBeforeInput={suggestion.dismiss} onCompositionStart={suggestion.dismiss}
+            onCompositionEnd={suggestion.restore}
             onPaste={event => { suggestion.dismiss(); state.paste(event); }} onChange={event => {
-              suggestion.dismiss();
+              if (event.target.value) suggestion.dismiss();
+              else suggestion.restore();
               draft.setText(event.target.value);
               menu.setSelection({ start: event.target.selectionStart, end: event.target.selectionEnd });
             }}
@@ -159,8 +161,7 @@ export function ChatComposer(props: ComposerProps) {
               if (event.defaultPrevented || event.nativeEvent.isComposing || event.keyCode === 229) return;
               if (event.key === 'Tab' && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey
                 && !menu.open && suggestion.accept()) { event.preventDefault(); return; }
-              if ((event.key.length === 1 && !event.ctrlKey && !event.metaKey)
-                || ['Backspace', 'Delete', 'Escape'].includes(event.key)) suggestion.dismiss();
+              if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) suggestion.dismiss();
               state.pasteKeyDown(event);
               if (event.key === 'Escape') { menu.close(); setAdding(false); return; }
               if (event.key !== 'Enter' || event.shiftKey || event.altKey) return;

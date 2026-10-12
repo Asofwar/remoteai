@@ -16,5 +16,5 @@ export function useComposerSuggestion(options: {
     dismiss(); options.fill(text);
     return true;
   };
-  return { text: suggestion.text, dismiss, accept };
+  return { text: suggestion.text, dismiss, restore: suggestion.restore, accept };
 }

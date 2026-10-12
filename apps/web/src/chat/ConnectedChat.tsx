@@ -136,7 +136,7 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
       disabled={!ready || state.sending || state.settingsBusy || state.selectedArchived || state.queueBusy
         || state.compacting === state.selected?.id} answer={controller.answerAsyncQuestion} />
     {composerHeader}
-    <ChatComposer suggestions={remotePromptSuggestion(state, controller.suggestNextPrompt)}
+    <ChatComposer suggestions={remotePromptSuggestion(state, controller.suggestNextPrompt, { scope })}
       queue={queueProps(state, controller)} readClipboardImages={readClipboardImages} nativeFileDrop={nativeFileDrop}
       connection={{ client: controller.guiAccounts, deviceName: device?.name ?? t("选择电脑"),
         chooseDevice: () => setPickingDevice(true) }}

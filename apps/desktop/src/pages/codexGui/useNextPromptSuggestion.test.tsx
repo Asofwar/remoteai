@@ -52,21 +52,25 @@ it('requests once after a completed reply using the fastest supported effort', a
   await render(); await advance(5_000); expect(guiApi.request).toHaveBeenCalledOnce();
 });
 
-it('typing before the debounce cancels the request even if the draft stays empty', async () => {
+it('typing before the debounce waits until the draft is cleared', async () => {
   await render(); await act(async () => { host.querySelector('button')!.click(); });
+  blocked = true; await render();
   await advance(); expect(guiApi.request).not.toHaveBeenCalled();
+  blocked = false; await render(); await advance();
+  expect(host.textContent).toBe('按方案实现'); expect(guiApi.request).toHaveBeenCalledOnce();
 });
 
-it('discards a response after input and never restores it when the draft is deleted', async () => {
+it('saves a response during input and restores it when the draft is deleted', async () => {
   const resolve = deferred(); await render(); await advance();
   await act(async () => { host.querySelector('button')!.click(); });
   blocked = true; await render(); await resolve();
+  expect(host.textContent).toBe('');
   blocked = false; await render(); await advance();
-  expect(host.textContent).toBe(''); expect(guiApi.request).toHaveBeenCalledOnce();
+  expect(host.textContent).toBe('按方案实现'); expect(guiApi.request).toHaveBeenCalledOnce();
 });
 
 it.each(['inactive', 'switch', 'running', 'blocked'])(
-  'discards a response after %s and returning to the same turn', async reason => {
+  'retains a response after %s and returning to the same completed turn', async reason => {
     const resolve = deferred(); await render(); await advance();
     if (reason === 'inactive') active = false;
     if (reason === 'switch') state = { ...state, selected: null };
@@ -75,8 +79,38 @@ it.each(['inactive', 'switch', 'running', 'blocked'])(
     await render(); await resolve();
     active = true; blocked = false; state.selected = 'one'; state.conversations.one.activeTurn = null;
     await render(); await advance();
-    expect(host.textContent).toBe(''); expect(guiApi.request).toHaveBeenCalledOnce();
+    expect(host.textContent).toBe('按方案实现'); expect(guiApi.request).toHaveBeenCalledOnce();
   });
+
+it.each(['loading', 'modelCatalogLoading', 'modelSettingsLoading'] as const)(
+  'keeps the saved suggestion visible during %s', async field => {
+    await render(); await advance();
+    state[field] = true; await render(); await advance(30_000);
+    expect(host.textContent).toBe('按方案实现');
+    state[field] = false; await render(); await advance();
+    expect(host.textContent).toBe('按方案实现'); expect(guiApi.request).toHaveBeenCalledOnce();
+  });
+
+it('restores the saved suggestion after remount without another prediction request', async () => {
+  await render(); await advance();
+  await act(async () => root.render(null));
+  await render(); await advance();
+  expect(host.textContent).toBe('按方案实现'); expect(guiApi.request).toHaveBeenCalledOnce();
+});
+
+it('keeps the same suggestion when the model changes without a new turn', async () => {
+  await render(); await advance();
+  state.models = [{ ...testModels[0], model: 'other-model' }]; state.settings.model = 'other-model';
+  await render(); await advance();
+  expect(host.textContent).toBe('按方案实现'); expect(guiApi.request).toHaveBeenCalledOnce();
+});
+
+it('hides the old suggestion as soon as a new turn starts', async () => {
+  await render(); await advance();
+  state.conversations.one.activeTurn = 'next';
+  state.conversations.one.turns.push({ id: 'next', status: 'inProgress', items: [] });
+  await render(); expect(host.textContent).toBe('');
+});
 
 it('discards the old response when a newer turn completes', async () => {
   const resolve = deferred(); await render(); await advance();

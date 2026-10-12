@@ -54,7 +54,7 @@ it.each(['shiftKey', 'ctrlKey', 'altKey', 'metaKey', 'isComposing'] as const)(
     expect(editor().textContent).toBe(''); expect(ghost()).not.toBeNull();
   });
 
-it('clears on the first keystroke and does not reappear when the draft is emptied', async () => {
+it('hides on the first keystroke and reappears when the draft is emptied', async () => {
   await key('a'); expect(ghost()).toBeNull(); expect(dismiss).toHaveBeenCalled();
   await act(async () => {
     editor().textContent = 'a'; editor().dispatchEvent(new InputEvent('input', { bubbles: true }));
@@ -62,9 +62,6 @@ it('clears on the first keystroke and does not reappear when the draft is emptie
   await act(async () => {
     editor().textContent = ''; editor().dispatchEvent(new InputEvent('input', { bubbles: true }));
   });
-  expect(ghost()).toBeNull();
-  await act(async () => root.render(<Fixture text="" />));
-  await act(async () => root.render(<Fixture />));
   expect(ghost()).not.toBeNull();
 });
 
@@ -79,6 +76,17 @@ it('clears when Chinese composition starts and leaves IME Tab and Enter alone', 
     editor().dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '继续检查' }));
   });
   await key('Enter'); expect(send).toHaveBeenLastCalledWith({ text: '继续检查', mentions: [] });
+});
+
+it('restores the suggestion when Chinese composition is cancelled without entering text', async () => {
+  await act(async () => { editor().dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })); });
+  expect(ghost()).toBeNull();
+  await act(async () => { editor().dispatchEvent(new CompositionEvent('compositionend', { bubbles: true })); });
+  expect(ghost()).not.toBeNull();
+});
+
+it.each(['Backspace', 'Delete', 'Escape'])('keeps the suggestion after %s in an empty draft', async name => {
+  await key(name); expect(ghost()).not.toBeNull();
 });
 
 it('clears on paste and preserves pasted plain text', async () => {

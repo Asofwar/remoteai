@@ -1,4 +1,5 @@
 import { remotePromptSuggestion } from '../../../../shared/remote-chat/client/promptSuggestion';
+import Storage from 'expo-sqlite/kv-store';
 import { t, useLanguage } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BackHandler, Keyboard, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
@@ -192,7 +193,9 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
       disabled={!ready || state.sending || state.settingsBusy || state.selectedArchived || state.queueBusy
         || state.compacting === state.selected?.id}
       answer={controller.answerAsyncQuestion} />
-    <ChatComposer suggestions={remotePromptSuggestion(state, controller.suggestNextPrompt)}
+    <ChatComposer suggestions={remotePromptSuggestion(state, controller.suggestNextPrompt, {
+      scope: JSON.stringify([session.baseUrl, session.email, device?.deviceId]), storage: Storage,
+    })}
       queue={queueProps(state, controller)}
       connection={{ client: controller.guiAccounts, deviceName: device?.name,
         chooseDevice: () => setPickingDevice(true) }}

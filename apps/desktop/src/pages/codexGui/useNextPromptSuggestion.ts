@@ -9,10 +9,10 @@ export function useNextPromptSuggestion(state: GuiState, options: { active: bool
   const current = state.selected ? state.conversations[state.selected] : undefined;
   const target = promptSuggestionTarget(current ? { id: current.thread.id, turns: current.turns } : null,
     state.models.find(model => model.model === state.settings.model));
-  const enabled = options.active && state.connection === 'ready'
-    && !state.loading && !state.sending && !state.archived && !state.compacting && !state.workspaceBusy
-    && !state.modelSettingsLoading && !state.modelCatalogLoading && !current?.activeTurn && !current?.error
+  const visible = options.active && !state.sending && !state.archived && !state.compacting && !current?.activeTurn
     && !state.goals?.[state.selected ?? ''] && !state.queued[state.selected ?? '']?.length
     && !state.approvals.some(event => event.params.threadId === state.selected);
-  return usePromptSuggestion({ target, enabled, request }, options.blocked);
+  const enabled = visible && state.connection === 'ready' && !state.loading && !state.workspaceBusy
+    && !state.modelSettingsLoading && !state.modelCatalogLoading && !current?.error;
+  return usePromptSuggestion({ target, enabled, visible, request }, options.blocked);
 }

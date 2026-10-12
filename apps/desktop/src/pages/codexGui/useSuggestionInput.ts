@@ -5,12 +5,12 @@ import type { ComposerText } from './types';
 /** Ghost text never enters the editable DOM or the draft until the user accepts it with Tab or the touch action. */
 export function useSuggestionInput(options: {
   editor: RefObject<HTMLDivElement>; text?: string; value: ComposerText; enabled: boolean;
-  onChange: (value: ComposerText) => void; onUserInput?: () => void;
+  onChange: (value: ComposerText) => void; onUserInput?: () => void; onInputEnd?: () => void;
 }) {
   const latest = useRef(options);
   latest.current = options;
   const [dismissed, setDismissed] = useState<string | undefined>();
-  useEffect(() => { setDismissed(undefined); }, [options.text]);
+  useEffect(() => { setDismissed(undefined); }, [options.text, options.value.text, options.value.mentions.length]);
   const text = options.enabled && !options.value.text && !options.value.mentions.length
     && dismissed !== options.text ? options.text ?? '' : '';
   const available = useRef('');
@@ -20,6 +20,7 @@ export function useSuggestionInput(options: {
     setDismissed(latest.current.text);
     latest.current.onUserInput?.();
   };
+  const restore = () => { setDismissed(undefined); latest.current.onInputEnd?.(); };
   const accept = () => {
     const text = available.current;
     const node = options.editor.current;
@@ -40,5 +41,5 @@ export function useSuggestionInput(options: {
     event.preventDefault();
     return true;
   };
-  return { text, dismiss, accept, keyDown };
+  return { text, dismiss, restore, accept, keyDown };
 }

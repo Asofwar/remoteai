@@ -120,7 +120,7 @@ export const Composer = forwardRef<ComposerHandle, {
           addImages(Array.from(event.target.files ?? [])); event.target.value = "";
         }} />
       <SkillInput ref={skillInput} value={draft} draftKey={key} cwd={project} active={active}
-        suggestion={suggestion.text} onUserInput={suggestion.dismiss}
+        suggestion={suggestion.text} onUserInput={suggestion.dismiss} onInputEnd={suggestion.restore}
         conversations={state} onConversation={(reference) => addAttachments([reference])}
         onCoze={(reference) => addAttachments([reference])}
         connected={state.connection === "ready"} disabled={disabled}

@@ -215,8 +215,10 @@ export function ChatComposer({ suggestions, models, selection, settingsBusy, set
         multiline value={draft.text} maxLength={100_000} selection={menu.selection} editable={!queueEditor.loading}
         placeholderTextColor={color("#999999", 'muted')} underlineColorAndroid="transparent"
         onSelectionChange={(event) => menu.setSelection(event.nativeEvent.selection)}
-        onKeyPress={suggestion.dismiss}
-        onChangeText={text => { suggestion.dismiss(); draft.setText(text); }}
+        onChangeText={text => {
+          if (text) suggestion.dismiss(); else suggestion.restore();
+          draft.setText(text);
+        }}
         placeholder={ready ? (goalMode.enabled ? t("描述想完成的目标…") : t("发消息，@ 引用对话…")) : t("连接后发消息")} />
       </ScrollView>
       <View pointerEvents="box-none" style={[styles.composerActions, compactField && styles.composerActionsCompact]}>

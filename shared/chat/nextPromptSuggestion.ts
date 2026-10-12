@@ -5,6 +5,9 @@ export type RequestPromptSuggestion = (target: PromptSuggestionTarget) => Promis
 export interface PromptSuggestionSource {
   target: PromptSuggestionTarget | null;
   enabled: boolean;
+  visible?: boolean;
+  scope?: string;
+  storage?: import('./promptSuggestionCache').PromptSuggestionStorage;
   request: RequestPromptSuggestion;
 }
 const FAST_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'] as const;

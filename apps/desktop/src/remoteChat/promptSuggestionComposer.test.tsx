@@ -17,6 +17,7 @@ let root: Root;
 let props: ComposerProps;
 
 beforeEach(async () => {
+  localStorage.clear();
   vi.useFakeTimers(); vi.clearAllMocks(); vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false,
     addEventListener: vi.fn(), removeEventListener: vi.fn() })));
@@ -99,19 +100,34 @@ it.each(['compositionstart', 'paste'])('dismisses on %s before changing the draf
   expect(props.send).not.toHaveBeenCalled();
 });
 
-it('clears on typing and never returns after clearing the draft', async () => {
+it('hides on typing and restores the saved suggestion after clearing the draft', async () => {
   await advance(); await type('我自己的内容');
   expect(ghost()).toBeNull();
   await type(''); await advance();
-  expect(ghost()).toBeNull(); expect(props.suggestions!.request).toHaveBeenCalledTimes(1);
+  expect(ghost()?.textContent).toContain('按这个方案实现');
+  expect(props.suggestions!.request).toHaveBeenCalledTimes(1);
 });
 
-it('discards a late result after typing even when the draft is cleared', async () => {
+it('restores a late result after the draft is cleared', async () => {
   let finish!: (value: { suggestion: string }) => void;
   vi.mocked(props.suggestions!.request).mockReturnValue(new Promise(resolve => { finish = resolve; }));
   await advance(); await type('自己的草稿'); await type('');
-  await act(async () => finish({ suggestion: '过期建议' }));
-  expect(ghost()).toBeNull(); expect(input().value).toBe('');
+  await act(async () => finish({ suggestion: '按方案实现' }));
+  expect(ghost()?.textContent).toContain('按方案实现'); expect(input().value).toBe('');
+});
+
+it('restores an accepted suggestion when its unsent draft is cleared', async () => {
+  await advance(); await key('Tab'); await type('');
+  expect(ghost()?.textContent).toContain('按这个方案实现');
+  expect(props.send).not.toHaveBeenCalled(); expect(props.suggestions!.request).toHaveBeenCalledOnce();
+});
+
+it('restores a suggestion after cancelling IME composition with an empty draft', async () => {
+  await advance();
+  await act(async () => { input().dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })); });
+  expect(ghost()).toBeNull();
+  await act(async () => { input().dispatchEvent(new CompositionEvent('compositionend', { bubbles: true })); });
+  expect(ghost()?.textContent).toContain('按这个方案实现');
 });
 
 it('keeps ordinary chat working with a host that does not support predictions', async () => {

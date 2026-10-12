@@ -18,6 +18,10 @@ export function readCodexConfigDocument(homeId?: string) {
   return invoke<CodexConfigDocument>("read_codex_config_document", { homeId });
 }
 
+export function readCodexConfigModelNames() {
+  return invoke<string[]>("read_admin_model_names");
+}
+
 export function validateCodexConfigDocument(content: string) {
   return invoke<CodexConfigDiagnostic | null>("validate_codex_config_document", { content });
 }

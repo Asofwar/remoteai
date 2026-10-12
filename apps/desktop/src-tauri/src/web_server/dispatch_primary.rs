@@ -68,6 +68,9 @@ fn dispatch_command(app: AppHandle, command: &str, args: Value) -> Result<Value,
         "refresh_official_model_catalog" => serialize(block_on(
             crate::official_models::refresh_official_model_catalog(app),
         )),
+        "read_admin_model_names" => serialize(block_on(
+            crate::official_models::read_admin_model_names(app),
+        )),
         "set_official_model_context_window" => serialize(block_on(
             crate::local_proxy::set_official_model_context_window(
                 app,

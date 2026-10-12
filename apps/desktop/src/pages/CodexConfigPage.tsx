@@ -8,6 +8,7 @@ import { hasLocalBackend } from "../api/backend";
 import { ConfigForm } from "./codexConfig/ConfigForm";
 import { TomlEditorModal } from "./codexConfig/TomlEditorModal";
 import { useCodexConfig } from "./codexConfig/useCodexConfig";
+import { ConfigModelsContext, useConfigModels } from "./codexConfig/useConfigModels";
 import styles from "./codexConfig/pageStyles.module.less";
 
 export const CODEX_CONFIG_TOPBAR_ID = "codex-config-topbar-controls";
@@ -19,6 +20,7 @@ export function CodexConfigPage({ active, homeKey = "" }: { active: boolean; hom
 function CodexConfigContent({ active }: { active: boolean }) {
   const homeId = useSelectedCodexHome();
   const config = useCodexConfig(active, homeId);
+  const models = useConfigModels(active);
   const [editorOpen, setEditorOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
@@ -44,7 +46,7 @@ function CodexConfigContent({ active }: { active: boolean }) {
               icon={<CheckCircle2 size={13} />}>{guiText("已自动保存")}</Tag>}
           </span>
           <Button icon={<RefreshCw size={18} />} disabled={busy || editorOpen}
-            onClick={() => void config.reload()}>{guiText("重新读取")}</Button>
+            onClick={() => { void config.reload(); void models.reload(); }}>{guiText("重新读取")}</Button>
           <Button type="primary" icon={<CodeXml size={18} />} disabled={!document || busy}
             onClick={() => setEditorOpen(true)}>{guiText("编辑 config.toml")}</Button>
         </div>
@@ -60,9 +62,12 @@ function CodexConfigContent({ active }: { active: boolean }) {
         description={config.error} className={styles.notice} />}
       {document?.error && <Alert type="warning" showIcon message={guiText("请先在编辑器中检查配置")}
         description={document.error.message} className={styles.notice} />}
+      {models.error && <Alert type="warning" showIcon message={models.error} className={styles.notice} />}
       {!config.loaded && <div className={styles.loading}><Spin tip={guiText("正在读取配置")}><div /></Spin></div>}
-      {document?.values && <ConfigForm key={config.reloadKey} values={document.values}
-        disabled={editorOpen} onCommit={config.commit} view={{ search, filter, onSearchChange: setSearch }} />}
+      <ConfigModelsContext.Provider value={models}>
+        {document?.values && <ConfigForm key={config.reloadKey} values={document.values}
+          disabled={editorOpen} onCommit={config.commit} view={{ search, filter, onSearchChange: setSearch }} />}
+      </ConfigModelsContext.Provider>
       {document && <TomlEditorModal open={editorOpen} content={document.content} revision={document.revision}
         saveError={config.error} onSave={config.saveContent} onClose={() => setEditorOpen(false)} />}
     </div>

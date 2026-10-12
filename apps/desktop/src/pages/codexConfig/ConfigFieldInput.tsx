@@ -1,9 +1,10 @@
 import { guiText } from "../../i18n/guiText";
-import { useEffect, useRef, useState } from "react";
-import { AutoComplete, Input, Select } from "antd";
+import { useContext, useEffect, useRef, useState } from "react";
+import { AutoComplete, Input, Select, Spin } from "antd";
 import { ChevronDown } from "lucide-react";
 import { optionLabel, stringSuggestions } from "./labels";
 import { schemaType, type ConfigSchema, type ConfigValue } from "./schema";
+import { ConfigModelsContext } from "./useConfigModels";
 import styles from "./formStyles.module.less";
 
 interface ConfigFieldInputProps {
@@ -73,6 +74,7 @@ function DraftInput(props: ConfigFieldInputProps) {
   const { fieldKey, label, value, disabled } = props;
   const { draft, error, numeric, change, commit } = useConfigDraft(props);
   const [search, setSearch] = useState("");
+  const modelCatalog = useContext(ConfigModelsContext);
   const shared = {
     value: draft, disabled, "aria-label": label, status: error ? "error" as const : undefined,
     placeholder: value === "" ? guiText("空文本") : guiText("使用默认值"), onBlur: () => { void commit(); },
@@ -80,18 +82,20 @@ function DraftInput(props: ConfigFieldInputProps) {
   };
   const multiline = /instructions|prompt|description/.test(fieldKey) || draft.includes("\n");
   const secret = /(?:^|_)(?:api_key|token|secret|password)$/.test(fieldKey);
-  const suggestions = stringSuggestions(fieldKey);
+  const suggestions = fieldKey === "model" ? modelCatalog.models : stringSuggestions(fieldKey);
   let input = <Input {...shared} inputMode={numeric ? "decimal" : undefined}
     onPressEnter={(event) => event.currentTarget.blur()} />;
   if (multiline) input = <Input.TextArea {...shared} autoSize={{ minRows: 3, maxRows: 10 }} />;
   else if (secret) input = <Input.Password {...shared} autoComplete="off" />;
-  else if (suggestions.length) input = <AutoComplete value={draft} disabled={disabled} onChange={change}
+  else if (fieldKey === "model" || suggestions.length) input = <AutoComplete
+    value={draft} disabled={disabled} onChange={change}
     className={styles.select} onSearch={setSearch} onFocus={() => setSearch("")}
     options={suggestions.filter((item) => optionLabel(item).toLowerCase().includes(search.toLowerCase()))
       .map((item) => ({ value: item, label: optionLabel(item) }))}
     onSelect={(next) => { change(next); void commit(); }} onBlur={() => { void commit(); }}>
     <Input aria-label={label} placeholder={guiText("选择或输入自定义值")} status={shared.status}
-      suffix={<ChevronDown size={14} aria-hidden="true" />} />
+      suffix={fieldKey === "model" && modelCatalog.loading
+        ? <Spin size="small" /> : <ChevronDown size={14} aria-hidden="true" />} />
   </AutoComplete>;
   return <div className={styles.inputWrap}>
     {input}

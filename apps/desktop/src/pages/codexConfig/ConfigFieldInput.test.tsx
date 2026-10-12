@@ -3,6 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigFieldInput } from "./ConfigFieldInput";
+import { ConfigModelsContext } from "./useConfigModels";
 
 const nativeValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
 let container: HTMLDivElement;
@@ -20,17 +21,22 @@ afterEach(async () => {
   container.remove();
 });
 
-async function mount(fieldKey: string, value: string) {
+async function mount(fieldKey: string, value: string, models = ["gpt-6.1-sol", "admin-only-model"]) {
   const onCommit = vi.fn().mockResolvedValue(true);
-  await act(async () => root.render(<ConfigFieldInput schema={{ type: "string" }}
-    fieldKey={fieldKey} label={fieldKey} value={value} onCommit={onCommit} />));
+  const renderModels = (models: string[], loading = false) => act(async () => root.render(
+    <ConfigModelsContext.Provider value={{ models, loading }}>
+      <ConfigFieldInput schema={{ type: "string" }} fieldKey={fieldKey}
+        label={fieldKey} value={value} onCommit={onCommit} />
+    </ConfigModelsContext.Provider>,
+  ));
+  await renderModels(models);
   const input = container.querySelector<HTMLInputElement>("input[role=combobox]");
   if (!input) throw new Error("Expected an editable model selection");
   await act(async () => {
     input.focus();
     input.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
   });
-  return { input, onCommit };
+  return { input, onCommit, renderModels };
 }
 
 async function typeValue(input: HTMLInputElement, value: string) {
@@ -86,4 +92,26 @@ describe.each([
     expect(optionValues()).toContain(selected);
     expect(input.value).toBe("no-preset-matches");
   });
+});
+
+it("replaces Admin suggestions without changing the configured model or saving automatically", async () => {
+  const { input, onCommit, renderModels } = await mount("model", "saved-custom-model");
+  expect(optionValues()).toEqual(["gpt-6.1-sol", "admin-only-model"]);
+  await renderModels(["new-admin-model"]);
+  expect(optionValues()).toEqual(["new-admin-model"]);
+  expect(input.value).toBe("saved-custom-model");
+  expect(onCommit).not.toHaveBeenCalled();
+});
+
+it("keeps custom model editing available while the Admin list is loading or unavailable", async () => {
+  const { input, onCommit, renderModels } = await mount("model", "saved-model", []);
+  await renderModels([], true);
+  expect(input.disabled).toBe(false);
+  await typeValue(input, "custom-draft");
+  await renderModels(["new-admin-model"]);
+  expect(input.value).toBe("custom-draft");
+  expect(onCommit).not.toHaveBeenCalled();
+  await renderModels([]);
+  await act(async () => input.blur());
+  expect(onCommit.mock.calls).toEqual([["custom-draft"]]);
 });

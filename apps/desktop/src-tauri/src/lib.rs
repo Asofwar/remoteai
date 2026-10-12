@@ -436,6 +436,7 @@ pub fn run() {
             commands::delete_account,
             commands::refresh_usage,
             official_models::refresh_official_model_catalog,
+            official_models::read_admin_model_names,
             commands::consume_account_quota,
             commands::fetch_reset_credits,
             commands::consume_reset_credit,

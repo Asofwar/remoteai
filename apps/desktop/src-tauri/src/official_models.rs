@@ -15,6 +15,8 @@ use crate::{
     storage::{managed_auth_path, read_json, read_state, resolve_paths, write_json_atomic, Paths},
 };
 
+#[cfg(test)]
+mod admin_tests;
 mod client_version;
 pub(crate) use client_version::model_client_version;
 #[cfg(any(target_os = "windows", target_os = "macos"))]
@@ -94,6 +96,25 @@ pub(crate) fn refresh_after_account_switch(account_id: &str) {
                 eprintln!("Failed to refresh the official model catalog after switching: {error}");
             }
         });
+}
+
+/// Read Admin suggestions without requiring an account or changing the active runtime catalog.
+#[tauri::command]
+pub(crate) async fn read_admin_model_names<R: Runtime + 'static>(
+    app: AppHandle<R>,
+) -> Result<Vec<String>, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        crate::local_proxy::admin_model_catalog(&app)
+            .map(|catalog| catalog_from_value(&catalog).models)
+    })
+    .await;
+    match result {
+        Ok(Ok(models)) => Ok(models),
+        error => {
+            eprintln!("Failed to read Admin model names: {error:?}");
+            Err("Could not load the model list. Please try again.".to_string())
+        }
+    }
 }
 
 #[tauri::command]

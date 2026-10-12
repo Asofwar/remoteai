@@ -201,11 +201,12 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      # Each peer test runs several native engines. Keep unrelated test cases from
-      # competing for discovery on Linux; concurrency within each test stays intact.
-      - name: Isolate Linux test cases
-        if: runner.os == 'Linux'
-        run: echo "RUST_TEST_THREADS=1" >> "$GITHUB_ENV"
+      # Process-wide history stores outlive temporary app fixtures, and native peer
+      # engines keep background state. Separate processes prevent cross-test leakage.
+      - name: Install isolated Rust test runner
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
 
       - name: Diagnose Linux peer discovery
         if: runner.os == 'Linux' && inputs.linux_only
@@ -231,8 +232,18 @@ jobs:
           path: ${{ runner.temp }}/linux-peer-network.log
           if-no-files-found: ignore
 
-      - name: Run checks
-        run: npm run check
+      - name: Run checks in isolated test processes
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx lerna run check --ignore @codex-switch/backend --stream
+          npm run check:backend
+          cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
+          cargo nextest run --locked --manifest-path apps/desktop/src-tauri/Cargo.toml \
+            --test-threads 1 --no-fail-fast
+          cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --doc
+          node scripts/check-installer-helper.mjs
+          node scripts/check-installer-fixture.mjs
 
       - name: Prepare desktop video runtime
         if: startsWith(matrix.name, 'windows') || startsWith(matrix.name, 'macos')

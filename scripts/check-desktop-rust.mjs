@@ -9,9 +9,18 @@ const env = {
   CARGO_PROFILE_DEV_DEBUG: "0",
   CARGO_PROFILE_TEST_DEBUG: "0",
 };
+// GUI fixtures and native engines retain process-wide state beyond an individual test.
+// CI and local release checks can opt into nextest without requiring it for every developer.
+const rustTests = env.CODEX_RUST_TEST_RUNNER === "nextest"
+  ? [
+      ["cargo", ["nextest", "run", "--manifest-path", "src-tauri/Cargo.toml",
+        "--test-threads", "1", "--no-fail-fast"]],
+      ["cargo", ["test", "--manifest-path", "src-tauri/Cargo.toml", "--doc"]],
+    ]
+  : [["cargo", ["test", "--manifest-path", "src-tauri/Cargo.toml"]]];
 const checks = [
   ["cargo", ["fmt", "--manifest-path", "src-tauri/Cargo.toml", "--", "--check"]],
-  ["cargo", ["test", "--manifest-path", "src-tauri/Cargo.toml"]],
+  ...rustTests,
   [process.execPath, [fileURLToPath(new URL("./check-installer-helper.mjs", import.meta.url))]],
   [process.execPath, [fileURLToPath(new URL("./check-installer-fixture.mjs", import.meta.url))]],
 ];

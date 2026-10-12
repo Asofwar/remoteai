@@ -1,13 +1,16 @@
 import type { Language } from '../../i18n';
 import type { HelpError } from './types';
 import type { HelpSetupError, HelpSetupPhase } from './useHelpSetup';
+import type { HelpImageError } from './useHelpImages';
 
 interface HelpCopy {
   title: string; subtitle: string; close: string; clear: string; placeholder: string;
   send: string; thinking: string; checking: string; retry: string;
+  addImage: string; removeImage: string; image: string; readingImages: string;
+  imageErrors: Record<HelpImageError, string>;
   install: string; initialize: string; selectAccount: string;
   setupPhases: Record<HelpSetupPhase, string>; setupErrors: Record<HelpSetupError, string>;
-  welcome: string; description: string; privacy: string; sources: string; questions: string[];
+  welcome: string; description: string; sources: string; questions: string[];
   errors: Record<HelpError, string>;
 }
 
@@ -16,6 +19,9 @@ const copies: Record<Language, HelpCopy> = {
     title: '问题解答助手', subtitle: 'Remote AI 使用帮助', close: '收起助手', clear: '新对话',
     placeholder: '想了解 Remote AI 的什么功能？', send: '发送', thinking: '正在查找答案…',
     checking: '正在检查是否可以使用…', retry: '重新检查',
+    addImage: '添加图片', removeImage: '移除图片', image: '图片', readingImages: '正在添加图片…',
+    imageErrors: { imageType: '请选择 PNG、JPEG、WebP 或 GIF 图片。', imageSize: '每张图片不能超过 5 MB。',
+      imageCount: '每条消息最多添加 4 张图片。', imageRead: '图片读取失败，请重新添加。' },
     install: '立即安装', initialize: '启用助手', selectAccount: '选择账户',
     setupPhases: { checking: '正在准备安装…', downloading: '正在下载 Codex…',
       installing: '正在安装，即将完成…', initializing: '正在启用助手…' },
@@ -23,7 +29,6 @@ const copies: Record<Language, HelpCopy> = {
       initializeFailed: '暂时无法启用助手，请重试。',
       previewOnly: '当前仅为界面预览，无法安装。请在 Remote AI 应用中操作。' },
     welcome: '你好，有什么可以帮你？', description: '结合使用说明和你当前的设置，解答 Remote AI 相关问题。',
-    privacy: '使用 Codex 中所选账户的额度。仅提供必要的设置摘要，不包含密钥或其他对话。',
     sources: '参考资料', questions: ['如何选择 Codex 使用的账户？', '手机为什么连接不上电脑？', '自动切换账户怎么设置？'],
     errors: {
       installRequired: '使用助手需要先安装 Codex。',
@@ -31,6 +36,9 @@ const copies: Record<Language, HelpCopy> = {
       accountRequired: '请先在 Codex 中选择一个可用账户。',
       accountChanged: 'Codex 账户已切换，请重新发送问题。',
       invalidRequest: '问题太长了，请缩短后重试。', busy: '还有一个问题正在回答，请稍后再试。',
+      invalidImage: '图片无法使用，请重新添加 PNG、JPEG、WebP 或 GIF 图片，每张不超过 5 MB。',
+      modelNotConfigured: '暂时无法获取助手配置，请稍后重试或联系管理员。',
+      modelUnsupported: '当前三方账户不支持助手指定的模型，请在 Codex 中切换到支持该模型的账户。',
       unavailable: '暂时无法读取设置，请稍后重试。',
       answerFailed: '暂时没有获取到答案，请检查 Codex 账户和网络后重试。',
     },
@@ -39,6 +47,9 @@ const copies: Record<Language, HelpCopy> = {
     title: 'Help assistant', subtitle: 'Remote AI help', close: 'Minimize help', clear: 'New chat',
     placeholder: 'What would you like to know about Remote AI?', send: 'Send', thinking: 'Finding an answer…',
     checking: 'Checking availability…', retry: 'Check again',
+    addImage: 'Add images', removeImage: 'Remove image', image: 'Image', readingImages: 'Adding images…',
+    imageErrors: { imageType: 'Choose PNG, JPEG, WebP or GIF images.', imageSize: 'Each image can be up to 5 MB.',
+      imageCount: 'Add up to 4 images per message.', imageRead: 'Could not read the images. Please add them again.' },
     install: 'Install now', initialize: 'Enable assistant', selectAccount: 'Choose account',
     setupPhases: { checking: 'Preparing installation…', downloading: 'Downloading Codex…',
       installing: 'Installing, almost done…', initializing: 'Enabling the assistant…' },
@@ -46,7 +57,6 @@ const copies: Record<Language, HelpCopy> = {
       initializeFailed: 'The assistant could not start. Please try again.',
       previewOnly: 'Installation is unavailable in this preview. Please use the Remote AI app.' },
     welcome: 'Hi! How can I help?', description: 'Get Remote AI answers based on the guides and your current settings.',
-    privacy: 'Uses your Codex account and its usage allowance. Only a settings summary is included, not keys or other chats.',
     sources: 'References', questions: ['How do I select a Codex account?', 'Why can’t my phone connect?',
       'How do I set up automatic account switching?'],
     errors: {
@@ -55,6 +65,9 @@ const copies: Record<Language, HelpCopy> = {
       accountRequired: 'Choose an available account in Codex first.',
       accountChanged: 'Your Codex account changed. Please send your question again.',
       invalidRequest: 'Your question is too long. Please shorten it.', busy: 'Another answer is in progress. Try again shortly.',
+      invalidImage: 'Please add valid PNG, JPEG, WebP or GIF images, up to 5 MB each.',
+      modelNotConfigured: 'Assistant settings are unavailable. Try again later or contact your administrator.',
+      modelUnsupported: 'This account does not support the assistant’s model. Choose a compatible account in Codex.',
       unavailable: 'Settings are temporarily unavailable. Please try again.',
       answerFailed: 'No answer received. Check your Codex account and connection, then try again.',
     },
@@ -63,6 +76,11 @@ const copies: Record<Language, HelpCopy> = {
     title: 'Помощник', subtitle: 'Помощь по Remote AI', close: 'Свернуть', clear: 'Новый чат',
     placeholder: 'Что вы хотите узнать о Remote AI?', send: 'Отправить', thinking: 'Ищу ответ…',
     checking: 'Проверяю доступность…', retry: 'Проверить снова',
+    addImage: 'Добавить изображения', removeImage: 'Удалить изображение', image: 'Изображение',
+    readingImages: 'Добавляю изображения…',
+    imageErrors: { imageType: 'Выберите изображения PNG, JPEG, WebP или GIF.',
+      imageSize: 'Размер каждого изображения не должен превышать 5 МБ.', imageCount: 'Не более 4 изображений в сообщении.',
+      imageRead: 'Не удалось прочитать изображения. Добавьте их снова.' },
     install: 'Установить', initialize: 'Включить помощника', selectAccount: 'Выбрать аккаунт',
     setupPhases: { checking: 'Подготовка к установке…', downloading: 'Загрузка Codex…',
       installing: 'Установка почти завершена…', initializing: 'Запуск помощника…' },
@@ -70,7 +88,6 @@ const copies: Record<Language, HelpCopy> = {
       initializeFailed: 'Не удалось запустить помощника. Попробуйте снова.',
       previewOnly: 'В режиме предпросмотра установка недоступна. Откройте приложение Remote AI.' },
     welcome: 'Здравствуйте! Чем помочь?', description: 'Ответы о Remote AI на основе руководств и ваших настроек.',
-    privacy: 'Используется квота аккаунта Codex. Передаётся только сводка настроек, без ключей и других чатов.',
     sources: 'Источники', questions: ['Как выбрать аккаунт Codex?', 'Почему телефон не подключается?',
       'Как настроить автоматическую смену аккаунта?'],
     errors: {
@@ -79,6 +96,9 @@ const copies: Record<Language, HelpCopy> = {
       accountRequired: 'Сначала выберите доступный аккаунт в Codex.',
       accountChanged: 'Аккаунт Codex изменился. Отправьте вопрос ещё раз.',
       invalidRequest: 'Вопрос слишком длинный. Сократите его.', busy: 'Другой ответ ещё готовится. Попробуйте позже.',
+      invalidImage: 'Добавьте изображения PNG, JPEG, WebP или GIF размером до 5 МБ каждое.',
+      modelNotConfigured: 'Настройки помощника недоступны. Повторите позже или обратитесь к администратору.',
+      modelUnsupported: 'Этот сторонний аккаунт не поддерживает модель помощника. Выберите совместимый аккаунт в Codex.',
       unavailable: 'Настройки временно недоступны. Попробуйте снова.',
       answerFailed: 'Ответ не получен. Проверьте аккаунт Codex и подключение, затем повторите попытку.',
     },

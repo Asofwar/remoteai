@@ -45,6 +45,37 @@ fn reads_server_title_model_and_effort_without_credentials() {
 }
 
 #[test]
+fn reads_current_help_model_and_system_prompt_without_authentication() {
+    let server = Server::http("127.0.0.1:0").unwrap();
+    let url = settings_url(
+        &format!("http://{}", server.server_addr()),
+        "/help-assistant/settings",
+    )
+    .unwrap();
+    let worker = thread::spawn(move || {
+        let request = server
+            .recv_timeout(Duration::from_secs(3))
+            .unwrap()
+            .unwrap();
+        assert_eq!(request.url(), "/help-assistant/settings");
+        assert!(!request
+            .headers()
+            .iter()
+            .any(|header| header.field.equiv("Authorization")));
+        request
+            .respond(Response::from_string(
+                r#"{"model":"admin-model","systemPrompt":"Be concise","revision":"new"}"#,
+            ))
+            .unwrap();
+    });
+    let settings: CloudHelpSettings =
+        request_settings(&Client::builder().no_proxy().build().unwrap(), url).unwrap();
+    assert_eq!(settings.model, "admin-model");
+    assert_eq!(settings.system_prompt, "Be concise");
+    worker.join().unwrap();
+}
+
+#[test]
 fn rejects_failed_malformed_and_oversized_responses() {
     for (status, body) in [
         (404, "not deployed".to_owned()),

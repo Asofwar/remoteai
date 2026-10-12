@@ -2,17 +2,17 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { hasLocalBackend, invoke } from '../../api/backend';
 import { subscribeGuiEvent } from '../../pages/codexGui/webEvents';
 import type { DashboardPage } from '../dashboard/DashboardNavigation';
-import { helpError, messageHistory, MAX_QUESTION_LENGTH, type HelpAnswer, type HelpError,
-  type HelpMessage, type HelpStatus, type HelpAvailability } from './types';
-
-const MAX_VISIBLE_MESSAGES = 40;
+import { boundedMessages, helpError, messageHistory, MAX_QUESTION_LENGTH, type HelpAnswer, type HelpError,
+  type HelpMessage, type HelpStatus, type HelpAvailability, type HelpContent } from './types';
+import { useHelpImages } from './useHelpImages';
 
 export function useHelpAssistant(options: { open: boolean; page: DashboardPage }) {
   const [status, setStatus] = useState<HelpStatus>();
   const [error, setError] = useState<HelpError>();
   const [messages, setMessages] = useState<HelpMessage[]>([]);
   const [draft, setDraft] = useState('');
-  const [pending, setPending] = useState('');
+  const [pending, setPending] = useState<HelpContent>();
+  const attachments = useHelpImages();
   const [checking, setChecking] = useState(false);
   const busy = useRef(false);
   const statusFlight = useRef(false);
@@ -72,41 +72,42 @@ export function useHelpAssistant(options: { open: boolean; page: DashboardPage }
 
   const send = async (question = draft) => {
     question = question.trim();
-    if (busy.current || status !== 'ready' || !question) return;
+    const images = attachments.images;
+    if (busy.current || attachments.reading || status !== 'ready' || (!question && !images.length)) return;
     if (Array.from(question).length > MAX_QUESTION_LENGTH) { setError('invalidRequest'); return; }
     busy.current = true;
     const currentGeneration = generation.current;
-    setError(undefined); setPending(question); setDraft('');
+    setError(undefined); setPending({ text: question, images }); setDraft(''); attachments.clear();
     try {
       const answer = await invoke<HelpAnswer>('remote_ai_help_ask', {
-        request: { question, history: messageHistory(messages), page: options.page,
-          accountRevision: accountRevision.current },
+        request: { question, ...(images.length ? { images } : {}), history: messageHistory(messages, images),
+          page: options.page, accountRevision: accountRevision.current },
       });
       if (!mounted.current) return;
       if (currentGeneration !== generation.current) {
-        setDraft(question); setError('accountChanged'); return;
+        setDraft(question); attachments.setImages(images); setError('accountChanged'); return;
       }
-      setMessages((current) => [...current,
-        { id: nextId.current++, role: 'user' as const, text: question },
+      setMessages((current) => boundedMessages([...current,
+        { id: nextId.current++, role: 'user' as const, text: question, images },
         { id: nextId.current++, role: 'assistant' as const, ...answer },
-      ].slice(-MAX_VISIBLE_MESSAGES));
+      ]));
     } catch (failure) {
       if (!mounted.current) return;
       const problem = helpError(failure);
-      setError(problem); setDraft(question);
+      setError(problem); setDraft(question); attachments.setImages(images);
       if (problem === 'accountChanged') void refresh();
       if (['installRequired', 'initializeRequired', 'accountRequired'].includes(problem)) {
         setStatus(problem as HelpStatus);
       }
     } finally {
       busy.current = false;
-      if (mounted.current) setPending('');
+      if (mounted.current) setPending(undefined);
     }
   };
 
   const clear = () => {
-    if (busy.current) return;
-    generation.current++; setMessages([]); setDraft(''); setError(undefined);
+    if (busy.current || attachments.reading) return;
+    generation.current++; setMessages([]); setDraft(''); setError(undefined); attachments.clear();
   };
-  return { status, error, messages, draft, setDraft, pending, checking, refresh, send, clear };
+  return { status, error, messages, draft, setDraft, pending, checking, refresh, send, clear, attachments };
 }

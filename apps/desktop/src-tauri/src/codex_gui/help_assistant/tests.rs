@@ -1,7 +1,7 @@
 use super::{context, knowledge, prompt, transport, types::*};
 use serde_json::json;
 
-fn request() -> HelpRequest {
+pub(super) fn request() -> HelpRequest {
     serde_json::from_value(
         json!({"question": "如何选择 Codex 账户？", "history": [], "page": "accounts", "accountRevision": 7}),
     )
@@ -43,6 +43,7 @@ fn history_limits_are_enforced() {
         .map(|_| HelpMessage {
             role: MessageRole::User,
             text: "question".into(),
+            images: vec![],
         })
         .collect();
     assert!(input.validate().is_err());
@@ -50,6 +51,7 @@ fn history_limits_are_enforced() {
         .map(|_| HelpMessage {
             role: MessageRole::Assistant,
             text: "界".repeat(16_000),
+            images: vec![],
         })
         .collect();
     assert!(input.validate().is_err());
@@ -99,6 +101,7 @@ fn prompt_has_no_tools_and_uses_only_supplied_context() {
         base_url: "http://127.0.0.1:1/codex-gui/v1".into(),
         model: "test-model".into(),
         effort: crate::codex_gui::model_settings::Effort::Low,
+        system_prompt: "Help settings from admin".into(),
         revision: 7,
         configuration: json!({"gui": {"selectedAccountKind": "provider"}}),
     };

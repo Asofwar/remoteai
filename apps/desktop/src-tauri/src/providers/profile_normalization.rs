@@ -213,6 +213,12 @@ pub(crate) fn uses_upstream_official_models(provider: &ProviderProfile) -> bool 
     provider.kind == ProviderKind::OpenAi
 }
 
+pub(crate) fn supports_explicit_model(provider: &ProviderProfile, model: &str) -> bool {
+    uses_upstream_official_models(provider)
+        || provider.model == model
+        || provider.models.iter().any(|candidate| candidate == model)
+}
+
 fn normalize_synced_provider(mut provider: ProviderProfile) -> Result<ProviderProfile, String> {
     validate_provider_id(&provider.id)?;
     provider.name = require_non_empty("Provider name", &provider.name)?;

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUp, Plus, X } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import type { Language } from '../../i18n';
 import type { DashboardPage } from '../dashboard/DashboardNavigation';
 import { helpCopy } from './copy';
-import { MAX_QUESTION_LENGTH } from './types';
+import { HelpComposer } from './HelpComposer';
 import { useHelpAssistant } from './useHelpAssistant';
 import { HelpMessages } from './HelpMessages';
 import { HelpSetupNotice } from './HelpSetupNotice';
@@ -34,7 +34,8 @@ export function HelpAssistant(props: { language: Language; page: DashboardPage; 
       <header className={styles.header}>
         <span className={styles.avatar}><img src={assistantIcon} alt="" /></span>
         <div><strong>{copy.title}</strong><small>{copy.subtitle}</small></div>
-        <button type="button" onClick={assistant.clear} disabled={Boolean(assistant.pending)} aria-label={copy.clear}>
+        <button type="button" onClick={assistant.clear}
+          disabled={Boolean(assistant.pending) || assistant.attachments.reading} aria-label={copy.clear}>
           <Plus size={18} /></button>
         <button type="button" onClick={close} aria-label={copy.close}><X size={18} /></button>
       </header>
@@ -51,18 +52,8 @@ export function HelpAssistant(props: { language: Language; page: DashboardPage; 
           copy={copy} setup={setup} refresh={assistant.refresh}
           onSelectAccount={() => { close(); props.onOpenCodex(); }} />
       </div>
-      <form className={styles.composer} onSubmit={(event) => { event.preventDefault(); void assistant.send(); }}>
-        <textarea ref={input} value={assistant.draft} onChange={(event) => assistant.setDraft(event.target.value)}
-          rows={2} maxLength={MAX_QUESTION_LENGTH} placeholder={copy.placeholder} aria-label={copy.placeholder}
-          disabled={!ready || Boolean(assistant.pending)} onKeyDown={(event) => {
-            if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing || event.keyCode === 229) return;
-            event.preventDefault(); void assistant.send();
-          }} />
-        <div className={styles.composerFooter}><small>{copy.privacy}</small>
-          <button type="submit" className={styles.send} aria-label={copy.send}
-            disabled={!ready || Boolean(assistant.pending) || !assistant.draft.trim()}><ArrowUp size={19} /></button>
-        </div>
-      </form>
+      <HelpComposer copy={copy} input={input} draft={assistant.draft} setDraft={assistant.setDraft}
+        disabled={!ready || Boolean(assistant.pending)} attachments={assistant.attachments} send={assistant.send} />
     </section>}
     <button ref={trigger} type="button" className={styles.launcher} aria-label={open ? copy.close : copy.title}
       aria-expanded={open} aria-controls="remote-ai-help" onClick={() => open ? close() : setOpen(true)}>

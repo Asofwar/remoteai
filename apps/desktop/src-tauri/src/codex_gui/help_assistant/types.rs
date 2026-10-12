@@ -17,6 +17,12 @@ pub(super) enum HelpError {
     AccountChanged,
     #[error("invalidRequest")]
     InvalidRequest,
+    #[error("invalidImage")]
+    InvalidImage,
+    #[error("modelNotConfigured")]
+    ModelNotConfigured,
+    #[error("modelUnsupported")]
+    ModelUnsupported,
     #[error("busy")]
     Busy,
     #[error("unavailable")]
@@ -56,6 +62,8 @@ pub(super) enum MessageRole {
 pub(super) struct HelpMessage {
     pub(super) role: MessageRole,
     pub(super) text: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(super) images: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -83,6 +91,8 @@ pub(super) enum HelpPage {
 pub(crate) struct HelpRequest {
     pub(super) account_revision: u64,
     pub(super) question: String,
+    #[serde(default)]
+    pub(super) images: Vec<String>,
     pub(super) history: Vec<HelpMessage>,
     pub(super) page: HelpPage,
 }
@@ -94,7 +104,7 @@ impl HelpRequest {
             .iter()
             .map(|entry| entry.text.chars().count())
             .sum();
-        if self.question.trim().is_empty()
+        if (self.question.trim().is_empty() && self.images.is_empty())
             || self.question.chars().count() > MAX_QUESTION_CHARS
             || self.history.len() > MAX_HISTORY_MESSAGES
             || history_chars > MAX_HISTORY_CHARS
@@ -105,7 +115,7 @@ impl HelpRequest {
         {
             return Err(HelpError::InvalidRequest);
         }
-        Ok(())
+        super::images::validate(self)
     }
 }
 

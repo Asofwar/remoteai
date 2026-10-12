@@ -5,11 +5,16 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { invoke } from '../../api/backend';
 import { subscribeGuiEvent } from '../../pages/codexGui/webEvents';
 import { HelpAssistant } from './HelpAssistant';
+import { readImage } from '../../pages/codexGui/draftImages';
+import { helpCopy } from './copy';
 import { helpError, messageHistory, type HelpAvailability, type HelpMessage } from './types';
 import type { DashboardPage } from '../dashboard/DashboardNavigation';
 
 vi.mock('../../api/backend', () => ({ hasLocalBackend: true, invoke: vi.fn() }));
 vi.mock('../../pages/codexGui/webEvents', () => ({ subscribeGuiEvent: vi.fn() }));
+vi.mock('../../pages/codexGui/draftImages', async (original) => ({
+  ...await original<typeof import('../../pages/codexGui/draftImages')>(), readImage: vi.fn(),
+}));
 
 let root: Root;
 let container: HTMLDivElement;
@@ -19,6 +24,13 @@ let accountChanged: () => void;
 let availability: HelpAvailability;
 const button = (label: string) => document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!;
 const input = () => document.querySelector<HTMLTextAreaElement>('textarea')!;
+const imageUrl = 'data:image/png;base64,aW1hZ2U=';
+
+async function attach(files = [new File(['image'], 'screenshot.png', { type: 'image/png' })]) {
+  const picker = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+  Object.defineProperty(picker, 'files', { configurable: true, value: files });
+  await act(async () => picker.dispatchEvent(new Event('change', { bubbles: true })));
+}
 
 async function render(page: DashboardPage = 'accounts') {
   await act(async () => root.render(<HelpAssistant language="zh" page={page} onOpenCodex={openCodex} />));
@@ -34,6 +46,7 @@ async function send() { await act(async () => button('发送').click()); }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(readImage).mockResolvedValue(imageUrl);
   availability = { status: 'ready', accountRevision: 7 };
   vi.mocked(invoke).mockImplementation(async (command) => command === 'remote_ai_help_status'
     ? availability : { text: '请打开 Codex，选择账户。', sources: ['docs/codex-gui.md'] });
@@ -57,6 +70,78 @@ it('adds one quiet global launcher and preserves answers across sidebar pages', 
   expect(vi.mocked(invoke).mock.calls.find(([command]) => command === 'remote_ai_help_ask')?.[1]).toEqual({
     request: { question: '怎么选择账户？', page: 'accounts', history: [], accountRevision: 7 },
   });
+});
+
+it.each(['zh', 'en', 'ru'] as const)('keeps the %s composer free of explanatory footer copy', async (language) => {
+  const copy = helpCopy(language);
+  await act(async () => root.render(<HelpAssistant language={language} page="accounts" onOpenCodex={openCodex} />));
+  await act(async () => button(copy.title).click());
+  expect(document.querySelector('form')?.textContent).toBe('');
+  expect(input()).not.toBeNull();
+  expect(button(copy.send)).not.toBeNull();
+  expect(button(copy.send).parentElement).toBe(input().parentElement);
+  expect(input().rows).toBe(1);
+  await type('a');
+  expect(input().rows).toBe(3);
+  await type('');
+  expect(input().rows).toBe(1);
+});
+
+it('sends image-only questions and includes images in follow-up history', async () => {
+  await render(); await open(); await attach();
+  expect(document.querySelector('form img')?.getAttribute('src')).toBe(imageUrl);
+  expect(input().rows).toBe(3);
+  await send();
+  expect(vi.mocked(invoke).mock.calls.find(([command]) => command === 'remote_ai_help_ask')?.[1]).toMatchObject({
+    request: { question: '', images: [imageUrl] },
+  });
+  expect(document.querySelector('[role="log"] img')?.getAttribute('src')).toBe(imageUrl);
+  await type('more'); await send();
+  expect(vi.mocked(invoke).mock.calls.filter(([command]) => command === 'remote_ai_help_ask').at(-1)?.[1])
+    .toMatchObject({ request: { history: [{ role: 'user', text: '', images: [imageUrl] },
+      { role: 'assistant', text: expect.any(String) }] } });
+});
+
+it('restores images on model errors and allows removing them', async () => {
+  await render(); await open(); await attach();
+  vi.mocked(invoke).mockRejectedValueOnce('modelUnsupported');
+  await send();
+  expect(document.querySelector('form img')).not.toBeNull();
+  expect(document.body.textContent).toContain(helpCopy('zh').errors.modelUnsupported);
+  await act(async () => button('移除图片 1').click());
+  expect(document.querySelector('form img')).toBeNull();
+  expect(button('发送').disabled).toBe(true);
+});
+
+it('rejects unsupported, oversized and excessive images before reading', async () => {
+  await render(); await open();
+  await attach([new File(['svg'], 'unsafe.svg', { type: 'image/svg+xml' })]);
+  expect(document.body.textContent).toContain(helpCopy('zh').imageErrors.imageType);
+  const large = new File(['image'], 'large.png', { type: 'image/png' });
+  Object.defineProperty(large, 'size', { value: 6 * 1024 * 1024 });
+  await attach([large]);
+  expect(document.body.textContent).toContain(helpCopy('zh').imageErrors.imageSize);
+  await attach(Array.from({ length: 5 }, () => new File(['image'], 'small.png', { type: 'image/png' })));
+  expect(document.body.textContent).toContain(helpCopy('zh').imageErrors.imageCount);
+  expect(readImage).not.toHaveBeenCalled();
+});
+
+it('pastes images, blocks sending while reading, and preserves the draft when minimized', async () => {
+  let finish!: (value: string) => void;
+  vi.mocked(readImage).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+  await render(); await open(); await type('question');
+  const event = new Event('paste', { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'clipboardData', {
+    value: { files: [new File(['image'], 'clipboard.png', { type: 'image/png' })] },
+  });
+  await act(async () => input().dispatchEvent(event));
+  expect(event.defaultPrevented).toBe(true);
+  expect(button('发送').disabled).toBe(true);
+  await act(async () => button('收起助手').click());
+  await act(async () => finish(imageUrl));
+  await open();
+  expect(document.querySelector('form img')).not.toBeNull();
+  expect(input().value).toBe('question');
 });
 
 it('opens account selection without submitting a request', async () => {

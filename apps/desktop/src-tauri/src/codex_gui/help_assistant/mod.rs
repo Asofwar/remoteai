@@ -1,5 +1,6 @@
 mod catalog;
 mod context;
+mod images;
 mod knowledge;
 mod prompt;
 mod transport;
@@ -90,8 +91,13 @@ fn request_context(
 }
 
 async fn answer(app: AppHandle, state: &GuiState, request: HelpRequest) -> Result<HelpAnswer> {
-    request.validate()?;
     let _slot = state.help_request.try_lock().map_err(|_| HelpError::Busy)?;
+    let request = tauri::async_runtime::spawn_blocking(move || {
+        request.validate()?;
+        Ok::<_, HelpError>(request)
+    })
+    .await
+    .map_err(|_| HelpError::Unavailable)??;
     match status(app.clone(), state).await? {
         HelpStatus::InstallRequired => return Err(HelpError::InstallRequired),
         HelpStatus::InitializeRequired => return Err(HelpError::InitializeRequired),
@@ -131,5 +137,7 @@ pub(crate) async fn remote_ai_help_ask(
         .map_err(|error| error.to_string())
 }
 
+#[cfg(test)]
+mod image_tests;
 #[cfg(test)]
 mod tests;

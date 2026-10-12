@@ -64,7 +64,7 @@ fn forward_help<R: Runtime>(request: GuiProxyRequest<'_, R>) -> Result<UpstreamP
     if expected != Some(snapshot.revision) {
         return Err("Codex account changed before the help request".into());
     }
-    let target = selected_target(request.app, &snapshot.selection)?;
+    let target = help_target(request.app, &snapshot.selection, &request.body)?;
     let account_id = match &snapshot.selection {
         GuiAccountSelection::Account(id) => Some(id.as_str()),
         _ => None,
@@ -88,6 +88,23 @@ fn forward_help<R: Runtime>(request: GuiProxyRequest<'_, R>) -> Result<UpstreamP
         payload
     });
     attach_token_usage_capture(request.app, context(&request, &target, started_at), result)
+}
+
+fn help_target<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    selection: &crate::codex_gui::account_selection::GuiAccountSelection,
+    body: &[u8],
+) -> Result<ActiveTarget, String> {
+    let mut target = selected_target(app, selection)?;
+    let body: Value = serde_json::from_slice(body).map_err(|_| "Invalid help request")?;
+    let model = requested_model(&body).ok_or("Missing help model")?;
+    if let ActiveTarget::Provider(provider) = &mut target {
+        if !providers::supports_explicit_model(provider, model) {
+            return Err("The selected provider does not support the help model".into());
+        }
+        provider.model = model.to_owned();
+    }
+    Ok(target)
 }
 
 fn context<R: Runtime>(

@@ -6,10 +6,13 @@ use crate::codex_gui::{
 use serde_json::{json, Value};
 use tauri::AppHandle;
 
+const MAX_SYSTEM_PROMPT_CHARS: usize = 16_000;
+
 pub(super) struct PreparedContext {
     pub(super) base_url: String,
     pub(super) model: String,
     pub(super) effort: model_settings::Effort,
+    pub(super) system_prompt: String,
     pub(super) revision: u64,
     pub(super) configuration: Value,
 }
@@ -17,26 +20,28 @@ pub(super) struct PreparedContext {
 pub(super) fn prepare(app: &AppHandle) -> Result<PreparedContext> {
     let snapshot = account_selection::snapshot(app).map_err(|_| HelpError::Unavailable)?;
     let paths = crate::storage::resolve_paths(app).map_err(|_| HelpError::Unavailable)?;
-    let (kind, fallback_model) = match &snapshot.selection {
+    let settings =
+        crate::cloud::load_help_settings(app).map_err(|_| HelpError::ModelNotConfigured)?;
+    validate_settings(&settings)?;
+    let kind = match &snapshot.selection {
         GuiAccountSelection::None => return Err(HelpError::AccountRequired),
-        GuiAccountSelection::Account(_) => ("account", crate::providers::official_model()),
-        GuiAccountSelection::Provider(id) => (
-            "provider",
-            crate::providers::read_provider(&paths, id)
-                .map_err(|_| HelpError::AccountRequired)?
-                .model,
-        ),
+        GuiAccountSelection::Account(_) => "account",
+        GuiAccountSelection::Provider(id) => {
+            let provider = crate::providers::read_provider(&paths, id)
+                .map_err(|_| HelpError::AccountRequired)?;
+            if !crate::providers::supports_explicit_model(&provider, &settings.model) {
+                return Err(HelpError::ModelUnsupported);
+            }
+            "provider"
+        }
     };
-    let selection = model_settings::read_draft(app).map_err(|_| HelpError::Unavailable)?;
-    let (model, effort) = selection
-        .map(|selection| (selection.model, selection.effort))
-        .unwrap_or((fallback_model, model_settings::Effort::Low));
-    model_settings::validate_model(&model).map_err(|_| HelpError::Unavailable)?;
+    let model = settings.model;
+    let effort = model_settings::Effort::Low;
     let state = crate::storage::try_read_state(&paths).map_err(|_| HelpError::Unavailable)?;
     let configuration = json!({
         "applicationVersion": app.package_info().version.to_string(), "platform": std::env::consts::OS,
-        "gui": {"selectedAccountKind": kind, "model": model, "reasoningEffort": effort,
-            "autoSwitch": gui_switch_summary(app)?},
+        "assistant": {"model": model, "reasoningEffort": effort},
+        "gui": {"selectedAccountKind": kind, "autoSwitch": gui_switch_summary(app)?},
         "accountManager": manager_summary(&state),
         "scope": "Only these saved settings were read, not live connectivity, logs, files or other conversations."
     });
@@ -45,9 +50,20 @@ pub(super) fn prepare(app: &AppHandle) -> Result<PreparedContext> {
             .map_err(|_| HelpError::Unavailable)?,
         model,
         effort,
+        system_prompt: settings.system_prompt,
         revision: snapshot.revision,
         configuration,
     })
+}
+
+pub(super) fn validate_settings(settings: &crate::cloud::CloudHelpSettings) -> Result<()> {
+    model_settings::validate_model(&settings.model).map_err(|_| HelpError::ModelNotConfigured)?;
+    if settings.system_prompt.trim().is_empty()
+        || settings.system_prompt.chars().count() > MAX_SYSTEM_PROMPT_CHARS
+    {
+        return Err(HelpError::ModelNotConfigured);
+    }
+    Ok(())
 }
 
 fn gui_switch_summary(app: &AppHandle) -> Result<Value> {

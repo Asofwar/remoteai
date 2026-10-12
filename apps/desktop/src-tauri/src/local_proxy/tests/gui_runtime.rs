@@ -58,6 +58,39 @@ struct GuiRuntimeFixture {
     base_url: String,
 }
 
+#[test]
+fn help_model_is_not_replaced_by_provider_defaults_or_image_routing() {
+    use crate::codex_config::{HELP_ACCOUNT_REVISION_HEADER, HELP_REQUEST_PURPOSE, LOCAL_PROXY_REQUEST_PURPOSE_HEADER};
+    let _guard = GUI_SPEED_TEST_LOCK.lock().unwrap();
+    let upstream = Server::http("127.0.0.1:0").unwrap();
+    let fixture = GuiRuntimeFixture::new(&upstream);
+    let paths = resolve_paths(fixture.app.handle()).unwrap();
+    let mut provider = providers::read_provider(&paths, "gui-runtime").unwrap();
+    provider.model = "provider-default".into();
+    provider.models = vec!["provider-default".into(), "admin-official".into()];
+    provider.model_selection_controlled_by_codex = false;
+    crate::storage::write_json_atomic(&paths.providers.join("gui-runtime.json"), &serde_json::to_value(&provider).unwrap()).unwrap();
+    let snapshot = crate::codex_gui::account_selection::snapshot(fixture.app.handle()).unwrap();
+    let worker = thread::spawn(move || {
+        let mut request = upstream.recv_timeout(Duration::from_secs(5)).unwrap().unwrap();
+        let body: Value = serde_json::from_reader(request.as_reader()).unwrap();
+        assert_eq!(body["model"], "admin-official");
+        assert_eq!(body["input"][0]["content"][0]["type"], "input_image");
+        runtime_upstream_reply(request, "default");
+        assert!(upstream.recv_timeout(Duration::from_millis(500)).unwrap().is_none());
+    });
+    let send = |model: &str| gui_runtime_client().post(format!("{}/responses", fixture.base_url))
+        .bearer_auth(crate::codex_config::LOCAL_PROXY_TOKEN)
+        .header(LOCAL_PROXY_REQUEST_PURPOSE_HEADER, HELP_REQUEST_PURPOSE)
+        .header(HELP_ACCOUNT_REVISION_HEADER, snapshot.revision.to_string())
+        .json(&json!({"model": model, "input": [{"role": "user", "content": [
+            {"type": "input_image", "image_url": "data:image/png;base64,AQID"}]}], "stream": false})).send().unwrap();
+    assert!(send("admin-official").status().is_success());
+    assert!(!send("unsupported-official").status().is_success());
+    assert_eq!(providers::read_provider(&paths, "gui-runtime").unwrap().model, "provider-default");
+    worker.join().unwrap();
+}
+
 impl GuiRuntimeFixture {
     fn new(upstream: &Server) -> Self {
         Self::with_app(upstream, breakdown_responsiveness_test_app())

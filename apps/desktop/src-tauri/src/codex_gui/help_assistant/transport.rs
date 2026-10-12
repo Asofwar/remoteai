@@ -34,9 +34,7 @@ async fn request(base_url: &str, body: Value, revision: u64) -> Result<String> {
         .send()
         .await
         .map_err(|_| HelpError::AnswerFailed)?;
-    if !response.status().is_success() {
-        return Err(HelpError::AnswerFailed);
-    }
+    let success = response.status().is_success();
     let mut bytes = Vec::new();
     while let Some(chunk) = response
         .chunk()
@@ -47,6 +45,12 @@ async fn request(base_url: &str, body: Value, revision: u64) -> Result<String> {
             return Err(HelpError::AnswerFailed);
         }
         bytes.extend_from_slice(&chunk);
+    }
+    if !success {
+        return Err(serde_json::from_slice::<Value>(&bytes)
+            .ok()
+            .map(|value| response_error(&value))
+            .unwrap_or(HelpError::AnswerFailed));
     }
     parse_response(&bytes)
 }
@@ -78,9 +82,10 @@ pub(super) fn parse_response(bytes: &[u8]) -> Result<String> {
             serde_json::from_str(line.trim()).map_err(|_| HelpError::AnswerFailed)?;
         match event["type"].as_str() {
             Some("response.completed") => return completed_text(&event["response"]),
-            Some("response.failed" | "response.incomplete" | "error") => {
-                return Err(HelpError::AnswerFailed)
+            Some("response.failed" | "response.incomplete") => {
+                return Err(response_error(&event["response"]))
             }
+            Some("error") => return Err(response_error(&event)),
             _ => {}
         }
     }
@@ -88,6 +93,9 @@ pub(super) fn parse_response(bytes: &[u8]) -> Result<String> {
 }
 
 fn completed_text(value: &Value) -> Result<String> {
+    if value["status"] == "failed" {
+        return Err(response_error(value));
+    }
     let text = message_text(value);
     if value["status"] != "completed"
         || text.trim().is_empty()
@@ -96,4 +104,18 @@ fn completed_text(value: &Value) -> Result<String> {
         return Err(HelpError::AnswerFailed);
     }
     Ok(text.trim().to_owned())
+}
+
+fn response_error(value: &Value) -> HelpError {
+    let error = value.get("error").unwrap_or(value);
+    let code = error["code"].as_str().unwrap_or_default();
+    if matches!(
+        code,
+        "model_not_found" | "unsupported_model" | "model_not_supported" | "invalid_model"
+    ) || error["param"] == "model"
+    {
+        HelpError::ModelUnsupported
+    } else {
+        HelpError::AnswerFailed
+    }
 }

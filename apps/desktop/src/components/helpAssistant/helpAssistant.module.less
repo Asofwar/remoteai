@@ -94,18 +94,31 @@
     border-radius: 7px; background: transparent; color: var(--ink); font-size: 12px; }
   .primary { background: var(--green-dark); color: #fff; border-color: transparent; }
 }
-.composer { padding: 12px 14px; border-top: 1px solid var(--line);
-  textarea { display: block; width: 100%; resize: none; padding: 10px 11px; font: inherit; color: var(--ink);
-    border: 1px solid var(--line); border-radius: 10px; background: transparent; }
-  textarea:focus { outline: 2px solid var(--green-accent); outline-offset: 1px; }
+.composer { flex-shrink: 0; padding: 12px 14px; border-top: 1px solid var(--line); }
+.inputBox { position: relative; min-height: 46px; border: 1px solid var(--line); border-radius: 12px;
+  &:focus-within { outline: 2px solid var(--green-accent); outline-offset: 1px; }
+  textarea { box-sizing: border-box; display: block; width: 100%; resize: none; padding: 11px 44px;
+    font: inherit; line-height: 22px; color: var(--ink); border: 0; outline: none; background: transparent; }
 }
+.expanded { padding-bottom: 44px; textarea { padding: 10px 11px; } }
+.attachments { display: flex; gap: 9px; flex-wrap: wrap; padding: 10px 11px 0; }
+.attachment { position: relative; width: 58px; height: 58px;
+  img { width: 100%; height: 100%; object-fit: cover; border: 1px solid var(--line); border-radius: 8px; }
+  button { position: absolute; top: -5px; right: -5px; display: grid; place-items: center;
+    width: 20px; height: 20px; padding: 0; color: var(--ink); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 50%; }
+}
+.imageNotice { margin: 7px 0 0; max-width: 100%; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.messageImages { display: flex; flex-wrap: wrap; gap: 6px;
+  img { max-width: 100%; width: 120px; max-height: 140px; object-fit: contain; border-radius: 8px; } }
 .setupProgress { display: flex; align-items: center; gap: 8px;
   progress { flex: 1; min-width: 0; height: 7px; accent-color: var(--green-dark); }
   span { font-size: 11px; color: var(--muted); }
 }
-.composerFooter { display: flex; align-items: center; gap: 12px; margin-top: 9px;
-  small { flex: 1; font-size: 10px; color: var(--muted); line-height: 1.5; } }
-.send { flex: 0 0 32px; height: 32px; display: grid; place-items: center; border: 0;
+.send, .addImage { position: absolute; bottom: 6px; width: 32px; height: 32px; padding: 0;
+  display: grid; place-items: center; border: 0; }
+.addImage { left: 6px; border-radius: 8px; background: transparent; color: var(--muted); }
+.send { right: 6px;
   border-radius: 10px; background: var(--green-dark); color: white; }
 @media (max-width: 480px) {
   .root { right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); }

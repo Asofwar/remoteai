@@ -8,11 +8,12 @@ use crate::{models::TitleSettings, storage::read_app_settings};
 
 const SETTINGS_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_SETTINGS_BYTES: u64 = 64 * 1024;
+const MAX_HELP_SETTINGS_BYTES: u64 = 128 * 1024;
 const TITLE_UNAVAILABLE: &str = "暂时无法获取起名设置。";
 const PRESETS_UNAVAILABLE: &str = "暂时无法获取目录预设。";
 
 #[derive(Debug, thiserror::Error)]
-enum SettingsError {
+pub(crate) enum SettingsError {
     #[error("Invalid cloud server address")]
     InvalidAddress,
     #[error("Could not read cloud server settings")]
@@ -30,6 +31,29 @@ pub(crate) struct CloudHomePreset {
     id: String,
     name: String,
     path: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CloudHelpSettings {
+    pub(crate) model: String,
+    pub(crate) system_prompt: String,
+}
+
+pub(crate) fn load_help_settings<R: Runtime>(
+    app: &AppHandle<R>,
+) -> Result<CloudHelpSettings, SettingsError> {
+    let settings = read_app_settings(app).map_err(|_| SettingsError::Configuration)?;
+    let base = settings
+        .cloud_base_url
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or(crate::models::DEFAULT_CLOUD_BASE_URL);
+    request_settings_limited(
+        &settings_client()?,
+        settings_url(base, "/help-assistant/settings")?,
+        MAX_HELP_SETTINGS_BYTES,
+    )
 }
 
 #[derive(Debug, Deserialize)]
@@ -64,6 +88,14 @@ fn settings_url(base: &str, path: &str) -> Result<Url, SettingsError> {
 }
 
 fn request_settings<T: DeserializeOwned>(client: &Client, url: Url) -> Result<T, SettingsError> {
+    request_settings_limited(client, url, MAX_SETTINGS_BYTES)
+}
+
+fn request_settings_limited<T: DeserializeOwned>(
+    client: &Client,
+    url: Url,
+    maximum_bytes: u64,
+) -> Result<T, SettingsError> {
     let response = client
         .get(url)
         .timeout(SETTINGS_TIMEOUT)
@@ -72,10 +104,8 @@ fn request_settings<T: DeserializeOwned>(client: &Client, url: Url) -> Result<T,
         .send()?
         .error_for_status()?;
     let mut bytes = Vec::new();
-    response
-        .take(MAX_SETTINGS_BYTES + 1)
-        .read_to_end(&mut bytes)?;
-    if bytes.len() as u64 > MAX_SETTINGS_BYTES {
+    response.take(maximum_bytes + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > maximum_bytes {
         return Err(SettingsError::InvalidResponse);
     }
     serde_json::from_slice(&bytes).map_err(|_| SettingsError::InvalidResponse)

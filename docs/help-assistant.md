@@ -12,17 +12,40 @@ action instead. Both reuse the normal installation/connection commands and prese
 Installation and initialization happen only after a click; opening the assistant does not start either.
 The user still chooses their account in Codex using **Choose account**. Each question rechecks prerequisites.
 
+## Composer and administration
+
+The empty composer is a single line, with the send button inside its right edge. Any text or attached
+image expands it to multiple lines, with send at the bottom right. There is no explanatory footer.
+Users can select or paste up to four PNG, JPEG, WebP or GIF images (5 MiB each). Attachments have previews
+and removal controls, can be sent without text, and are restored after failure. Reading images blocks
+submission. Recent images are included in follow-up questions, bounded to 20 MiB across a request and
+the in-memory conversation. The backend rejects remote URLs, filesystem paths and invalid images.
+
+In **Admin → Official models → Help assistant**, choose a model from the saved visible official model
+catalog and edit the system instructions. Both fields save atomically with revision checks and an audit
+entry; official-account read/manage permissions govern access. Settings use the `help-assistant` row in
+the existing `chat_settings` table, so no schema migration is needed and normal chat policy is untouched.
+The desktop fetches `/help-assistant/settings` without credentials for every question. The prompt is
+public application configuration: do not include secrets. Basic evidence/privacy safeguards remain in
+force alongside the configured instructions.
+
+Deploy the updated admin-go and admin-ui, then save a model and prompt before using the updated assistant.
+Missing or unavailable configuration is an error; there is no fallback to the GUI model or a hard-coded
+model. Provider requests must support the exact configured model, and their normal default cannot replace
+it. Unsupported-model responses are reported without retrying another model or account. Official API
+providers use their upstream model validation; other providers are checked against their saved model list.
+
 ## Evidence and privacy
 
 - Repository documentation and a small set of relevant source files are embedded at build time.
   Bounded keyword retrieval supports Chinese and English and refreshes with each application build.
   This works in packaged installations without a checkout or repository network access.
-- Each question reads a fresh allowlisted configuration summary: platform/version, GUI model and
-  routing policy, plus saved account-manager proxy, LAN, prompt and image-routing switches.
+- Each question reads a fresh allowlisted configuration summary: platform/version, assistant model,
+  GUI routing policy, plus saved account-manager proxy, LAN, prompt and image-routing switches.
   Saved configuration is not presented as a live connectivity diagnosis.
 - API keys, tokens, account identifiers, custom prompt contents, local paths, logs and other
   conversation histories are not part of the evidence snapshot. Users should not paste secrets.
-- Questions, recent help messages, relevant excerpts and the summary go through the selected GUI
+- Questions, user-attached images, recent help messages, relevant excerpts and the summary go through the selected GUI
   account and consume its normal allowance. There are no tools or filesystem actions in the model request.
 - Requests follow the existing local proxy conversation-history and token-usage recording behavior,
   with the label **Remote AI 问题解答**. Clearing the panel does not delete those local records.

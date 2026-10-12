@@ -1,6 +1,7 @@
 import { Button, Card, Input, Space, Tag, Typography } from "antd";
 import { useI18n } from "../i18n-context";
 import { useOfficialModels, type OfficialModelsProps } from "../hooks/useOfficialModels";
+import { HelpAssistantSettings } from "./HelpAssistantSettings";
 
 export function OfficialModelsPage({ api, canManage }: OfficialModelsProps) {
   const { language } = useI18n();
@@ -21,6 +22,7 @@ export function OfficialModelsPage({ api, canManage }: OfficialModelsProps) {
         : "Saved changes apply the next time users load models. Automatic updates resume after 30 minutes."}
       </Typography.Paragraph>
     </div>
+    <HelpAssistantSettings api={api} canManage={canManage} catalog={catalog} zh={zh} />
     <Card loading={models.loading}>
       <Space wrap style={{ marginBottom: 16 }}>
         <Tag>{zh ? `${count} 个模型` : `${count} models`}</Tag>

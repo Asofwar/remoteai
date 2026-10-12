@@ -6,7 +6,7 @@ import type { HelpImageError } from './useHelpImages';
 interface HelpCopy {
   title: string; subtitle: string; close: string; clear: string; placeholder: string;
   hide: string; visibilityLabel: string; visibilityDescription: string; visibilitySaveError: string;
-  send: string; thinking: string; checking: string; retry: string;
+  send: string; thinking: string; checking: string; retry: string; unread: string;
   addImage: string; removeImage: string; image: string; readingImages: string;
   imageErrors: Record<HelpImageError, string>;
   install: string; initialize: string; selectAccount: string;
@@ -17,7 +17,7 @@ interface HelpCopy {
 
 const copies: Record<Language, HelpCopy> = {
   zh: {
-    hide: '隐藏助手', visibilityLabel: '显示助手入口',
+    hide: '隐藏助手', visibilityLabel: '显示助手入口', unread: '有新回答',
     visibilityDescription: '在页面右下角显示问题解答助手，也可右键入口隐藏。',
     visibilitySaveError: '未能保存显示设置，请重试。',
     title: '问题解答助手', subtitle: 'Remote AI 使用帮助', close: '收起助手', clear: '新对话',
@@ -48,7 +48,7 @@ const copies: Record<Language, HelpCopy> = {
     },
   },
   en: {
-    hide: 'Hide assistant', visibilityLabel: 'Show assistant button',
+    hide: 'Hide assistant', visibilityLabel: 'Show assistant button', unread: 'New answer',
     visibilityDescription: 'Show the help assistant in the bottom-right corner. Right-click its button to hide it.',
     visibilitySaveError: 'Could not save the display setting. Please try again.',
     title: 'Help assistant', subtitle: 'Remote AI help', close: 'Minimize help', clear: 'New chat',
@@ -80,7 +80,7 @@ const copies: Record<Language, HelpCopy> = {
     },
   },
   ru: {
-    hide: 'Скрыть помощника', visibilityLabel: 'Показывать кнопку помощника',
+    hide: 'Скрыть помощника', visibilityLabel: 'Показывать кнопку помощника', unread: 'Новый ответ',
     visibilityDescription: 'Помощник в правом нижнем углу. Чтобы скрыть его, нажмите на кнопку правой кнопкой мыши.',
     visibilitySaveError: 'Не удалось сохранить настройку отображения. Попробуйте ещё раз.',
     title: 'Помощник', subtitle: 'Помощь по Remote AI', close: 'Свернуть', clear: 'Новый чат',

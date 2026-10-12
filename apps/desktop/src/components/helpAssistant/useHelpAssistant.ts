@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { hasLocalBackend, invoke } from '../../api/backend';
 import { subscribeGuiEvent } from '../../pages/codexGui/webEvents';
 import type { DashboardPage } from '../dashboard/DashboardNavigation';
-import { boundedMessages, helpError, messageHistory, MAX_QUESTION_LENGTH, type HelpAnswer, type HelpError,
+import { boundedMessages, helpError, messageHistory, MAX_QUESTION_LENGTH, type HelpError,
   type HelpMessage, type HelpStatus, type HelpAvailability, type HelpContent } from './types';
 import { useHelpImages } from './useHelpImages';
+import { askHelp } from './streaming';
 
 export function useHelpAssistant(options: { open: boolean; page: DashboardPage }) {
   const [status, setStatus] = useState<HelpStatus>();
@@ -12,6 +13,11 @@ export function useHelpAssistant(options: { open: boolean; page: DashboardPage }
   const [messages, setMessages] = useState<HelpMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState<HelpContent>();
+  const [streamed, setStreamed] = useState('');
+  const [unread, setUnread] = useState(false);
+  const open = useRef(options.open);
+  open.current = options.open;
+  const observing = options.open || Boolean(pending) || unread;
   const attachments = useHelpImages();
   const [checking, setChecking] = useState(false);
   const busy = useRef(false);
@@ -21,7 +27,12 @@ export function useHelpAssistant(options: { open: boolean; page: DashboardPage }
   const nextId = useRef(0);
   const accountRevision = useRef<number>();
   const mounted = useRef(true);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; generation.current++; }; }, []);
+  const request = useRef<AbortController>();
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; generation.current++; request.current?.abort(); };
+  }, []);
+  useEffect(() => { if (options.open) setUnread(false); }, [options.open]);
 
   const refresh = useCallback(async () => {
     if (statusFlight.current) { refreshAgain.current = true; return; }
@@ -34,7 +45,7 @@ export function useHelpAssistant(options: { open: boolean; page: DashboardPage }
           ? await invoke<HelpAvailability>('remote_ai_help_status') : { status: 'installRequired' };
         if (!mounted.current) return;
         if (accountRevision.current !== undefined && accountRevision.current !== result.accountRevision) {
-          generation.current++; setMessages([]);
+          generation.current++; setMessages([]); setStreamed(''); setUnread(false);
         }
         accountRevision.current = result.accountRevision;
         setStatus(result.status); setError(undefined);
@@ -56,19 +67,20 @@ export function useHelpAssistant(options: { open: boolean; page: DashboardPage }
   }, [options.open, refresh]);
 
   useEffect(() => {
-    if (!options.open || !hasLocalBackend) return;
+    if (!observing || !hasLocalBackend) return;
     let disposed = false;
     let stop: (() => void) | undefined;
     void subscribeGuiEvent('codex-gui-account-changed', () => {
       generation.current++;
       setMessages([]);
+      setStreamed(''); setUnread(false);
       setError('accountChanged');
       setStatus(undefined);
       void refresh();
     }).then((unsubscribe) => { if (disposed) unsubscribe(); else stop = unsubscribe; })
       .catch(() => { if (!disposed) setError('unavailable'); });
     return () => { disposed = true; stop?.(); };
-  }, [options.open, refresh]);
+  }, [observing, refresh]);
 
   const send = async (question = draft) => {
     question = question.trim();
@@ -76,13 +88,18 @@ export function useHelpAssistant(options: { open: boolean; page: DashboardPage }
     if (busy.current || attachments.reading || status !== 'ready' || (!question && !images.length)) return;
     if (Array.from(question).length > MAX_QUESTION_LENGTH) { setError('invalidRequest'); return; }
     busy.current = true;
+    const controller = new AbortController();
+    request.current = controller;
     const currentGeneration = generation.current;
+    setStreamed(''); setUnread(false);
     setError(undefined); setPending({ text: question, images }); setDraft(''); attachments.clear();
     try {
-      const answer = await invoke<HelpAnswer>('remote_ai_help_ask', {
-        request: { question, ...(images.length ? { images } : {}), history: messageHistory(messages, images),
-          page: options.page, accountRevision: accountRevision.current },
-      });
+      const answer = await askHelp({
+        question, ...(images.length ? { images } : {}), history: messageHistory(messages, images),
+        page: options.page, accountRevision: accountRevision.current,
+      }, (text) => {
+        if (mounted.current && currentGeneration === generation.current) setStreamed(text);
+      }, controller.signal);
       if (!mounted.current) return;
       if (currentGeneration !== generation.current) {
         setDraft(question); attachments.setImages(images); setError('accountChanged'); return;
@@ -91,6 +108,7 @@ export function useHelpAssistant(options: { open: boolean; page: DashboardPage }
         { id: nextId.current++, role: 'user' as const, text: question, images },
         { id: nextId.current++, role: 'assistant' as const, ...answer },
       ]));
+      setUnread(!open.current);
     } catch (failure) {
       if (!mounted.current) return;
       const problem = helpError(failure);
@@ -101,13 +119,14 @@ export function useHelpAssistant(options: { open: boolean; page: DashboardPage }
       }
     } finally {
       busy.current = false;
-      if (mounted.current) setPending(undefined);
+      request.current = undefined;
+      if (mounted.current) { setPending(undefined); setStreamed(''); }
     }
   };
 
   const clear = () => {
     if (busy.current || attachments.reading) return;
-    generation.current++; setMessages([]); setDraft(''); setError(undefined); attachments.clear();
+    generation.current++; setMessages([]); setDraft(''); setError(undefined); setUnread(false); attachments.clear();
   };
-  return { status, error, messages, draft, setDraft, pending, checking, refresh, send, clear, attachments };
+  return { status, error, messages, draft, setDraft, pending, streamed, unread, checking, refresh, send, clear, attachments };
 }

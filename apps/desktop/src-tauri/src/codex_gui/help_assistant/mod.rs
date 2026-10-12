@@ -3,6 +3,7 @@ mod context;
 mod images;
 mod knowledge;
 mod prompt;
+mod streaming;
 mod transport;
 mod types;
 
@@ -108,11 +109,14 @@ async fn answer(app: AppHandle, state: &GuiState, request: HelpRequest) -> Resul
         .await
         .map_err(|_| HelpError::InitializeRequired)?;
     let context_app = app.clone();
+    let mut progress = streaming::publisher(app.clone(), request.request_id.clone());
     let (context, knowledge, body) =
         tauri::async_runtime::spawn_blocking(move || request_context(context_app, request))
             .await
             .map_err(|_| HelpError::Unavailable)??;
-    let text = transport::answer(&context.base_url, body, context.revision).await?;
+    let text =
+        transport::answer_streaming(&context.base_url, body, context.revision, &mut progress)
+            .await?;
     let current = tauri::async_runtime::spawn_blocking(move || account_selection::snapshot(&app))
         .await
         .map_err(|_| HelpError::Unavailable)?
@@ -139,5 +143,7 @@ pub(crate) async fn remote_ai_help_ask(
 
 #[cfg(test)]
 mod image_tests;
+#[cfg(test)]
+mod streaming_tests;
 #[cfg(test)]
 mod tests;

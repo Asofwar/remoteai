@@ -8,12 +8,13 @@ import styles from './helpAssistant.module.less';
 interface Props {
   copy: HelpCopy;
   open: boolean;
+  unread: boolean;
   trigger: RefObject<HTMLButtonElement>;
   onToggle: () => void;
   onHide: () => void;
 }
 
-export function HelpLauncher({ copy, open, trigger, onToggle, onHide }: Props) {
+export function HelpLauncher({ copy, open, unread, trigger, onToggle, onHide }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   return <Dropdown trigger={['contextMenu']} open={menuOpen} onOpenChange={setMenuOpen}
     autoFocus overlayClassName={styles.launcherMenu}
@@ -27,6 +28,7 @@ export function HelpLauncher({ copy, open, trigger, onToggle, onHide }: Props) {
         event.preventDefault(); setMenuOpen(true);
       }}>
       <img src={assistantIcon} alt="" />
+      {unread && !open && <span className={styles.unread} role="status" aria-label={copy.unread} />}
       {!open && !menuOpen && <span className={styles.tooltip}>{copy.title}</span>}
     </button>
   </Dropdown>;

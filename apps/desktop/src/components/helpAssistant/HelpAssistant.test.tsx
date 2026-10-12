@@ -21,6 +21,7 @@ let container: HTMLDivElement;
 const openCodex = vi.fn();
 const unsubscribe = vi.fn();
 let accountChanged: () => void;
+let progress: (payload: { requestId: string; text: string }) => void;
 let availability: HelpAvailability;
 const button = (label: string) => document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!;
 const input = () => document.querySelector<HTMLTextAreaElement>('textarea')!;
@@ -50,8 +51,9 @@ beforeEach(() => {
   availability = { status: 'ready', accountRevision: 7 };
   vi.mocked(invoke).mockImplementation(async (command) => command === 'remote_ai_help_status'
     ? availability : { text: '请打开 Codex，选择账户。', sources: ['docs/codex-gui.md'] });
-  vi.mocked(subscribeGuiEvent).mockImplementation(async (_name, callback) => {
-    accountChanged = () => callback({ kind: 'account', id: 'new-account' });
+  vi.mocked(subscribeGuiEvent).mockImplementation(async (name, callback) => {
+    if (name === 'remote-ai-help-progress') progress = callback;
+    else accountChanged = () => callback({ kind: 'account', id: 'new-account' });
     return unsubscribe;
   });
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
@@ -68,7 +70,8 @@ it('adds one quiet global launcher and preserves answers across sidebar pages', 
   expect(document.body.textContent).toContain('请打开 Codex，选择账户。');
   expect(document.querySelectorAll('[aria-label="问题解答助手"][role="dialog"]')).toHaveLength(1);
   expect(vi.mocked(invoke).mock.calls.find(([command]) => command === 'remote_ai_help_ask')?.[1]).toEqual({
-    request: { question: '怎么选择账户？', page: 'accounts', history: [], accountRevision: 7 },
+    request: { question: '怎么选择账户？', page: 'accounts', history: [], accountRevision: 7,
+      requestId: expect.any(String) },
   });
 });
 
@@ -202,7 +205,8 @@ it('clears old-account history even when the account changes while minimized', a
   expect(document.querySelector('[role="log"]')?.textContent).toBe('');
   await type('第二个问题'); await send();
   expect(vi.mocked(invoke).mock.calls.filter(([command]) => command === 'remote_ai_help_ask').at(-1)?.[1]).toEqual({
-    request: { question: '第二个问题', page: 'accounts', history: [], accountRevision: 8 },
+    request: { question: '第二个问题', page: 'accounts', history: [], accountRevision: 8,
+      requestId: expect.any(String) },
   });
 });
 
@@ -227,4 +231,66 @@ it('bounds submitted history and maps unknown errors to safe copy', () => {
   expect(messageHistory(messages)[0]).not.toHaveProperty('id');
   expect(helpError({ message: 'secret' })).toBe('answerFailed');
   expect(helpError(new Error('accountRequired'))).toBe('accountRequired');
+});
+
+function activeRequestId() {
+  const args = vi.mocked(invoke).mock.calls.find(([command]) => command === 'remote_ai_help_ask')?.[1];
+  return (args?.request as { requestId: string }).requestId;
+}
+
+it('streams before completion, keeps progress while dismissed, and marks the completed answer unread', async () => {
+  let finish!: (value: unknown) => void;
+  vi.mocked(invoke).mockImplementation((command) => command === 'remote_ai_help_status'
+    ? Promise.resolve(availability) : new Promise((resolve) => { finish = resolve; }));
+  await render(); await open(); await type('怎么使用？'); await send();
+  const requestId = activeRequestId();
+  await act(async () => progress({ requestId: 'another-request', text: '别的回答' }));
+  expect(document.body.textContent).not.toContain('别的回答');
+  await act(async () => progress({ requestId, text: '**逐步**生成' }));
+  expect(document.querySelector('[role="log"] strong')?.textContent).toBe('逐步');
+  expect(button('发送').disabled).toBe(true);
+  await act(async () => input().dispatchEvent(new Event('pointerdown', { bubbles: true })));
+  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  await act(async () => container.dispatchEvent(new Event('pointerdown', { bubbles: true })));
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(document.querySelector('[aria-label="有新回答"]')).toBeNull();
+  await act(async () => progress({ requestId, text: '**逐步**生成的内容' }));
+  await open();
+  expect(document.querySelector('[role="log"]')?.textContent).toContain('逐步生成的内容');
+  await act(async () => button('收起助手').click());
+  await act(async () => finish({ text: '完整回答', sources: ['docs/help-assistant.md'] }));
+  expect(document.querySelector('[aria-label="有新回答"]')).not.toBeNull();
+  await open();
+  expect(document.querySelector('[aria-label="有新回答"]')).toBeNull();
+  expect(document.querySelector('[role="log"]')?.textContent).toContain('完整回答');
+  expect(document.querySelector('[role="log"]')?.textContent).not.toContain('逐步生成');
+  expect(document.querySelector('[role="log"] details')?.textContent).toContain('docs/help-assistant.md');
+});
+
+it.each(['failed', 'accountChanged'] as const)('does not mark a %s stream as a new answer', async (outcome) => {
+  let finish!: (value: unknown) => void;
+  let reject!: (reason: string) => void;
+  vi.mocked(invoke).mockImplementation((command) => command === 'remote_ai_help_status'
+    ? Promise.resolve(availability) : new Promise((resolve, fail) => { finish = resolve; reject = fail; }));
+  await render(); await open(); await type('保留问题'); await send();
+  const requestId = activeRequestId();
+  await act(async () => progress({ requestId, text: '未完成内容' }));
+  await act(async () => button('收起助手').click());
+  if (outcome === 'failed') await act(async () => reject('answerFailed'));
+  else {
+    availability = { status: 'ready', accountRevision: 8 };
+    await act(async () => accountChanged());
+    await act(async () => progress({ requestId, text: '过时内容' }));
+    await act(async () => finish({ text: '过时内容', sources: [] }));
+  }
+  expect(document.querySelector('[aria-label="有新回答"]')).toBeNull();
+  await open();
+  expect(document.querySelector('[role="log"]')?.textContent).toBe('');
+  expect(input().value).toBe('保留问题');
+});
+
+it('does not show an unread dot for answers completed while open', async () => {
+  await render(); await open(); await type('问题'); await send();
+  await act(async () => button('收起助手').click());
+  expect(document.querySelector('[aria-label="有新回答"]')).toBeNull();
 });

@@ -11,15 +11,21 @@ function Question({ content, copy }: { content: HelpContent; copy: HelpCopy }) {
   </div>}{content.text}</>;
 }
 
-export function HelpMessages(props: { messages: HelpMessage[]; pending?: HelpContent; copy: HelpCopy }) {
+function Answer({ text }: { text: string }) {
+  return <Markdown remarkPlugins={[remarkGfm]} skipHtml
+    components={{ img: () => null, a: ({ children }) => <span>{children}</span> }}>{text}</Markdown>;
+}
+
+export function HelpMessages(props: {
+  messages: HelpMessage[]; pending?: HelpContent; streamed?: string; copy: HelpCopy;
+}) {
   const bottom = useRef<HTMLDivElement>(null);
-  useEffect(() => { bottom.current?.scrollIntoView?.({ block: 'nearest' }); }, [props.messages, props.pending]);
+  useEffect(() => { bottom.current?.scrollIntoView?.({ block: 'nearest' }); },
+    [props.messages, props.pending, props.streamed]);
   return <div className={styles.messages} role="log" aria-live="polite" aria-label={props.copy.title}>
     {props.messages.map((message) => <article key={message.id}
       className={message.role === 'user' ? styles.question : styles.answer}>
-      {message.role === 'user' ? <Question content={message} copy={props.copy} /> : <Markdown
-        remarkPlugins={[remarkGfm]} skipHtml
-        components={{ img: () => null, a: ({ children }) => <span>{children}</span> }}>{message.text}</Markdown>}
+      {message.role === 'user' ? <Question content={message} copy={props.copy} /> : <Answer text={message.text} />}
       {Boolean(message.sources?.length) && <details className={styles.sources}>
         <summary>{props.copy.sources}</summary>
         {message.sources?.map((source) => <div key={source}>{source}</div>)}
@@ -27,7 +33,9 @@ export function HelpMessages(props: { messages: HelpMessage[]; pending?: HelpCon
     </article>)}
     {props.pending && <><article className={styles.question}>
       <Question content={props.pending} copy={props.copy} /></article>
-      <div className={styles.thinking} role="status">{props.copy.thinking}</div></>}
+      {props.streamed ? <article className={styles.answer} aria-busy="true">
+        <Answer text={props.streamed} /></article> :
+        <div className={styles.thinking} role="status">{props.copy.thinking}</div>}</>}
     <div ref={bottom} />
   </div>;
 }

@@ -89,6 +89,8 @@ pub(super) enum HelpPage {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct HelpRequest {
+    #[serde(default)]
+    pub(super) request_id: Option<String>,
     pub(super) account_revision: u64,
     pub(super) question: String,
     #[serde(default)]
@@ -99,6 +101,13 @@ pub(crate) struct HelpRequest {
 
 impl HelpRequest {
     pub(super) fn validate(&self) -> Result<()> {
+        if self
+            .request_id
+            .as_ref()
+            .is_some_and(|id| uuid::Uuid::parse_str(id).is_err())
+        {
+            return Err(HelpError::InvalidRequest);
+        }
         let history_chars: usize = self
             .history
             .iter()

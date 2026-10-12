@@ -9,20 +9,35 @@ use std::time::Duration;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(90);
 const MAX_RESPONSE_BYTES: usize = 2 * 1024 * 1024;
 
+#[cfg(test)]
 pub(super) async fn answer(base_url: &str, body: Value, revision: u64) -> Result<String> {
-    tokio::time::timeout(REQUEST_TIMEOUT, request(base_url, body, revision))
+    answer_streaming(base_url, body, revision, &mut |_| {}).await
+}
+
+pub(super) async fn answer_streaming(
+    base_url: &str,
+    body: Value,
+    revision: u64,
+    progress: &mut (impl FnMut(&str) + Send),
+) -> Result<String> {
+    tokio::time::timeout(REQUEST_TIMEOUT, request(base_url, body, revision, progress))
         .await
         .map_err(|_| HelpError::AnswerFailed)?
 }
 
-async fn request(base_url: &str, body: Value, revision: u64) -> Result<String> {
+async fn request(
+    base_url: &str,
+    body: Value,
+    revision: u64,
+    progress: &mut (impl FnMut(&str) + Send),
+) -> Result<String> {
     let client = reqwest::Client::builder()
         .no_proxy()
         .redirect(reqwest::redirect::Policy::none())
         .timeout(REQUEST_TIMEOUT)
         .build()
         .map_err(|_| HelpError::AnswerFailed)?;
-    let mut response = client
+    let response = client
         .post(format!("{base_url}/responses"))
         .bearer_auth(LOCAL_PROXY_TOKEN)
         .header(LOCAL_PROXY_ACTOR_AUTHORIZATION_HEADER, LOCAL_PROXY_TOKEN)
@@ -34,8 +49,16 @@ async fn request(base_url: &str, body: Value, revision: u64) -> Result<String> {
         .send()
         .await
         .map_err(|_| HelpError::AnswerFailed)?;
+    read_response(response, progress).await
+}
+
+async fn read_response(
+    mut response: reqwest::Response,
+    progress: &mut impl FnMut(&str),
+) -> Result<String> {
     let success = response.status().is_success();
     let mut bytes = Vec::new();
+    let mut stream = super::streaming::AnswerStream::default();
     while let Some(chunk) = response
         .chunk()
         .await
@@ -45,6 +68,9 @@ async fn request(base_url: &str, body: Value, revision: u64) -> Result<String> {
             return Err(HelpError::AnswerFailed);
         }
         bytes.extend_from_slice(&chunk);
+        if success {
+            stream.push(&chunk, progress)?;
+        }
     }
     if !success {
         return Err(serde_json::from_slice::<Value>(&bytes)

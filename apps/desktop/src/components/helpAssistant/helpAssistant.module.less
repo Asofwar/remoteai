@@ -10,18 +10,18 @@
   button:disabled { cursor: default; opacity: .5; }
 }
 .launcher {
-  width: 62px;
-  height: 62px;
+  width: 31px;
+  height: 31px;
   padding: 0;
   display: grid;
   place-items: center;
   border: 1px solid #d9eaff;
-  border-radius: 22px;
+  border-radius: 11px;
   background: #fff;
   box-shadow: 0 6px 24px #234e7e26;
   position: relative;
   margin-left: auto;
-  img { width: 60px; height: 60px; object-fit: cover; border-radius: 21px; transform: scale(1.05); }
+  img { width: 30px; height: 30px; object-fit: cover; border-radius: 10.5px; transform: scale(1.05); }
   &:hover, &:focus-visible { box-shadow: 0 8px 28px #2776c43d; }
   &:hover .tooltip, &:focus-visible .tooltip { opacity: 1; }
 }
@@ -29,11 +29,22 @@
   max-width: min(400px, calc(100vw - 32px));
   :global(.ant-dropdown-menu-title-content) { white-space: normal; overflow-wrap: anywhere; }
 }
+.unread {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--panel);
+  border-radius: 50%;
+  background: #e5484d;
+  pointer-events: none;
+}
 .tooltip {
   position: absolute;
-  right: 72px;
+  right: 41px;
   width: max-content;
-  max-width: min(240px, calc(100vw - 110px));
+  max-width: min(240px, calc(100vw - 79px));
   padding: 6px 10px;
   border: 1px solid var(--line);
   border-radius: 9px;
@@ -45,7 +56,7 @@
 }
 .panel {
   position: absolute;
-  bottom: 76px;
+  bottom: 45px;
   right: 0;
   width: min(392px, calc(100vw - 32px));
   max-width: 400px;

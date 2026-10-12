@@ -35,6 +35,17 @@ export function HelpAssistant(props: { language: Language; page: DashboardPage; 
     if (ready) input.current?.focus(); else panel.current?.focus();
   }, [open, ready]);
 
+  useEffect(() => {
+    if (!open) return;
+    const dismissOutside = (event: PointerEvent) => {
+      if (!(event.target instanceof Node)) return;
+      if (panel.current?.contains(event.target) || trigger.current?.contains(event.target)) return;
+      setExpanded(false);
+    };
+    document.addEventListener('pointerdown', dismissOutside, true);
+    return () => document.removeEventListener('pointerdown', dismissOutside, true);
+  }, [open]);
+
   if (!visible) return null;
 
   return createPortal(<div className={styles.root}>
@@ -55,7 +66,7 @@ export function HelpAssistant(props: { language: Language; page: DashboardPage; 
             <button type="button" key={question} onClick={() => { assistant.setDraft(question); input.current?.focus(); }}>
               {question}</button>)}</div>}
         </div>}
-        <HelpMessages messages={assistant.messages} pending={assistant.pending} copy={copy} />
+        <HelpMessages messages={assistant.messages} pending={assistant.pending} streamed={assistant.streamed} copy={copy} />
         {assistant.checking && <p className={styles.status} role="status">{copy.checking}</p>}
         <HelpSetupNotice status={assistant.status} error={assistant.error} checking={assistant.checking}
           copy={copy} setup={setup} refresh={assistant.refresh}
@@ -64,7 +75,8 @@ export function HelpAssistant(props: { language: Language; page: DashboardPage; 
       <HelpComposer copy={copy} input={input} draft={assistant.draft} setDraft={assistant.setDraft}
         disabled={!ready || Boolean(assistant.pending)} attachments={assistant.attachments} send={assistant.send} />
     </section>}
-    <HelpLauncher copy={copy} open={open} trigger={trigger} onToggle={() => open ? close() : setExpanded(true)}
+    <HelpLauncher copy={copy} open={open} unread={assistant.unread} trigger={trigger}
+      onToggle={() => open ? close() : setExpanded(true)}
       onHide={() => {
         if (!setVisible(false)) void message.error({ content: copy.visibilitySaveError,
           style: { maxWidth: 400, marginInline: 'auto' } });

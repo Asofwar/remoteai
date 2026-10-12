@@ -19,7 +19,11 @@ async function expectReadableQuestion(panel: Locator) {
 }
 
 async function mockBackend(page: Page, options: { status?: string; wait?: Promise<void> } = {}) {
-  const stats = { asks: 0, polls: 0, installs: 0, connections: 0, requests: [] as unknown[] };
+  const events: { name: string; payload: { requestId: string; text: string } }[] = [];
+  let requestId = '';
+  let sequence = 0;
+  const stats = { asks: 0, polls: 0, installs: 0, connections: 0, requests: [] as unknown[],
+    progress: (text: string) => events.push({ name: 'remote-ai-help-progress', payload: { requestId, text } }) };
   let status = options.status ?? 'ready';
   await page.route('https://fonts.googleapis.com/**', (route) => route.abort());
   await page.route('**/__codex_switch__/api/invoke', async (route) => {
@@ -32,10 +36,14 @@ async function mockBackend(page: Page, options: { status?: string; wait?: Promis
       stats.installs++; status = 'initializeRequired'; result = { version: '0.99.0' };
     }
     if (command === 'codex_gui_connect') { stats.connections++; status = 'accountRequired'; result = []; }
-    if (command === 'codex_gui_events') result = { cursor: { streamId: 'test', sequence: 0 }, reset: false, events: [] };
+    if (command === 'codex_gui_events') {
+      sequence += events.length;
+      result = { cursor: { streamId: 'test', sequence }, reset: false, events: events.splice(0) };
+    }
     if (command === 'get_proxy_session_unlimited_conversation') result = false;
     if (command === 'list_proxy_sessions') { stats.polls++; result = []; }
     if (command === 'remote_ai_help_ask') {
+      requestId = route.request().postDataJSON().args.request.requestId as string;
       stats.asks++; stats.requests.push(route.request().postDataJSON()); await options.wait;
       result = { text: '可以在 **Codex** 页面选择账户。\n\n1. 打开账户选择菜单。\n2. 选择可用账户。',
         sources: ['docs/codex-gui.md'] };
@@ -58,22 +66,36 @@ test('help remains responsive during requests and session polling on every sideb
   await panel.getByRole('textbox').fill('怎么选择账户？');
   await panel.getByRole('button', { name: '发送', exact: true }).click();
   await expect(panel).toContainText('正在查找答案');
+  await expect.poll(() => stats.asks).toBe(1);
+  stats.progress('可以在 **Codex** 页面');
+  await expect(panel).toContainText('可以在 Codex 页面');
+  await expect(panel.locator('article[aria-busy="true"]')).toBeVisible();
   try {
     for (let count = 0; count < 5; count++) {
       await page.getByRole('button', { name: `Click ${count}`, exact: true }).click({ timeout: 2_000 });
+      await expect(panel).not.toBeVisible();
     }
     await expect.poll(() => stats.polls).toBeGreaterThanOrEqual(3);
     expect(stats.asks).toBe(1);
     for (const menu of await page.locator('aside button').all()) {
-      await menu.click(); await expect(panel).toBeVisible();
+      await page.getByRole('button', { name: '问题解答助手', exact: true }).click();
+      await expect(panel).toContainText('可以在 Codex 页面');
+      await menu.click(); await expect(panel).not.toBeVisible();
     }
+    await page.getByRole('button', { name: '问题解答助手', exact: true }).click();
     await page.screenshot({ path: '../../.codex-tmp/help-pending-desktop.png', animations: 'disabled' });
+    await page.locator('button[aria-controls="remote-ai-help"]').click();
   } finally { release(); }
+  await expect(page.getByRole('status', { name: '有新回答' })).toBeVisible();
+  await page.screenshot({ path: '../../.codex-tmp/help-unread-desktop.png', animations: 'disabled' });
+  await page.getByRole('button', { name: '问题解答助手', exact: true }).click();
+  await expect(page.getByRole('status', { name: '有新回答' })).toHaveCount(0);
   await expect(panel).toContainText('可以在 Codex 页面选择账户');
   await expectReadableQuestion(panel);
   await page.screenshot({ path: '../../.codex-tmp/help-answer-desktop.png', animations: 'disabled' });
   await page.getByRole('button', { name: 'Toggle theme' }).click();
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: '问题解答助手', exact: true }).click();
   const bounds = (await panel.boundingBox())!;
   expect(bounds.width).toBeLessThanOrEqual(400);
   expect(bounds.x).toBeGreaterThanOrEqual(0);

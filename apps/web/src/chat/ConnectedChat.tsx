@@ -5,6 +5,7 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import type { ChatComputer } from '../../../../shared/remote-chat/devices';
 import { ChatApproval } from './ChatApproval';
 import { ChatComposer } from './ChatComposer';
+import type { NativeFileDrop } from './composerProps';
 import { queueProps } from '../../../../shared/remote-chat/client/queueProps';
 import { ChatMessages } from './ChatMessages';
 import { ChatProcessing } from './ChatProcessing';
@@ -44,6 +45,7 @@ export interface ConnectedChatProps {
   conversationFooter?: ReactNode;
   desktopDiffs?: boolean;
   readClipboardImages?: () => Promise<File[]>;
+  nativeFileDrop?: NativeFileDrop;
 }
 
 export interface ChatSidebarActions {
@@ -56,7 +58,7 @@ export interface ChatSidebarActions {
 export function ConnectedChat({ chat, device, devices, active, scope, email, chooseDevice,
   chooseLocal, accountPicker, headerActions, headerConnectionActions, headerEnd, renderSidebar, composerHeader,
   conversationFooter,
-  readClipboardImages, desktopDiffs }: ConnectedChatProps) {
+  readClipboardImages, nativeFileDrop, desktopDiffs }: ConnectedChatProps) {
   useLanguage();
   const { state, controller, foreground } = chat;
   const [drawer, setDrawer] = useState(false);
@@ -135,7 +137,7 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
         || state.compacting === state.selected?.id} answer={controller.answerAsyncQuestion} />
     {composerHeader}
     <ChatComposer suggestions={remotePromptSuggestion(state, controller.suggestNextPrompt)}
-      queue={queueProps(state, controller)} readClipboardImages={readClipboardImages}
+      queue={queueProps(state, controller)} readClipboardImages={readClipboardImages} nativeFileDrop={nativeFileDrop}
       connection={{ client: controller.guiAccounts, deviceName: device?.name ?? t("选择电脑"),
         chooseDevice: () => setPickingDevice(true) }}
       goals={controller.goals} goal={state.selected ? state.goals?.[state.selected.id] : null} goalBusy={!!state.goalBusy}

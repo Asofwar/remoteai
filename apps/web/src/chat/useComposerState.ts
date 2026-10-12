@@ -12,6 +12,7 @@ import { useComposerMenu } from './useComposerMenu';
 import type { ComposerProps } from './composerProps';
 import { pickChatImages } from './pickChatImages';
 import { useComposerPaste } from './useComposerPaste';
+import { fileDropError, useFileDrop } from '../../../../shared/chat/useFileDrop';
 
 export function useComposerState(props: ComposerProps) {
   const { threadId, active, ready, sending, settingsBusy, compacting, selection, send, goals, running } = props;
@@ -19,6 +20,7 @@ export function useComposerState(props: ComposerProps) {
   const [pausing, setPausing] = useState(false);
   const [error, setError] = useState('');
   const attachments = useComposerAttachments({ threadId, sending });
+  const dropTarget = useRef<HTMLDivElement>(null);
   const quotes = useChatQuotes();
   const disabled = !ready || settingsBusy || compacting;
   const draft = useChatDraft({ threadId, sending, disabled: disabled || attachments.busy, selection, send });
@@ -32,8 +34,25 @@ export function useComposerState(props: ComposerProps) {
       menu.setSelection({ start: message.text.length, end: message.text.length });
       requestAnimationFrame(() => menu.input.current?.focus());
     } });
+  const addFiles = async (files: File[]) => {
+    const images = files.filter(file => file.type.startsWith('image/'));
+    const documents = files.filter(file => !file.type.startsWith('image/'));
+    await Promise.all([
+      images.length ? draft.addImages(remaining => pickChatImages(images, remaining)) : undefined,
+      documents.length ? attachments.pick(documents) : undefined,
+    ]);
+  };
+  const drop = useFileDrop({ target: dropTarget, scope: threadId, active,
+    disabled: disabled || sending || draft.picking || attachments.busy || queueEditor.loading,
+    subscribe: props.nativeFileDrop?.subscribe,
+    addPaths: async (paths, current) => {
+      const files = await props.nativeFileDrop!.readFiles(paths);
+      if (!current()) return;
+      await addFiles(files);
+      if (current()) menu.input.current?.focus();
+    }, addFiles, report: error => setError(t(fileDropError(error))) });
   const paste = useComposerPaste({ scope: threadId, active,
-    busy: sending || draft.picking || attachments.busy || queueEditor.loading,
+    busy: sending || draft.picking || attachments.busy || queueEditor.loading || drop.reading,
     readClipboardImages: props.readClipboardImages, insertText: (text, input) => {
       const start = input.selectionStart;
       const end = input.selectionEnd;
@@ -41,15 +60,8 @@ export function useComposerState(props: ComposerProps) {
       const inserted = input.maxLength < 0 ? text : text.slice(0, available);
       draft.setText(input.value.slice(0, start) + inserted + input.value.slice(end));
       menu.restoreCaret(start + inserted.length);
-    }, addFiles: async files => {
-      const images = files.filter(file => file.type.startsWith('image/'));
-      const documents = files.filter(file => !file.type.startsWith('image/'));
-      await Promise.all([
-        images.length ? draft.addImages(remaining => pickChatImages(images, remaining)) : undefined,
-        documents.length ? attachments.pick(documents) : undefined,
-      ]);
-    } });
-  const busy = sending || draft.picking || attachments.busy || queueEditor.loading || paste.reading;
+    }, addFiles });
+  const busy = sending || draft.picking || attachments.busy || queueEditor.loading || paste.reading || drop.reading;
   const compact = !goalMode.enabled && !props.goal && !draft.text.length && !hasContent && !busy;
   const action = composerAction({ running: running && !hasContent,
     interrupted: !!props.interrupted && !goalMode.enabled, hasDraft: hasContent });
@@ -109,6 +121,7 @@ export function useComposerState(props: ComposerProps) {
     else goalMode.exit();
   };
   return { draft, attachments, goalMode, menu, queueEditor, busy, compact, action, actionDisabled, pausing,
+    drop, dropTarget,
     hasQuotes: Boolean(quotes?.quotes.length),
     error: error || paste.error || attachments.error || draft.error, submit, removeGoal,
     paste: paste.paste, pasteKeyDown: paste.pasteKeyDown, readingClipboard: paste.reading };

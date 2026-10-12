@@ -17,6 +17,8 @@ import { ComposerSubmit } from "./ComposerSubmit";
 import type { GuiController } from "./controller";
 import type { AccessMode, GuiState } from "./types";
 import { ImageAttachments } from "./ImageAttachments";
+import { fileDropError, useFileDrop } from "../../../../../shared/chat/useFileDrop";
+import { droppedReferences, subscribeFileDrop } from "./fileDrop";
 import { IMAGE_TYPES, useComposerDraft } from "./useComposerDraft";
 import { ModelPicker } from "./ModelPicker";
 import { useGuiRequestSpeed } from "./useGuiRequestSpeed";
@@ -45,8 +47,9 @@ export const Composer = forwardRef<ComposerHandle, {
   const goalMode = useGoalMode(state.selected, Boolean(state.goalBusy));
   const requestSpeed = useGuiRequestSpeed(active);
   const workspaceBusy = Boolean(state.workspaceBusy);
-  const { draft, reading, editContent, removeImage, editImage, addImages, paste, pasteKeyDown, send: sendDraft,
-    addAttachments, removeAttachment, addQuote, removeQuote, clearQuotes, editQueued } = useComposerDraft(key, controller);
+  const { draft, reading: draftReading, editContent, removeImage, editImage, addImages, paste, pasteKeyDown,
+    send: sendDraft, addAttachments, removeAttachment, addQuote, removeQuote, clearQuotes, editQueued }
+    = useComposerDraft(key, controller);
   // Creating a goal first creates its conversation; keep the form until the goal request succeeds.
   useEffect(() => { if (!controller.getSnapshot().goalBusy || !active) setDialog(null); }, [key, active, controller]);
   const current = state.selected ? state.conversations[state.selected] : undefined;
@@ -57,6 +60,17 @@ export const Composer = forwardRef<ComposerHandle, {
   const queuedMessages = state.selected ? state.queued[state.selected] ?? [] : [];
   const disabled = workspaceBusy || state.connection !== "ready" || state.sending || state.archived
     || state.compacting === state.selected;
+  const drop = useFileDrop({ target: composer, scope: key, active, disabled: disabled || draftReading || !!dialog,
+    subscribe: isDesktopApp ? subscribeFileDrop : undefined,
+    addPaths: async (paths, current) => {
+      const references = await droppedReferences(paths);
+      if (current()) { addAttachments(references); skillInput.current?.focus(); }
+    }, addFiles: files => {
+      const images = files.filter(file => file.type.startsWith('image/'));
+      if (images.length) addImages(images);
+      if (images.length !== files.length) controller.report(guiText('请通过“添加文件”选择这些文件。'));
+    }, report: error => controller.report(guiText(fileDropError(error))) });
+  const reading = draftReading || drop.reading;
   const hasDraft = Boolean(draft.text.trim() || draft.images.length
     || draft.attachments?.length || draft.quotes?.length);
   const suggestion = useNextPromptSuggestion(state, { active,
@@ -93,7 +107,8 @@ export const Composer = forwardRef<ComposerHandle, {
     {state.selected && <QueuedMessages threadId={state.selected} messages={queuedMessages}
       running={running} connected={state.connection === "ready"} queue={controller.queue}
       editDisabled={disabled || reading || !active} onEdit={editQueuedMessage} />}
-    <div ref={composer} className={styles.composer}>
+    <div ref={composer} className={styles.composer} {...drop.handlers}
+      data-file-dragging={drop.dragging || undefined}>
       <ImageAttachments key={`images:${key}`} images={draft.images} active={active}
         disabled={state.sending} onRemove={removeImage} onEdit={editImage} />
       <ComposerReferences key={`references:${key}`} items={draft.attachments ?? []} disabled={disabled}

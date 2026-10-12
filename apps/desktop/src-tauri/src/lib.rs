@@ -139,6 +139,7 @@ pub fn run() {
         .manage(AppState::default())
         .manage(coze::CozeState::default())
         .manage(codex_gui::GuiState::default())
+        .manage(codex_gui::dropped_files::DroppedFilesState::default())
         .manage(codex_gui::file_preview::PreviewSessions::default())
         .manage(codex_gui::notification_navigation::NavigationState::default())
         .manage(codex_gui::releases::CliUpdateState::default())
@@ -249,6 +250,7 @@ pub fn run() {
         })
         .on_page_load(codex_gui::file_preview::handle_page_load)
         .on_window_event(|window, event| {
+            codex_gui::dropped_files::handle_window_event(window, event);
             codex_gui::file_preview::handle_window_event(window, event);
             if window.label() == "main" {
                 if matches!(
@@ -333,6 +335,7 @@ pub fn run() {
             codex_gui::notification_navigation::codex_gui_take_notification_navigation,
             codex_gui::scheduled_tasks::codex_gui_scheduled_tasks,
             codex_gui::clipboard::codex_gui_clipboard_files,
+            codex_gui::dropped_files::codex_gui_dropped_files,
             codex_gui::attachment_preview::codex_gui_attachment_preview,
             codex_gui::image_actions::codex_gui_image_action,
             codex_gui::account_selection::codex_gui_account_selection,

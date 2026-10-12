@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ChatComposer } from '../../../web/src/chat/ChatComposer';
 import { draftImage, MAX_CHAT_IMAGE_CHARS } from '../../../../shared/remote-chat/attachments';
+import type { FileDropEvent } from '../../../../shared/chat/useFileDrop';
 
 const mocks = vi.hoisted(() => ({ pick: vi.fn() }));
 vi.mock('../../../web/src/chat/pickChatImages', () => ({ pickChatImages: mocks.pick }));
@@ -60,6 +61,58 @@ async function type(text: string) {
     textarea.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
+
+it('drops mixed browser files as photo thumbnails and transferable document attachments', async () => {
+  vi.spyOn(FileReader.prototype, 'readAsDataURL').mockImplementation(function (this: FileReader) {
+    Object.defineProperty(this, 'result', { value: 'data:text/plain;base64,bm90ZXM=' });
+    this.dispatchEvent(new ProgressEvent('load'));
+  });
+  await render();
+  const image = new File(['image'], 'photo.png', { type: 'image/png' });
+  const file = new File(['notes'], 'notes.txt', { type: 'text/plain' });
+  const event = new Event('drop', { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'dataTransfer', { value: { files: [image, file], types: ['Files'] } });
+  await act(async () => container.querySelector('textarea')!.dispatchEvent(event));
+  expect(event.defaultPrevented).toBe(true);
+  expect(container.querySelector('img')?.src).toBe(url);
+  expect(container.querySelector('.chat-capsule')?.textContent).toBe('notes.txt');
+  await act(async () => button('发送消息')!.click());
+  expect(props.send).toHaveBeenCalledWith({ text: '', images: [url], ...props.selection,
+    attachments: [{ kind: 'file', name: 'notes.txt', path: '', data: 'bm90ZXM=' }] });
+});
+
+it('blocks sending during native drop reads and discards them after a conversation switch', async () => {
+  let listener!: (event: FileDropEvent) => void;
+  let finish!: (files: File[]) => void;
+  const readFiles = vi.fn(() => new Promise<File[]>(resolve => { finish = resolve; }));
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    left: 0, top: 0, right: 100, bottom: 100, width: 100, height: 100, x: 0, y: 0, toJSON: () => ({}),
+  });
+  await render({ nativeFileDrop: { readFiles,
+    subscribe: async callback => { listener = callback; return vi.fn<() => void>(); } } });
+  await type('Draft one');
+  await act(async () => listener({ type: 'drop', paths: ['C:\\photo.png'], position: { x: 10, y: 10 } }));
+  expect(button('发送消息')!.disabled).toBe(true);
+  await render({ threadId: 'two' });
+  await act(async () => finish([new File(['image'], 'photo.png', { type: 'image/png' })]));
+  expect(container.querySelector('img')).toBeNull();
+  expect(mocks.pick).not.toHaveBeenCalled();
+  expect(container.querySelector('textarea')!.value).toBe('');
+});
+
+it('shows a native dropped image as a thumbnail and sends its bytes without the local path', async () => {
+  let listener!: (event: FileDropEvent) => void;
+  const image = new File(['image'], 'photo.png', { type: 'image/png' });
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    left: 0, top: 0, right: 100, bottom: 100, width: 100, height: 100, x: 0, y: 0, toJSON: () => ({}),
+  });
+  await render({ nativeFileDrop: { readFiles: vi.fn().mockResolvedValue([image]),
+    subscribe: async callback => { listener = callback; return vi.fn<() => void>(); } } });
+  await act(async () => listener({ type: 'drop', paths: ['C:\\photo.png'], position: { x: 10, y: 10 } }));
+  expect(container.querySelector('img')?.src).toBe(url);
+  await act(async () => button('发送消息')!.click());
+  expect(props.send).toHaveBeenCalledWith({ text: '', images: [url], ...props.selection });
+});
 
 it('shows separate progress inside each photo and restores the draft controls after failure', async () => {
   mocks.pick.mockResolvedValueOnce([draftImage(url), draftImage(url)]);

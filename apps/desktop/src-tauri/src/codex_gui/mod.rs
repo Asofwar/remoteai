@@ -19,6 +19,7 @@ mod conversation_tools;
 mod coze_reference;
 pub(crate) mod deletion;
 mod downloads;
+pub(crate) mod dropped_files;
 mod error;
 pub(crate) mod file_actions;
 pub(crate) mod file_preview;

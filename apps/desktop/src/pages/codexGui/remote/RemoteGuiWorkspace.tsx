@@ -9,6 +9,8 @@ import { useDreamSkin } from '../useDreamSkin';
 import { RemoteGuiSidebar } from './RemoteGuiSidebar';
 import { RemoteGuiProject } from './RemoteGuiProject';
 import { readClipboardImages } from '../clipboardImages';
+import { readDroppedFiles, subscribeFileDrop } from '../fileDrop';
+import { isDesktopApp } from '../../../api/backend';
 import { useRemoteTerminalPanel } from '../../../../../../shared/remote-chat/useRemoteTerminalPanel';
 import { remoteTerminalApi } from './terminalApi';
 import { RemoteGuiTools } from './RemoteGuiTools';
@@ -18,6 +20,7 @@ import './remoteGui.less';
 import { useDesktopDownloads } from '../../../downloads/useDesktopDownloads';
 
 const TerminalPanel = lazy(() => import('../terminal/TerminalPanel'));
+const nativeFileDrop = { subscribe: subscribeFileDrop, readFiles: readDroppedFiles };
 
 export default function RemoteGuiWorkspace(props: {
   active: boolean; identity: GuiCloudIdentity; device: GuiComputer; computers: GuiComputerNavigation;
@@ -52,6 +55,7 @@ export default function RemoteGuiWorkspace(props: {
         <TerminalPanel panel={terminal} active={active} api={terminalApi} notice={terminal.error} />
       </Suspense>}
       readClipboardImages={readClipboardImages}
+      nativeFileDrop={isDesktopApp ? nativeFileDrop : undefined}
       composerHeader={<RemoteGuiProject state={chat.state} controller={chat.controller} computers={computers}
         active={active} />}
       renderSidebar={actions => <RemoteGuiSidebar state={chat.state} controller={chat.controller}

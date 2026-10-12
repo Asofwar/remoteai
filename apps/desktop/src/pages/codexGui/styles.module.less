@@ -201,6 +201,7 @@
   container: gui-composer / inline-size; padding: 12px var(--gui-composer-padding) 9px;
   box-shadow: 0 5px 25px #173c2810;
   &:focus-within { border-color: var(--green); }
+  &[data-file-dragging] { border-color: var(--green); outline: 2px solid var(--green); outline-offset: 2px; }
   textarea:global(.ant-input) { border: 0; background: transparent; resize: none; box-shadow: none;
     padding: 5px 8px 12px; font-size: var(--gui-font-size, 14px); } }
 .composerControls { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }

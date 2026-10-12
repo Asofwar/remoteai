@@ -11,6 +11,8 @@ const devices = [
   { deviceId: 'offline', name: 'Offline PC', platform: 'linux', online: false },
 ];
 let callbackId = 0;
+const callbacks = new Map<number, (value: unknown) => void>();
+const listeners = new Map<number, string>();
 let beats = 0;
 let holdDirectory = false;
 let clipboardImages: { mimeType: string; data: string }[] = [];
@@ -25,6 +27,19 @@ type NativeArgs = { request: { clientId: string; deviceId: string; publicKey: st
 
 async function invoke(command: string, args: NativeArgs) {
   commands.push(command);
+  if (command.startsWith('plugin:event|')) {
+    const event = args as unknown as { event: string; handler: number; eventId: number };
+    if (command === 'plugin:event|unlisten') { listeners.delete(event.eventId); return; }
+    listeners.set(event.handler, event.event);
+    return event.handler;
+  }
+  if (command === 'codex_gui_dropped_files') {
+    if (holdClipboard) await new Promise<void>(resolve => pendingClipboard.push(resolve));
+    return { references: [], files: [
+      { name: 'dropped.png', mimeType: 'image/png', data: previewImage.split(',')[1] },
+      { name: 'notes.txt', mimeType: 'application/octet-stream', data: btoa('dropped notes') },
+    ] };
+  }
   if (command === 'get_dream_skin_status') return { installed: true, session: 'running', activeThemeId: 'fixture',
     activeThemeAppearance: 'light', activeThemeOverlayOpacity: 0.85 };
   if (command === 'get_dream_skin_theme_preview') return previewImage;
@@ -53,10 +68,20 @@ async function invoke(command: string, args: NativeArgs) {
   throw new Error(`Unexpected native command: ${command}`);
 }
 
-Object.assign(window, { __TAURI_INTERNALS__: { invoke, transformCallback: () => ++callbackId, unregisterCallback: () => {} },
+Object.assign(window, { __TAURI_INTERNALS__: { invoke,
+  metadata: { currentWindow: { label: 'main' }, currentWebview: { label: 'main' } },
+  transformCallback: (callback: (value: unknown) => void) => { callbacks.set(++callbackId, callback); return callbackId; },
+  unregisterCallback: (id: number) => { callbacks.delete(id); } },
+  __TAURI_EVENT_PLUGIN_INTERNALS__: { unregisterListener: (_event: string, id: number) => { listeners.delete(id); } },
   remoteGuiFixture: { commands, beats: () => beats, setFontSize: saveGuiFontSize,
     pauseDirectory: () => { holdDirectory = true; },
     copyImage: () => { clipboardImages = [{ mimeType: 'image/png', data: previewImage.split(',')[1] }]; },
+    dropFiles: (position: { x: number; y: number }) => {
+      for (const [id, event] of listeners) {
+        if (event === 'tauri://drag-drop') callbacks.get(id)?.({ event, id,
+          payload: { paths: ['C:\\private\\dropped.png', 'C:\\private\\notes.txt'], position } });
+      }
+    },
     pauseClipboard: () => { holdClipboard = true; },
     releaseClipboard: () => { holdClipboard = false; pendingClipboard.splice(0).forEach(resolve => resolve()); },
     releaseDirectory: () => { holdDirectory = false; pendingDirectories.splice(0).forEach(resolve => resolve()); } } });
@@ -67,5 +92,6 @@ declare global {
     commands: string[]; beats: () => number; pauseDirectory: () => void; releaseDirectory: () => void;
     setFontSize: (size: number) => boolean;
     copyImage: () => void; pauseClipboard: () => void; releaseClipboard: () => void;
+    dropFiles: (position: { x: number; y: number }) => void;
   } }
 }

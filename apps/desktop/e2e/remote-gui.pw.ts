@@ -8,6 +8,7 @@ import type { ChatIdentity } from '../../admin/src/modules/devices/chat/protocol
 import type { desktopTest } from '../../web/e2e/remote-desktop-fixture';
 import './chat-harness-types';
 import { checkGitDiffReview } from './git-diff-checks';
+import { checkRemoteFileDrop } from './file-drop-checks';
 
 declare global { interface Window { desktopTest: typeof desktopTest } }
 
@@ -339,7 +340,7 @@ test('searches hosts beside the project picker and stays usable during slow disc
     await expect(page.getByRole('button', { name: '选择项目文件夹：workspace', exact: true })).toBeVisible();
   });
 
-test('matches local GUI layout and sends pasted images over Relay under the desktop image policy', async ({ context, page }) => {
+test('matches local GUI layout and sends pasted images and dropped files over Relay', async ({ context, page }) => {
   test.setTimeout(90_000);
   const office = await context.newPage();
   await office.goto(`/e2e/chat-harness.html?role=desktop&demo&blocked=true&device=computer-one`
@@ -397,6 +398,7 @@ test('matches local GUI layout and sends pasted images over Relay under the desk
     .filter(operation => operation.operation === 'send').map(operation => operation.images))).toEqual([
     [expect.stringMatching(/^data:image\/jpeg;base64,/)]]);
   await expect(preview).toHaveCount(0);
+  await checkRemoteFileDrop(page, office);
   expect(await page.evaluate(() => window.remoteGuiFixture.commands
     .filter(command => /codex_gui_(connect|disconnect|request|respond)$/.test(command)))).toEqual([]);
 });

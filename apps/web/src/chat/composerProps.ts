@@ -13,11 +13,18 @@ import type { SkillCatalogState } from '../../../../shared/chat/skillCatalog';
 import type { RemoteComposerCatalog } from '../../../../shared/remote-chat/composerCatalog';
 import type { ProjectFilesRequest, ProjectFilesResponse } from '../../../../shared/remote-chat/projectFiles';
 import type { ConversationSearch } from '../../../../shared/chat/useConversationCandidates';
+import type { SubscribeFileDrop } from '../../../../shared/chat/useFileDrop';
+
+export interface NativeFileDrop {
+  subscribe: SubscribeFileDrop;
+  readFiles: (paths: string[]) => Promise<File[]>;
+}
 
 export interface ComposerProps {
   suggestions?: PromptSuggestionSource;
   connection: ChatConnectionProps;
   readClipboardImages?: () => Promise<File[]>;
+  nativeFileDrop?: NativeFileDrop;
   uploadProgress?: UploadProgress;
   queue?: QueueProps;
   tokenUsage?: ThreadTokenUsage;

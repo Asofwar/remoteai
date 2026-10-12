@@ -94,7 +94,7 @@ export function ChatComposer(props: ComposerProps) {
     if (event.defaultPrevented || event.nativeEvent.isComposing || event.keyCode === 229) return;
     if (event.key === 'Escape') { setAdding(false); menu.close(); }
   }}>
-    {queue && <ChatQueue {...queue} {...state.queueEditor} />}
+    {queue && <ChatQueue {...queue} {...state.queueEditor} editDisabled={state.queueEditor.editDisabled || busy} />}
     <form className={`chat-composer${compact && !desktop && !suggestion.text ? ' is-compact' : ''}`}
       onSubmit={event => { event.preventDefault(); void state.submit(); }}>
       <input ref={photoInput} type="file" accept="image/*" multiple hidden aria-label={t("选择相册图片")}
@@ -110,7 +110,7 @@ export function ChatComposer(props: ComposerProps) {
         <button type="button" className="chat-button" disabled={settingsBusy}
           onClick={() => { void updateSettings(selection); }}>{t('重新保存')}</button></p>}
       {props.compacting && <p role="status" className="chat-muted">{t("正在压缩上下文…")}</p>}
-      {(draft.picking || attachments.busy || state.readingClipboard)
+      {(draft.picking || attachments.busy || state.readingClipboard || state.drop.reading)
         && <p role="status" className="chat-muted">{t("正在添加附件…")}</p>}
       {(adding || menu.open) && <div className="chat-composer-popover" onKeyDown={event => {
         if (event.defaultPrevented || event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -128,7 +128,8 @@ export function ChatComposer(props: ComposerProps) {
             catalog={catalog} query={menu.query} skillsOnly={menu.skillsOnly} input={menu.input}
             compactReason={props.compactReason} choose={menu.choose} compact={() => { void menu.runCompact(); }}
             goal={() => { menu.consumeTrigger(); goalMode.enter(); }} close={menu.close} />}</div>}
-      <div className="chat-composer-field" aria-hidden={settings || undefined}>
+      <div className="chat-composer-field" aria-hidden={settings || undefined}
+        ref={state.dropTarget} {...state.drop.handlers} data-file-dragging={state.drop.dragging || undefined}>
         <div className="chat-composer-content">
           <ChatAttachmentPreviews images={draft.images} busy={busy} remove={draft.removeImage}
             upload={sending ? uploadProgress : undefined} reconnecting={!ready}

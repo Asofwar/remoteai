@@ -10,6 +10,7 @@
 }
 .chat-composer.is-compact { border-radius: 32px; }
 .chat-composer-field { padding: 0; border: 0; border-radius: 0; background: transparent; }
+.chat-composer-field[data-file-dragging] { outline: 2px solid var(--chat-green); outline-offset: 4px; border-radius: 12px; }
 .chat-composer-content { max-height: min(35dvh, 300px); overflow: auto; overscroll-behavior: contain; }
 .chat-composer textarea { display: block; width: 100%; box-sizing: border-box; resize: none; border: 0; outline: none;
   min-height: 44px; max-height: none; padding: 8px 10px; font: inherit; font-size: 16px; line-height: 1.6;

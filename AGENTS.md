@@ -11,7 +11,9 @@
 ## Automatic Commit and Push
 
 - After completing the requested changes and verifying them successfully, automatically commit the changes made for the current task and push the current branch to its configured upstream. Do not wait for a separate request to commit or push.
-- Never include unrelated existing changes in the commit. If verification fails, the branch has no configured upstream, or the push is blocked, report the issue instead of bypassing checks or rewriting history.
+- Never include unrelated existing changes in the commit. If verification fails, the branch has no configured upstream, or the push is blocked for a reason other than remote updates, report the issue instead of bypassing checks or rewriting history.
+- If remote updates are detected before or during a push, fetch the configured upstream and attempt to merge it into the current branch. After a successful merge, rerun the relevant checks and push again.
+- If the merge produces conflicts, immediately abort it with `git merge --abort`, preserve local commits and existing work, and stop the push. Report the conflict instead of resolving it automatically or forcing the push.
 - Also include tracked files changed only by line-ending differences rather than leaving them uncommitted.
 
 ## User-Facing Prompts and Copy

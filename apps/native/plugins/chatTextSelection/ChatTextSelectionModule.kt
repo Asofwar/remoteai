@@ -39,6 +39,11 @@ class ChatTextSelectionModule(private val context: ReactApplicationContext) : Re
   }
 
   @ReactMethod
+  fun dismiss() {
+    UiThreadUtil.runOnUiThread { controller.dismiss() }
+  }
+
+  @ReactMethod
   fun detach(tag: Int) {
     UiThreadUtil.runOnUiThread {
       val view = textView(tag) ?: return@runOnUiThread

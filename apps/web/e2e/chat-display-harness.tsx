@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ChatMessages } from '../src/chat/ChatMessages';
+import { ChatSidebar } from '../src/chat/ChatSidebar';
 import { ChatProcessing } from '../src/chat/ChatProcessing';
 import { ChatQuotesProvider } from '../src/chat/ChatQuotes';
 import { ChatDetailsWorkspace } from '../src/chat/ChatDetailsWorkspace';
@@ -12,6 +13,8 @@ import '../src/chat/chat.css';
 
 function Harness() {
   const desktop = useDesktopLayout();
+  const sidebarFixture = new URLSearchParams(location.search).has('sidebar');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [thread, setThread] = useState<Thread | null>(null);
   const [hasMore, setHasMore] = useState(new URLSearchParams(location.search).has('history'));
   const [loadingMore, setLoadingMore] = useState(false);
@@ -38,6 +41,7 @@ function Harness() {
       <ChatDetailsWorkspace selected={thread?.id ?? null} active enabled={desktop}>
       <div className="chat-conversation">
         <header className="chat-header"><h2>对话展示回归</h2>
+          {sidebarFixture && <button onClick={() => setSidebarOpen(!sidebarOpen)}>打开聊天列表</button>}
           {desktop && <ConversationChangesButton value={thread?.turns ? { turns: thread.turns } : undefined} />}
         </header>
         <ChatMessages key={thread?.id} thread={thread} hasMore={hasMore}
@@ -45,6 +49,9 @@ function Harness() {
           processing={runningTurn && <ChatProcessing key={runningTurn.id} turn={runningTurn} active />} />
         <footer style={{ padding: 20 }}><input aria-label="消息" placeholder="输入消息…" /></footer>
       </div>
+      {sidebarFixture && <ChatSidebar desktop={desktop} open={sidebarOpen} onClose={() => setSidebarOpen(false)}>
+        <p>Conversation list</p>
+      </ChatSidebar>}
       </ChatDetailsWorkspace>
     </main>
   </ChatQuotesProvider>;

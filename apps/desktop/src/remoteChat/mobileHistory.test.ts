@@ -127,6 +127,27 @@ it.each([2, 35])('loads earlier items once and ignores results after leaving (%i
   stream.close();
 });
 
+it('does not move an unfinished answer below subsequent steering when disk history omits it', async () => {
+  const initial = { id: 'user', type: 'userMessage', text: 'Check downloads' };
+  const remote: Thread = { id: 'chat', preview: '', cwd: '', updatedAt: 1,
+    turns: [{ id: 'active', status: 'inProgress', items: [initial] }] };
+  const { controller, stream, emit } = await connected(remote);
+  try {
+    await controller.select({ ...remote, turns: [] });
+    const partial = { id: 'partial', type: 'agentMessage', phase: 'final_answer' as const, text: 'Partial answer' };
+    const supplement = { id: 'supplement', type: 'userMessage', text: 'Add pipelining' };
+    const latest = { id: 'latest', type: 'agentMessage', phase: 'commentary' as const, text: 'Implementing it' };
+    for (const item of [partial, supplement, latest]) emit({ method: 'item/started',
+      params: { threadId: remote.id, turnId: 'active', item } });
+    remote.turns![0].items = [initial, supplement, latest];
+    for (let refresh = 0; refresh < 2; refresh++) {
+      await controller.refreshSelected();
+      expect(controller.snapshot().selected?.turns?.[0].items.map(item => item.id))
+        .toEqual(['user', 'partial', 'supplement', 'latest']);
+    }
+  } finally { controller.stop(); stream.close(); }
+});
+
 it('joins a running reply during a delayed read without losing its prefix or replaying buffered tokens', async () => {
   const remote: Thread = { id: 'chat', preview: '', cwd: '', updatedAt: 1, turns: [{ id: 'active',
     status: 'inProgress', startedAt: Date.now() / 1000,

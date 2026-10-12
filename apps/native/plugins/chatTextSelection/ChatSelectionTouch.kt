@@ -4,6 +4,8 @@ import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.ViewConfiguration
 import android.widget.TextView
+import android.text.Selection
+import android.text.Spannable
 
 private const val MIN_LONG_PRESS_MS = 500L
 
@@ -32,12 +34,28 @@ internal class ChatSelectionTouch(
 
   fun onTouchEvent(event: MotionEvent): Boolean {
     if (event.actionMasked == MotionEvent.ACTION_DOWN) beginTouch(event)
-    if (!waiting) return dispatch(event)
+    if (!waiting) return forward(event)
     if (event.actionMasked == MotionEvent.ACTION_MOVE && moved(event)) cancelPending()
     if (event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) cancelPending()
-    val forward = selecting
+    val shouldForward = selecting
     if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) cancel()
-    return if (forward) dispatch(event) else true
+    return if (shouldForward) forward(event) else true
+  }
+
+  private fun forward(event: MotionEvent): Boolean {
+    if (event.actionMasked != MotionEvent.ACTION_CANCEL || !view.hasSelection()) return dispatch(event)
+    // Android's selection drag accelerator dismisses its magnifier on UP only, not CANCEL.
+    // A drawer/React responder can take over after a long press; finish the drag before cancelling.
+    val release = MotionEvent.obtain(event).apply { action = MotionEvent.ACTION_UP }
+    try {
+      dispatch(release)
+    } finally {
+      release.recycle()
+    }
+    val handled = dispatch(event)
+    view.clearFocus()
+    (view.text as? Spannable)?.let { Selection.removeSelection(it) }
+    return handled
   }
 
   private fun beginTouch(event: MotionEvent) {

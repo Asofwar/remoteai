@@ -1,14 +1,9 @@
 import { useContext, useEffect, useRef } from 'react';
-import { DeviceEventEmitter, findNodeHandle, NativeModules, Text,
+import { DeviceEventEmitter, findNodeHandle, Text,
   type GestureResponderHandlers, type TextProps } from 'react-native';
 import { QuoteSourceContext, useChatQuotes } from './ChatQuotes';
 import { CopyTextButton, type CopyAction } from './CopyTextButton';
-
-interface SelectionBridge {
-  configure: (tag: number, enabled: boolean, trailingControls: number) => void;
-  detach: (tag: number) => void;
-}
-const bridge = NativeModules.ChatTextSelection as SelectionBridge | undefined;
+import { nativeTextSelection as bridge } from './nativeTextSelection';
 
 export function SelectableChatText({ onLayout, children, copy, ...props }: TextProps & {
   copy?: CopyAction | CopyAction[];

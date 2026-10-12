@@ -6,6 +6,7 @@ import type { TimelineEntry } from './activityTimeline';
 import type { Item, Turn } from './types';
 import { CONTINUE_MESSAGE } from '../../../../shared/remote-chat/composerAction';
 import { useStyles } from './styles';
+import { mergeHistory } from '../../../../shared/remote-chat/client/history';
 const styles = useStyles();
 
 const state = vi.hoisted(() => ({ selection: null as unknown, inline: new Map<string, boolean>(),
@@ -81,6 +82,21 @@ const render = (turn: Turn) => ChatMessages({ thread: { id: 'thread', cwd: '', p
 it('passes the initial positioning event frequency through to the native list', () => {
   const tree = render({ id: 'turn', status: 'completed', items: [command('single')] });
   expect(element<ListProps>(tree, 'FlatList').props.scrollEventThrottle).toBe(16);
+});
+
+it('renders an interrupted answer before the supplement and newer progress after a history refresh', () => {
+  const turn: Turn = { id: 'turn', status: 'inProgress', items: [
+    { id: 'user', type: 'userMessage', text: 'Check downloads' },
+    { id: 'partial', type: 'agentMessage', phase: 'final_answer', text: 'Partial earlier answer' },
+    { id: 'supplement', type: 'userMessage', text: 'Add pipelining' },
+    { id: 'progress', type: 'agentMessage', phase: 'commentary', text: 'Implementing pipelining' },
+  ] };
+  const live = { id: 'thread', cwd: '', preview: '', updatedAt: 1, turns: [turn] };
+  const snapshot = { ...live, turns: [{ ...turn, items: turn.items.filter(item => item.id !== 'partial') }] };
+  const merged = mergeHistory(snapshot, live, live);
+  const entries = element<ListProps>(render(merged.turns![0]), 'FlatList').props.data;
+  expect(entries.flatMap(entry => entry.kind === 'message' || entry.kind === 'process' ? [entry.item.id] : []))
+    .toEqual(['user', 'partial', 'supplement', 'progress']);
 });
 
 it.each(['interrupted', 'failed'])('hides the automatic retry message after %s while keeping replies', (status) => {

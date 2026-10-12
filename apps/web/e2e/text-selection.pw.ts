@@ -89,6 +89,30 @@ async function textPoint(page: Page) {
   });
 }
 
+test('the mobile drawer clears covered selection and desktop keeps visible text selected',
+  async ({ page, isMobile }, info) => {
+    await page.goto('e2e/chat-display-harness.html?sidebar');
+    const text = page.locator('.chat-assistant-message .chat-markdown p').first();
+    await expect(text).toContainText(message);
+    await text.evaluate(node => {
+      const range = document.createRange(); range.selectNodeContents(node);
+      const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range);
+    });
+    const selected = () => page.evaluate(() => window.getSelection()?.toString());
+    expect(await selected()).toBe(message);
+    // Keyboard activation leaves the range intact until the drawer handles opening.
+    await page.getByRole('button', { name: '打开聊天列表' }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByText('Conversation list', { exact: true })).toBeVisible();
+    await expect.poll(selected).toBe(isMobile ? '' : message);
+    await page.screenshot({ path: info.outputPath('drawer-selection.png') });
+    if (isMobile) {
+      await page.locator('.chat-drawer .ant-drawer-close').click();
+      await expect(page.getByText('Conversation list', { exact: true })).toHaveCount(0);
+      expect(await selected()).toBe('');
+    }
+  });
+
 test('Chromium touch only permits native selection after a long press', async ({ page, browserName }, info) => {
   test.skip(browserName !== 'chromium' || !info.project.use.hasTouch, 'Native touch needs mobile Chromium.');
   const input = await page.context().newCDPSession(page);

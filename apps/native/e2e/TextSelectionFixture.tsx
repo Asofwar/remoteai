@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import { registerRootComponent } from 'expo';
-import { useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
@@ -9,6 +9,8 @@ import { ChatMessage } from '../src/chat/ChatMessage';
 import { ChatMath } from '../src/chat/ChatMath';
 import { ChatQuotesProvider, useChatQuotes } from '../src/chat/ChatQuotes';
 import { SelectableChatText } from '../src/chat/SelectableChatText';
+import { ChatDrawer, type ChatDrawerMethods } from '../src/chat/ChatDrawer';
+import { useChatDrawerSwipe } from '../src/chat/useChatDrawerSwipe';
 
 function Messages() {
   const [links, setLinks] = useState(0);
@@ -35,10 +37,23 @@ function Messages() {
 
 function TextSelectionFixture() {
   const [fonts] = useFonts(Ionicons.font);
+  const [open, setOpen] = useState(false);
+  const drawer = useRef<ChatDrawerMethods>(null);
+  const openDrawer = () => { setOpen(true); drawer.current?.openDrawer(); };
+  const swipe = useChatDrawerSwipe(!open, openDrawer);
   if (!fonts) return null;
   return <SafeAreaProvider><SafeAreaView style={{ flex: 1, backgroundColor: '#f4f4f4' }}>
     <ChatQuotesProvider scope="selection-test" active enabled>
-      <ScrollView contentContainerStyle={{ padding: 20 }}><Messages /></ScrollView>
+      <ChatDrawer ref={drawer} enabled onOpen={() => setOpen(true)} onMoving={() => setOpen(true)}
+        onClose={() => setOpen(false)} navigation={<View style={{ padding: 24 }}>
+          <Text>Conversation list</Text>
+          <Pressable onPress={() => drawer.current?.closeDrawer()}><Text>Close conversation list</Text></Pressable>
+        </View>}>
+        <View style={{ flex: 1 }} {...swipe}>
+          <Pressable onPress={openDrawer}><Text>Open conversation list</Text></Pressable>
+          <ScrollView contentContainerStyle={{ padding: 20 }}><Messages /></ScrollView>
+        </View>
+      </ChatDrawer>
     </ChatQuotesProvider>
   </SafeAreaView></SafeAreaProvider>;
 }

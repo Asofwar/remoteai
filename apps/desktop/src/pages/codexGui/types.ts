@@ -113,6 +113,9 @@ export interface EventParams {
   serverName?: string;
   _meta?: { tool_params?: Record<string, unknown> };
   userMessageIndex?: number;
+  /** Neighbours locate acknowledged messages when history is ahead of the acknowledgement. */
+  afterItemId?: string;
+  beforeItemId?: string;
   computerUseSetup?: AutomaticSetupStatus;
   unattendedSetup?: AutomaticSetupStatus;
   goal?: ThreadGoal;

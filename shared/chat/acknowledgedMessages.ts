@@ -4,11 +4,16 @@ export const MESSAGE_ACKNOWLEDGED = 'chat/message/acknowledged';
 
 /** The ordinal identifies repeated identical sends without matching their text or attachment URLs. */
 export function acknowledgeMessage(turn: Turn, event: GuiEvent): Turn {
-  const { item, userMessageIndex } = event.params;
+  const { item, userMessageIndex, afterItemId, beforeItemId } = event.params;
   if (!item || !item.localEcho || !Number.isSafeInteger(userMessageIndex) || userMessageIndex! < 0) return turn;
   const users = turn.items.filter((entry) => entry.type === 'userMessage');
   if (users.length > userMessageIndex! || turn.items.some((entry) => entry.id === item.id)) return turn;
-  return { ...turn, items: userMessageIndex === 0 ? [item, ...turn.items] : [...turn.items, item] };
+  const before = turn.items.findIndex(entry => entry.id === beforeItemId);
+  const after = turn.items.findIndex(entry => entry.id === afterItemId);
+  let position = userMessageIndex === 0 ? 0 : turn.items.length;
+  if (before >= 0) position = before;
+  else if (after >= 0) position = after + 1;
+  return { ...turn, items: [...turn.items.slice(0, position), item, ...turn.items.slice(position)] };
 }
 
 export function reconcileAcknowledgedItems(live: Item[], snapshot: Item[]): Item[] {
@@ -28,11 +33,12 @@ export function reconcileAcknowledgedItems(live: Item[], snapshot: Item[]): Item
 export function acknowledgedEvents(thread: Thread): GuiEvent[] {
   return (thread.turns ?? []).flatMap((turn) => {
     let userMessageIndex = 0;
-    return turn.items.flatMap((item): GuiEvent[] => {
+    return turn.items.flatMap((item, position): GuiEvent[] => {
       if (item.type !== 'userMessage') return [];
       const index = userMessageIndex++;
       return item.localEcho ? [{ method: MESSAGE_ACKNOWLEDGED,
-        params: { threadId: thread.id, turnId: turn.id, item, userMessageIndex: index } }] : [];
+        params: { threadId: thread.id, turnId: turn.id, item, userMessageIndex: index,
+          afterItemId: turn.items[position - 1]?.id, beforeItemId: turn.items[position + 1]?.id } }] : [];
     });
   });
 }

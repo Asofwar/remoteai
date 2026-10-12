@@ -1,6 +1,7 @@
 import type { Item, Thread, Turn } from './types';
 import { restoreTurnTiming } from '../../../apps/desktop/src/pages/codexGui/turnTiming';
 import { reconcileAcknowledgedItems } from '../../chat/acknowledgedMessages';
+import { mergeItemOrder } from '../../chat/itemOrder';
 
 function mergeItem(snapshot: Item, live: Item, before?: Item): Item {
   const merged = { ...snapshot, ...live };
@@ -16,15 +17,18 @@ function mergeItem(snapshot: Item, live: Item, before?: Item): Item {
 function mergeTurn(snapshot: Turn, live: Turn, before?: Turn, authoritative = false): Turn {
   const original = new Map(before?.items.map((item) => [item.id, item]));
   const hasAcknowledgements = snapshot.items.some((item) => item.localEcho) || live.items.some((item) => item.localEcho);
-  const items = new Map(reconcileAcknowledgedItems(snapshot.items, live.items).map((item) => [item.id, item]));
-  for (const item of reconcileAcknowledgedItems(live.items, snapshot.items)) {
+  const snapshotItems = reconcileAcknowledgedItems(snapshot.items, live.items);
+  const liveItems = reconcileAcknowledgedItems(live.items, snapshot.items);
+  const items = new Map(snapshotItems.map((item) => [item.id, item]));
+  for (const item of liveItems) {
     if (item === original.get(item.id)
       && (authoritative || (live.status !== 'inProgress' && !hasAcknowledgements))) continue;
     const existing = items.get(item.id);
     items.set(item.id, existing ? mergeItem(existing, item, original.get(item.id)) : item);
   }
   const terminal = live.status !== 'inProgress' ? live.status : snapshot.status;
-  return { ...snapshot, ...live, status: terminal, items: [...items.values()] };
+  const order = mergeItemOrder(snapshotItems, liveItems.filter(item => items.has(item.id)));
+  return { ...snapshot, ...live, status: terminal, items: order.map(id => items.get(id)!) };
 }
 
 /** Preserve notifications received while a history snapshot was in flight. */

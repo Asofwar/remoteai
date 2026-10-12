@@ -47,13 +47,18 @@ internal class ChatSelectionController {
     val selected = view ?: return
     val bounds = Rect()
     if (selected.getGlobalVisibleRect(bounds) && bounds.contains(event.rawX.toInt(), event.rawY.toInt())) return
-    val text = selected.text
+    dismiss()
+  }
+
+  fun dismiss() {
+    val selected = view
     mode?.finish()
-    if (text is Spannable) Selection.removeSelection(text)
+    selected?.clearFocus()
+    (selected?.text as? Spannable)?.let { Selection.removeSelection(it) }
   }
 
   fun detach() {
-    mode?.finish()
+    dismiss()
     if (window?.callback === observer) window?.callback = original
     window = null
     original = null

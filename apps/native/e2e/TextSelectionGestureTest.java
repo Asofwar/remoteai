@@ -12,6 +12,8 @@ import com.android.uiautomator.core.UiDevice;
 import com.android.uiautomator.testrunner.UiAutomatorTestCase;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 
 /** Run against the separately installed TextSelectionFixture, with real touchscreen events. */
 public final class TextSelectionGestureTest extends UiAutomatorTestCase {
@@ -35,6 +37,8 @@ public final class TextSelectionGestureTest extends UiAutomatorTestCase {
         assertUnselected("Quick repeated taps");
         hold(x, y, 250);
         assertUnselected("Short hold");
+        checkCancelledSelection(x, y);
+        checkSelectionDrag(x, y);
         hold(x, y, 750);
         assertNotNull("Long hold opens selection menu", awaitNode("引用"));
         AccessibilityNodeInfo selected = find(MESSAGE);
@@ -46,6 +50,8 @@ public final class TextSelectionGestureTest extends UiAutomatorTestCase {
         assertNotNull("Selection can be opened again", awaitNode("复制"));
         tap("复制");
         assertUnselected("Copy closes selection");
+        assertNoMagnifier("Copy");
+        checkDrawerWithSelection(x, y);
         Rect link = bounds("Open inline link");
         hold(link.left + 80, link.centerY(), 45);
         assertNotNull("Inline link still handles a tap", awaitNode("Links opened: 1"));
@@ -55,6 +61,76 @@ public final class TextSelectionGestureTest extends UiAutomatorTestCase {
         assertUnselected("Scrolling does not select");
         Rect moved = bounds(MESSAGE);
         assertTrue("Message list scrolls", moved.top < bounds.top);
+    }
+
+    private void checkDrawerWithSelection(int x, int y) throws Exception {
+        hold(x, y, 750);
+        assertNotNull("Selection before opening drawer", awaitNode("引用"));
+        getUiDevice().swipe(x, y, x + 350, y, 25);
+        assertNotNull("Drawer opens", awaitNode("Conversation list"));
+        assertNoMagnifier("Opening drawer");
+        assertNull("Opening drawer closes selection menu", find("引用"));
+        tap("Close conversation list");
+        assertUnselected("Closing drawer does not restore selection");
+        hold(x, y, 750);
+        tap("Open conversation list");
+        assertNotNull("Drawer button opens the list", awaitNode("Conversation list"));
+        assertNull("Drawer button clears selection menu", find("引用"));
+        tap("Close conversation list");
+        assertUnselected("Drawer button clears selection");
+    }
+
+    private void checkCancelledSelection(int x, int y) throws Exception {
+        long down = SystemClock.uptimeMillis();
+        inject(MotionEvent.ACTION_DOWN, down, x, y);
+        SystemClock.sleep(750);
+        inject(MotionEvent.ACTION_MOVE, down, x + 6, y);
+        SystemClock.sleep(250);
+        assertTrue("Dragging selected text shows magnifier", awaitMagnifier(true));
+        inject(MotionEvent.ACTION_CANCEL, down, x + 6, y);
+        assertNoMagnifier("Cancelled selection");
+        assertUnselected("Cancelled selection");
+    }
+
+    private void checkSelectionDrag(int x, int y) throws Exception {
+        long down = SystemClock.uptimeMillis();
+        inject(MotionEvent.ACTION_DOWN, down, x, y);
+        SystemClock.sleep(750);
+        for (int distance = 5; distance <= 120; distance += 5) {
+            inject(MotionEvent.ACTION_MOVE, down, x + distance, y);
+            SystemClock.sleep(20);
+        }
+        inject(MotionEvent.ACTION_UP, down, x + 120, y);
+        assertNotNull("Selection drag keeps its menu", awaitNode("引用"));
+        assertNull("Selection drag must not open the drawer", find("Conversation list"));
+        assertNoMagnifier("Released selection drag");
+        tap("Blank space dismisses selection");
+    }
+
+    private void assertNoMagnifier(String reason) throws Exception {
+        assertTrue(reason + ": no magnifier surface", awaitMagnifier(false));
+    }
+
+    private boolean awaitMagnifier(boolean visible) throws Exception {
+        for (int attempt = 0; attempt < 20; attempt++) {
+            if (surfaces().contains("magnifier surface") == visible) return true;
+            SystemClock.sleep(100);
+        }
+        return false;
+    }
+
+    private String surfaces() throws Exception {
+        Process process = new ProcessBuilder("dumpsys", "SurfaceFlinger", "--list").redirectErrorStream(true).start();
+        try (InputStream input = process.getInputStream();
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096];
+            int count;
+            while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+            String result = output.toString("UTF-8").toLowerCase(java.util.Locale.ROOT);
+            assertEquals("Surface listing is available: " + result, 0, process.waitFor());
+            assertTrue("Surface listing is not empty", result.contains("selectiontest"));
+            return result;
+        }
     }
 
     private void checkFormula() throws Exception {

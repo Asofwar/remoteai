@@ -48,7 +48,7 @@ async function exerciseEditor(page: Page, touch: boolean) {
   await editor.getByRole('button', { name: '箭头', exact: true }).click();
   await editor.getByRole('button', { name: '蓝色', exact: true }).click();
   await draw(page, touch);
-  await editor.getByRole('button', { name: '方框', exact: true }).click();
+  await editor.getByRole('button', { name: /^(方框|矩形)$/ }).click();
   await editor.getByRole('button', { name: '红色', exact: true }).click();
   await draw(page, touch);
   const beforeResize = await snapshot();

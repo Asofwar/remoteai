@@ -83,7 +83,7 @@ for (const blocked of [false, true]) {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(`/e2e/remote-gui-harness.html?socket=${encodeURIComponent(endpoint)}`);
     await chooseHost(page, 'Office PC');
-    await expect(page.getByRole('button', { name: '选择电脑', exact: true }))
+    await expect(page.locator('.gui-remote-workspace:visible .chat-connection-status'))
       .toContainText(blocked ? 'Relay' : 'P2P', { timeout: 20_000 });
     const input = page.getByRole('textbox', { name: '聊天消息' });
     const menu = page.getByRole('menu', { name: '对话', exact: true });
@@ -103,7 +103,7 @@ for (const blocked of [false, true]) {
       attachments: [{ kind: 'conversation', name: 'Office reference',
         path: 'codex-thread://demo-chat-computer-one' }] });
     await chooseComputer(page, 'Home PC');
-    await expect(page.getByRole('button', { name: '选择电脑', exact: true }))
+    await expect(page.locator('.gui-remote-workspace:visible .chat-connection-status'))
       .toContainText(blocked ? 'Relay' : 'P2P', { timeout: 20_000 });
     await expect(input).not.toHaveAttribute('placeholder', '连接后发消息');
     await input.fill('@');

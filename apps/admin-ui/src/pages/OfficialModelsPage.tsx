@@ -2,6 +2,7 @@ import { Button, Card, Input, Space, Tag, Typography } from "antd";
 import { useI18n } from "../i18n-context";
 import { useOfficialModels, type OfficialModelsProps } from "../hooks/useOfficialModels";
 import { HelpAssistantSettings } from "./HelpAssistantSettings";
+import { OfficialModelRefreshSettings } from "./OfficialModelRefreshSettings";
 
 export function OfficialModelsPage({ api, canManage }: OfficialModelsProps) {
   const { language } = useI18n();
@@ -14,14 +15,15 @@ export function OfficialModelsPage({ api, canManage }: OfficialModelsProps) {
     <div>
       <Typography.Title level={2}>{zh ? "官方模型" : "Official models"}</Typography.Title>
       <Typography.Paragraph type="secondary">{zh
-        ? "对外代理和 Codex GUI 优先使用此列表。每 30 分钟自动更新；更新失败或列表为空时保留现有内容。"
-        : "The proxy and Codex GUI use this list first. It refreshes every 30 minutes and keeps old models on failure."}
+        ? "对外代理和 Codex GUI 优先从官方获取模型，获取失败时使用此列表。"
+        : "The proxy and Codex GUI fetch models from the official service first and use this list if that fails."}
       </Typography.Paragraph>
       <Typography.Paragraph type="secondary">{zh
-        ? "手动保存后立即可用，用户下次加载模型时生效。30 分钟后恢复自动更新。"
-        : "Saved changes apply the next time users load models. Automatic updates resume after 30 minutes."}
+        ? "手动保存后立即可用，用户下次读取此列表时生效。自动更新的开关和间隔可在下方设置。"
+        : "Saved changes apply the next time this list is loaded. Configure automatic updates below."}
       </Typography.Paragraph>
     </div>
+    <OfficialModelRefreshSettings api={api} canManage={canManage} zh={zh} />
     <HelpAssistantSettings api={api} canManage={canManage} catalog={catalog} zh={zh} />
     <Card loading={models.loading}>
       <Space wrap style={{ marginBottom: 16 }}>

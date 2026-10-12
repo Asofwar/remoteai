@@ -19,7 +19,6 @@ use crate::{
 mod admin_tests;
 mod client_version;
 pub(crate) use client_version::model_client_version;
-#[cfg(any(target_os = "windows", target_os = "macos"))]
 pub(crate) use client_version::MIN_CODEX_MODEL_CLIENT_VERSION;
 
 const OFFICIAL_MODEL_CACHE_FILENAME: &str = "official-models-cache.json";

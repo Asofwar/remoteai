@@ -7,6 +7,25 @@
 该顺序适用于代理查询、Codex GUI 模型发现、启动刷新、切换账户和手动刷新。
 两处均失败时沿用现有的本地缓存与重试流程。
 
+### 请求参数核对（2026-10-12）
+
+对照 [Codex CLI 模型接口](https://github.com/openai/codex/blob/main/codex-rs/codex-api/src/endpoint/models.rs)，
+接口仍为 `GET /backend-api/codex/models?client_version=<major.minor.patch>`，没有新增必填查询参数。
+CLI 自带的版本号去除预发布后缀，额外 Provider 查询参数会保留；官方登录使用 Bearer 凭据和账户 ID。
+Remote AI 主动刷新仍查找最新稳定版，失败时使用已知版本；代理保留客户端传入的版本与查询参数。
+
+[CLI 默认客户端](https://github.com/openai/codex/blob/main/codex-rs/login/src/auth/default_client.rs)
+的 `User-Agent` 使用版本号。桌面端主动获取模型时现按 `client_version` 生成该请求头，
+不再固定为 `codex_cli_rs/0.1.0`；转发已有 CLI 请求时保留其身份，避免发送重复的 `User-Agent`。
+admin-go 已使用同一版本生成查询参数与请求头，并通过出站代理测试验证认证和参数。
+
+### Admin 自动更新
+
+管理页面的“自动更新”支持开关和自定义间隔，默认开启、每 30 分钟，范围为 1 分钟至 7 天。
+保存设置或模型列表后，开启状态下按所设间隔重新计时；关闭后保留列表，也不会在服务重启时自动刷新。
+手动“从官方刷新”和编辑始终可用。修改自动更新设置会阻止此前正在运行的自动刷新结果写回。
+配置由所有 Go 实例共享，服务每分钟检查是否到期，失败或空响应仍保留此前的有效列表。
+
 ## Codex 配置中的模型选项
 
 “默认模型”的选项直接读取当前云端地址的 Admin `/official-models` 接口，无需先添加官方账户。

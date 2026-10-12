@@ -30,6 +30,7 @@ pub(crate) mod lan_keys;
 mod lan_usage_capture;
 mod official_input;
 mod official_model_cache;
+mod official_model_request;
 pub(crate) use official_model_cache::admin_model_catalog;
 mod quota_detection;
 mod quota_sse;

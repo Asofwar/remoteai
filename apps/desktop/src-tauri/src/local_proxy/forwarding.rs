@@ -119,7 +119,9 @@ fn send_official_request(
                     }
                 }
             }
-            apply_forward_headers(request, headers, true).body(body.to_vec())
+            let request = apply_forward_headers(request, headers, true);
+            official_model_request::apply_user_agent(request, method, upstream_url, headers)
+                .body(body.to_vec())
         },
         "Official Codex proxy request failed",
     )?;

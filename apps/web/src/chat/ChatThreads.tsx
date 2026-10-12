@@ -27,7 +27,7 @@ export function ChatThreads({ state, controller, newChat, onClose, openSearch, p
         <button className="chat-button chat-grow" type="button" disabled={!ready || state.loading}
           onClick={() => { void controller.list({ archived: !state.archived }); }}>
           {state.archived ? t("已归档 ▾") : t("最近聊天 ▾")}</button>
-        <button className="chat-back" type="button" aria-label={t("刷新聊天")} disabled={!ready || state.loading}
+        <button className="chat-back" type="button" aria-label={t("刷新聊天")} disabled={!ready || state.listRefreshing}
           onClick={() => { void controller.list(); }}>
           <RefreshCw size={17} className={state.listRefreshing ? 'chat-spinner' : undefined} /></button>
       </div>

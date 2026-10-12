@@ -27,6 +27,17 @@ async function scrollDown(page: Page, touch: boolean) {
   } finally { await session.detach(); }
 }
 
+async function stopTouchMomentum(page: Page) {
+  const box = (await page.locator('.chat-thread-list').boundingBox())!;
+  const session = await page.context().newCDPSession(page);
+  try {
+    // Stop the previous fling before measuring the position a newly appended page must preserve.
+    await session.send('Input.dispatchTouchEvent', { type: 'touchStart',
+      touchPoints: [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }] });
+    await session.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+  } finally { await session.detach(); }
+}
+
 test('loads once near the bottom using a mouse wheel or phone touch and preserves the reading position',
   async ({ page, isMobile }) => {
     let requests = 0;
@@ -49,6 +60,7 @@ test('loads once near the bottom using a mouse wheel or phone touch and preserve
     expect(requests).toBe(1);
     const list = page.locator('.chat-thread-list');
     await expect.poll(() => list.evaluate(node => node.scrollHeight - node.clientHeight - node.scrollTop)).toBeLessThan(2);
+    if (isMobile) await stopTouchMomentum(page);
     const position = await list.evaluate(node => node.scrollTop);
     finish();
     await expect(page.locator('.chat-thread')).toHaveCount(24);
@@ -113,18 +125,59 @@ test('coalesces background list updates while keeping chats visible and shows pr
     await expect(page.locator('.chat-thread-list')).toHaveAttribute('aria-busy', 'true');
     await expect(refresh.locator('.chat-spinner')).toHaveCount(0);
     await expect(page.locator('.chat-thread')).toHaveCount(5);
-    finish();
     await expect(refresh).toBeEnabled();
     let finishManual = () => {};
     const manual = new Promise<void>(resolve => { finishManual = resolve; });
     await page.route('**/thread-page?*', async route => {
+      requests++;
       await manual;
-      await route.fulfill({ json: { data: threads(0, 6, true), nextCursor: null } });
+      await route.fulfill({ json: { data: threads(10, 6, true), nextCursor: null } });
     });
     await refresh.click();
     await expect(refresh.locator('.chat-spinner')).toHaveCount(1);
     await expect(page.locator('.chat-thread')).toHaveCount(5);
+    expect(requests).toBe(2);
+    finish();
+    await expect.poll(() => requests).toBe(3);
+    await expect(refresh.locator('.chat-spinner')).toHaveCount(1);
     finishManual();
     await expect(refresh).toBeEnabled();
     await expect(refresh.locator('.chat-spinner')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '聊天 10', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '聊天 0', exact: true })).toHaveCount(0);
   });
+
+test('keeps a live rename when an older page arrives and refreshes a newly completed chat', async ({ page }) => {
+  let requests = 0;
+  let finish = () => {};
+  let finishLatest = () => {};
+  const pending = new Promise<void>(resolve => { finish = resolve; });
+  const latest = new Promise<void>(resolve => { finishLatest = resolve; });
+  await page.route('**/thread-page?*', async route => {
+    const index = ++requests;
+    if (index === 2) await pending;
+    if (index === 3) await latest;
+    const data = index < 3 ? threads(0, 1) : [{ ...threads(1, 1)[0], name: '最新完成的聊天' },
+      { ...threads(0, 1)[0], name: '更新后的标题' }];
+    await route.fulfill({ json: { data, nextCursor: null } });
+  });
+  await page.goto('./e2e/thread-pagination-harness.html');
+  await expect(page.getByRole('button', { name: '聊天 0', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '刷新聊天', exact: true }).click();
+  await expect.poll(() => requests).toBe(2);
+  await page.evaluate(() => {
+    const emit = (method: string, params: object) => window.dispatchEvent(new CustomEvent('test-chat-event', {
+      detail: { method, params },
+    }));
+    emit('thread/name/updated', { threadId: 'chat-0', threadName: '更新后的标题' });
+    emit('turn/completed', { threadId: 'chat-1', turn: { id: 'turn', status: 'completed', items: [] } });
+  });
+  await expect(page.getByRole('button', { name: '更新后的标题', exact: true })).toBeVisible();
+  finish();
+  await expect.poll(() => requests).toBe(3);
+  await expect(page.getByRole('button', { name: '更新后的标题', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '聊天 0', exact: true })).toHaveCount(0);
+  finishLatest();
+  await expect(page.getByRole('button', { name: '最新完成的聊天', exact: true })).toBeVisible();
+  await expect(page.locator('.chat-thread').first()).toContainText('最新完成的聊天');
+});

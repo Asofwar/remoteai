@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ChatController } from '../../../../shared/remote-chat/client/controller';
 import type { ChatConnection, ConnectionEvents } from '../../../../shared/remote-chat/client/connection';
 import type { ListResponse, Thread } from './types';
-import { HISTORY_CHANGED } from '../../../../shared/remote-chat/historySync';
+import { HISTORY_CHANGED, historyDelta } from '../../../../shared/remote-chat/historySync';
 
 const thread: Thread = { id: 'chat', name: 'Original', preview: '', cwd: '/project', updatedAt: 1 };
 let controller: ChatController;
@@ -57,7 +57,7 @@ it('coalesces event bursts and applies an in-flight page before one trailing ref
   expect(vi.getTimerCount()).toBe(0);
 });
 
-it('joins identical manual pulls to the pending automatic request and shows manual progress', async () => {
+it('coalesces manual pulls into one fresh request after a pending automatic request', async () => {
   const finish = pendingPage();
   notify();
   await vi.advanceTimersByTimeAsync(150);
@@ -66,9 +66,12 @@ it('joins identical manual pulls to the pending automatic request and shows manu
   expect(first).toBe(second);
   expect(request).toHaveBeenCalledTimes(1);
   expect(controller.snapshot().listRefreshing).toBe(true);
+  const latest = { ...thread, name: 'Updated after the automatic request started' };
+  request.mockResolvedValueOnce({ data: [latest], nextCursor: null });
   finish();
   await Promise.all([first, second]);
-  expect(controller.snapshot()).toMatchObject({ loading: false, listRefreshing: false });
+  expect(request).toHaveBeenCalledTimes(2);
+  expect(controller.snapshot()).toMatchObject({ loading: false, listRefreshing: false, threads: [latest] });
 });
 
 it('keeps a newer archive filter when an older request arrives late', async () => {
@@ -96,6 +99,114 @@ it('waits for pagination before refreshing notifications and does not show pull 
   expect(controller.snapshot().threads).toEqual([thread, older]);
   await vi.advanceTimersByTimeAsync(150);
   expect(request).toHaveBeenCalledTimes(2);
+});
+
+it('preserves a scheduled first-page refresh when pagination starts before its timer', async () => {
+  Object.assign(controller.snapshot(), { cursor: 'next' });
+  notify();
+  const finish = pendingPage();
+  const more = controller.list({ more: true });
+  finish([{ ...thread, id: 'older' }]);
+  await more;
+  const latest = { ...thread, id: 'newest' };
+  request.mockResolvedValueOnce({ data: [latest, thread], nextCursor: null });
+  await vi.advanceTimersByTimeAsync(150);
+  expect(request).toHaveBeenCalledTimes(2);
+  expect(request.mock.calls[1][1]).toMatchObject({ operation: 'list', cursor: undefined });
+  expect(controller.snapshot().threads).toEqual([latest, thread]);
+});
+
+it.each(['thread/name/updated', 'turn/started', 'turn/completed'])(
+  'does not let a slow list roll back a newer %s event', async method => {
+    const finish = pendingPage();
+    const pending = controller.list({ background: true });
+    events.event({ method, params: { threadId: thread.id, threadName: 'Renamed',
+      turn: { id: 'turn', status: method === 'turn/started' ? 'inProgress' : 'completed', items: [] } } });
+    const live = controller.snapshot().threads;
+    finish();
+    await pending;
+    expect(controller.snapshot().threads).toEqual(live);
+    const latest = { ...live[0], updatedAt: 2 };
+    request.mockResolvedValueOnce({ data: [latest], nextCursor: null });
+    await vi.advanceTimersByTimeAsync(150);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(controller.snapshot().threads).toEqual([latest]);
+  },
+);
+
+it('refreshes ordering after a turn completes in an existing unselected chat', async () => {
+  const recent = { ...thread, id: 'recent', updatedAt: 2 };
+  Object.assign(controller.snapshot(), { threads: [recent, thread] });
+  events.event({ method: 'turn/completed', params: { threadId: thread.id,
+    turn: { id: 'turn', status: 'completed', items: [] } } });
+  const latest = { ...thread, updatedAt: 3 };
+  request.mockResolvedValueOnce({ data: [latest, recent], nextCursor: null });
+  await vi.advanceTimersByTimeAsync(150);
+  expect(controller.snapshot().threads).toEqual([latest, recent]);
+});
+
+it('keeps newly started chats while applying other useful rows from a slow page', async () => {
+  const finish = pendingPage();
+  const pending = controller.list({ background: true });
+  const created = { ...thread, id: 'created', updatedAt: 3 };
+  events.event({ method: 'thread/started', params: { thread: created } });
+  const incoming = { ...thread, updatedAt: 2 };
+  finish([incoming]);
+  await pending;
+  expect(controller.snapshot().threads).toEqual([created, incoming]);
+  request.mockResolvedValueOnce({ data: [created, incoming], nextCursor: null });
+  await vi.advanceTimersByTimeAsync(150);
+  expect(request).toHaveBeenCalledTimes(2);
+  expect(controller.snapshot().threads).toEqual([created, incoming]);
+});
+
+it('discards an older archived page when sending creates a new active chat', async () => {
+  Object.assign(controller.snapshot(), { archived: true, settingsBusy: false });
+  const finish = pendingPage();
+  const pending = controller.list({ background: true });
+  const created = { ...thread, id: 'created', turns: [] };
+  request.mockImplementation(async (_method, body) => {
+    const input = body as { operation: string };
+    if (input.operation === 'start') return { thread: created };
+    if (input.operation === 'syncHistory') return historyDelta(created);
+    if (input.operation === 'list') return { data: [created], nextCursor: null };
+    return {};
+  });
+  expect(await controller.send({ text: 'Hello', access: 'workspace-write' })).toBe(true);
+  finish([{ ...thread, id: 'archived' }]);
+  await pending;
+  expect(controller.snapshot()).toMatchObject({ archived: false, threads: [created], loading: false });
+  await vi.advanceTimersByTimeAsync(150);
+  expect(controller.snapshot().threads).toEqual([created]);
+});
+
+it('waits for pagination before fetching a fresh manual first page', async () => {
+  Object.assign(controller.snapshot(), { cursor: 'next' });
+  const finish = pendingPage();
+  const more = controller.list({ more: true });
+  const manual = controller.list();
+  expect(request).toHaveBeenCalledTimes(1);
+  const latest = { ...thread, id: 'latest' };
+  request.mockResolvedValueOnce({ data: [latest], nextCursor: null });
+  finish([{ ...thread, id: 'older' }]);
+  await Promise.all([more, manual]);
+  expect(request).toHaveBeenCalledTimes(2);
+  expect(controller.snapshot()).toMatchObject({ threads: [latest], loading: false, listRefreshing: false });
+});
+
+it.each(['stop', 'disconnect', 'filter'] as const)('cancels a queued manual refresh on %s', async action => {
+  const finish = pendingPage();
+  const background = controller.list({ background: true });
+  const manual = controller.list();
+  if (action === 'stop') controller.stop();
+  else if (action === 'disconnect') events.mode('offline');
+  else await controller.list({ archived: true });
+  finish([{ ...thread, name: 'Obsolete' }]);
+  await Promise.all([background, manual]);
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(request).toHaveBeenCalledTimes(action === 'filter' ? 2 : 1);
+  expect(controller.snapshot()).toMatchObject({ threads: [thread], loading: false, listRefreshing: false });
+  expect(vi.getTimerCount()).toBe(0);
 });
 
 it.each(['stop', 'disconnect'] as const)('cancels pending work on %s', async action => {

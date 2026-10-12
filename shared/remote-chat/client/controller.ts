@@ -14,6 +14,7 @@ import { HistoryCache } from './historyCache';
 import { ImageCache } from './imageCache';
 import { ThreadActions, threadMutationPatch, type ThreadMutation } from './threadActions';
 import { ThreadListRequests } from './threadListRequests';
+import { mergeThreadList } from './threadListSnapshot';
 import { forkConversation } from './forkConversation';
 import { OfflineWriter, type OfflineHistoryStore } from './offline';
 import { offlineImage } from './offlineImages';
@@ -71,6 +72,7 @@ export class ChatController {
   private readonly listRequests = new ThreadListRequests(async () => {
     if (this.active && this.transportConnected) await this.list({ background: true });
   });
+  private manualList?: Promise<void>;
   private readGeneration = 0;
   private selectionGeneration = 0;
   private refreshThreadId: string | null = null;
@@ -204,7 +206,7 @@ export class ChatController {
     if (event?.method === HISTORY_CHANGED) {
       if (event.params.threadId === this.state.selected?.id) this.scheduleHistory();
       if (event.params.reason?.startsWith('thread/')
-        || !this.state.threads.some((thread) => thread.id === event.params.threadId)) this.listRequests.schedule();
+        || !this.state.threads.some((thread) => thread.id === event.params.threadId)) this.listRequests.changed();
       return;
     }
     if (event?.method === COMPOSER_EVENT) { this.composer.receive(event.params as unknown as ComposerSnapshot); return; }
@@ -216,14 +218,17 @@ export class ChatController {
     if (event?.method === 'turn/completed' && event.params.threadId === this.state.selected?.id) {
       this.scheduleHistory();
     }
-    if (['thread/name/updated', 'thread/archived', 'thread/unarchived', 'thread/deleted'].includes(event?.method)) {
-      this.listRequests.schedule();
+    if (['thread/started', 'thread/name/updated', 'thread/archived', 'thread/unarchived', 'thread/deleted',
+      'turn/started', 'turn/completed'].includes(event.method)) this.listRequests.changed();
+    if (['thread/name/updated', 'thread/archived', 'thread/unarchived', 'thread/deleted'].includes(event.method)) {
       if (event.params.threadId === this.state.selected?.id) this.scheduleHistory();
     }
     if (event?.method === 'connection/closed' || event?.method === 'codex/disconnected') {
       this.skillGeneration += 1;
       this.synchronization += 1;
-      this.update({ ready: false, connecting: false, error: CONNECTION_ERRORS.guiDisconnected,
+      this.listRequests.reset();
+      this.update({ ready: false, connecting: false, loading: false, listRefreshing: false,
+        error: CONNECTION_ERRORS.guiDisconnected,
         connectionIssue: CONNECTION_ERRORS.guiDisconnected });
       this.scheduleSynchronization();
     }
@@ -425,36 +430,48 @@ export class ChatController {
     const search = options.search ?? this.state.search;
     const archived = options.archived ?? this.state.archived;
     const cursor = options.more ? this.state.cursor ?? undefined : undefined;
-    // Joining an automatic request still gives a manual pull its own progress indicator.
-    if (!options.background && !options.more) this.update({ listRefreshing: true });
+    const manual = !options.background && !options.more;
     const key = JSON.stringify([search, archived, cursor, Boolean(options.more)]);
-    return this.listRequests.run(key, async generation => {
-      this.update({ search, archived, loading: true });
-      await this.loadList({ search, archived, cursor, more: options.more }, generation);
-    });
+    const scope = JSON.stringify([search, archived]);
+    const promise = this.listRequests.run({ key, scope, more: options.more, fresh: manual },
+      async (generation, revision) => {
+        this.update({ search, archived, loading: true });
+        await this.loadList({ search, archived, cursor, more: options.more }, generation, revision);
+      });
+    if (manual && this.manualList !== promise) {
+      this.manualList = promise;
+      this.update({ listRefreshing: true });
+      void promise.finally(() => {
+        if (this.manualList !== promise) return;
+        this.manualList = undefined;
+        this.update({ listRefreshing: false });
+      });
+    }
+    return promise;
   }
 
   private async loadList(options: { search: string; archived: boolean; cursor?: string; more?: boolean },
-    generation: number) {
+    generation: number, revision: number) {
     const { search, archived, cursor, more } = options;
+    const before = this.state.threads;
     if (this.offline && !this.state.ready && this.synchronizing !== this.synchronization) {
       await this.listOffline();
-      if (generation === this.listRequests.generation) this.update({ loading: false, listRefreshing: false });
+      if (generation === this.listRequests.generation) this.update({ loading: false });
       return;
     }
     try {
       const result = await this.request<ListResponse<Thread> & { sidebar?: SidebarSnapshot }>({
         operation: 'list', search, archived, cursor,
       });
-      if (generation !== this.listRequests.generation) return;
+      if (!this.listRequests.accepts(generation, revision)) return;
       this.applySidebar(result.sidebar);
-      void this.offline?.updateSummaries?.(result.data, archived).catch(this.cacheFailure);
-      const threads = more ? [...this.state.threads, ...result.data] : result.data;
-      this.update({ threads: [...new Map(threads.map((thread) => [thread.id, thread])).values()],
-        cursor: result.nextCursor });
+      const { threads, summaries } = mergeThreadList({ before, current: this.state.threads,
+        incoming: result.data, more });
+      void this.offline?.updateSummaries?.(summaries, archived).catch(this.cacheFailure);
+      this.update({ threads, cursor: result.nextCursor });
     } catch (error) { if (generation === this.listRequests.generation) this.failure(error); }
     finally {
-      if (generation === this.listRequests.generation) this.update({ loading: false, listRefreshing: false });
+      if (generation === this.listRequests.generation) this.update({ loading: false });
     }
   }
 
@@ -603,9 +620,12 @@ export class ChatController {
         const result = await this.request<{ thread: Thread }>({ operation: 'start', model: selection.model || undefined,
           access: input.access, cwd: this.state.draftProject?.cwd });
         thread = result.thread;
+        this.listRequests.reset();
+        const threads = this.state.archived ? [] : this.state.threads;
         this.update({ selected: thread, draftProject: null, selectedArchived: false,
-          threads: [thread, ...this.state.threads.filter((entry) => entry.id !== result.thread.id)],
-          archived: false, search: '', cursor: null });
+          threads: [thread, ...threads.filter((entry) => entry.id !== result.thread.id)],
+          archived: false, search: '', cursor: null, loading: false, listRefreshing: false });
+        this.listRequests.changed();
         await this.composer.created(thread.id, selection);
       }
       this.ensureCurrent(generation);
@@ -797,7 +817,7 @@ export class ChatController {
         operation === 'rename' ? { ...thread, name: body.name } : thread,
       ], archived)).catch(this.cacheFailure);
     }
-    this.update({ ...threadMutationPatch(this.state, body), listRefreshing: false });
+    this.update({ ...threadMutationPatch(this.state, body), loading: false, listRefreshing: false });
   }
 
   forkConversation = (thread: Thread) => {

@@ -60,9 +60,11 @@ afterEach(async () => {
   controller.stop(); container.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals();
 });
 
-it('keeps remote chats usable during background sync and joins a manual refresh to the same request', async () => {
+it('keeps remote chats usable during background sync and queues a fresh manual request', async () => {
   let finish!: (value: unknown) => void;
+  let finishManual!: (value: unknown) => void;
   request.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  request.mockImplementationOnce(() => new Promise(resolve => { finishManual = resolve; }));
   await render();
   let background!: Promise<void>;
   await act(async () => { background = controller.list({ background: true }); });
@@ -70,18 +72,22 @@ it('keeps remote chats usable during background sync and joins a manual refresh 
   expect(refresh.classList.contains('ant-btn-loading')).toBe(false);
   expect(container.querySelector<HTMLButtonElement>('[aria-label="已有对话"]')!.disabled).toBe(false);
   expect(list().getAttribute('aria-busy')).toBe('true');
-  let manual!: Promise<void>;
-  await act(async () => { manual = controller.list(); });
-  expect(manual).toBe(background);
+  expect(refresh.disabled).toBe(false);
+  await act(async () => refresh.click());
   expect(request).toHaveBeenCalledTimes(1);
   expect(refresh.classList.contains('ant-btn-loading')).toBe(true);
   await act(async () => {
     finish({ data: [older], nextCursor: null });
-    await manual;
+    await background;
   });
+  expect(request).toHaveBeenCalledTimes(2);
+  expect(list().textContent).toContain('已有对话');
+  expect(list().textContent).not.toContain('更早的对话');
+  expect(refresh.classList.contains('ant-btn-loading')).toBe(true);
+  await act(async () => finishManual({ data: [{ ...thread, name: '最新对话' }], nextCursor: null }));
   expect(refresh.classList.contains('ant-btn-loading')).toBe(false);
   expect(refresh.disabled).toBe(false);
-  expect(list().textContent).toContain('更早的对话');
+  expect(list().textContent).toContain('最新对话');
 });
 
 it('retries the failed remote page on downward scrolling with the local hint and no overlapping requests', async () => {

@@ -1,6 +1,7 @@
 import { DeviceEventEmitter, NativeModules } from 'react-native';
 import type { AppRelease } from './appUpdate';
 import { findUpdatePeers } from '../../../../shared/app-update/peerLookup';
+import { updateNotificationLabels } from './androidUpdateNotifications';
 
 interface UpdateModule {
   sharingProtocol?: number;
@@ -39,6 +40,7 @@ export async function downloadSharedAndroidUpdate(options: {
     if (session) lease = await findUpdatePeers(session, artifact, { protocol: native.sharingProtocol === 2 ? 2 : 0 })
       .catch(() => undefined);
     return await native.downloadPeers(JSON.stringify({ ...metadata, path: options.path,
+      notification: updateNotificationLabels(),
       wifiOnly: options.wifiOnly, artifact, configs: lease?.configs ?? [] }));
   } catch {
     // Peer lookup, transport, file and integrity failures all return to the original GitHub URL.
@@ -52,5 +54,7 @@ export function downloadOfficialAndroidUpdate(options: {
   const native = module();
   if (!native?.downloadOfficial) return null;
   return native.downloadOfficial(JSON.stringify({ path: options.path, wifiOnly: options.wifiOnly,
-    url: options.release.androidAsset?.downloadUrl, version: options.release.version }));
+    url: options.release.androidAsset?.downloadUrl, version: options.release.version,
+    size: options.release.androidAsset?.size, sha256: options.release.androidAsset?.sha256,
+    notification: updateNotificationLabels() }));
 }

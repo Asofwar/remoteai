@@ -7,6 +7,8 @@ import { getAndroidDownloadStatus } from './androidDownloadStatus';
 import { downloadSharedAndroidUpdate, downloadOfficialAndroidUpdate,
   nativeUpdatePath, verifyAndroidPackage } from './androidSharedDownload';
 import { compareAppVersions, versionFromReleaseMetadata } from '../../../../shared/app-update/version';
+import { subscribeAndroidDownloadProgress, type AndroidDownloadProgress } from './androidDownloadProgress';
+import { prepareUpdateNotifications } from './androidUpdateNotifications';
 
 export { compareAppVersions } from '../../../../shared/app-update/version';
 export { versionFromReleaseMetadata } from './version';
@@ -47,7 +49,7 @@ export interface AppUpdateCheck {
 
 export type AndroidUpdateDownloadState =
   | { status: 'idle' }
-  | { status: 'downloading'; version: string }
+  | { status: 'downloading'; version: string; progress?: AndroidDownloadProgress }
   | { status: 'downloaded'; version: string; path: string }
   | { status: 'failed'; version: string; message: string };
 
@@ -238,29 +240,41 @@ export function refreshAndroidUpdateDownloadState(): Promise<AndroidUpdateDownlo
   return stateRefresh;
 }
 
+async function prepareAndroidDownload(release: AppRelease, wifiOnly: boolean): Promise<StoredAndroidUpdate> {
+  // Let recovery finish its storage cleanup before recording the new attempt.
+  await stateRefresh;
+  if (!wifiOnly) await prepareUpdateNotifications();
+  const util = await blobUtil();
+  const safeVersion = release.version.replace(/[^0-9A-Za-z.-]/g, '-');
+  const path = await nativeUpdatePath(safeVersion)
+    ?? `${util.fs.dirs.DownloadDir}/CodexSwitch-update-${safeVersion}-${Date.now()}.apk`;
+  const stored = { version: release.version, path,
+    expectedSize: release.androidAsset!.size, sha256: release.androidAsset!.sha256 };
+  await SecureStore.setItemAsync(UPDATE_METADATA_KEY, JSON.stringify(stored));
+  return stored;
+}
+
 export async function startAndroidUpdateDownload(release: AppRelease, options: { wifiOnly?: boolean } = {}) {
   if (Platform.OS !== 'android') throw new Error(t("应用内安装目前仅支持 Android"));
   if (!release.androidAsset) throw new Error(t("该版本没有可用的 Android 安装包"));
   if (activeDownload) return activeDownload;
   const androidAsset = release.androidAsset;
 
-  publishDownloadState({ status: 'downloading', version: release.version });
+  publishDownloadState({ status: 'downloading', version: release.version, progress: {
+    receivedBytes: 0, totalBytes: androidAsset.size, bytesPerSecond: 0, phase: 'downloading',
+  } });
   activeDownload = (async () => {
+    let unsubscribe: (() => void) | undefined;
     try {
-      // Let recovery finish its storage cleanup before recording the new attempt.
-      await stateRefresh;
-      const util = await blobUtil();
-      const safeVersion = release.version.replace(/[^0-9A-Za-z.-]/g, '-');
-      const path = await nativeUpdatePath(safeVersion)
-        ?? `${util.fs.dirs.DownloadDir}/CodexSwitch-update-${safeVersion}-${Date.now()}.apk`;
-      const stored: StoredAndroidUpdate = {
-        version: release.version,
-        path,
-        expectedSize: androidAsset.size,
-        sha256: androidAsset.sha256,
-      };
-      await SecureStore.setItemAsync(UPDATE_METADATA_KEY, JSON.stringify(stored));
-      const downloadedPath = await downloadAndroidPackage({ release, path, wifiOnly: options.wifiOnly === true });
+      const stored = await prepareAndroidDownload(release, options.wifiOnly === true);
+      unsubscribe = subscribeAndroidDownloadProgress(stored.path, progress => {
+        publishDownloadState({ status: 'downloading', version: release.version, progress });
+      });
+      const downloadedPath = await downloadAndroidPackage({ release, path: stored.path,
+        wifiOnly: options.wifiOnly === true });
+      publishDownloadState({ status: 'downloading', version: release.version, progress: {
+        receivedBytes: androidAsset.size, totalBytes: androidAsset.size, bytesPerSecond: 0, phase: 'verifying',
+      } });
       if (!await verifyAndroidPackage({ path: downloadedPath, size: androidAsset.size, sha256: androidAsset.sha256 })) {
         throw new Error(t("下载未完成，请重新下载。"));
       }
@@ -274,6 +288,7 @@ export async function startAndroidUpdateDownload(release: AppRelease, options: {
       publishDownloadState({ status: 'failed', version: release.version, message });
       throw error;
     } finally {
+      unsubscribe?.();
       activeDownload = null;
     }
   })();

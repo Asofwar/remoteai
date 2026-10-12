@@ -6,7 +6,9 @@ import android.net.Uri
 import android.os.SystemClock
 import org.json.JSONObject
 
-internal fun downloadOfficial(context: Context, files: UpdateFiles, input: JSONObject): String {
+internal fun downloadOfficial(
+  context: Context, files: UpdateFiles, input: JSONObject, progress: UpdateDownloadProgress,
+): String {
   val url = input.getString("url")
   require(officialUrl(url))
   val target = files.target(input.getString("path"))
@@ -15,7 +17,7 @@ internal fun downloadOfficial(context: Context, files: UpdateFiles, input: JSONO
     .setDestinationUri(Uri.fromFile(target))
     .setTitle("Remote AI ${input.getString("version")}")
     .setMimeType("application/vnd.android.package-archive")
-    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_HIDDEN)
   if (input.optBoolean("wifiOnly")) {
     request.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI)
       .setAllowedOverMetered(false).setAllowedOverRoaming(false)
@@ -26,8 +28,14 @@ internal fun downloadOfficial(context: Context, files: UpdateFiles, input: JSONO
   while (SystemClock.elapsedRealtime() < deadline) {
     manager.query(DownloadManager.Query().setFilterById(id)).use { cursor ->
       check(cursor.moveToFirst())
+      progress.report(cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)),
+        cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)))
       when (cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))) {
-        DownloadManager.STATUS_SUCCESSFUL -> return target.path
+        DownloadManager.STATUS_SUCCESSFUL -> {
+          progress.publish(verifying = true)
+          check(files.verify(input))
+          return target.path
+        }
         DownloadManager.STATUS_FAILED -> error("Update download failed")
       }
     }

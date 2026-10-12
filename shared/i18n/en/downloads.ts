@@ -1,4 +1,9 @@
 export const downloads: Readonly<Record<string, string>> = {
+  '应用更新': 'App updates', '下载中 · {percent}%': 'Downloading · {percent}%',
+  '更新已下载，点击打开应用安装。': 'Update downloaded. Tap to open the app and install.',
+  '下载未完成，点击打开应用重试。': 'Download incomplete. Tap to open the app and retry.',
+  '可以继续使用应用，在此页面或通知栏查看进度。':
+    'Keep using the app. Check progress here or in notifications.',
   '下载会在后台继续，可在“下载管理”查看进度。': 'Downloads continue in the background. Track progress in Downloads.',
   '将删除此下载任务和临时文件，已保存的文件会保留。':
     'Remove this task and its temporary files. Files you have saved will be kept.',

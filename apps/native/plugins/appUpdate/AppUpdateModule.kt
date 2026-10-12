@@ -32,22 +32,36 @@ class AppUpdateModule(private val context: ReactApplicationContext) : ReactConte
   fun verifyPackage(options: String, promise: Promise) = task(promise) { files.verify(JSONObject(options)) }
 
   @ReactMethod
-  fun downloadPeers(options: String, promise: Promise) = download(promise) {
-    val input = JSONObject(options)
+  fun downloadPeers(options: String, promise: Promise) = download(options, promise) { input, progress ->
     val configs = input.getJSONArray("configs")
     if ((0 until configs.length()).all { configs.getJSONObject(it).optInt("packageProtocol") >= 2 }) {
-      UpdateBlockDownload(context, files, input).download()
-    } else { UpdatePeerDownload(files, input).download() }
+      UpdateBlockDownload(context, files, input, progress).download()
+    } else { UpdatePeerDownload(files, input, progress).download() }
   }
 
   @ReactMethod
-  fun downloadOfficial(options: String, promise: Promise) = download(promise) {
-    downloadOfficial(context, files, JSONObject(options))
+  fun downloadOfficial(options: String, promise: Promise) = download(options, promise) { input, progress ->
+    downloadOfficial(context, files, input, progress)
   }
 
-  private fun download(promise: Promise, action: () -> String) = task(promise) {
+  private fun download(options: String, promise: Promise,
+    action: (JSONObject, UpdateDownloadProgress) -> String) = task(promise) {
     check(downloading.compareAndSet(false, true))
-    try { action() } finally { downloading.set(false) }
+    var progress: UpdateDownloadProgress? = null
+    var complete = false
+    try {
+      val input = JSONObject(options)
+      files.target(input.getString("path"))
+      val reporter = UpdateDownloadProgress(context, input)
+      progress = reporter
+      reporter.restore(0)
+      val path = action(input, reporter)
+      complete = true
+      path
+    } finally {
+      progress?.finish(complete)
+      downloading.set(false)
+    }
   }
 
   private fun task(promise: Promise, action: () -> Any) {

@@ -11,7 +11,9 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** Native workers write disjoint file ranges; no APK buffers cross the React Native bridge. */
-internal class UpdatePeerDownload(private val files: UpdateFiles, private val input: JSONObject) {
+internal class UpdatePeerDownload(
+  private val files: UpdateFiles, private val input: JSONObject, private val progress: UpdateDownloadProgress,
+) {
   private val owner = "update-${UUID.randomUUID()}"
   private val cancelled = AtomicBoolean(false)
   private val started = SystemClock.elapsedRealtime()
@@ -31,6 +33,7 @@ internal class UpdatePeerDownload(private val files: UpdateFiles, private val in
         tasks.submit(java.util.concurrent.Callable { transfer(configs.getJSONObject(index), index, configs.length()) })
       }
       repeat(configs.length()) { tasks.take().get() }
+      progress.publish(verifying = true)
       check(files.verify(input))
       complete = true
       return target.path
@@ -45,6 +48,7 @@ internal class UpdatePeerDownload(private val files: UpdateFiles, private val in
   }
 
   private fun checkActive() {
+    progress.publish()
     check(!cancelled.get() && !Thread.currentThread().isInterrupted)
     check(SystemClock.elapsedRealtime() - started < 20 * 60_000)
     if (input.optBoolean("wifiOnly")) check(files.wifiAvailable())
@@ -132,6 +136,7 @@ internal class UpdatePeerDownload(private val files: UpdateFiles, private val in
         }
         val bytes = decodeChunk(frame, offset, end)
         file.write(bytes); offset += bytes.size
+        progress.advance(bytes.size.toLong())
         val elapsed = SystemClock.elapsedRealtime() - rateAt
         if (elapsed >= 15_000) {
           check((offset - rateOffset) * 1000 / elapsed >= 64 * 1024)

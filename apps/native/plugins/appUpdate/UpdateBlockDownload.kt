@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit
 /** Small jobs let fast sources take more work; failed jobs leave completed file ranges intact. */
 internal class UpdateBlockDownload(
   private val context: ReactApplicationContext, private val files: UpdateFiles, private val input: JSONObject,
+  private val progress: UpdateDownloadProgress,
 ) {
   private data class Result(val source: Int, val block: Int, val bytes: ByteArray?, val ready: Boolean = false)
   private val configs = input.getJSONArray("configs").also { require(it.length() in 0..3) }
@@ -34,15 +35,18 @@ internal class UpdateBlockDownload(
     try {
       UpdateCheckpoint(files, input).use { checkpoint ->
         plan.restore(checkpoint.restored)
+        progress.restore(checkpoint.receivedBytes)
         sessions.indices.forEach { source -> submit(source, -1) { sessions[source].open(); null } }
         submit(sessions.size, -1) { if (sessions.isNotEmpty()) Thread.sleep(2_000); null }
         val deadline = SystemClock.elapsedRealtime() + 20 * 60_000
         while (!plan.complete() && pending > 0 && SystemClock.elapsedRealtime() < deadline) {
           val result = tasks.poll(250, TimeUnit.MILLISECONDS)?.get()
           if (result != null) { pending--; accept(result, checkpoint) }
+          progress.publish()
           schedule()
         }
         check(plan.complete())
+        progress.publish(verifying = true)
         return checkpoint.finish()
       }
     } finally {
@@ -74,6 +78,7 @@ internal class UpdateBlockDownload(
     }
     if (!plan.finish(result.source, result.block)) return
     checkpoint.write(result.block, bytes)
+    progress.advance(bytes.size.toLong())
   }
 
   private fun schedule() {

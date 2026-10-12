@@ -5,13 +5,18 @@ import { ActivityIndicator, Pressable, Text } from 'react-native';
 import type { useAppUpdate } from './useAppUpdate';
 import { useStyles } from './styles';
 import { useStyles as useSettingsStyles } from '../settings/styles';
+import { updateDownloadPercent } from '../update/androidDownloadProgress';
 
 type UpdateState = ReturnType<typeof useAppUpdate>;
 
 function updateAction(update: UpdateState) {
   const { downloadState, updateCheck, checking } = update;
   if (downloadState.status === 'downloaded') return { label: t("立即安装"), onPress: update.installDownloaded };
-  if (downloadState.status === 'downloading') return { label: t("下载中"), busy: true };
+  if (downloadState.status === 'downloading') {
+    if (downloadState.progress?.phase === 'verifying') return { label: t('正在校验'), busy: true };
+    const percent = updateDownloadPercent(downloadState.progress);
+    return { label: percent === null ? t('下载中') : t('下载中 · {percent}%', { percent }), busy: true };
+  }
   if (checking) return { label: t("检查中"), busy: true };
   if (updateCheck?.updateAvailable) {
     return { label: downloadState.status === 'failed' ? t("重新下载") : t("更新"),

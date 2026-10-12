@@ -3,6 +3,7 @@ import { Text, View } from 'react-native';
 import type { useAppUpdate } from './useAppUpdate';
 import { useStyles } from './styles';
 import { ReleaseNotes } from './ReleaseNotes';
+import { UpdateDownloadProgress } from './UpdateDownloadProgress';
 
 type UpdateState = ReturnType<typeof useAppUpdate>;
 
@@ -13,7 +14,7 @@ function DownloadStatus({ update }: { update: UpdateState }) {
   if (state.status === 'idle') return null;
   if (state.status === 'downloading') return <View style={styles.status}>
     <Text style={styles.statusTitle}>{t("正在下载 v")}{state.version}</Text>
-    <Text style={styles.detail}>{t("可以离开此页面，在通知栏查看下载进度。")}</Text>
+    <UpdateDownloadProgress progress={state.progress} />
   </View>;
   if (state.status === 'failed') return <View style={styles.status}>
     <Text style={[styles.statusTitle, styles.error]}>v{state.version}{' '}{t("下载失败")}</Text>
@@ -46,13 +47,10 @@ function ReleaseDetails({ update }: { update: UpdateState }) {
 export function UpdateDetails({ update }: { update: UpdateState }) {
   const styles = useStyles();
   useLanguage();
-  if (update.error) return <View style={styles.updateDetails}>
-    <Text accessibilityRole="alert" style={[styles.detail, styles.error]}>{update.error}</Text>
-  </View>;
-  if (!update.updateCheck && update.downloadState.status === 'idle') return null;
-  if (!update.updateCheck?.updateAvailable && update.downloadState.status === 'idle') return null;
+  if (!update.error && !update.updateCheck?.updateAvailable && update.downloadState.status === 'idle') return null;
   return <View style={styles.updateDetails}>
     <DownloadStatus update={update} />
+    {update.error ? <Text accessibilityRole="alert" style={[styles.detail, styles.error]}>{update.error}</Text> : null}
     <ReleaseDetails update={update} />
   </View>;
 }

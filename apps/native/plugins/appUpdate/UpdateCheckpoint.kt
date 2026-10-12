@@ -18,6 +18,7 @@ internal class UpdateCheckpoint(private val files: UpdateFiles, private val inpu
   private val file: RandomAccessFile
   private val hashes = arrayOfNulls<String>(((size + UPDATE_BLOCK_BYTES - 1) / UPDATE_BLOCK_BYTES).toInt())
   val restored: BooleanArray
+  val receivedBytes: Long get() = hashes.indices.sumOf { if (hashes[it] != null) length(it).toLong() else 0L }
 
   init {
     require(artifact.matches(Regex("[0-9a-f]{64}")) && size in 1..MAX_UPDATE_BYTES)

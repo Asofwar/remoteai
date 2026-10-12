@@ -6,12 +6,16 @@ const native = vi.hoisted(() => ({
   getItem: vi.fn(), setItem: vi.fn(), deleteItem: vi.fn(),
   exists: vi.fn(), stat: vi.fn(), fetch: vi.fn(), config: vi.fn(), status: vi.fn(),
   modules: {} as Record<string, unknown>,
+  listen: vi.fn(), remove: vi.fn(),
 }));
 vi.mock('expo-application', () => ({ nativeApplicationVersion: '1.5.29', nativeBuildVersion: '10502999' }));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: native.getItem, setItemAsync: native.setItem, deleteItemAsync: native.deleteItem,
 }));
-vi.mock('react-native', () => ({ Platform: { OS: 'android' }, NativeModules: native.modules }));
+vi.mock('react-native', () => ({ Platform: { OS: 'android' }, NativeModules: native.modules,
+  DeviceEventEmitter: { addListener: native.listen } }));
+vi.mock('./androidUpdateNotifications', () => ({ prepareUpdateNotifications: vi.fn(),
+  updateNotificationLabels: () => ({}) }));
 vi.mock('react-native-blob-util', () => ({ default: {
   fs: { exists: native.exists, stat: native.stat, dirs: { DownloadDir: '/storage/emulated/0/Download' } },
   config: native.config,
@@ -46,6 +50,7 @@ beforeEach(() => {
   native.modules.AppUpdate = { getDownloadStatus: native.status };
   native.config.mockReturnValue({ fetch: native.fetch });
   native.fetch.mockResolvedValue({ path: () => stored.path });
+  native.listen.mockReturnValue({ remove: native.remove });
 });
 
 describe('Android update recovery after restarting the app', () => {
@@ -128,6 +133,32 @@ describe('Android update recovery after restarting the app', () => {
 });
 
 describe('Android update refresh and retry races', () => {
+  it('shares live bytes and speed across page visits and cleans up after verification', async () => {
+    const transfer = deferred<string>();
+    const official = vi.fn().mockReturnValue(transfer.promise);
+    native.modules.AppUpdate = { downloadOfficial: official, updatePath: () => Promise.resolve(stored.path) };
+    const update = await import('./appUpdate');
+    const download = update.startAndroidUpdateDownload(release);
+    await vi.waitFor(() => expect(official).toHaveBeenCalledOnce());
+    const event = native.listen.mock.calls.find(([name]) => name === 'appUpdateDownloadProgress')![1];
+    const progress = { receivedBytes: 40, totalBytes: 100, bytesPerSecond: 20, phase: 'downloading' };
+    event({ ...progress, path: '/unrelated.apk' });
+    expect(update.getAndroidUpdateDownloadState()).toMatchObject({ progress: { receivedBytes: 0 } });
+    event({ ...progress, path: stored.path });
+    const revisited = vi.fn();
+    const unsubscribe = update.subscribeAndroidUpdateDownload(revisited);
+    expect(await update.refreshAndroidUpdateDownloadState()).toMatchObject({ status: 'downloading', progress });
+    event({ ...progress, receivedBytes: 100, phase: 'verifying', bytesPerSecond: 0, path: stored.path });
+    expect(revisited).toHaveBeenLastCalledWith(expect.objectContaining({
+      progress: expect.objectContaining({ phase: 'verifying', bytesPerSecond: 0 }),
+    }));
+    transfer.resolve(stored.path);
+    await download;
+    expect(update.getAndroidUpdateDownloadState().status).toBe('downloaded');
+    expect(native.remove).toHaveBeenCalledOnce();
+    unsubscribe();
+  });
+
   it('does not restore or install an APK when native integrity or signing checks fail', async () => {
     const verify = vi.fn().mockResolvedValue(false);
     native.modules.AppUpdate = { getDownloadStatus: native.status, verifyPackage: verify };
@@ -169,6 +200,7 @@ describe('Android update refresh and retry races', () => {
     const update = await import('./appUpdate');
     await expect(update.startAndroidUpdateDownload(release)).rejects.toThrow('network failure');
     expect(native.stored).toBeNull();
+    expect(native.remove).toHaveBeenCalledOnce();
     expect((await update.refreshAndroidUpdateDownloadState()).status).toBe('failed');
     await update.startAndroidUpdateDownload(release);
     expect(native.fetch).toHaveBeenCalledTimes(2);

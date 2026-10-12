@@ -25,6 +25,17 @@ it('provides an enabled retry action for a failed update download', () => {
   expect(beginDownload).toHaveBeenCalledWith(release);
 });
 
+it.each(['downloading', 'verifying'] as const)('prioritizes %s over a latest-version result', phase => {
+  vi.stubGlobal('React', React);
+  const update = { checking: false, error: '', updateCheck: { updateAvailable: false },
+    downloadState: { status: 'downloading', version: '2.0.0', progress: {
+      receivedBytes: 40, totalBytes: 100, bytesPerSecond: 20, phase,
+    } } } as ReturnType<typeof useAppUpdate>;
+  const button = VersionUpdateButton({ update });
+  expect(button.props.accessibilityLabel).toBe(phase === 'verifying' ? '正在校验' : '下载中 · 40%');
+  expect(button.props.disabled).toBe(true);
+});
+
 vi.mock('react', async () => ({ ...await vi.importActual<typeof import('react')>('react'),
 
   useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),

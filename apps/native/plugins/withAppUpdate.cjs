@@ -1,10 +1,21 @@
-const { withDangerousMod, withMainApplication } = require('expo/config-plugins');
+const { withAndroidManifest, withDangerousMod, withMainApplication } = require('expo/config-plugins');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
 const PACKAGE_LINE = 'packages.add(com.codexswitch.update.AppUpdatePackage())';
 
 module.exports = function withAppUpdate(config) {
+  config = withAndroidManifest(config, (result) => {
+    const permissions = result.modResults.manifest['uses-permission'] ??= [];
+    // DownloadManager is silent because the app supplies progress for every download source.
+    for (const name of ['DOWNLOAD_WITHOUT_NOTIFICATION', 'POST_NOTIFICATIONS']) {
+      const permission = 'android.permission.' + name;
+      if (!permissions.some(entry => entry.$['android:name'] === permission)) {
+        permissions.push({ $: { 'android:name': permission } });
+      }
+    }
+    return result;
+  });
   config = withMainApplication(config, (result) => {
     const source = result.modResults.contents;
     if (!source.includes(PACKAGE_LINE)) {
@@ -18,7 +29,8 @@ module.exports = function withAppUpdate(config) {
     await fs.mkdir(target, { recursive: true });
     for (const name of ['AppUpdatePackage.kt', 'AppUpdateModule.kt', 'UpdateFiles.kt',
       'UpdatePeerDownload.kt', 'UpdateOfficialDownload.kt', 'UpdateBlockSession.kt',
-      'UpdateBlockDownload.kt', 'UpdateOriginBlocks.kt', 'UpdateCheckpoint.kt']) {
+      'UpdateBlockDownload.kt', 'UpdateOriginBlocks.kt', 'UpdateCheckpoint.kt',
+      'UpdateDownloadProgress.kt', 'UpdateDownloadNotification.kt']) {
       await fs.copyFile(path.join(__dirname, 'appUpdate', name), path.join(target, name));
     }
     return result;

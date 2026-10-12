@@ -9,13 +9,15 @@ vi.mock('react', async (importOriginal) => ({
 
   useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),
 }));
-vi.mock('react-native', () => ({ Text: 'Text', View: 'View', StyleSheet: {
+vi.mock('react-native', () => ({ Text: 'Text', View: 'View', ActivityIndicator: 'Spinner', StyleSheet: {
   create: <T,>(styles: T) => styles, hairlineWidth: 1,
 } }));
 vi.mock('./styles', () => ({ useStyles: () => ({}) }));
 vi.mock('./useAppUpdate', () => ({ openReleasePage: observed.openReleasePage }));
 
-interface Props { children?: unknown; accessibilityRole?: string; onPress?: () => void }
+interface Props {
+  children?: unknown; accessibilityRole?: string; accessibilityValue?: { now: number }; onPress?: () => void;
+}
 interface RenderedNode { props: Props; children: RenderedNode[]; text: string }
 
 function render(value: unknown): RenderedNode[] {
@@ -34,7 +36,7 @@ function descendants(nodes: RenderedNode[]): RenderedNode[] {
   return nodes.flatMap((node) => [node, ...descendants(node.children)]);
 }
 
-function details(notes: string) {
+function details(notes: string, overrides: Partial<ReturnType<typeof useAppUpdate>> = {}) {
   vi.stubGlobal('React', React);
   const update: ReturnType<typeof useAppUpdate> = {
     checking: false, error: '', downloadState: { status: 'idle' },
@@ -42,7 +44,7 @@ function details(notes: string) {
     updateCheck: { currentVersion: '1.5.29', updateAvailable: true, release: {
       version: '1.5.31', tagName: 'v1.5.31', title: 'Remote AI', notes, publishedAt: null,
       releaseUrl: 'https://example.com/release', androidAsset: null,
-    } },
+    } }, ...overrides,
   };
   return descendants(render(UpdateDetails({ update })));
 }
@@ -76,4 +78,31 @@ it('shows a friendly fallback when the release only contains installer links or 
     + '<!-- codex-switch-downloads:end -->\n\n## 更新内容\n\n<!-- no notes -->')
     .map((node) => node.text).join('');
   expect(text).toContain('本次版本未提供更新说明。');
+});
+
+it('keeps live progress and speed visible when checking the release fails', () => {
+  const nodes = details('', { error: '暂时无法检查更新，请重试。', updateCheck: null,
+    downloadState: { status: 'downloading', version: '2.0.0', progress: {
+      receivedBytes: 40 * 1024 * 1024, totalBytes: 100 * 1024 * 1024,
+      bytesPerSecond: 2.5 * 1024 * 1024, phase: 'downloading',
+    } } });
+  const text = nodes.map(node => node.text).join('');
+  expect(text).toContain('40%');
+  expect(text).toContain('40.0 MB / 100.0 MB');
+  expect(text).toContain('2.5 MB/s');
+  expect(nodes.find(node => node.props.accessibilityRole === 'progressbar')?.props.accessibilityValue?.now).toBe(40);
+  expect(text).toContain('暂时无法检查更新');
+});
+
+it('shows verification separately from download speed and keeps unknown totals indeterminate', () => {
+  const downloadState = { status: 'downloading', version: '2.0.0', progress: {
+    receivedBytes: 100, totalBytes: 100, bytesPerSecond: 0, phase: 'verifying',
+  } } as const;
+  const text = details('', { downloadState }).map(node => node.text).join('');
+  expect(text).toContain('正在校验');
+  expect(text).toContain('100%');
+  expect(text).not.toContain('/s');
+  const unknown = details('', { downloadState: { ...downloadState, progress: undefined } });
+  expect(unknown.map(node => node.text).join('')).not.toContain('%');
+  expect(unknown.some(node => node.props.accessibilityRole === 'progressbar')).toBe(false);
 });

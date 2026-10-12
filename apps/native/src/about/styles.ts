@@ -22,6 +22,10 @@ export const useStyles = createThemedStyles((color) => ({
   statusHeading: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   statusTitle: { color: color(colors.ink, 'ink'), fontSize: 15, fontWeight: '600', flex: 1 },
   statusLabel: { color: color('#079c70', 'accent'), fontSize: 13 },
+  progressDetails: { gap: 8 },
+  progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: color('#e5ebe8', 'border') },
+  progressFill: { height: '100%', borderRadius: 3, backgroundColor: color('#079c70', 'accent') },
+  progressNumbers: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 12 },
   detail: { color: color(colors.muted, 'muted'), fontSize: 13, lineHeight: 21 },
   error: { color: color(colors.danger, 'danger') },
 }));

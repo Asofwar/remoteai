@@ -233,6 +233,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Run checks in isolated test processes
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
@@ -244,6 +245,27 @@ jobs:
           cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --doc
           node scripts/check-installer-helper.mjs
           node scripts/check-installer-fixture.mjs
+
+      # Git Bash prepends its own link.exe and shadows the configured MSVC linker.
+      - name: Run Windows checks in isolated test processes
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          npx lerna run check --ignore @codex-switch/backend --stream
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run check:backend
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo nextest run --locked --manifest-path apps/desktop/src-tauri/Cargo.toml `
+            --test-threads 1 --no-fail-fast
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --doc
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/check-installer-helper.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/check-installer-fixture.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Prepare desktop video runtime
         if: startsWith(matrix.name, 'windows') || startsWith(matrix.name, 'macos')

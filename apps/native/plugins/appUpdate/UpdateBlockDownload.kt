@@ -42,6 +42,7 @@ internal class UpdateBlockDownload(
         while (!plan.complete() && pending > 0 && SystemClock.elapsedRealtime() < deadline) {
           val result = tasks.poll(250, TimeUnit.MILLISECONDS)?.get()
           if (result != null) { pending--; accept(result, checkpoint) }
+          checkpoint.flushIfDue()
           progress.publish()
           schedule()
         }
@@ -52,7 +53,7 @@ internal class UpdateBlockDownload(
     } finally {
       executor.shutdownNow()
       while (!executor.awaitTermination(1, TimeUnit.SECONDS)) { /* Wait before deleting a destination still in use. */ }
-      sessions.forEach { it.close() }
+      try { origin.close() } finally { sessions.forEach { it.close() } }
     }
   }
 
@@ -84,35 +85,11 @@ internal class UpdateBlockDownload(
   private fun schedule() {
     ready.indices.forEach { source ->
       if (!ready[source]) return@forEach
-      val index = plan.claim(source, SystemClock.elapsedRealtime()) ?: return@forEach
+      // Peers fill from the end, leaving the official stream a continuous range from the start.
+      val index = plan.claim(source, SystemClock.elapsedRealtime(), fromEnd = source < sessions.size) ?: return@forEach
       submit(source, index) {
         if (source == sessions.size) origin.block(index) else sessions[source].block(index)
       }
     }
-  }
-}
-
-internal class UpdateBlockPlan(blocks: Int, sources: Int) {
-  private val done = BooleanArray(blocks)
-  private val busy = arrayOfNulls<Pair<Int, Long>>(sources)
-  private val failed = BooleanArray(sources)
-  fun complete() = done.all { it }
-  fun restore(previous: BooleanArray) { require(previous.size == done.size); previous.copyInto(done) }
-  fun fail(source: Int) { busy[source] = null; failed[source] = true }
-  fun finish(source: Int, index: Int): Boolean {
-    busy[source] = null
-    if (done[index]) return false
-    done[index] = true
-    return true
-  }
-  fun claim(source: Int, now: Long): Int? {
-    if (failed[source] || busy[source] != null) return null
-    val pending = done.indices.firstOrNull { index -> !done[index] && busy.none { it?.first == index } }
-    val steal = busy.filterNotNull().firstOrNull { (index, started) ->
-      !done[index] && now - started >= 2_000 && busy.count { it?.first == index } == 1
-    }?.first
-    val index = pending ?: steal ?: return null
-    busy[source] = index to now
-    return index
   }
 }

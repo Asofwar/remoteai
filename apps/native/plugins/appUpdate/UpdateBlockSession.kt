@@ -5,8 +5,6 @@ import com.codexswitch.connectivity.NativeConnectivity
 import org.json.JSONObject
 import java.security.MessageDigest
 
-internal const val UPDATE_BLOCK_BYTES = 512 * 1024
-
 /** One negotiated binary session; payloads never cross the React Native bridge. */
 internal class UpdateBlockSession(
   private val owner: String, private val files: UpdateFiles,

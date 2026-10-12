@@ -29,7 +29,7 @@ module.exports = function withAppUpdate(config) {
     await fs.mkdir(target, { recursive: true });
     for (const name of ['AppUpdatePackage.kt', 'AppUpdateModule.kt', 'UpdateFiles.kt',
       'UpdatePeerDownload.kt', 'UpdateOfficialDownload.kt', 'UpdateBlockSession.kt',
-      'UpdateBlockDownload.kt', 'UpdateOriginBlocks.kt', 'UpdateCheckpoint.kt',
+      'UpdateBlockDownload.kt', 'UpdateBlockPlan.kt', 'UpdateOriginBlocks.kt', 'UpdateCheckpoint.kt',
       'UpdateDownloadProgress.kt', 'UpdateDownloadNotification.kt']) {
       await fs.copyFile(path.join(__dirname, 'appUpdate', name), path.join(target, name));
     }

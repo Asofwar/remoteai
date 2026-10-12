@@ -127,7 +127,7 @@ function MessageBody({ item, onOpen, running = false, process = false }: Message
   return <View style={styles.assistantMessage}>
     <ChatMarkdown text={text} tone={process ? 'process' : 'default'} />
     {!process && !running && !!text.trim() && <View style={messageStyles.actions}>
-      <CopyTextButton text={text} label={t("复制回复")} variant="labeled" />
+      <CopyTextButton text={text} label={t("复制回复")} variant="icon" />
     </View>}
   </View>;
 }

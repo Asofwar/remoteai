@@ -43,7 +43,7 @@ export const ChatMessage = memo(function ChatMessage({ item, onOpen, process = f
       {!desktop && images.map((source, index) => <ChatImage key={index} source={source} />)}
     </div> : <ChatMarkdown text={text} process={process} desktop={desktop} />}
     {!!text.trim() && !running && !(desktop && process) && <div className="chat-message-actions" data-quote-exclude>
-      <ChatCopyButton text={text} label={user ? t("复制消息") : t("复制回复")} />
+      <ChatCopyButton text={text} label={user ? t("复制消息") : t("复制回复")} iconOnly={!user} />
       <ChatQuoteButton messageId={item.id} text={text} role={user ? 'user' : 'assistant'} onQuote={onQuote} />
     </div>}
   </article>;

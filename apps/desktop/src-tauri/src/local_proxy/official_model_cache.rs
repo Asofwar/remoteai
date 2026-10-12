@@ -1,4 +1,4 @@
-//! Shared admin-first discovery for proxy clients, the GUI, and explicit catalog refreshes.
+//! Shared official-first discovery with Admin fallback for proxy clients, the GUI, and refreshes.
 use super::{UpstreamBody, UpstreamPayload};
 use std::{collections::HashSet, io::Read, time::Duration};
 
@@ -19,6 +19,8 @@ enum CatalogError {
     Request(#[from] reqwest::Error),
     #[error("Could not read model catalog cache")]
     Read(#[from] std::io::Error),
+    #[error("Model catalog returned HTTP {0}")]
+    Status(u16),
     #[error("Model catalog cache is invalid or empty")]
     Invalid,
 }
@@ -27,10 +29,10 @@ pub(super) fn with_fallback<R: Runtime>(
     app: &AppHandle<R>,
     official: impl FnOnce() -> Result<UpstreamPayload, String>,
 ) -> Result<UpstreamPayload, String> {
-    prefer_cache(fetch(app), official)
+    prefer_official(official(), || fetch(app))
 }
 
-/// Fetch the same validated Admin catalog used for official GUI model discovery.
+/// Fetch Admin suggestions and defaults independently of official model discovery.
 pub(crate) fn admin_model_catalog<R: Runtime>(app: &AppHandle<R>) -> Result<Value, String> {
     let payload = fetch(app).map_err(|error| error.to_string())?;
     let UpstreamBody::Buffered(bytes) = payload.body else {
@@ -39,17 +41,39 @@ pub(crate) fn admin_model_catalog<R: Runtime>(app: &AppHandle<R>) -> Result<Valu
     serde_json::from_slice(&bytes).map_err(|error| error.to_string())
 }
 
-fn prefer_cache(
-    cached: Result<UpstreamPayload, CatalogError>,
-    official: impl FnOnce() -> Result<UpstreamPayload, String>,
+fn prefer_official(
+    official: Result<UpstreamPayload, String>,
+    admin: impl FnOnce() -> Result<UpstreamPayload, CatalogError>,
 ) -> Result<UpstreamPayload, String> {
-    match cached {
+    match official
+        .and_then(|payload| validate_official_payload(payload).map_err(|error| error.to_string()))
+    {
         Ok(payload) => Ok(payload),
         Err(error) => {
-            eprintln!("{error}; fetching models from the official service");
-            official()
+            eprintln!("Official model catalog failed: {error}; fetching models from Admin");
+            admin().map_err(|admin_error| {
+                eprintln!("Admin model catalog fallback failed: {admin_error}");
+                error
+            })
         }
     }
+}
+
+fn validate_official_payload(
+    mut payload: UpstreamPayload,
+) -> Result<UpstreamPayload, CatalogError> {
+    if !(200..300).contains(&payload.status) {
+        return Err(CatalogError::Status(payload.status));
+    }
+    let bytes = match payload.body {
+        UpstreamBody::Buffered(bytes) => {
+            validate_catalog(&bytes)?;
+            bytes
+        }
+        UpstreamBody::Streaming(reader) => read_catalog(reader)?,
+    };
+    payload.body = UpstreamBody::Buffered(bytes);
+    Ok(payload)
 }
 
 fn fetch<R: Runtime>(app: &AppHandle<R>) -> Result<UpstreamPayload, CatalogError> {
@@ -99,11 +123,7 @@ fn request_catalog(client: &Client, url: Url) -> Result<UpstreamPayload, Catalog
             Some((name.to_owned(), value.to_owned()))
         })
         .collect();
-    let mut bytes = Vec::new();
-    response
-        .take(MAX_CATALOG_BYTES + 1)
-        .read_to_end(&mut bytes)?;
-    validate_catalog(&bytes)?;
+    let bytes = read_catalog(response)?;
     Ok(UpstreamPayload {
         status: 200,
         content_type: Some("application/json".into()),
@@ -112,6 +132,13 @@ fn request_catalog(client: &Client, url: Url) -> Result<UpstreamPayload, Catalog
         token_usage_service_tier: None,
         token_usage_account: None,
     })
+}
+
+fn read_catalog(reader: impl Read) -> Result<Vec<u8>, CatalogError> {
+    let mut bytes = Vec::new();
+    reader.take(MAX_CATALOG_BYTES + 1).read_to_end(&mut bytes)?;
+    validate_catalog(&bytes)?;
+    Ok(bytes)
 }
 
 fn validate_catalog(bytes: &[u8]) -> Result<(), CatalogError> {

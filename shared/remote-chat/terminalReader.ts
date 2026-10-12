@@ -6,7 +6,7 @@ const RECONNECT_POLL_MS = 1000;
 
 /** Each attachment owns one cursor and one in-flight read; failed reads never end the shell. */
 export function readTerminal(options: {
-  client: GuiToolsClient['terminal']; id: string; onEvent: (event: TerminalEvent) => void;
+  client: Pick<GuiToolsClient['terminal'], 'read'>; id: string; onEvent: (event: TerminalEvent) => void;
 }) {
   let stopped = false;
   let connected = true;

@@ -1,5 +1,5 @@
 import { guiText } from "../../../i18n/guiText";
-import { useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Plus, SquareTerminal, X } from "lucide-react";
 import { Tooltip } from "antd";
 import { MAX_TERMINAL_TABS, type TerminalPanelState, type TerminalTab } from "./useTerminalPanel";
@@ -8,6 +8,7 @@ import { useTerminalSession } from "./useTerminalSession";
 import type { TerminalApi } from "../../../../../../shared/terminal/types";
 import styles from "./terminal.module.less";
 import { TerminalKeys } from './TerminalKeys';
+import { TerminalLinkMenu, type TerminalLinkTarget } from './TerminalLinkMenu';
 
 
 export default function TerminalPanel({ panel, active, api, fill = false, translate = guiText, notice }: {
@@ -52,11 +53,16 @@ function TerminalPane({ tab, visible, api, translate, shortcuts }: {
   tab: TerminalTab; visible: boolean; api: TerminalApi; translate: (source: string) => string;
   shortcuts: boolean;
 }) {
-  const { host, info, status, input } = useTerminalSession(tab.cwd, visible, api, tab.session);
+  const [link, setLink] = useState<TerminalLinkTarget>();
+  const closeLink = useCallback(() => setLink(undefined), []);
+  const { host, info, status, input } = useTerminalSession({ cwd: tab.cwd, visible, api,
+    session: tab.session, onLink: setLink });
   return <div className={styles.pane} hidden={!visible} role="tabpanel" id={`terminal-pane-${tab.id}`}
     aria-labelledby={`terminal-tab-${tab.id}`}>
     <div ref={host} className={styles.screen} aria-label={info?.shell ?? translate("终端")} />
     {status && <div className={styles.status} role="status">{translate(status)}</div>}
     {shortcuts && <TerminalKeys input={input} />}
+    {link && visible && <TerminalLinkMenu key={`${link.url}:${link.x}:${link.y}`} target={link} id={info?.id}
+      api={api} close={closeLink} translate={translate} />}
   </div>;
 }

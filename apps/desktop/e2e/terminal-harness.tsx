@@ -7,6 +7,7 @@ import { terminalApi, type TerminalEvent } from "../src/pages/codexGui/terminal/
 import { DetailsWorkspace } from "../src/pages/codexGui/DetailsWorkspace";
 import { ConversationChangesButton } from "../src/pages/codexGui/ConversationChangesButton";
 import styles from "../src/pages/codexGui/styles.module.less";
+import type { TerminalApi } from '../../../shared/terminal/types';
 
 const sessions = new Map<string, (event: TerminalEvent) => void>();
 const writes: string[] = [];
@@ -14,6 +15,9 @@ const sizes: { cols: number; rows: number }[] = [];
 let opens = 0;
 let closes = 0;
 let ticks = 0;
+const links: string[] = [];
+const external: string[] = [];
+window.open = url => { external.push(String(url)); return null; };
 const output = (id: string, text: string) => sessions.get(id)?.({ type: "output", data: [...new TextEncoder().encode(text)] });
 terminalApi.open = async (cwd, _size, receive) => {
   const id = String(++opens); sessions.set(id, receive);
@@ -23,8 +27,16 @@ terminalApi.open = async (cwd, _size, receive) => {
 terminalApi.write = async (id, data) => { writes.push(data); output(id, data); };
 terminalApi.resize = async (_id, size) => { sizes.push(size); };
 terminalApi.close = async (id) => { sessions.delete(id); closes++; };
+const fixtureApi: TerminalApi = { ...terminalApi };
+if (new URLSearchParams(location.search).has('remote')) {
+  fixtureApi.resolveLink = async (id, url) => {
+    links.push(`${id}:${url}`);
+    return `${location.origin}/e2e/terminal-site.html`;
+  };
+}
 setInterval(() => { ticks++; }, 20);
-Object.assign(window, { terminalHarness: { snapshot: () => ({ opens, closes, writes, sizes, ticks }),
+Object.assign(window, { terminalHarness: { snapshot: () => ({ opens, closes, writes, sizes, ticks, links, external }),
+  output: (text: string) => { for (const id of sessions.keys()) output(id, text); },
   stream: () => { for (const id of sessions.keys()) output(id, "\r\n持续输出 中文 😀\r\n"); } } });
 
 function Fixture() {
@@ -47,7 +59,7 @@ function Fixture() {
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: 20 }}>
           <p>聊天内容</p><textarea aria-label="聊天输入" placeholder="随心输入" style={{ marginTop: 'auto', minHeight: 80 }} />
         </div>
-        {panel.tabs.length > 0 && <TerminalPanel panel={panel} api={terminalApi} active />}
+        {panel.tabs.length > 0 && <TerminalPanel panel={panel} api={fixtureApi} active />}
       </div>
     </DetailsWorkspace>
   </div>;

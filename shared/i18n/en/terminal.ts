@@ -1,4 +1,11 @@
 export const terminalMessages: Record<string, string> = {
+  '打开终端链接': 'Open terminal link',
+  '内部预览': 'Preview in app',
+  '正在打开链接…': 'Opening link…',
+  '请在桌面端打开远程电脑的网页。': 'Open the remote computer’s website in the desktop app.',
+  '网页连接已断开，请重新打开链接。': 'The website connection closed. Open the link again.',
+  '无法连接网页，请确认服务已启动。': 'Unable to connect. Check that the server is running.',
+  '链接无效，请检查后重试。': 'Check the link and try again.',
   '重试': 'Retry',
   '连接中断，恢复后可继续使用。': 'Connection lost. You can continue when it reconnects.',
   '请先连接电脑，再试一次。': 'Connect to your computer, then try again.',

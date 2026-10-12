@@ -13,6 +13,7 @@ import { readDroppedFiles, subscribeFileDrop } from '../fileDrop';
 import { isDesktopApp } from '../../../api/backend';
 import { useRemoteTerminalPanel } from '../../../../../../shared/remote-chat/useRemoteTerminalPanel';
 import { remoteTerminalApi } from './terminalApi';
+import { useTerminalLinkTunnels } from '../terminal/useTerminalLinkTunnels';
 import { RemoteGuiTools } from './RemoteGuiTools';
 import { GuiRemoteDesktop } from '../GuiRemoteDesktop';
 import styles from '../styles.module.less';
@@ -31,7 +32,9 @@ export default function RemoteGuiWorkspace(props: {
   useDesktopDownloads({ identity, device, controller: chat.controller });
   const terminal = useRemoteTerminalPanel({ client: chat.controller.guiTools.terminal, connected: chat.state.ready,
     cwd: chat.state.selected?.cwd ?? chat.state.draftProject?.cwd ?? '' });
-  const terminalApi = useMemo(() => remoteTerminalApi(chat.controller.guiTools.terminal), [chat.controller]);
+  const resolveLink = useTerminalLinkTunnels(chat.controller.guiTools.terminal);
+  const terminalApi = useMemo(() => remoteTerminalApi(chat.controller.guiTools.terminal, resolveLink),
+    [chat.controller, resolveLink]);
   const skinStyle = useDreamSkin(active);
   const workspace = useRef<HTMLElement>(null);
   const popupContainer = useCallback(() => workspace.current ?? document.body, []);

@@ -1,4 +1,5 @@
 import type { TerminalRead, TerminalInfo, TerminalSize } from '../terminal/types';
+import type { TerminalLinkRequest, TerminalLinkReply } from '../terminal/links';
 import { desktopClient } from '../remote-desktop/protocol';
 import { createReviewClient } from './taskReview';
 import type { GitRequest, GitStatus } from './gitWorkspace';
@@ -20,6 +21,7 @@ export const GUI_TOOL_OPERATIONS = new Set([
   PROJECT_LIST_OPERATION, PROJECT_SELECT_OPERATION,
   'guiCliStatus', 'guiCliRelease', 'guiCliInstall', 'guiReconnect',
   'guiTerminalList', 'guiTerminalOpen', 'guiTerminalRead', 'guiTerminalWrite', 'guiTerminalResize', 'guiTerminalClose',
+  'guiTerminalLink',
   'guiGitChanges', 'guiGitDiff', 'guiGitHistory', 'guiGitCommit', 'guiGitCommitFiles',
   'guiGitRepository', 'guiGitAction', 'guiGitWorkspace',
   'guiTaskReview', 'guiTaskRestore',
@@ -53,6 +55,8 @@ export function createGuiToolsClient(request: <T>(body: object) => Promise<T>,
       commit: (input: GitCommitRequest) => request<{ hash: string }>({ ...input, operation: 'guiGitCommit' }),
     },
     terminal: {
+      link: (id: string, input: TerminalLinkRequest) =>
+        request<TerminalLinkReply>({ operation: 'guiTerminalLink', id, request: input }),
       list: (cwd: string) => request<TerminalInfo[]>({ operation: 'guiTerminalList', cwd }),
       open: (cwd: string, size: TerminalSize) =>
         request<TerminalInfo>({ operation: 'guiTerminalOpen', cwd, size }),

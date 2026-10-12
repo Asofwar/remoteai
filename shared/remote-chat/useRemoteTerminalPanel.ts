@@ -12,7 +12,7 @@ const asTab = (session: TerminalInfo): Tab => ({ id: session.id, cwd: session.cw
 
 /** Both phone clients discover this project's PC shells without owning their lifetime. */
 export function useRemoteTerminalPanel(options: {
-  client: GuiToolsClient['terminal']; cwd: string; connected: boolean;
+  client: Pick<GuiToolsClient['terminal'], 'list' | 'open' | 'close'>; cwd: string; connected: boolean;
 }) {
   const { client, cwd, connected } = options;
   const project = terminalProjectKey(cwd);

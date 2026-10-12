@@ -24,6 +24,7 @@ function App() {
     const sessions = new Map<string, { info: TerminalInfo; events: TerminalEvent[] }>();
     let sequence = 0;
     return {
+      link: async () => { throw new Error('Website connections are not simulated by this terminal fixture.'); },
       list: async cwd => [...sessions.values()].filter(session => session.info.cwd === cwd).map(session => session.info),
       open: async cwd => {
         setOpened(value => value + 1);

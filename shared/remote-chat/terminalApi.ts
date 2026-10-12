@@ -1,8 +1,11 @@
 import type { GuiToolsClient } from './guiTools';
 import type { TerminalApi } from '../terminal/types';
 import { readTerminal } from './terminalReader';
+import { remoteDevelopmentUrl } from '../terminal/links';
+import type { ResolveTerminalLink } from '../terminal/links';
 
-export function remoteTerminalApi(client: GuiToolsClient['terminal']): TerminalApi {
+export function remoteTerminalApi(client: Omit<GuiToolsClient['terminal'], 'link'>,
+  resolveLink?: ResolveTerminalLink): TerminalApi {
   const readers = new Map<string, () => void>();
   const attach: NonNullable<TerminalApi['attach']> = async (info, size, onEvent) => {
     readers.get(info.id)?.();
@@ -17,6 +20,11 @@ export function remoteTerminalApi(client: GuiToolsClient['terminal']): TerminalA
   };
   const detach = (id: string) => { readers.get(id)?.(); readers.delete(id); };
   return {
+    resolveLink: async (id, url) => {
+      if (!remoteDevelopmentUrl(url)) return url;
+      if (resolveLink) return resolveLink(id, url);
+      throw new Error('请在桌面端打开远程电脑的网页。');
+    },
     async open(cwd, size, onEvent) {
       const info = await client.open(cwd, size);
       return attach(info, size, onEvent);

@@ -11,6 +11,7 @@ export interface TerminalRead {
   truncated: boolean;
 }
 export interface TerminalApi {
+  resolveLink?: import('./links').ResolveTerminalLink;
   open: (cwd: string, size: TerminalSize, onEvent: (event: TerminalEvent) => void) => Promise<TerminalAttachment>;
   write: (id: string, data: string) => Promise<void>;
   resize: (id: string, size: TerminalSize) => Promise<void>;

@@ -2,6 +2,9 @@ use super::types::{Result, TerminalError};
 use portable_pty::CommandBuilder;
 use std::path::{Path, PathBuf};
 
+#[cfg(windows)]
+mod windows_environment;
+
 pub(super) fn directory(cwd: Option<&str>) -> Result<PathBuf> {
     let path = match cwd.filter(|value| !value.trim().is_empty()) {
         Some(value) if !value.contains('\0') => PathBuf::from(value),
@@ -20,6 +23,7 @@ pub(super) fn shell(cwd: &Path) -> Result<(CommandBuilder, String)> {
     let system = std::env::var_os("SystemRoot").ok_or(TerminalError::Start)?;
     let program = PathBuf::from(system).join("System32/WindowsPowerShell/v1.0/powershell.exe");
     let mut command = CommandBuilder::new(program);
+    windows_environment::refresh(&mut command);
     command.arg("-NoLogo");
     command.cwd(display_path(cwd));
     Ok((command, "PowerShell".into()))

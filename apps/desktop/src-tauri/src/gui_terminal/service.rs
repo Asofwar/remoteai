@@ -40,6 +40,10 @@ pub(crate) struct TerminalState {
 }
 
 impl TerminalState {
+    pub(super) fn ensure_open(&self, id: &str) -> Result<()> {
+        self.get(id).map(|_| ())
+    }
+
     pub(super) fn open(
         self: &Arc<Self>,
         request: OpenTerminal,

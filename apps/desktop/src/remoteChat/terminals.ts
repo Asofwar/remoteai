@@ -1,6 +1,7 @@
 import { terminalApi, type TerminalInfo, type TerminalSize } from '../pages/codexGui/terminal/api';
 import { TerminalOutput } from './terminalOutput';
 import { terminalBelongsToProject } from '../../../../shared/remote-chat/terminalProject';
+import { invoke } from '../api/backend';
 
 const MAX_TERMINALS = 8;
 interface Session { info?: TerminalInfo; output: TerminalOutput; exited: boolean; legacyCursor: number }
@@ -25,6 +26,14 @@ export class RemoteTerminals {
       throw new Error('终端已关闭，请新建终端。');
     }
     switch (body.operation) {
+      case 'guiTerminalLink': {
+        const request = body.request;
+        if (!request || typeof request !== 'object' || Array.isArray(request)
+          || !('type' in request) || !['connect', 'read', 'write', 'close'].includes(String(request.type))) {
+          throw new Error('链接无效，请检查后重试。');
+        }
+        return invoke('codex_gui_terminal_link', { request: { ...request, scope: session.info.id } });
+      }
       case 'guiTerminalWrite':
         if (session.exited || typeof body.data !== 'string') throw new Error('终端已结束，请新建终端。');
         return terminalApi.write(session.info.id, body.data);

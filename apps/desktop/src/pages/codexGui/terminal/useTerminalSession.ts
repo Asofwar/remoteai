@@ -2,24 +2,36 @@ import { guiText } from "../../../i18n/guiText";
 import { useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { WebLinksAddon } from '@xterm/addon-web-links';
+import { websiteUrl } from '../../../../../../shared/terminal/links';
+import type { TerminalLinkTarget } from './TerminalLinkMenu';
 import { connectTerminal } from "../../../../../../shared/terminal/connection";
 import { terminalTheme } from "./theme";
 import type { TerminalApi, TerminalInfo } from "../../../../../../shared/terminal/types";
 import "@xterm/xterm/css/xterm.css";
 
-export function useTerminalSession(cwd: string, visible: boolean, api: TerminalApi, session?: TerminalInfo) {
+export function useTerminalSession({ cwd, visible, api, session, onLink }: {
+  cwd: string; visible: boolean; api: TerminalApi; session?: TerminalInfo; onLink: (link: TerminalLinkTarget) => void;
+}) {
   const host = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal>();
   const [info, setInfo] = useState<TerminalInfo>();
   const [status, setStatus] = useState(guiText("正在打开终端…"));
+  const linkHandler = useRef(onLink);
+  linkHandler.current = onLink;
   useEffect(() => {
     if (!host.current) return;
     const element = host.current;
-    const terminal = new Terminal({ cursorBlink: true, fontSize: 13, scrollback: 5000,
+    const activate = (event: MouseEvent, url: string) => {
+      event.preventDefault();
+      if (websiteUrl(url)) linkHandler.current({ url, x: event.clientX, y: event.clientY });
+    };
+    const terminal = new Terminal({ cursorBlink: true, fontSize: 13, scrollback: 5000, linkHandler: { activate },
       fontFamily: '"Cascadia Mono", Consolas, "Courier New", monospace', allowTransparency: false,
       theme: terminalTheme(document.documentElement.dataset.theme === "dark") });
     terminalRef.current = terminal;
     const fit = new FitAddon(); terminal.loadAddon(fit); terminal.open(element);
+    terminal.loadAddon(new WebLinksAddon(activate));
     if (element.clientWidth && element.clientHeight) fit.fit();
     const connection = connectTerminal({ api, cwd, session, size: { cols: terminal.cols, rows: terminal.rows },
       onReady: (value) => { setInfo(value); setStatus(""); }, onError: setStatus,

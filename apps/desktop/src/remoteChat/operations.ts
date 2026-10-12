@@ -51,6 +51,14 @@ const OPERATIONS = new Set([
 const CACHE_TTL_MS = 5 * 60_000;
 interface Cached {
   fingerprint: string; result: Promise<RpcResponse>; expires: number; completed: boolean; readOnly: boolean;
+  terminalLink?: { terminal: unknown; stream: unknown; action: unknown };
+}
+function terminalLinkRequest(request: RpcRequest): Cached['terminalLink'] {
+  const body = request.body as { operation?: unknown; id?: unknown; request?: unknown } | undefined;
+  if (request.method !== 'request' || body?.operation !== 'guiTerminalLink'
+    || !body.request || typeof body.request !== 'object' || Array.isArray(body.request)) return;
+  const stream = object(body.request);
+  return { terminal: body.id, stream: stream.id, action: stream.type };
 }
 const READ_OPERATIONS = new Set([
   'suggestNextPrompt',
@@ -104,6 +112,7 @@ export class ChatOperations {
       if (cached.fingerprint !== fingerprint) return Promise.reject(new Error('Request id reused'));
       return cached.result;
     }
+    this.pruneTerminalLink(request, owner);
     this.prune();
     if (this.cache.size >= 512) return Promise.reject(new Error('请求较多，请稍后重试。'));
     const operation = (request.body as { operation?: string } | undefined)?.operation;
@@ -115,9 +124,17 @@ export class ChatOperations {
       || (operation === 'guiGitWorkspace' && object(object(request.body).request).operation === 'status')
       || (operation === DESKTOP_OPERATION && object(request.body).action === 'signal'));
     const entry: Cached = { fingerprint, result, expires: Date.now() + CACHE_TTL_MS, completed: false, readOnly };
+    entry.terminalLink = terminalLinkRequest(request);
+    if (entry.terminalLink) {
+      entry.readOnly = entry.terminalLink.action === 'close'; // Closing a closed stream is safe to repeat.
+    }
     this.cache.set(cacheKey, entry);
-    void result.then(() => {
+    void result.then(reply => {
       entry.completed = true;
+      if (entry.terminalLink?.action === 'connect' && !reply.error) {
+        entry.terminalLink.stream = (reply.data as { id?: string } | undefined)?.id;
+      }
+      if (entry.terminalLink && reply.error) entry.readOnly = true;
       // Range reads are repeatable; caching their payloads would retain an entire file in memory.
       if (operation === 'videoRead' || operation === 'fileRead'
         || (operation === 'guiTerminalRead' && object(request.body).cursor !== undefined)) this.cache.delete(cacheKey);
@@ -130,6 +147,21 @@ export class ChatOperations {
     if (owner === undefined) this.titles.clear();
     for (const key of this.cache.keys()) {
       if (owner === undefined || (JSON.parse(key) as string[])[0] === owner) this.cache.delete(key);
+    }
+  }
+
+  private pruneTerminalLink(request: RpcRequest, owner: string) {
+    const stream = terminalLinkRequest(request);
+    if (!stream || !['read', 'write', 'close'].includes(String(stream.action))) return;
+    // The next request in each single-flight direction acknowledges the preceding response.
+    // Keep that response until then so transport retries cannot consume or write bytes twice.
+    for (const [key, entry] of this.cache) {
+      if (!entry.completed || (JSON.parse(key) as string[])[0] !== owner) continue;
+      const previous = entry.terminalLink;
+      if (previous && previous.terminal === stream.terminal && previous.stream === stream.stream
+        && (stream.action === 'close' || previous.action === 'connect' || previous.action === stream.action)) {
+        this.cache.delete(key);
+      }
     }
   }
 

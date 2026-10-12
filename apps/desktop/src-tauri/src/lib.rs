@@ -145,6 +145,9 @@ pub fn run() {
         .manage(codex_gui::releases::CliUpdateState::default())
         .manage(codex_gui::scheduled_tasks::ScheduledTasksState::default())
         .manage(std::sync::Arc::new(gui_terminal::TerminalState::default()))
+        .manage(std::sync::Arc::new(
+            gui_terminal::links::LinkState::default(),
+        ))
         .manage(codex_gui::git::GitState::default())
         .manage(codex_gui::web::WebEventState::default())
         .manage(codex_gui::model_settings::ModelSettingsState::default())
@@ -354,6 +357,7 @@ pub fn run() {
             local_proxy::gui_system_prompts::codex_gui_set_system_prompt_settings,
             gui_terminal::codex_gui_terminal_open,
             gui_terminal::codex_gui_terminal_command,
+            gui_terminal::links::codex_gui_terminal_link,
             remote_chat::remote_chat_attach,
             remote_chat::remote_chat_send,
             remote_chat::bulk::remote_chat_bulk_send,

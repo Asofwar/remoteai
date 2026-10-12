@@ -51,6 +51,43 @@ it('retains shells across new connections and isolates authenticated owners and 
   expect(terminalApi.close).toHaveBeenCalledWith('terminal');
 });
 
+it('scopes terminal website connections to the authenticated owner and rejects local listener operations', async () => {
+  const operations = new ChatOperations(new RemoteTerminals());
+  await operations.execute(request('open-link-shell', { operation: 'guiTerminalOpen', cwd: '/remote', size: {} }),
+    'relay', 'session', 'owner');
+  vi.mocked(invoke).mockResolvedValue({ type: 'socket', id: 'stream' });
+  const connect = request('connect-link', { operation: 'guiTerminalLink', id: 'terminal',
+    request: { type: 'connect', url: 'http://localhost:3002', scope: 'forged' } });
+  expect((await operations.execute(connect, 'relay', 'session', 'owner')).data).toEqual({ type: 'socket', id: 'stream' });
+  expect(invoke).toHaveBeenCalledWith('codex_gui_terminal_link', {
+    request: { type: 'connect', url: 'http://localhost:3002', scope: 'terminal' },
+  });
+  expect((await operations.execute(connect, 'relay', 'other', 'other-owner')).error).toContain('已关闭');
+  const listen = request('forged-listen', { operation: 'guiTerminalLink', id: 'terminal', request: { type: 'listen' } });
+  expect((await operations.execute(listen, 'relay', 'session', 'owner')).error).toContain('链接无效');
+});
+
+it('replays in-flight stream operations once and keeps long transfers from exhausting the retry cache', async () => {
+  const operations = new ChatOperations(new RemoteTerminals());
+  await operations.execute(request('open-stream-shell', { operation: 'guiTerminalOpen', cwd: '/remote', size: {} }));
+  const stream = (id: string, action: object) => request(id, { operation: 'guiTerminalLink', id: 'terminal', request: action });
+  vi.mocked(invoke).mockResolvedValue({ type: 'data', data: 'YQ==', eof: false });
+  const read = stream('read-stream', { type: 'read', id: 'stream' });
+  await operations.execute(read, 'relay'); await operations.execute(read, 'direct');
+  expect(invoke).toHaveBeenCalledOnce();
+  for (let index = 0; index < 600; index++) {
+    const reply = await operations.execute(stream(`chunk-${index}`, { type: 'read', id: 'stream' }));
+    expect(reply.error).toBeUndefined();
+  }
+  for (let index = 0; index < 600; index++) {
+    vi.mocked(invoke).mockResolvedValueOnce({ type: 'socket', id: `stream-${index}` });
+    const connect = await operations.execute(stream(`connect-${index}`, { type: 'connect', url: 'http://localhost:3002' }));
+    expect(connect.error).toBeUndefined();
+    const close = await operations.execute(stream(`close-${index}`, { type: 'close', id: `stream-${index}` }));
+    expect(close.error).toBeUndefined();
+  }
+});
+
 it('replays output by cursor and keeps the shell running when offline output exceeds the retained history', async () => {
   let receive!: (event: TerminalEvent) => void;
   vi.mocked(terminalApi.open).mockImplementation(async (_cwd, _size, listener) => {

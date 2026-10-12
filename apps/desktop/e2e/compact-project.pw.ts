@@ -82,7 +82,7 @@ for (const width of [390, 1280]) {
           projectDropFixture: { listenerCount: () => number };
         }).projectDropFixture.listenerCount())).toBe(4);
         await dropOn(page, target, ['C:\\项目 空格'], 'enter');
-        await expect(target.locator('div[role="status"]')).toHaveText('松开以添加项目');
+        await expect(target.locator('div[role="status"]')).toHaveText('松开以添加文件或文件夹');
         await dropOn(page, target, ['C:\\项目 空格']);
         await expect(page.getByLabel('项目路径')).toHaveText('C:/项目 空格');
         expect(await page.evaluate(() => JSON.parse(localStorage.getItem('codex-switch:gui-projects')!)))
@@ -99,6 +99,10 @@ for (const width of [390, 1280]) {
         await expect(dialog.getByRole('textbox', { name: '项目名称' })).toHaveValue('自定义项目');
         await dialog.getByRole('button', { name: '创建项目', exact: true }).click();
         await expect(page.getByLabel('项目路径')).toHaveText('C:/第二个目录');
+        await dropOn(page, target, ['C:/第二个目录']);
+        await expect(page.getByRole('button', { name: '选择项目文件夹：自定义项目' })).toBeVisible();
+        expect(await page.evaluate(() => JSON.parse(localStorage.getItem('codex-switch:gui-projects')!)[0]))
+          .toEqual({ path: 'C:/第二个目录', name: '自定义项目' });
         await dropOn(page, target, ['C:/file.txt']);
         await expect(page.getByRole('alert')).toHaveCount(0);
         await expect(page.getByLabel('项目路径')).toHaveText('C:/第二个目录');

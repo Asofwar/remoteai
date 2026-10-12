@@ -48,6 +48,7 @@ beforeEach(async () => {
   vi.mocked(guiApi.request).mockImplementation(async request => {
     if (request.operation === 'models') return { data: testModels, nextCursor: null };
     if (request.operation === 'list') return { data: [], nextCursor: null };
+    if (request.operation === 'projectDirectories') return { directory: request.directory };
     return { thread: { id: 'existing', cwd: '', preview: 'hello', updatedAt: 1, turns: [] } };
   });
   controller = new GuiController(); await controller.connect();
@@ -83,10 +84,11 @@ it('does not add a late native drop to a different conversation', async () => {
   expect(host.querySelector('[aria-label="文件、插件和对话引用"]')).toBeNull();
 });
 
-it('leaves new-conversation folders to the project picker while attaching files', async () => {
+it('selects new-conversation folders as projects while attaching files', async () => {
   vi.mocked(droppedReferences).mockResolvedValueOnce([
     { kind: 'folder', name: 'project', path: 'C:/project' }, file,
   ]);
   await act(async () => drop());
+  expect(controller.getSnapshot().settings.cwd).toBe('C:/project');
   expect(host.querySelector('[aria-label="文件、插件和对话引用"]')?.textContent).toBe('notes.txt');
 });

@@ -1,6 +1,31 @@
 use super::*;
 
 #[test]
+fn only_a_main_native_drop_grants_one_read_and_hover_preserves_it() {
+    let paths = vec![std::env::temp_dir().join("dropped.txt")];
+    let state = DroppedFilesState::default();
+    let drop = tauri::DragDropEvent::Drop {
+        paths: paths.clone(),
+        position: tauri::PhysicalPosition::new(10.0, 20.0),
+    };
+    record_drop(&state, "file-preview", &drop);
+    assert!(state.0.lock().unwrap().is_none());
+    record_drop(&state, "main", &drop);
+    for event in [
+        tauri::DragDropEvent::Enter {
+            paths: vec![PathBuf::from("other.txt")],
+            position: tauri::PhysicalPosition::new(10.0, 20.0),
+        },
+        tauri::DragDropEvent::Leave,
+    ] {
+        record_drop(&state, "main", &event);
+    }
+    let mut pending = state.0.lock().unwrap();
+    assert!(authorize(&mut pending, &paths).is_ok());
+    assert!(authorize(&mut pending, &paths).is_err());
+}
+
+#[test]
 fn requires_the_exact_recent_native_drop_and_consumes_it_once() {
     let paths = vec![std::env::temp_dir().join("dropped.txt")];
     let mut pending = Some(PendingDrop {

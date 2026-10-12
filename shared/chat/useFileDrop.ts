@@ -108,5 +108,7 @@ export function useFileDrop(options: Options) {
     const files = Array.from(event.dataTransfer.files);
     if (files.length) accept(() => options.addFiles(files));
   };
-  return { reading, dragging, handlers: { onDragOver, onDragEnter: onDragOver, onDragLeave, onDrop } };
+  // Native drops can arrive before React commits the loading state; send handlers need the live guard.
+  return { reading, dragging, isReading: () => pending.current,
+    handlers: { onDragOver, onDragEnter: onDragOver, onDragLeave, onDrop } };
 }

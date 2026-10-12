@@ -40,23 +40,42 @@ struct PendingDrop {
 #[derive(Default)]
 pub(crate) struct DroppedFilesState(Arc<Mutex<Option<PendingDrop>>>);
 
-pub(crate) fn handle_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
-    if window.label() != "main" {
+/// Record the grant before Tauri forwards the drop to JavaScript. Window listeners run too late;
+/// multi-webview windows also deliver drops as webview events instead of window events.
+pub(crate) fn handle_run_event(app: &tauri::AppHandle, event: &tauri::RunEvent) {
+    let (label, drop) = match event {
+        tauri::RunEvent::WindowEvent {
+            label,
+            event: tauri::WindowEvent::DragDrop(drop),
+            ..
+        }
+        | tauri::RunEvent::WebviewEvent {
+            label,
+            event: tauri::WebviewEvent::DragDrop(drop),
+            ..
+        } => (label, drop),
+        _ => return,
+    };
+    record_drop(&app.state::<DroppedFilesState>(), label, drop);
+}
+
+fn record_drop(state: &DroppedFilesState, label: &str, event: &tauri::DragDropEvent) {
+    if label != "main" {
         return;
     }
-    if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
-        let state = window.state::<DroppedFilesState>();
-        // The UI thread must never wait for a file reader to release a lock.
-        match state.0.try_lock() {
-            Ok(mut pending) => {
-                *pending = (paths.len() <= MAX_FILES).then(|| PendingDrop {
-                    paths: paths.clone(),
-                    received: Instant::now(),
-                });
-            }
-            Err(error) => eprintln!("could not record dropped files: {error}"),
-        };
-    }
+    let tauri::DragDropEvent::Drop { paths, .. } = event else {
+        return;
+    };
+    // The UI thread must never wait for a file reader to release a lock.
+    match state.0.try_lock() {
+        Ok(mut pending) => {
+            *pending = (paths.len() <= MAX_FILES).then(|| PendingDrop {
+                paths: paths.to_vec(),
+                received: Instant::now(),
+            });
+        }
+        Err(error) => eprintln!("could not record dropped files: {error}"),
+    };
 }
 
 #[derive(Deserialize)]

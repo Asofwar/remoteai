@@ -17,8 +17,7 @@ import { ComposerSubmit } from "./ComposerSubmit";
 import type { GuiController } from "./controller";
 import type { AccessMode, GuiState } from "./types";
 import { ImageAttachments } from "./ImageAttachments";
-import { fileDropError, useFileDrop } from "../../../../../shared/chat/useFileDrop";
-import { droppedReferences, subscribeFileDrop } from "./fileDrop";
+import { useComposerDrop } from './useComposerDrop';
 import { IMAGE_TYPES, useComposerDraft } from "./useComposerDraft";
 import { ModelPicker } from "./ModelPicker";
 import { useGuiRequestSpeed } from "./useGuiRequestSpeed";
@@ -61,18 +60,9 @@ export const Composer = forwardRef<ComposerHandle, {
   const queuedMessages = state.selected ? state.queued[state.selected] ?? [] : [];
   const disabled = workspaceBusy || state.connection !== "ready" || state.sending || state.archived
     || state.compacting === state.selected;
-  const drop = useFileDrop({ target: composer, scope: key, active, disabled: disabled || draftReading || !!dialog,
-    subscribe: isDesktopApp ? subscribeFileDrop : undefined,
-    addPaths: async (paths, current) => {
-      const references = await droppedReferences(paths);
-      // On a new conversation folders become projects; files retain the attachment behavior.
-      const attachments = state.selected ? references : references.filter(reference => reference.kind !== 'folder');
-      if (current()) { addAttachments(attachments); skillInput.current?.focus(); }
-    }, addFiles: files => {
-      const images = files.filter(file => file.type.startsWith('image/'));
-      if (images.length) addImages(images);
-      if (images.length !== files.length) controller.report(guiText('请通过“添加文件”选择这些文件。'));
-    }, report: error => controller.report(guiText(fileDropError(error))) });
+  const drop = useComposerDrop({ target: dropTarget, selected: state.selected, active,
+    disabled: disabled || draftReading || !!dialog, addAttachments, addImages,
+    setProject: controller.setProject, report: controller.report, focus: () => skillInput.current?.focus() });
   const reading = draftReading || drop.reading;
   const hasDraft = Boolean(draft.text.trim() || draft.images.length
     || draft.attachments?.length || draft.quotes?.length);
@@ -89,7 +79,7 @@ export const Composer = forwardRef<ComposerHandle, {
   const canSend = !disabled && !reading && !state.modelSettingsLoading && !state.modelCatalogLoading
     && hasDraft;
   const send = async () => {
-    if (!canSend) return;
+    if (!canSend || drop.isReading()) return;
     await sendDraft(goalMode.enabled, goalMode.exit);
   };
   const editQueuedMessage = (id: string) => {
@@ -101,10 +91,10 @@ export const Composer = forwardRef<ComposerHandle, {
   return <div ref={dropTarget} className={styles.composerWrap}>
     <RunningChangesSummary value={current} />
     {(!running || isDesktopApp || hostPicker) && <ProjectPicker key={key} value={project}
-      projects={state.projects} hostPicker={hostPicker} running={running} active={active} dropTarget={dropTarget}
+      projects={state.projects} hostPicker={hostPicker} running={running} active={active} dropState={drop}
       actions={isDesktopApp && <GuiToolbox trigger="git" active={active} connected={!workspaceBusy}
         cwd={project} deviceName={guiText("本机")} git={localGitClient} />}
-      disabled={running || state.sending || state.archived || workspaceBusy} gitEnabled={!state.selected}
+      disabled={running || state.sending || state.archived || workspaceBusy || reading} gitEnabled={!state.selected}
       onBusyChange={controller.setWorkspaceBusy}
       onChange={controller.setProject} onError={controller.report} />}
     {state.selected && <QueuedMessages threadId={state.selected} messages={queuedMessages}

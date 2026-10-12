@@ -70,6 +70,7 @@ export const composer = {
   "点击或拖入其他文件夹以更换": "Click or drop another folder to change it",
   "拖入文件夹，或点击选择": "Drop a folder here, or click to choose",
   "松开以添加项目": "Drop to add project",
+  "松开以添加文件或文件夹": "Drop to add files or folders",
   "请一次拖入一个文件夹。": "Please drop one folder at a time.",
   "无法使用此文件夹，请选择可访问的文件夹。": "This folder is unavailable. Please choose an accessible folder.",
   "拖放暂不可用，请点击选择文件夹。": "Drag and drop is unavailable. Click to choose a folder.",

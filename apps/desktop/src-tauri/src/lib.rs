@@ -253,7 +253,6 @@ pub fn run() {
         })
         .on_page_load(codex_gui::file_preview::handle_page_load)
         .on_window_event(|window, event| {
-            codex_gui::dropped_files::handle_window_event(window, event);
             codex_gui::file_preview::handle_window_event(window, event);
             if window.label() == "main" {
                 if matches!(
@@ -665,6 +664,7 @@ pub fn run() {
             std::process::exit(1);
         })
         .run(|app, event| {
+            codex_gui::dropped_files::handle_run_event(app, &event);
             #[cfg(target_os = "macos")]
             if matches!(event, tauri::RunEvent::Reopen { .. }) {
                 system_tray::show_dashboard(app);

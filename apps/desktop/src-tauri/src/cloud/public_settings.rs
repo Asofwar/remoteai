@@ -4,6 +4,7 @@ use reqwest::{blocking::Client, Url};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tauri::{AppHandle, Runtime};
 
+use crate::codex_gui::model_settings::Effort;
 use crate::{models::TitleSettings, storage::read_app_settings};
 
 const SETTINGS_TIMEOUT: Duration = Duration::from_secs(5);
@@ -37,7 +38,14 @@ pub(crate) struct CloudHomePreset {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct CloudHelpSettings {
     pub(crate) model: String,
+    #[serde(default = "default_help_effort")]
+    pub(crate) effort: Effort,
     pub(crate) system_prompt: String,
+}
+
+// Older servers omit this field; preserve the assistant's original reasoning level.
+fn default_help_effort() -> Effort {
+    Effort::Low
 }
 
 pub(crate) fn load_help_settings<R: Runtime>(

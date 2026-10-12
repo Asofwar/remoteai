@@ -100,7 +100,7 @@ fn prompt_has_no_tools_and_uses_only_supplied_context() {
     let prepared = context::PreparedContext {
         base_url: "http://127.0.0.1:1/codex-gui/v1".into(),
         model: "test-model".into(),
-        effort: crate::codex_gui::model_settings::Effort::Low,
+        effort: crate::codex_gui::model_settings::Effort::High,
         system_prompt: "Help settings from admin".into(),
         revision: 7,
         configuration: json!({"gui": {"selectedAccountKind": "provider"}}),
@@ -110,6 +110,7 @@ fn prompt_has_no_tools_and_uses_only_supplied_context() {
     assert_eq!(body["tools"], json!([]));
     assert_eq!(body["store"], false);
     assert_eq!(body["model"], "test-model");
+    assert_eq!(body["reasoning"]["effort"], "high");
     assert!(body["instructions"]
         .as_str()
         .unwrap()

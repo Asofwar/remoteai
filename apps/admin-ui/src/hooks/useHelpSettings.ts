@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { App } from "antd";
 import type { OfficialModelsProps } from "./useOfficialModels";
 
-export interface HelpSettings { model: string; systemPrompt: string; revision: string }
+export type HelpReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
+export interface HelpSettings { model: string; effort: HelpReasoningEffort; systemPrompt: string; revision: string }
 const ENDPOINT = "/admin/api/help-assistant";
 const noticeStyle = { maxWidth: 400, whiteSpace: "normal" as const };
 
@@ -18,7 +19,9 @@ export function useHelpSettings(api: OfficialModelsProps["api"], zh: boolean) {
   useEffect(() => {
     let current = true;
     setLoading(true);
-    void api<HelpSettings>(ENDPOINT).then((settings) => { if (current) setDraft(settings); })
+    void api<HelpSettings>(ENDPOINT).then((settings) => {
+      if (current) setDraft({ ...settings, effort: settings.effort ?? "low" });
+    })
       .catch(() => {
         if (current) message.error({ content: zh ? "助手设置加载失败，请重试。"
           : "Unable to load assistant settings. Please retry.", style: noticeStyle });

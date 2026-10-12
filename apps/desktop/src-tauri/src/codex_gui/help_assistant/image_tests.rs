@@ -75,6 +75,7 @@ fn model_errors_are_safe_and_admin_settings_have_no_local_defaults() {
     for model in ["", " ", "bad\nmodel"] {
         let settings = crate::cloud::CloudHelpSettings {
             model: model.into(),
+            effort: crate::codex_gui::model_settings::Effort::Low,
             system_prompt: "Help".into(),
         };
         assert!(context::validate_settings(&settings).is_err());
@@ -82,6 +83,7 @@ fn model_errors_are_safe_and_admin_settings_have_no_local_defaults() {
     for system_prompt in [String::new(), "x".repeat(16_001)] {
         let settings = crate::cloud::CloudHelpSettings {
             model: "configured".into(),
+            effort: crate::codex_gui::model_settings::Effort::Low,
             system_prompt,
         };
         assert!(context::validate_settings(&settings).is_err());

@@ -45,7 +45,7 @@ fn reads_server_title_model_and_effort_without_credentials() {
 }
 
 #[test]
-fn reads_current_help_model_and_system_prompt_without_authentication() {
+fn reads_current_help_model_effort_and_system_prompt_without_authentication() {
     let server = Server::http("127.0.0.1:0").unwrap();
     let url = settings_url(
         &format!("http://{}", server.server_addr()),
@@ -64,15 +64,25 @@ fn reads_current_help_model_and_system_prompt_without_authentication() {
             .any(|header| header.field.equiv("Authorization")));
         request
             .respond(Response::from_string(
-                r#"{"model":"admin-model","systemPrompt":"Be concise","revision":"new"}"#,
+                r#"{"model":"admin-model","effort":"high","systemPrompt":"Be concise","revision":"new"}"#,
             ))
             .unwrap();
     });
     let settings: CloudHelpSettings =
         request_settings(&Client::builder().no_proxy().build().unwrap(), url).unwrap();
     assert_eq!(settings.model, "admin-model");
+    assert_eq!(settings.effort, Effort::High);
     assert_eq!(settings.system_prompt, "Be concise");
     worker.join().unwrap();
+}
+
+#[test]
+fn legacy_help_settings_default_to_low_and_unknown_efforts_are_rejected() {
+    let mut raw = serde_json::json!({"model": "admin-model", "systemPrompt": "Be concise"});
+    let settings: CloudHelpSettings = serde_json::from_value(raw.clone()).unwrap();
+    assert_eq!(settings.effort, Effort::Low);
+    raw["effort"] = serde_json::json!("unknown");
+    assert!(serde_json::from_value::<CloudHelpSettings>(raw).is_err());
 }
 
 #[test]

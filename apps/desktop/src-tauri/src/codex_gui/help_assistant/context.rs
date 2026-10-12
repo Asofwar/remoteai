@@ -36,7 +36,7 @@ pub(super) fn prepare(app: &AppHandle) -> Result<PreparedContext> {
         }
     };
     let model = settings.model;
-    let effort = model_settings::Effort::Low;
+    let effort = settings.effort;
     let state = crate::storage::try_read_state(&paths).map_err(|_| HelpError::Unavailable)?;
     let configuration = json!({
         "applicationVersion": app.package_info().version.to_string(), "platform": std::env::consts::OS,

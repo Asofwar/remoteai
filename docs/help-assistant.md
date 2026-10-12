@@ -27,12 +27,18 @@ submission. Recent images are included in follow-up questions, bounded to 20 MiB
 the in-memory conversation. The backend rejects remote URLs, filesystem paths and invalid images.
 
 In **Admin → Official models → Help assistant**, choose a model from the saved visible official model
-catalog and edit the system instructions. Both fields save atomically with revision checks and an audit
-entry; official-account read/manage permissions govern access. Settings use the `help-assistant` row in
-the existing `chat_settings` table, so no schema migration is needed and normal chat policy is untouched.
+catalog, set the reasoning effort, and edit the system instructions. These fields save atomically with
+revision checks and an audit entry; official-account read/manage permissions govern access. Settings use
+the `help-assistant` row in the existing `chat_settings` table, so no schema migration is needed and normal
+chat policy is untouched.
 The desktop fetches `/help-assistant/settings` without credentials for every question. The prompt is
 public application configuration: do not include secrets. Basic evidence/privacy safeguards remain in
 force alongside the configured instructions.
+
+Reasoning effort supports `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` and `ultra`;
+choose a level supported by the selected model. Higher effort usually takes longer. Existing settings
+without an effort default to `low`. Updated clients apply the saved effort to the next question,
+independently of the regular Codex conversation settings; older clients continue to use `low`.
 
 Deploy the updated admin-go and admin-ui, then save a model and prompt before using the updated assistant.
 Missing or unavailable configuration is an error; there is no fallback to the GUI model or a hard-coded

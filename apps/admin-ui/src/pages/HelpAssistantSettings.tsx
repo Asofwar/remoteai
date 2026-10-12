@@ -1,6 +1,7 @@
 import { Button, Card, Input, Select, Space, Typography } from "antd";
 import { useHelpSettings } from "../hooks/useHelpSettings";
 import type { OfficialModelsProps } from "../hooks/useOfficialModels";
+import { HelpReasoningField } from "./HelpReasoningField";
 
 function modelOptions(catalog: Record<string, unknown> | null | undefined) {
   const models: unknown[] = Array.isArray(catalog?.models) ? catalog.models : [];
@@ -24,8 +25,8 @@ export function HelpAssistantSettings({ api, canManage, catalog, zh }: OfficialM
   return <Card title={zh ? "问题解答助手" : "Help assistant"} loading={settings.loading}
     extra={<Button disabled={busy} onClick={settings.reload}>{zh ? "重新加载" : "Reload"}</Button>}>
     <Typography.Paragraph type="secondary">{zh
-      ? "统一设置助手使用的模型和回答方式。用户使用 Codex 中所选账户；三方账户不支持指定模型时会提示错误，不会自动换模型。"
-      : "Set the assistant’s model and instructions. It uses the account selected in Codex "
+      ? "统一设置助手的模型、推理强度和回答方式。用户使用 Codex 中所选账户；三方账户不支持指定模型时会提示错误，不会自动换模型。"
+      : "Set the assistant’s model, reasoning effort and instructions. It uses the account selected in Codex "
         + "and reports unsupported models without switching."}
     </Typography.Paragraph>
     <Space direction="vertical" size="middle" style={{ width: "100%" }}>
@@ -42,6 +43,8 @@ export function HelpAssistantSettings({ api, canManage, catalog, zh }: OfficialM
           : "The saved model is no longer listed. Choose another model."}
         </Typography.Paragraph>}
       </div>
+      <HelpReasoningField value={settings.draft?.effort} disabled={!editable} zh={zh}
+        onChange={(effort) => settings.setDraft((draft) => draft && { ...draft, effort })} />
       <div><Typography.Paragraph>{zh ? "系统提示词" : "System instructions"}</Typography.Paragraph>
         <Input.TextArea aria-label={zh ? "系统提示词" : "System instructions"}
           value={settings.draft?.systemPrompt ?? ""}

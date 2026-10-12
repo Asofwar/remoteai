@@ -1,6 +1,7 @@
 package com.codexswitch.selection
 
 import android.widget.TextView
+import android.view.ViewConfiguration
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -13,6 +14,7 @@ import com.facebook.react.uimanager.UIManagerHelper
 class ChatTextSelectionModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
   private val controller = ChatSelectionController()
   override fun getName() = "ChatTextSelection"
+  override fun getConstants(): Map<String, Any> = mapOf("longPressTimeoutMs" to ViewConfiguration.getLongPressTimeout())
 
   @ReactMethod
   fun configure(tag: Int, quoteEnabled: Boolean, trailingControls: Int) {

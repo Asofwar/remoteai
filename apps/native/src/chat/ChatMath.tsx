@@ -8,6 +8,7 @@ import { ChatFileContext } from './ChatFilePreview';
 import { MIN_MATH_HEIGHT, mathDocument, mathHeight, type MathTextOptions } from './mathDocument';
 import { SelectableChatText } from './SelectableChatText';
 import type { CopyAction } from './CopyTextButton';
+import { nativeTextSelection } from './nativeTextSelection';
 
 export function ChatMath({ markup, muted, fontSize, copy, compact = false, flushTop = false }: MathTextOptions & {
   markup: string; copy?: CopyAction; compact?: boolean; flushTop?: boolean;
@@ -16,7 +17,9 @@ export function ChatMath({ markup, muted, fontSize, copy, compact = false, flush
   const openFile = useContext(ChatFileContext);
   const theme = useThemeMode();
   const [height, setHeight] = useState(MIN_MATH_HEIGHT);
-  const source = useMemo(() => ({ html: mathDocument(markup, { muted, fontSize, theme }),
+  const source = useMemo(() => ({ html: mathDocument(markup, {
+    muted, fontSize, theme, longPressTimeoutMs: nativeTextSelection?.longPressTimeoutMs,
+  }),
     baseUrl: 'about:blank' }), [markup, muted, fontSize, theme]);
   return <View style={[styles.container, compact && styles.compact, flushTop && styles.flushTop]}>
     <WebView source={source} style={styles.content} containerStyle={{ flex: 0, height }} scrollEnabled={false}

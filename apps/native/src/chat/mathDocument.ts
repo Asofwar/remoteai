@@ -5,7 +5,20 @@ import { themeColor, type ThemeMode } from '../../../../shared/theme/mode';
 export const MIN_MATH_HEIGHT = 32;
 const MAX_MATH_HEIGHT = 10000;
 
-export interface MathTextOptions { muted?: boolean; fontSize?: number; theme?: ThemeMode }
+export interface MathTextOptions {
+  muted?: boolean; fontSize?: number; theme?: ThemeMode; longPressTimeoutMs?: number;
+}
+
+const DEFAULT_LONG_PRESS_MS = 500;
+const NATIVE_EVENT_MARGIN_MS = 50;
+
+export function mathSelectionDelay(timeout?: number): number {
+  if (timeout === undefined || !Number.isFinite(timeout) || timeout <= NATIVE_EVENT_MARGIN_MS) {
+    return DEFAULT_LONG_PRESS_MS;
+  }
+  // Android starts its long-press timer before the WebView delivers touchstart to JavaScript.
+  return timeout - NATIVE_EVENT_MARGIN_MS;
+}
 
 export function mathDocument(markup: string, options: MathTextOptions = {}): string {
   const fontSize = options.fontSize ?? 14;
@@ -24,6 +37,7 @@ a{color:${color('#0b8065', 'accent')};}code{background:${color('#f4f6f5', 'eleva
 </style></head><body><div id="content">${markup}</div><script>
 (()=>{
 const content=document.getElementById('content');
+const longPressMs=${mathSelectionDelay(options.longPressTimeoutMs)};
 ${textSelectionScript}
 let previous=0;
 function measure(){

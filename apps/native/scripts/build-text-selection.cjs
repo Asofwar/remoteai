@@ -9,7 +9,7 @@ const compiled = ts.transpileModule(source, { compilerOptions: {
 } }).outputText;
 // Hermes Function.toString() contains bytecode, so prepare WebView source before bundling the app.
 const script = `(() => { const exports = {};\n${compiled}\n`
-  + `exports.installTouchTextSelection(document.getElementById('content'));\n})();`;
+  + `exports.installTouchTextSelection(document.getElementById('content'), longPressMs);\n})();`;
 const output = JSON.stringify({ script }) + '\n';
 const target = path.join(root, 'apps/native/assets/text-selection.json');
 const previous = fs.existsSync(target) ? fs.readFileSync(target, 'utf8').replace(/\r\n/g, '\n') : '';

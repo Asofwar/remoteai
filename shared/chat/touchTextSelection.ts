@@ -1,6 +1,5 @@
 /** Also embedded in the native math WebView; keep this function self-contained. */
-export function installTouchTextSelection(root: HTMLElement): () => void {
-  const longPressMs = 500;
+export function installTouchTextSelection(root: HTMLElement, longPressMs = 500): () => void {
   const moveTolerancePx = 10;
   let touchInput = false;
   let gesture: { x: number; y: number; started: number; allowed: boolean } | undefined;

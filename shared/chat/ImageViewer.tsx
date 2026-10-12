@@ -4,6 +4,7 @@ import type { PreviewImageLoader } from '../remote-chat/previewProgress';
 import { PreviewTransferProgress } from './PreviewTransferProgress';
 import { clampZoom, INITIAL_TRANSFORM, moveImage, type Point } from './imageTransform';
 import './imageViewer.css';
+import { ImageAiToolbar } from './ImageAiToolbar';
 
 interface Props {
   thumbnail: string; description: string; load: PreviewImageLoader; close: () => void;
@@ -66,6 +67,7 @@ export function ImageViewer({ thumbnail, description, load, close, download, con
       <button type="button" aria-label={translate('旋转图片')} onClick={() => setTransform((v) => ({ ...v,
         rotation: (v.rotation + 90) % 360 }))}>↻</button>
     </div>
+    <ImageAiToolbar load={image.loadOriginal} close={close} translate={translate} />
     {image.loading && <div className="cs-image-status cs-image-transfer">
       <PreviewTransferProgress progress={image.progress} label={translate('正在加载原图…')} /></div>}
     {downloadError && <div className="cs-image-status" role="status">{downloadError}</div>}

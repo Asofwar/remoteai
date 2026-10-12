@@ -1,3 +1,4 @@
+import { imageAiRussian } from '../imageAi';
 import { messages1 } from "./messages1";
 import { messages2 } from "./messages2";
 import { messages3 } from "./messages3";
@@ -28,6 +29,7 @@ export const russian = {
   ...assistanceRussian,
   ...guiSettingsRussian,
   ...cozeRussian,
+  ...imageAiRussian,
   ...downloads,
   ...cliImportRussian,
   ...reliabilityRussian,

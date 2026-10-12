@@ -1,3 +1,6 @@
+import { ImageAiContext } from '../../../../shared/chat/ImageAiContext';
+import { imageAiSender } from '../../../../shared/remote-chat/client/imageAiSender';
+import { prepareImageEdit } from './prepareImageEdit';
 import { remotePromptSuggestion } from '../../../../shared/remote-chat/client/promptSuggestion';
 import { t, useLanguage } from '../i18n';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -88,7 +91,10 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
     if (!active) { setDrawer(false); setPickingDevice(false); setSearching(false); setTokenSummary(false); }
   }, [active]);
   const showDesktopDiffs = desktopDiffs ?? desktop;
-  return <ChatDetailsWorkspace selected={state.selected?.id ?? null} active={active} enabled={showDesktopDiffs}>
+  return <ImageAiContext.Provider value={{ enabled: active && ready && !state.selectedArchived
+    && !state.sending && !state.settingsBusy && !state.workspaceBusy && !state.compacting,
+    send: imageAiSender(controller, prepareImageEdit) }}>
+    <ChatDetailsWorkspace selected={state.selected?.id ?? null} active={active} enabled={showDesktopDiffs}>
     <ChatQuotesProvider scope={state.selected?.id ?? null} sending={state.sending}
     enabled={active && !state.selectedArchived}>
     <div className="chat-conversation">
@@ -173,5 +179,5 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
       deviceName={device?.name} onClose={() => setTokenSummary(false)} />}
     {pickingDevice && <ChatDevices chooseLocal={chooseLocal} devices={devices} onClose={() => setPickingDevice(false)}
       choose={(id) => { chooseDevice(id); setPickingDevice(false); }} />}
-  </ChatQuotesProvider></ChatDetailsWorkspace>;
+  </ChatQuotesProvider></ChatDetailsWorkspace></ImageAiContext.Provider>;
 }

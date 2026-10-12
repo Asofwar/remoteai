@@ -1,6 +1,6 @@
 import { createThemedStyles } from '../theme/styles';
 import { t, useLanguage } from '../i18n';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -11,6 +11,7 @@ import { useImageGestures } from './useImageGestures';
 import { useSaveImage } from './useSaveImage';
 import type { PreviewImageLoader } from '../../../../shared/remote-chat/previewProgress';
 import { PreviewTransferProgress } from './PreviewTransferProgress';
+import { ImageAiToolbar } from './ImageAiToolbar';
 
 interface Props {
   thumbnail?: string; description: string; load: PreviewImageLoader; close: () => void;
@@ -39,8 +40,18 @@ export function ImageViewer({ thumbnail, description, load, close, save }: Props
               fadeDuration={0} style={[styles.image, animatedStyle]} />}
           </View>
         </GestureDetector>
-        <SafeAreaView pointerEvents="box-none" style={styles.controls}>
+        <KeyboardAvoidingView pointerEvents="box-none" style={styles.controls}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <SafeAreaView pointerEvents="box-none">
           <View pointerEvents="box-none" style={styles.footer}>
+            <View pointerEvents="box-none" style={styles.notices}>
+              {!!message && <Text pointerEvents="none" accessibilityLiveRegion="polite"
+                style={styles.status}>{message}</Text>}
+              {image.loading && <PreviewTransferProgress progress={image.progress} dark label={t("正在加载原图…")} />}
+              {image.error && <View style={styles.error}>
+                <Text style={styles.status}>{t("原图加载失败")}</Text>
+              </View>}
+            </View>
             <View pointerEvents="box-none" style={styles.actions}>
               {!image.url && !image.loading && <Pressable accessibilityRole="button" onPress={image.request}
                 accessibilityLabel={t(image.error ? "重新加载原图" : "查看原图")}
@@ -58,16 +69,10 @@ export function ImageViewer({ thumbnail, description, load, close, save }: Props
                   : <MaterialCommunityIcons name="download" size={30} color="#fff" />}
               </Pressable>
             </View>
-            <View pointerEvents="box-none" style={styles.notices}>
-              {!!message && <Text pointerEvents="none" accessibilityLiveRegion="polite"
-                style={styles.status}>{message}</Text>}
-              {image.loading && <PreviewTransferProgress progress={image.progress} dark label={t("正在加载原图…")} />}
-              {image.error && <View style={styles.error}>
-                <Text style={styles.status}>{t("原图加载失败")}</Text>
-              </View>}
-            </View>
+            <ImageAiToolbar load={image.loadOriginal} close={close} />
           </View>
         </SafeAreaView>
+        </KeyboardAvoidingView>
       </GestureHandlerRootView>
     </SafeAreaProvider>
   </Modal>;
@@ -77,8 +82,8 @@ const useStyles = createThemedStyles((color) => ({
   overlay: { flex: 1, backgroundColor: '#000' },
   stage: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
   image: { width: '100%', height: '100%' },
-  controls: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end' },
-  footer: { paddingHorizontal: 24, paddingBottom: 24, paddingTop: 12 },
+  controls: { flex: 1, justifyContent: 'flex-end' },
+  footer: { paddingHorizontal: 12, paddingBottom: 12, paddingTop: 12 },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 56 },
   rotate: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
   original: { minHeight: 44, paddingHorizontal: 16, borderRadius: 22, backgroundColor: '#484848',
@@ -86,7 +91,7 @@ const useStyles = createThemedStyles((color) => ({
   save: { marginLeft: 'auto', width: 56, height: 56, borderRadius: 28, backgroundColor: '#484848',
     alignItems: 'center', justifyContent: 'center' },
   disabled: { opacity: 0.4 },
-  notices: { position: 'absolute', bottom: 96, left: 16, right: 16, alignItems: 'center', gap: 8 },
+  notices: { alignItems: 'center', gap: 8 },
   status: { color: color('#ddd', 'faint'), fontSize: 14, textAlign: 'center', maxWidth: 400 },
   error: { maxWidth: 400, alignItems: 'center', backgroundColor: '#222', borderRadius: 12, padding: 8 },
 }));

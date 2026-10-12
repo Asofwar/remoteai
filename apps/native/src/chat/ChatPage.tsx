@@ -1,3 +1,6 @@
+import { ImageAiContext } from '../../../../shared/chat/ImageAiContext';
+import { imageAiSender } from '../../../../shared/remote-chat/client/imageAiSender';
+import { prepareImageEdit } from './prepareImageEdit';
 import { remotePromptSuggestion } from '../../../../shared/remote-chat/client/promptSuggestion';
 import Storage from 'expo-sqlite/kv-store';
 import { t, useLanguage } from '../i18n';
@@ -170,6 +173,9 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
       {t("桌面已就绪。打开远程桌面，登录电脑后即可继续聊天。")}</Text>}
     <ChatImageContext.Provider value={{ threadId: state.selected?.id ?? null, ready, offline: true,
       load: controller.imagePreview, save: controller.managedPreviews ? controller.savePreviewImage : undefined }}>
+      <ImageAiContext.Provider value={{ enabled: active && ready && !state.selectedArchived
+        && !state.sending && !state.settingsBusy && !state.workspaceBusy && !state.compacting,
+        send: imageAiSender(controller, prepareImageEdit) }}>
       <ChatImagePreviewProvider key={state.selected?.id ?? 'new'}>
       <ChatFileProvider key={state.selected?.id ?? 'new'} threadId={state.selected?.id ?? null}
         ready={ready} load={controller.textPreview} videos={controller.videos} files={controller.files}>
@@ -182,7 +188,7 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
           processing={state.processing} active={active && ready && foreground} />} />
       </ChatRetryProvider></TaskReviewProvider>
       </ChatFileProvider>
-      </ChatImagePreviewProvider>
+      </ChatImagePreviewProvider></ImageAiContext.Provider>
     </ChatImageContext.Provider>
     {ready && state.approvals.some((event) => event.params.threadId === state.selected?.id) &&
       <ScrollView style={{ maxHeight: 280 }} contentContainerStyle={styles.padded} keyboardShouldPersistTaps="handled">

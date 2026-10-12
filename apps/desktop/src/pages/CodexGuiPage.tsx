@@ -1,3 +1,5 @@
+import { ImageAiContext } from '../../../../shared/chat/ImageAiContext';
+import { prepareImageEdit } from '../../../web/src/chat/prepareImageEdit';
 import { guiText } from "../i18n/guiText";
 import { useGuiLanguage } from '../i18n/useGuiLanguage';
 import { DiffTextContext } from "../../../../shared/chat/diffText";
@@ -104,7 +106,13 @@ function Workspace({ active, accountPicker, windowControls, plugins, hostPicker,
   const running = state.sending || Object.values(state.conversations).some((value) => value.activeTurn);
   const canQuote = state.connection === "ready" && !state.sending && !state.archived
     && state.compacting !== state.selected;
-  return <DiffTextContext.Provider value={diffText}><WorkspaceOperationContext.Provider value={{ busy: Boolean(state.workspaceBusy),
+  return <ImageAiContext.Provider value={{ enabled: conversationActive && canQuote && !state.workspaceBusy,
+    send: async (text, source) => {
+      const image = await prepareImageEdit(source);
+      if (controller.getSnapshot().selected !== state.selected) return false;
+      if (!state.selected && controller.getSnapshot().settings.cwd !== state.settings.cwd) return false;
+      return controller.send(text, [image]);
+    } }}><DiffTextContext.Provider value={diffText}><WorkspaceOperationContext.Provider value={{ busy: Boolean(state.workspaceBusy),
     setBusy: controller.setWorkspaceBusy }}><DetailsWorkspace selected={state.selected} active={conversationActive}>
     <div className={`${styles.page} ${collapsed ? styles.collapsed : ""}`}
       data-dream-skin={skinStyle ? "true" : undefined} style={skinStyle}>
@@ -180,5 +188,5 @@ function Workspace({ active, accountPicker, windowControls, plugins, hostPicker,
       </div>
     </div>
     </div>
-  </DetailsWorkspace></WorkspaceOperationContext.Provider></DiffTextContext.Provider>;
+  </DetailsWorkspace></WorkspaceOperationContext.Provider></DiffTextContext.Provider></ImageAiContext.Provider>;
 }

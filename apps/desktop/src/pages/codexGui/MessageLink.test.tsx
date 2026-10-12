@@ -6,10 +6,13 @@ import { isTauri } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { message } from "antd";
 import { MessageLink } from "./MessageLink";
+import { copyText } from "../../utils/clipboard";
 
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: vi.fn(() => false) }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
-vi.mock("antd", () => ({ message: { error: vi.fn() } }));
+vi.mock("antd", async (original) => ({ ...await original<typeof import("antd")>(),
+  message: { error: vi.fn() } }));
+vi.mock("../../utils/clipboard", () => ({ copyText: vi.fn().mockResolvedValue(undefined) }));
 let root: Root;
 let container: HTMLDivElement;
 const href = "https://example.com/photo-source";
@@ -25,6 +28,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await act(async () => root.unmount());
+  document.body.replaceChildren();
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
@@ -43,6 +47,43 @@ it.each([false, true])("preserves browser navigation with Ctrl-click=%s", async 
 it("uses the desktop opener inside Tauri", async () => {
   vi.mocked(isTauri).mockReturnValue(true);
   const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+  await act(async () => container.querySelector("a")!.dispatchEvent(event));
+  expect(event.defaultPrevented).toBe(true);
+  expect(openUrl).toHaveBeenCalledWith(href);
+});
+
+async function contextMenu() {
+  vi.mocked(isTauri).mockReturnValue(true);
+  await act(async () => root.render(<MessageLink href={href}>图片来源</MessageLink>));
+  const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 });
+  await act(async () => container.querySelector("a")!.dispatchEvent(event));
+  expect(event.defaultPrevented).toBe(true);
+  return Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]'));
+}
+
+it("opens a link from the desktop context menu in the system browser", async () => {
+  const menu = await contextMenu();
+  await act(async () => menu.find(item => item.textContent === "在浏览器中打开")!.click());
+  expect(openUrl).toHaveBeenCalledWith(href);
+});
+
+it("copies the link from the desktop context menu", async () => {
+  const menu = await contextMenu();
+  await act(async () => menu.find(item => item.textContent === "复制链接")!.click());
+  expect(copyText).toHaveBeenCalledWith(href);
+  expect(openUrl).not.toHaveBeenCalled();
+});
+
+it("preserves the browser context menu", async () => {
+  const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 });
+  await act(async () => container.querySelector("a")!.dispatchEvent(event));
+  expect(event.defaultPrevented).toBe(false);
+  expect(document.querySelector('[role="menu"]')).toBeNull();
+});
+
+it("opens middle-clicks through the desktop opener", async () => {
+  vi.mocked(isTauri).mockReturnValue(true);
+  const event = new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 });
   await act(async () => container.querySelector("a")!.dispatchEvent(event));
   expect(event.defaultPrevented).toBe(true);
   expect(openUrl).toHaveBeenCalledWith(href);

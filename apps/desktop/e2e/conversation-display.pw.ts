@@ -129,7 +129,8 @@ test("process folds on completion, preserves inspected output, and displays the 
   await expect(process).not.toHaveAttribute("open");
   await expect(process.locator("summary")).toHaveText("用时 32秒");
   await process.locator("summary").click();
-  await process.locator("summary").last().click();
+  // Wait for the deferred command row instead of clicking the process heading a second time.
+  await process.locator(`[data-message-id="${command.id}"] > details > summary`).click();
   await expect(process.getByRole("region", { name: "工具内容" }).first()).toHaveText(command.command!);
   await expect(process.getByRole("region", { name: "工具内容" }).last()).toHaveText("DISPLAY-FIRST");
   await update(page, fixture([comment, command, answer], true));

@@ -82,3 +82,11 @@ it('does not add a late native drop to a different conversation', async () => {
   expect(host.querySelector('img')).toBeNull();
   expect(host.querySelector('[aria-label="文件、插件和对话引用"]')).toBeNull();
 });
+
+it('leaves new-conversation folders to the project picker while attaching files', async () => {
+  vi.mocked(droppedReferences).mockResolvedValueOnce([
+    { kind: 'folder', name: 'project', path: 'C:/project' }, file,
+  ]);
+  await act(async () => drop());
+  expect(host.querySelector('[aria-label="文件、插件和对话引用"]')?.textContent).toBe('notes.txt');
+});

@@ -1,33 +1,43 @@
 import { guiText } from '../../i18n/guiText';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { isDesktopApp } from '../../api/backend';
 import { CreateProjectDialog } from './CreateProjectDialog';
 import { folderName, readProjects, saveProject, type SavedProject } from './projectCatalog';
 import { ProjectFolderPicker } from './ProjectFolderPicker';
 import { WorkspacePicker } from './WorkspacePicker';
+import { useProjectFolderDrop } from './useProjectFolderDrop';
+import dropStyles from './ProjectPicker.module.less';
 import layout from './styles.module.less';
 
 interface ProjectPickerProps {
   value: string; projects: string[]; disabled: boolean;
   onChange: (cwd: string) => void; onError: (error: unknown) => void;
   gitEnabled?: boolean; onBusyChange?: (busy: boolean) => void; hostPicker?: ReactNode;
-  actions?: ReactNode; running?: boolean;
+  actions?: ReactNode; running?: boolean; active?: boolean; dropTarget?: RefObject<HTMLElement>;
 }
 
 export function ProjectPicker({ value, projects, disabled, onChange, onError,
-  gitEnabled, onBusyChange, hostPicker, actions, running = false }: ProjectPickerProps) {
+  gitEnabled, onBusyChange, hostPicker, actions, running = false, active = true, dropTarget }: ProjectPickerProps) {
   const [creating, setCreating] = useState(false);
   const [saved, setSaved] = useState(readProjects);
   const trigger = useRef<HTMLButtonElement>(null);
+  const bar = useRef<HTMLDivElement>(null);
   const close = () => { setCreating(false); trigger.current?.focus(); };
-  useEffect(() => { if (disabled) setCreating(false); }, [disabled]);
+  useEffect(() => { if (disabled || !active) setCreating(false); }, [disabled, active]);
   const create = (project: SavedProject) => {
     if (disabled) return;
     try {
       setSaved(saveProject(project)); onChange(project.path); close();
     } catch { onError(new Error(guiText('项目未能保存，请重试。'))); }
   };
-  return <div className={layout.projectBar}>
+  const drop = useProjectFolderDrop({ target: dropTarget ?? bar,
+    allowFileAttachments: true,
+    enabled: active && Boolean(gitEnabled) && !disabled && !creating,
+    onFolder: path => create({ path, name: folderName(path) }), onError });
+  return <div ref={bar} className={layout.projectBar}>
+    {(drop.dragging || drop.reading) && <div className={dropStyles.dropHint} role="status">
+      {drop.reading ? guiText('正在读取文件夹…') : guiText('松开以添加项目')}
+    </div>}
     {!running && <ProjectFolderPicker value={value} disabled={disabled} triggerRef={trigger}
       projects={[...saved, ...projects.map(path => ({ path, name: folderName(path) }))]}
       onChange={onChange} onClear={() => onChange('')} onOpen={() => setSaved(readProjects())}

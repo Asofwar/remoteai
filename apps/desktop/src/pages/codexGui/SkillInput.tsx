@@ -156,16 +156,17 @@ export const SkillInput = forwardRef<SkillInputHandle, {
     document.execCommand("insertText", false, readPastedContent(event.clipboardData).text);
     change();
   };
-  return <div className={styles.inputWrap}>
+  return <div className={styles.inputWrap} data-suggesting={Boolean(ghost.text)}>
     {open && <SkillMenu id={listId} options={options} selected={selectedIndex}
       loading={menuState.loading} error={menuState.error}
       conversations={isConversation} coze={isCoze}
       onChoose={choose} below={Boolean(editing)}
       skillsOnly={!compact && !goal} />}
     {ghost.text && <div className={styles.suggestion} data-testid="next-prompt-suggestion">
-      <span>{ghost.text}</span><kbd aria-hidden="true">Tab</kbd>
-      <button type="button" aria-label={guiText('填入建议')}
-        onPointerDown={event => event.preventDefault()} onClick={ghost.accept}>{guiText('填入')}</button>
+      <span>{ghost.text}</span>
+      <button className={styles.suggestionKey} type="button"
+        aria-label={guiText('填入建议')} aria-keyshortcuts="Tab" tabIndex={-1}
+        onPointerDown={event => event.preventDefault()} onClick={ghost.accept}><kbd>Tab</kbd></button>
     </div>}
     <div ref={editor} role="textbox" aria-label={editing ? guiText("编辑消息内容") : guiText("消息")}
       aria-multiline="true" aria-disabled={disabled}

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { testModels } from '../src/pages/codexGui/testModels';
 import type { Request, Thread } from '../src/pages/codexGui/types';
 
@@ -49,6 +49,24 @@ async function openThread(page: Page, dark = false) {
   return page.getByRole('textbox', { name: '消息', exact: true });
 }
 
+async function expectPlaceholderLayout(editor: Locator, ghost: Locator) {
+  const input = (await editor.boundingBox())!;
+  const suggestion = (await ghost.locator('span').boundingBox())!;
+  const padding = await editor.evaluate(node => {
+    const style = getComputedStyle(node);
+    return { top: parseFloat(style.paddingTop), left: parseFloat(style.paddingLeft) };
+  });
+  expect(suggestion.x - input.x).toBeCloseTo(padding.left, 1);
+  expect(suggestion.y - input.y).toBeCloseTo(padding.top, 1);
+  expect(input.height - suggestion.height).toBeCloseTo(2, 1);
+  const accept = ghost.getByRole('button', { name: '填入建议', exact: true });
+  await expect(accept).toHaveText('Tab');
+  const keycap = await accept.evaluate(node => ({
+    height: node.getBoundingClientRect().height, lineHeight: parseFloat(getComputedStyle(node).lineHeight),
+  }));
+  expect(keycap.height - keycap.lineHeight).toBeCloseTo(2, 1);
+}
+
 for (const dark of [false, true]) {
   test('ghost stays translucent and only Tab accepts it (' + (dark ? 'dark' : 'light') + ')', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: dark ? 900 : 1440, height: 900 });
@@ -61,8 +79,9 @@ for (const dark of [false, true]) {
     await expect(ghost).toHaveCSS('opacity', '0.45');
     await expect(ghost).toHaveCSS('pointer-events', 'none');
     expect((await ghost.boundingBox())!.width).toBeLessThanOrEqual(400);
+    await expectPlaceholderLayout(editor, ghost);
     await editor.press('Enter'); expect(calls.some(call => call.operation === 'send')).toBe(false);
-    await page.screenshot({ path: testInfo.outputPath('suggestion.png') });
+    await page.screenshot({ path: testInfo.outputPath('suggestion.png'), caret: 'initial' });
     await editor.press('Tab');
     await expect(editor).toHaveText(text); await expect(ghost).toHaveCount(0);
     expect(calls.some(call => call.operation === 'send')).toBe(false);
@@ -90,8 +109,8 @@ test('typing remains responsive while prediction is pending and rejects the late
   await editor.press('Tab'); await expect(editor).toHaveText('');
 });
 
-test.describe('touchscreen composer', () => {
-  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+for (const width of [390, 1440]) test.describe(`touchscreen composer (${width}px)`, () => {
+  test.use({ viewport: { width, height: 844 }, hasTouch: true, isMobile: width === 390 });
   test('fills through a touch action and sends only after confirmation', async ({ page }, info) => {
     const calls = await mockBackend(page);
     const editor = await openThread(page);
@@ -100,12 +119,34 @@ test.describe('touchscreen composer', () => {
     const ghost = page.getByTestId('next-prompt-suggestion');
     const bounds = (await ghost.boundingBox())!;
     expect(bounds.width).toBeLessThanOrEqual(400);
-    expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
-    await page.screenshot({ path: info.outputPath('touch-suggestion.png') });
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+    await expectPlaceholderLayout(editor, ghost);
+    await editor.tap();
+    await page.screenshot({ path: info.outputPath('touch-suggestion.png'), caret: 'initial' });
     await accept.tap();
     await expect(editor).toHaveText(text); await expect(editor).toBeFocused();
     expect(calls.some(call => call.operation === 'send')).toBe(false);
     await page.getByRole('button', { name: '发送消息', exact: true }).tap();
     await expect.poll(() => calls.filter(call => call.operation === 'send').length).toBe(1);
+  });
+  test('keeps the caret on the suggestion line and dismisses it when typing', async ({ page }) => {
+    await mockBackend(page);
+    const editor = await openThread(page);
+    const ghost = page.getByTestId('next-prompt-suggestion');
+    await expect(ghost).toBeVisible();
+    await editor.tap();
+    await expect(editor).toBeFocused();
+    await expectPlaceholderLayout(editor, ghost);
+    await editor.press('Tab');
+    await expect(editor).toHaveText(text);
+    await expect(ghost).toHaveCount(0);
+
+    await page.reload();
+    await expect(ghost).toBeVisible();
+    await editor.press('a');
+    await expect(editor).toHaveText('a');
+    await expect(ghost).toHaveCount(0);
+    await editor.clear();
+    await expect(ghost).toHaveCount(0);
   });
 });

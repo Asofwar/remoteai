@@ -32,15 +32,11 @@ pub(super) fn run(root: &Path, id: &str) -> Result<()> {
     if !install::configured(&record.home, true)? || !package::present(root)? {
         return Err(ComputerError::Disabled);
     }
-    let mut command = Command::new(package::executable(root)?);
+    let mut command = driver_command(root)?;
     command
-        .args(["mcp", "--direct"])
-        .env("CUA_DRIVER_PERMISSION_MODE", "standard")
-        .env("CUA_DRIVER_RS_TELEMETRY_ENABLED", "0")
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit());
-    platform::configure_driver(&mut command);
     let mut driver = Driver(command.spawn().map_err(|_| ComputerError::Startup)?);
     loop {
         if !state::allowed(root, id, &record.generation) {
@@ -58,4 +54,15 @@ pub(super) fn run(root: &Path, id: &str) -> Result<()> {
         }
         thread::sleep(REVOCATION_INTERVAL);
     }
+}
+
+/// Shared launch policy for Codex GUI and the product help assistant.
+pub(super) fn driver_command(root: &Path) -> Result<Command> {
+    let mut command = Command::new(package::executable(root)?);
+    command
+        .args(["mcp", "--direct"])
+        .env("CUA_DRIVER_PERMISSION_MODE", "standard")
+        .env("CUA_DRIVER_RS_TELEMETRY_ENABLED", "0");
+    platform::configure_driver(&mut command);
+    Ok(command)
 }

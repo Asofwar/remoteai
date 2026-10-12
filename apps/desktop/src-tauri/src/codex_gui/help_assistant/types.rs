@@ -29,6 +29,10 @@ pub(super) enum HelpError {
     Unavailable,
     #[error("answerFailed")]
     AnswerFailed,
+    #[error("cancelled")]
+    Cancelled,
+    #[error("computerUnavailable")]
+    ComputerUnavailable,
 }
 
 pub(super) type Result<T> = std::result::Result<T, HelpError>;

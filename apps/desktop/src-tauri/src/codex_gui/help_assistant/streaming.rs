@@ -6,6 +6,16 @@ use tauri::AppHandle;
 
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(50);
 
+pub(super) fn activity(app: &AppHandle, request_id: Option<&str>, activity: Option<&str>) {
+    if let Some(request_id) = request_id {
+        crate::codex_gui::web::publish(
+            app,
+            "remote-ai-help-activity",
+            serde_json::json!({"requestId": request_id, "activity": activity}),
+        );
+    }
+}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct HelpProgress<'a> {

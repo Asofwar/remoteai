@@ -14,6 +14,8 @@ export function useHelpAssistant(options: { open: boolean; page: DashboardPage }
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState<HelpContent>();
   const [streamed, setStreamed] = useState('');
+  const [operating, setOperating] = useState(false);
+  const cancelRequest = useRef<() => Promise<void>>();
   const [unread, setUnread] = useState(false);
   const open = useRef(options.open);
   open.current = options.open;
@@ -97,9 +99,10 @@ export function useHelpAssistant(options: { open: boolean; page: DashboardPage }
       const answer = await askHelp({
         question, ...(images.length ? { images } : {}), history: messageHistory(messages, images),
         page: options.page, accountRevision: accountRevision.current,
-      }, (text) => {
+      }, { progress: (text) => {
         if (mounted.current && currentGeneration === generation.current) setStreamed(text);
-      }, controller.signal);
+      }, activity: (active) => { if (mounted.current) setOperating(active); },
+      cancelReady: (cancel) => { cancelRequest.current = cancel; } }, controller.signal);
       if (!mounted.current) return;
       if (currentGeneration !== generation.current) {
         setDraft(question); attachments.setImages(images); setError('accountChanged'); return;
@@ -120,7 +123,8 @@ export function useHelpAssistant(options: { open: boolean; page: DashboardPage }
     } finally {
       busy.current = false;
       request.current = undefined;
-      if (mounted.current) { setPending(undefined); setStreamed(''); }
+      cancelRequest.current = undefined;
+      if (mounted.current) { setPending(undefined); setStreamed(''); setOperating(false); }
     }
   };
 
@@ -128,5 +132,10 @@ export function useHelpAssistant(options: { open: boolean; page: DashboardPage }
     if (busy.current || attachments.reading) return;
     generation.current++; setMessages([]); setDraft(''); setError(undefined); setUnread(false); attachments.clear();
   };
-  return { status, error, messages, draft, setDraft, pending, streamed, unread, checking, refresh, send, clear, attachments };
+  const stop = async () => {
+    if (!cancelRequest.current) { request.current?.abort(); return; }
+    try { await cancelRequest.current(); } catch { if (mounted.current) setError('stopFailed'); }
+  };
+  return { status, error, messages, draft, setDraft, pending, streamed, unread, checking, refresh, send, clear, attachments,
+    operating, stop };
 }

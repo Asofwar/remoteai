@@ -7,7 +7,7 @@ export async function officialModelsBackend(page: Page) {
   let failure = false;
   let refreshes = 0;
   const saves: ModelRefreshSettings[] = [];
-  let help: Omit<HelpSettings, "effort"> & { effort?: HelpSettings["effort"] } = {
+  let help: Omit<HelpSettings, "effort" | "questions"> & Partial<Pick<HelpSettings, "effort" | "questions">> = {
     model: "gpt-test", systemPrompt: "Be concise.", revision: "help-1",
   };
   const helpSaves: HelpSettings[] = [];

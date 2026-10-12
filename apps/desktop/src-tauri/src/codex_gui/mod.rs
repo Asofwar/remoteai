@@ -92,6 +92,7 @@ pub(crate) struct GuiState {
     pub(crate) upload_policy: Arc<upload_policy::UploadPolicyStore>,
     client: Mutex<Option<Arc<Client>>>,
     help_request: Mutex<()>,
+    help_control: help_assistant::control::RequestControl,
     activity: Arc<tokio::sync::RwLock<()>>,
     videos: Arc<file_stream::FileStreams>,
     downloads: DownloadStreams,

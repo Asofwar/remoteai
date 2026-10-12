@@ -9,6 +9,7 @@ import { helpCopy } from './copy';
 import { HelpComposer } from './HelpComposer';
 import { HelpLauncher } from './HelpLauncher';
 import { useHelpAssistant } from './useHelpAssistant';
+import { useHelpQuestions } from './useHelpQuestions';
 import { HelpMessages } from './HelpMessages';
 import { HelpSetupNotice } from './HelpSetupNotice';
 import { useHelpSetup } from './useHelpSetup';
@@ -22,6 +23,7 @@ export function HelpAssistant(props: { language: Language; page: DashboardPage; 
   const assistant = useHelpAssistant({ open, page: props.page });
   const setup = useHelpSetup(assistant.refresh);
   const copy = helpCopy(props.language);
+  const questions = useHelpQuestions(open, props.language, copy.questions);
   const trigger = useRef<HTMLButtonElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const panel = useRef<HTMLElement>(null);
@@ -62,18 +64,21 @@ export function HelpAssistant(props: { language: Language; page: DashboardPage; 
       <div className={styles.body}>
         {!assistant.messages.length && !assistant.pending && <div className={styles.welcome}>
           <h3>{copy.welcome}</h3><p>{copy.description}</p>
-          {ready && <div className={styles.suggestions}>{copy.questions.map((question) =>
-            <button type="button" key={question} onClick={() => { assistant.setDraft(question); input.current?.focus(); }}>
+          {ready && <div className={styles.suggestions}>{questions.map((question, index) =>
+            <button type="button" key={index} disabled={assistant.attachments.reading}
+              onClick={() => void assistant.send(question)}>
               {question}</button>)}</div>}
         </div>}
         <HelpMessages messages={assistant.messages} pending={assistant.pending} streamed={assistant.streamed} copy={copy} />
+        {assistant.operating && <p className={styles.status} role="status">{copy.operating}</p>}
         {assistant.checking && <p className={styles.status} role="status">{copy.checking}</p>}
         <HelpSetupNotice status={assistant.status} error={assistant.error} checking={assistant.checking}
           copy={copy} setup={setup} refresh={assistant.refresh}
           onSelectAccount={() => { close(); props.onOpenCodex(); }} />
       </div>
       <HelpComposer copy={copy} input={input} draft={assistant.draft} setDraft={assistant.setDraft}
-        disabled={!ready || Boolean(assistant.pending)} attachments={assistant.attachments} send={assistant.send} />
+        disabled={!ready || Boolean(assistant.pending)} attachments={assistant.attachments} send={assistant.send}
+        pending={Boolean(assistant.pending)} stop={assistant.stop} />
     </section>}
     <HelpLauncher copy={copy} open={open} unread={assistant.unread} trigger={trigger}
       onToggle={() => open ? close() : setExpanded(true)}

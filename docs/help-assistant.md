@@ -27,7 +27,12 @@ submission. Recent images are included in follow-up questions, bounded to 20 MiB
 the in-memory conversation. The backend rejects remote URLs, filesystem paths and invalid images.
 
 In **Admin → Official models → Help assistant**, choose a model from the saved visible official model
-catalog, set the reasoning effort, and edit the system instructions. These fields save atomically with
+catalog, set the reasoning effort, edit the system instructions, and maintain the suggested questions.
+Questions support Chinese and English text, with a fallback to the filled language. Add up to 12 questions,
+with 200 characters per language; at least one language must be filled. Removing all entries hides suggestions.
+Opening the assistant reloads this list. Clicking a suggestion immediately sends it, with the same duplicate
+submission and attachment guards as the composer. Existing settings retain the original three suggestions;
+older admin clients that omit the field preserve the saved list. These fields save atomically with
 revision checks and an audit entry; official-account read/manage permissions govern access. Settings use
 the `help-assistant` row in the existing `chat_settings` table, so no schema migration is needed and normal
 chat policy is untouched.
@@ -57,21 +62,41 @@ providers use their upstream model validation; other providers are checked again
 - API keys, tokens, account identifiers, custom prompt contents, local paths, logs and other
   conversation histories are not part of the evidence snapshot. Users should not paste secrets.
 - Questions, user-attached images, recent help messages, relevant excerpts and the summary go through the selected GUI
-  account and consume its normal allowance. There are no tools or filesystem actions in the model request.
+  account and consume its normal allowance. Computer-use screenshots and tool results also go through this account.
 - Requests follow the existing local proxy conversation-history and token-usage recording behavior,
   with the label **Remote AI 问题解答**. Clearing the panel does not delete those local records.
 - Help requests bypass automatic account switching and custom GUI prompt rewriting. A selection
-  revision guards dispatch; changed-account answers are discarded. Help never modifies GUI selection.
+  revision guards dispatch; changing accounts cancels the running help task and discards its answer.
+  Help does not automatically switch accounts.
 - Replies show the supplied reference paths. These are evidence supplied to the model, not proof that
   every reference was cited. Missing evidence should result in a limitation or a clarifying question.
 
 The independent mobile apps and cloud web console do not host this desktop-sidebar widget. Their
 remote-chat behavior is unchanged.
 
+## Computer Use
+
+The assistant reuses the GUI home's installed and enabled Computer Use driver, including its standard
+permission policy. Each help request owns a separate `mcp --direct` process, so it does not use another
+Codex conversation's native session. Missing or disabled installations leave ordinary questions available;
+the assistant can explain how to enable the plugin. No extra plugin installation occurs when asking a question.
+
+Only a fixed desktop-tool allowlist is exposed, using the installed driver's actual input schemas.
+It covers application/window discovery, screenshots, accessibility inspection and interface interaction.
+Shell execution, browser scripts, arbitrary file access and permission escalation are not exposed.
+The model selects tools when asked to inspect or operate Remote AI, verifies results, and treats visible
+content as untrusted. Screenshots remain in the tool conversation; only the most recent results keep images.
+
+The panel displays desktop activity and replaces Send with **Stop** while a request is running.
+Stopping, unmounting, an account change, a timeout or plugin revocation terminates the help runtime.
+Minimizing preserves the request. Calls run asynchronously and serially, with a 24-action budget,
+60-second tool timeout and ten-minute total limit. The GUI's normal conversation and polling remain independent.
+
 ## Validation
 
 Rust tests cover input bounds, credential exclusion, retrieval, request isolation, stream validation
-and the loopback transport. Frontend tests cover prerequisite guidance, conversation persistence,
+and the loopback transport, including function-call continuations, reasoning items, screenshots and tool limits.
+Frontend tests cover prerequisite guidance, conversation persistence, editable suggestions and cancellation,
 duplicate submission prevention, failure recovery and safe Markdown rendering. Build with the normal
 desktop TypeScript/Vite pipeline; run Rust formatting, tests and Clippy before release.
 Visibility tests cover saved preferences, settings/menu synchronization, keyboard access, storage errors
@@ -81,3 +106,8 @@ From `apps/desktop`, run `npm run test:chat:e2e -- help-assistant.pw.ts` for the
 It checks all sidebar entries, responsive interaction during a pending answer and session polling,
 prerequisite guidance, narrow-screen layout and light/dark text contrast. The test uses mocked model
 responses and does not charge a real account.
+
+Run `help-assistant-settings.pw.ts` for admin question persistence and narrow-layout checks. PostgreSQL
+integration tests use an isolated database via `HELP_SETTINGS_TEST_DSN`. The ignored Rust test
+`managed_installation_connects_and_lists_applications` can verify the real managed driver without changing
+any application: set `CSW_HELP_COMPUTER_TEST_HOME` to the GUI home and run that test with `--ignored`.

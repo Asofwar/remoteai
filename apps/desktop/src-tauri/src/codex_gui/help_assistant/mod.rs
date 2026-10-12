@@ -1,15 +1,43 @@
+mod agent;
 mod catalog;
 mod context;
+pub(crate) mod control;
 mod images;
 mod knowledge;
 mod prompt;
 mod streaming;
+mod tool_loop;
+mod tool_output;
 mod transport;
 mod types;
 
 use super::{account_selection, connection::connected, releases, GuiState};
 use tauri::{AppHandle, State};
 use types::{HelpAnswer, HelpAvailability, HelpError, HelpRequest, HelpStatus, Result};
+
+#[tauri::command]
+pub(crate) async fn remote_ai_help_questions(
+    app: AppHandle,
+) -> std::result::Result<Option<Vec<crate::cloud::CloudHelpQuestion>>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let settings =
+            crate::cloud::load_help_settings(&app).map_err(|_| HelpError::Unavailable)?;
+        let Some(questions) = settings.questions else {
+            return Ok(None);
+        };
+        if questions.len() > 12
+            || questions.iter().any(|question| {
+                question.zh.chars().count() > 200 || question.en.chars().count() > 200
+            })
+        {
+            return Err(HelpError::Unavailable);
+        }
+        Ok(Some(questions))
+    })
+    .await
+    .map_err(|_| HelpError::Unavailable.to_string())?
+    .map_err(|error| error.to_string())
+}
 
 async fn status(app: AppHandle, state: &GuiState) -> Result<HelpStatus> {
     let installed = tauri::async_runtime::spawn_blocking(move || {
@@ -92,7 +120,6 @@ fn request_context(
 }
 
 async fn answer(app: AppHandle, state: &GuiState, request: HelpRequest) -> Result<HelpAnswer> {
-    let _slot = state.help_request.try_lock().map_err(|_| HelpError::Busy)?;
     let request = tauri::async_runtime::spawn_blocking(move || {
         request.validate()?;
         Ok::<_, HelpError>(request)
@@ -109,14 +136,22 @@ async fn answer(app: AppHandle, state: &GuiState, request: HelpRequest) -> Resul
         .await
         .map_err(|_| HelpError::InitializeRequired)?;
     let context_app = app.clone();
+    let request_id = request.request_id.clone();
     let mut progress = streaming::publisher(app.clone(), request.request_id.clone());
     let (context, knowledge, body) =
         tauri::async_runtime::spawn_blocking(move || request_context(context_app, request))
             .await
             .map_err(|_| HelpError::Unavailable)??;
-    let text =
-        transport::answer_streaming(&context.base_url, body, context.revision, &mut progress)
-            .await?;
+    let text = agent::answer(
+        agent::Run {
+            app: &app,
+            context: &context,
+            request_id: request_id.as_deref(),
+        },
+        body,
+        &mut progress,
+    )
+    .await?;
     let current = tauri::async_runtime::spawn_blocking(move || account_selection::snapshot(&app))
         .await
         .map_err(|_| HelpError::Unavailable)?
@@ -136,7 +171,7 @@ pub(crate) async fn remote_ai_help_ask(
     state: State<'_, GuiState>,
     request: HelpRequest,
 ) -> std::result::Result<HelpAnswer, String> {
-    answer(app, &state, request)
+    control::answer(app, &state, request)
         .await
         .map_err(|error| error.to_string())
 }

@@ -1,5 +1,5 @@
 import { useRef, type RefObject } from 'react';
-import { ArrowUp, ImagePlus, X } from 'lucide-react';
+import { ArrowUp, ImagePlus, Square, X } from 'lucide-react';
 import { IMAGE_TYPES } from '../../pages/codexGui/draftImages';
 import type { HelpCopy } from './copy';
 import { MAX_QUESTION_LENGTH } from './types';
@@ -14,9 +14,11 @@ interface HelpComposerProps {
   disabled: boolean;
   attachments: ReturnType<typeof useHelpImages>;
   send: () => Promise<void>;
+  pending: boolean;
+  stop: () => Promise<void>;
 }
 
-export function HelpComposer({ copy, input, draft, setDraft, disabled, attachments, send }: HelpComposerProps) {
+export function HelpComposer({ copy, input, draft, setDraft, disabled, attachments, send, pending, stop }: HelpComposerProps) {
   const picker = useRef<HTMLInputElement>(null);
   const expanded = Boolean(draft.length || attachments.images.length || attachments.reading);
   const canSend = !disabled && !attachments.reading && Boolean(draft.trim() || attachments.images.length);
@@ -49,8 +51,9 @@ export function HelpComposer({ copy, input, draft, setDraft, disabled, attachmen
       <button type="button" className={styles.addImage} aria-label={copy.addImage}
         disabled={disabled || attachments.reading || attachments.images.length >= MAX_HELP_IMAGES}
         onClick={() => picker.current?.click()}><ImagePlus size={18} /></button>
-      <button type="submit" className={styles.send} aria-label={copy.send} disabled={!canSend}>
-        <ArrowUp size={19} /></button>
+      {pending ? <button type="button" className={styles.send} aria-label={copy.stop} onClick={() => void stop()}>
+        <Square size={16} /></button> : <button type="submit" className={styles.send} aria-label={copy.send}
+          disabled={!canSend}><ArrowUp size={19} /></button>}
     </div>
     {attachments.reading && <p className={styles.imageNotice} role="status">{copy.readingImages}</p>}
     {attachments.error && <p className={styles.imageNotice} role="alert">{copy.imageErrors[attachments.error]}</p>}

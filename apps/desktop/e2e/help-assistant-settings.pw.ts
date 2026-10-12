@@ -15,7 +15,7 @@ for (const width of [1280, 390]) {
     await page.getByText("极高（xhigh）", { exact: true }).click();
     await page.getByRole("button", { name: "保存助手设置", exact: true }).click();
     await expect(page.getByText("助手设置已保存，下次提问时生效。", { exact: true })).toBeVisible();
-    expect(backend.helpSaves[0]).toEqual({
+    expect(backend.helpSaves[0]).toMatchObject({
       model: "gpt-test", effort: "xhigh", systemPrompt: "Be concise.", revision: "help-1",
     });
     await page.reload();
@@ -30,6 +30,28 @@ test("read-only users cannot change help reasoning", async ({ page }) => {
   await page.goto(`${harness}?readonly`);
   await expect(page.getByRole("combobox", { name: "推理强度", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "保存助手设置", exact: true })).toHaveCount(0);
+});
+
+test('suggested questions can be edited, added and removed, including an empty list', async ({ page }) => {
+  const backend = await officialModelsBackend(page);
+  await page.setViewportSize({ width: 390, height: 1000 });
+  await page.goto(harness);
+  await page.getByRole('textbox', { name: '中文问题 1', exact: true }).fill('帮我检查当前设置');
+  await page.getByRole('button', { name: '新增问题', exact: true }).click();
+  await expect(page.getByRole('button', { name: '保存助手设置', exact: true })).toBeDisabled();
+  await page.getByRole('textbox', { name: '中文问题 4', exact: true }).fill('如何启用电脑助手？');
+  await page.getByRole('button', { name: '保存助手设置', exact: true }).click();
+  await expect.poll(() => backend.helpSaves.length).toBe(1);
+  expect(backend.helpSaves[0].questions).toHaveLength(4);
+  await page.reload();
+  await expect(page.getByRole('textbox', { name: '中文问题 1', exact: true })).toHaveValue('帮我检查当前设置');
+  await expect(page.getByRole('textbox', { name: '中文问题 4', exact: true })).toHaveValue('如何启用电脑助手？');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: '../../.codex-tmp/help-questions-admin.png', fullPage: true });
+  for (let index = 0; index < 4; index++) await page.getByRole('button', { name: '删除问题 1', exact: true }).click();
+  await page.getByRole('button', { name: '保存助手设置', exact: true }).click();
+  await expect.poll(() => backend.helpSaves.length).toBe(2);
+  expect(backend.helpSaves[1].questions).toEqual([]);
 });
 
 test("failed saves retain the reasoning draft", async ({ page }) => {

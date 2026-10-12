@@ -1,4 +1,6 @@
-use super::types::{HelpError, Result, MAX_ANSWER_CHARS};
+#[cfg(test)]
+use super::types::MAX_ANSWER_CHARS;
+use super::types::{HelpError, Result};
 use crate::codex_config::{
     HELP_ACCOUNT_REVISION_HEADER, HELP_REQUEST_PURPOSE, LOCAL_PROXY_ACTOR_AUTHORIZATION_HEADER,
     LOCAL_PROXY_REQUEST_PURPOSE_HEADER, LOCAL_PROXY_TOKEN,
@@ -11,15 +13,25 @@ const MAX_RESPONSE_BYTES: usize = 2 * 1024 * 1024;
 
 #[cfg(test)]
 pub(super) async fn answer(base_url: &str, body: Value, revision: u64) -> Result<String> {
-    answer_streaming(base_url, body, revision, &mut |_| {}).await
+    completed_text(&response_streaming(base_url, body, revision, &mut |_| {}).await?)
 }
 
+#[cfg(test)]
 pub(super) async fn answer_streaming(
     base_url: &str,
     body: Value,
     revision: u64,
     progress: &mut (impl FnMut(&str) + Send),
 ) -> Result<String> {
+    completed_text(&response_streaming(base_url, body, revision, progress).await?)
+}
+
+pub(super) async fn response_streaming(
+    base_url: &str,
+    body: Value,
+    revision: u64,
+    progress: &mut (impl FnMut(&str) + Send),
+) -> Result<Value> {
     tokio::time::timeout(REQUEST_TIMEOUT, request(base_url, body, revision, progress))
         .await
         .map_err(|_| HelpError::AnswerFailed)?
@@ -30,7 +42,7 @@ async fn request(
     body: Value,
     revision: u64,
     progress: &mut (impl FnMut(&str) + Send),
-) -> Result<String> {
+) -> Result<Value> {
     let client = reqwest::Client::builder()
         .no_proxy()
         .redirect(reqwest::redirect::Policy::none())
@@ -55,7 +67,7 @@ async fn request(
 async fn read_response(
     mut response: reqwest::Response,
     progress: &mut impl FnMut(&str),
-) -> Result<String> {
+) -> Result<Value> {
     let success = response.status().is_success();
     let mut bytes = Vec::new();
     let mut stream = super::streaming::AnswerStream::default();
@@ -78,10 +90,10 @@ async fn read_response(
             .map(|value| response_error(&value))
             .unwrap_or(HelpError::AnswerFailed));
     }
-    parse_response(&bytes)
+    parse_completion(&bytes)
 }
 
-fn message_text(value: &Value) -> String {
+pub(super) fn message_text(value: &Value) -> String {
     value["output"]
         .as_array()
         .into_iter()
@@ -95,10 +107,15 @@ fn message_text(value: &Value) -> String {
         .join("\n")
 }
 
+#[cfg(test)]
 pub(super) fn parse_response(bytes: &[u8]) -> Result<String> {
+    completed_text(&parse_completion(bytes)?)
+}
+
+pub(super) fn parse_completion(bytes: &[u8]) -> Result<Value> {
     let text = std::str::from_utf8(bytes).map_err(|_| HelpError::AnswerFailed)?;
     if let Ok(response) = serde_json::from_str::<Value>(text) {
-        return completed_text(&response);
+        return validate_completion(response);
     }
     for line in text.lines().filter_map(|line| line.strip_prefix("data:")) {
         if line.trim() == "[DONE]" {
@@ -107,7 +124,7 @@ pub(super) fn parse_response(bytes: &[u8]) -> Result<String> {
         let event: Value =
             serde_json::from_str(line.trim()).map_err(|_| HelpError::AnswerFailed)?;
         match event["type"].as_str() {
-            Some("response.completed") => return completed_text(&event["response"]),
+            Some("response.completed") => return validate_completion(event["response"].clone()),
             Some("response.failed" | "response.incomplete") => {
                 return Err(response_error(&event["response"]))
             }
@@ -118,6 +135,14 @@ pub(super) fn parse_response(bytes: &[u8]) -> Result<String> {
     Err(HelpError::AnswerFailed)
 }
 
+fn validate_completion(value: Value) -> Result<Value> {
+    if value["status"] != "completed" || !value["output"].is_array() {
+        return Err(response_error(&value));
+    }
+    Ok(value)
+}
+
+#[cfg(test)]
 fn completed_text(value: &Value) -> Result<String> {
     if value["status"] == "failed" {
         return Err(response_error(value));

@@ -77,6 +77,7 @@ fn model_errors_are_safe_and_admin_settings_have_no_local_defaults() {
             model: model.into(),
             effort: crate::codex_gui::model_settings::Effort::Low,
             system_prompt: "Help".into(),
+            questions: None,
         };
         assert!(context::validate_settings(&settings).is_err());
     }
@@ -85,6 +86,7 @@ fn model_errors_are_safe_and_admin_settings_have_no_local_defaults() {
             model: "configured".into(),
             effort: crate::codex_gui::model_settings::Effort::Low,
             system_prompt,
+            questions: None,
         };
         assert!(context::validate_settings(&settings).is_err());
     }

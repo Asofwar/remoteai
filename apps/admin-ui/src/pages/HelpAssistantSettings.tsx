@@ -2,6 +2,7 @@ import { Button, Card, Input, Select, Space, Typography } from "antd";
 import { useHelpSettings } from "../hooks/useHelpSettings";
 import type { OfficialModelsProps } from "../hooks/useOfficialModels";
 import { HelpReasoningField } from "./HelpReasoningField";
+import { HelpQuestionsField } from "./HelpQuestionsField";
 
 function modelOptions(catalog: Record<string, unknown> | null | undefined) {
   const models: unknown[] = Array.isArray(catalog?.models) ? catalog.models : [];
@@ -51,8 +52,12 @@ export function HelpAssistantSettings({ api, canManage, catalog, zh }: OfficialM
           readOnly={!canManage} disabled={busy || !settings.draft} maxLength={16000} autoSize={{ minRows: 5, maxRows: 12 }}
           onChange={(event) => settings.setDraft((draft) => draft && { ...draft, systemPrompt: event.target.value })} />
       </div>
+      <HelpQuestionsField value={settings.draft?.questions ?? []} disabled={!editable} zh={zh}
+        onChange={(questions) => settings.setDraft((draft) => draft && { ...draft, questions })} />
       {canManage && <Button type="primary" loading={settings.saving}
-        disabled={!editable || !validModel || !settings.draft?.systemPrompt.trim()} onClick={() => void settings.save()}>
+        disabled={!editable || !validModel || !settings.draft?.systemPrompt.trim()
+          || settings.draft.questions.some((question) => !question.zh.trim() && !question.en.trim())}
+        onClick={() => void settings.save()}>
         {zh ? "保存助手设置" : "Save assistant settings"}</Button>}
     </Space>
   </Card>;

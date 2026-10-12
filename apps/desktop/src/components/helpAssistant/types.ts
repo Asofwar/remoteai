@@ -7,7 +7,8 @@ const MAX_VISIBLE_MESSAGES = 40;
 export type HelpStatus = 'ready' | 'installRequired' | 'initializeRequired' | 'accountRequired';
 export interface HelpAvailability { status: HelpStatus; accountRevision?: number }
 export type HelpError = Exclude<HelpStatus, 'ready'> | 'accountChanged' | 'invalidRequest'
-  | 'busy' | 'unavailable' | 'answerFailed' | 'invalidImage' | 'modelNotConfigured' | 'modelUnsupported';
+  | 'busy' | 'unavailable' | 'answerFailed' | 'invalidImage' | 'modelNotConfigured' | 'modelUnsupported'
+  | 'cancelled' | 'computerUnavailable' | 'stopFailed';
 export interface HelpAnswer { text: string; sources: string[] }
 export interface HelpContent { text: string; images?: string[] }
 export interface HelpMessage extends HelpContent { id: number; role: 'user' | 'assistant'; sources?: string[] }
@@ -15,7 +16,8 @@ export interface HelpMessage extends HelpContent { id: number; role: 'user' | 'a
 export function helpError(value: unknown): HelpError {
   const code = value instanceof Error ? value.message : value;
   const errors: HelpError[] = ['installRequired', 'initializeRequired', 'accountRequired', 'accountChanged',
-    'invalidRequest', 'busy', 'unavailable', 'answerFailed', 'invalidImage', 'modelNotConfigured', 'modelUnsupported'];
+    'invalidRequest', 'busy', 'unavailable', 'answerFailed', 'invalidImage', 'modelNotConfigured', 'modelUnsupported',
+    'cancelled', 'computerUnavailable', 'stopFailed'];
   return errors.find((error) => error === code) ?? 'answerFailed';
 }
 

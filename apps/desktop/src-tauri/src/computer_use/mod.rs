@@ -2,6 +2,7 @@
 mod archive;
 mod assets;
 mod automatic;
+mod client;
 pub(crate) mod commands;
 mod install;
 mod package;
@@ -13,6 +14,7 @@ mod state;
 use std::path::PathBuf;
 
 pub(crate) use automatic::setup_gui;
+pub(crate) use client::ComputerSession;
 static CHANGES: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 const VERSION: &str = "0.25.0";

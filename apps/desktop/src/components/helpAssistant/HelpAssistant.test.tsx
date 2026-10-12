@@ -22,6 +22,7 @@ const openCodex = vi.fn();
 const unsubscribe = vi.fn();
 let accountChanged: () => void;
 let progress: (payload: { requestId: string; text: string }) => void;
+let activity: (payload: { requestId: string; activity: string | null }) => void;
 let availability: HelpAvailability;
 const button = (label: string) => document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!;
 const input = () => document.querySelector<HTMLTextAreaElement>('textarea')!;
@@ -53,7 +54,8 @@ beforeEach(() => {
     ? availability : { text: '请打开 Codex，选择账户。', sources: ['docs/codex-gui.md'] });
   vi.mocked(subscribeGuiEvent).mockImplementation(async (name, callback) => {
     if (name === 'remote-ai-help-progress') progress = callback;
-    else accountChanged = () => callback({ kind: 'account', id: 'new-account' });
+    else if (name === 'remote-ai-help-activity') activity = callback;
+    else if (name === 'codex-gui-account-changed') accountChanged = () => callback({ kind: 'account', id: 'new-account' });
     return unsubscribe;
   });
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
@@ -160,7 +162,7 @@ it('opens account selection without submitting a request', async () => {
 
 it('keeps a single request running while minimized and hides remote Markdown images and links', async () => {
   let finish!: (value: unknown) => void;
-  vi.mocked(invoke).mockImplementation((command) => command === 'remote_ai_help_status'
+  vi.mocked(invoke).mockImplementation((command) => command === 'remote_ai_help_questions' ? Promise.resolve(null) : command === 'remote_ai_help_status'
     ? Promise.resolve(availability) : new Promise((resolve) => { finish = resolve; }));
   await render(); await open(); await type('Remote AI 如何使用？');
   await act(async () => { button('发送').click(); button('发送').click(); });
@@ -212,7 +214,7 @@ it('clears old-account history even when the account changes while minimized', a
 
 it('discards answers from an account that changed during the request', async () => {
   let finish!: (value: unknown) => void;
-  vi.mocked(invoke).mockImplementation((command) => command === 'remote_ai_help_status'
+  vi.mocked(invoke).mockImplementation((command) => command === 'remote_ai_help_questions' ? Promise.resolve(null) : command === 'remote_ai_help_status'
     ? Promise.resolve(availability) : new Promise((resolve) => { finish = resolve; }));
   await render(); await open(); await type('问题'); await send();
   availability = { status: 'ready', accountRevision: 8 };
@@ -240,7 +242,7 @@ function activeRequestId() {
 
 it('streams before completion, keeps progress while dismissed, and marks the completed answer unread', async () => {
   let finish!: (value: unknown) => void;
-  vi.mocked(invoke).mockImplementation((command) => command === 'remote_ai_help_status'
+  vi.mocked(invoke).mockImplementation((command) => command === 'remote_ai_help_questions' ? Promise.resolve(null) : command === 'remote_ai_help_status'
     ? Promise.resolve(availability) : new Promise((resolve) => { finish = resolve; }));
   await render(); await open(); await type('怎么使用？'); await send();
   const requestId = activeRequestId();
@@ -248,7 +250,7 @@ it('streams before completion, keeps progress while dismissed, and marks the com
   expect(document.body.textContent).not.toContain('别的回答');
   await act(async () => progress({ requestId, text: '**逐步**生成' }));
   expect(document.querySelector('[role="log"] strong')?.textContent).toBe('逐步');
-  expect(button('发送').disabled).toBe(true);
+  expect(button('停止').disabled).toBe(false);
   await act(async () => input().dispatchEvent(new Event('pointerdown', { bubbles: true })));
   expect(document.querySelector('[role="dialog"]')).not.toBeNull();
   await act(async () => container.dispatchEvent(new Event('pointerdown', { bubbles: true })));
@@ -270,7 +272,7 @@ it('streams before completion, keeps progress while dismissed, and marks the com
 it.each(['failed', 'accountChanged'] as const)('does not mark a %s stream as a new answer', async (outcome) => {
   let finish!: (value: unknown) => void;
   let reject!: (reason: string) => void;
-  vi.mocked(invoke).mockImplementation((command) => command === 'remote_ai_help_status'
+  vi.mocked(invoke).mockImplementation((command) => command === 'remote_ai_help_questions' ? Promise.resolve(null) : command === 'remote_ai_help_status'
     ? Promise.resolve(availability) : new Promise((resolve, fail) => { finish = resolve; reject = fail; }));
   await render(); await open(); await type('保留问题'); await send();
   const requestId = activeRequestId();
@@ -293,4 +295,49 @@ it('does not show an unread dot for answers completed while open', async () => {
   await render(); await open(); await type('问题'); await send();
   await act(async () => button('收起助手').click());
   expect(document.querySelector('[aria-label="有新回答"]')).toBeNull();
+});
+
+it('loads administrator questions and sends a clicked question immediately only once', async () => {
+  let finish!: (value: unknown) => void;
+  vi.mocked(invoke).mockImplementation(async (command) => {
+    if (command === 'remote_ai_help_status') return availability;
+    if (command === 'remote_ai_help_questions') return [{ zh: '帮我检查设置', en: 'Check my settings' }];
+    return new Promise((resolve) => { finish = resolve; });
+  });
+  await render(); await open();
+  expect(document.body.textContent).not.toContain('如何选择 Codex 使用的账户？');
+  const question = [...document.querySelectorAll('button')].find((item) => item.textContent === '帮我检查设置')!;
+  await act(async () => { question.click(); question.click(); });
+  const asks = vi.mocked(invoke).mock.calls.filter(([command]) => command === 'remote_ai_help_ask');
+  expect(asks).toHaveLength(1);
+  expect(asks[0][1]).toMatchObject({ request: { question: '帮我检查设置' } });
+  expect(input().value).toBe('');
+  await act(async () => finish({ text: '检查完成', sources: [] }));
+});
+
+it('respects an empty configured question list', async () => {
+  vi.mocked(invoke).mockImplementation(async (command) => command === 'remote_ai_help_status' ? availability : []);
+  await render(); await open();
+  for (const question of helpCopy('zh').questions) expect(document.body.textContent).not.toContain(question);
+});
+
+it('shows tool activity and stops only the active help request', async () => {
+  let reject!: (reason: string) => void;
+  vi.mocked(invoke).mockImplementation(async (command) => {
+    if (command === 'remote_ai_help_status') return availability;
+    if (command === 'remote_ai_help_questions') return null;
+    if (command === 'remote_ai_help_cancel') { reject('cancelled'); return; }
+    return new Promise((_, fail) => { reject = fail; });
+  });
+  await render(); await open(); await type('帮我查看界面'); await send();
+  const requestId = activeRequestId();
+  await act(async () => activity({ requestId: 'unrelated', activity: 'computer' }));
+  expect(document.body.textContent).not.toContain(helpCopy('zh').operating);
+  await act(async () => activity({ requestId, activity: 'computer' }));
+  expect(document.body.textContent).toContain(helpCopy('zh').operating);
+  await act(async () => button('停止').click());
+  expect(invoke).toHaveBeenCalledWith('remote_ai_help_cancel', { requestId });
+  expect(document.body.textContent).toContain(helpCopy('zh').errors.cancelled);
+  expect(input().disabled).toBe(false);
+  expect(button('发送')).not.toBeNull();
 });

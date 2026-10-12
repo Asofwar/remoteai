@@ -335,6 +335,8 @@ pub fn run() {
             codex_gui::codex_gui_connect,
             codex_gui::help_assistant::remote_ai_help_status,
             codex_gui::help_assistant::remote_ai_help_ask,
+            codex_gui::help_assistant::control::remote_ai_help_cancel,
+            codex_gui::help_assistant::remote_ai_help_questions,
             codex_gui::notification_navigation::codex_gui_take_notification_navigation,
             codex_gui::scheduled_tasks::codex_gui_scheduled_tasks,
             codex_gui::clipboard::codex_gui_clipboard_files,

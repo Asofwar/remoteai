@@ -41,6 +41,14 @@ pub(crate) struct CloudHelpSettings {
     #[serde(default = "default_help_effort")]
     pub(crate) effort: Effort,
     pub(crate) system_prompt: String,
+    #[serde(default)]
+    pub(crate) questions: Option<Vec<CloudHelpQuestion>>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) struct CloudHelpQuestion {
+    pub(crate) zh: String,
+    pub(crate) en: String,
 }
 
 // Older servers omit this field; preserve the assistant's original reasoning level.

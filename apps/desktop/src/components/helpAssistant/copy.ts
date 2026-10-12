@@ -7,6 +7,7 @@ interface HelpCopy {
   title: string; subtitle: string; close: string; clear: string; placeholder: string;
   hide: string; visibilityLabel: string; visibilityDescription: string; visibilitySaveError: string;
   send: string; thinking: string; checking: string; retry: string; unread: string;
+  stop: string; operating: string;
   addImage: string; removeImage: string; image: string; readingImages: string;
   imageErrors: Record<HelpImageError, string>;
   install: string; initialize: string; selectAccount: string;
@@ -17,6 +18,7 @@ interface HelpCopy {
 
 const copies: Record<Language, HelpCopy> = {
   zh: {
+    stop: '停止', operating: '正在查看或操作界面…',
     hide: '隐藏助手', visibilityLabel: '显示助手入口', unread: '有新回答',
     visibilityDescription: '在页面右下角显示问题解答助手，也可右键入口隐藏。',
     visibilitySaveError: '未能保存显示设置，请重试。',
@@ -35,6 +37,8 @@ const copies: Record<Language, HelpCopy> = {
     welcome: '你好，有什么可以帮你？', description: '结合使用说明和你当前的设置，解答 Remote AI 相关问题。',
     sources: '参考资料', questions: ['如何选择 Codex 使用的账户？', '手机为什么连接不上电脑？', '自动切换账户怎么设置？'],
     errors: {
+      cancelled: '已停止。你可以继续提问。', stopFailed: '暂时无法停止，请再点一次停止。',
+      computerUnavailable: '电脑操作已中止。请检查 Codex 社区插件中的电脑助手是否已启用，并确认系统权限。',
       installRequired: '使用助手需要先安装 Codex。',
       initializeRequired: 'Codex 已安装，点击下方按钮即可启用助手。',
       accountRequired: '请先在 Codex 中选择一个可用账户。',
@@ -48,6 +52,7 @@ const copies: Record<Language, HelpCopy> = {
     },
   },
   en: {
+    stop: 'Stop', operating: 'Inspecting or interacting with the interface…',
     hide: 'Hide assistant', visibilityLabel: 'Show assistant button', unread: 'New answer',
     visibilityDescription: 'Show the help assistant in the bottom-right corner. Right-click its button to hide it.',
     visibilitySaveError: 'Could not save the display setting. Please try again.',
@@ -67,6 +72,9 @@ const copies: Record<Language, HelpCopy> = {
     sources: 'References', questions: ['How do I select a Codex account?', 'Why can’t my phone connect?',
       'How do I set up automatic account switching?'],
     errors: {
+      cancelled: 'Stopped. You can ask another question.', stopFailed: 'Could not stop yet. Please press Stop again.',
+      computerUnavailable: 'Computer interaction stopped. Check that Computer Use is enabled in Codex community plugins '
+        + 'and has the required system permissions.',
       installRequired: 'The assistant needs Codex. Use the button below to install it here.',
       initializeRequired: 'Codex is installed. Use the button below to enable the assistant.',
       accountRequired: 'Choose an available account in Codex first.',
@@ -80,6 +88,7 @@ const copies: Record<Language, HelpCopy> = {
     },
   },
   ru: {
+    stop: 'Остановить', operating: 'Просмотр или управление интерфейсом…',
     hide: 'Скрыть помощника', visibilityLabel: 'Показывать кнопку помощника', unread: 'Новый ответ',
     visibilityDescription: 'Помощник в правом нижнем углу. Чтобы скрыть его, нажмите на кнопку правой кнопкой мыши.',
     visibilitySaveError: 'Не удалось сохранить настройку отображения. Попробуйте ещё раз.',
@@ -101,6 +110,8 @@ const copies: Record<Language, HelpCopy> = {
     sources: 'Источники', questions: ['Как выбрать аккаунт Codex?', 'Почему телефон не подключается?',
       'Как настроить автоматическую смену аккаунта?'],
     errors: {
+      cancelled: 'Остановлено. Можно задать новый вопрос.', stopFailed: 'Не удалось остановить. Нажмите ещё раз.',
+      computerUnavailable: 'Управление компьютером остановлено. Проверьте плагин Computer Use в Codex и разрешения системы.',
       installRequired: 'Для помощника нужен Codex. Нажмите кнопку ниже, чтобы установить его здесь.',
       initializeRequired: 'Codex установлен. Нажмите кнопку ниже, чтобы включить помощника.',
       accountRequired: 'Сначала выберите доступный аккаунт в Codex.',

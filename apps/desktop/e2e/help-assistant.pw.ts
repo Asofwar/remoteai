@@ -18,7 +18,9 @@ async function expectReadableQuestion(panel: Locator) {
     .toBeGreaterThanOrEqual(4.5);
 }
 
-async function mockBackend(page: Page, options: { status?: string; wait?: Promise<void> } = {}) {
+async function mockBackend(page: Page, options: {
+  status?: string; wait?: Promise<void>; questions?: { zh: string; en: string }[];
+} = {}) {
   const events: { name: string; payload: { requestId: string; text: string } }[] = [];
   let requestId = '';
   let sequence = 0;
@@ -30,6 +32,7 @@ async function mockBackend(page: Page, options: { status?: string; wait?: Promis
     const { command } = route.request().postDataJSON() as { command: string };
     let result: unknown = {};
     if (command === 'remote_ai_help_status') result = { status, accountRevision: 7 };
+    if (command === 'remote_ai_help_questions') result = options.questions ?? null;
     if (command === 'codex_gui_cli_status') result = { version: null, release: null };
     if (command === 'codex_gui_cli_release') result = { version: '0.99.0', size: 100 };
     if (command === 'codex_gui_cli_install') {
@@ -52,6 +55,27 @@ async function mockBackend(page: Page, options: { status?: string; wait?: Promis
   });
   return stats;
 }
+
+test('configured questions send immediately while polling remains responsive', async ({ page }) => {
+  let release = () => {};
+  const wait = new Promise<void>((resolve) => { release = resolve; });
+  const stats = await mockBackend(page, { wait, questions: [{ zh: '帮我检查当前设置', en: 'Check my settings' }] });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/e2e/help-assistant-harness.html');
+  await page.getByRole('button', { name: '问题解答助手', exact: true }).click();
+  const panel = page.getByRole('dialog');
+  await panel.getByRole('button', { name: '帮我检查当前设置', exact: true }).click();
+  await expect.poll(() => stats.asks).toBe(1);
+  expect(stats.requests[0]).toMatchObject({ args: { request: { question: '帮我检查当前设置' } } });
+  await expect(panel.getByRole('button', { name: '停止', exact: true })).toBeVisible();
+  try {
+    await expect.poll(() => stats.polls).toBeGreaterThan(1);
+    await page.getByRole('button', { name: 'Click 0', exact: true }).click();
+    await expect(panel).not.toBeVisible();
+  } finally { release(); }
+  await page.getByRole('button', { name: '问题解答助手', exact: true }).click();
+  await expect(panel).toContainText('可以在 Codex 页面选择账户');
+});
 
 test('help remains responsive during requests and session polling on every sidebar page', async ({ page }) => {
   let release = () => {};

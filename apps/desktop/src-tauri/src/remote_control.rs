@@ -156,6 +156,7 @@ fn run_connection<R: Runtime>(
     let mut last_ping = Instant::now();
     let mut updates = app_update::UpdateBridge::new(app);
     let mut commands = crate::remote_command::host::CommandHost::new();
+    update_peers.server(&config.websocket_url);
     update_peers.connected();
     loop {
         for response in updates

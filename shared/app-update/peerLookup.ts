@@ -4,10 +4,10 @@ export interface UpdatePeerConfig {
   sameAccount?: boolean;
 }
 export interface UpdatePeerLease { configs: UpdatePeerConfig[]; close(): void; failed(sessionId: string): void }
-interface Session { baseUrl: string; accessToken: string }
+export interface UpdatePeerSession { baseUrl: string; accessToken: string }
 const LOOKUP_TIMEOUT_MS = 6_000;
 
-function validConfig(value: unknown): value is UpdatePeerConfig {
+export function validUpdatePeerConfig(value: unknown): value is UpdatePeerConfig {
   if (!value || typeof value !== 'object') return false;
   const config = value as Partial<UpdatePeerConfig>;
   return typeof config.sessionId === 'string' && /^update-[\da-f-]{36}$/.test(config.sessionId)
@@ -19,7 +19,7 @@ function validConfig(value: unknown): value is UpdatePeerConfig {
 }
 
 /** Metadata remains on GitHub; the authenticated broker only grants isolated package connections. */
-export function findUpdatePeers(session: Session, artifact: string,
+export function findUpdatePeers(session: UpdatePeerSession, artifact: string,
   options: { protocol?: number; ownOnly?: boolean } = {}): Promise<UpdatePeerLease> {
   return new Promise((resolve, reject) => {
     const url = new URL(session.baseUrl);
@@ -61,7 +61,7 @@ export function findUpdatePeers(session: Session, artifact: string,
         if (message.type === 'update-peer-unavailable') { fail(); return; }
         const configs = message.type === 'update-peer-offers' ? message.configs : [message.config];
         if (message.artifact !== artifact || !Array.isArray(configs) || !configs.length || configs.length > 3
-          || !configs.every(validConfig)
+          || !configs.every(validUpdatePeerConfig)
           || (options.ownOnly !== false && configs.some(config => !config.sameAccount))
           || new Set(configs.map(config => config.sessionId)).size !== configs.length) {
           fail(); return;

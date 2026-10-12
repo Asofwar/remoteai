@@ -2,11 +2,13 @@
 //! Signaling carries opaque identifiers only; each transfer gets an isolated direct-only network.
 mod android;
 mod block_download;
+mod block_plan;
 mod block_protocol;
 mod cache;
 mod checkpoint;
 pub(crate) mod commands;
 mod dependency;
+mod mirror;
 mod network_cost;
 mod origin_blocks;
 pub(crate) mod packages;
@@ -46,6 +48,7 @@ pub(crate) struct Service {
     uploads: Arc<Semaphore>,
     downloads: Semaphore,
     policy: Arc<policy::Policy>,
+    mirror_base: watch::Sender<Option<String>>,
 }
 
 pub(crate) fn setup<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
@@ -68,6 +71,7 @@ pub(crate) fn setup<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Resu
         uploads: Arc::new(Semaphore::new(MAX_UPLOADS)),
         downloads: Semaphore::new(1),
         policy: policy::Policy::new(app.path().app_config_dir()?.join("update-sharing.json")),
+        mirror_base: watch::channel(None).0,
     });
     app.manage(service.clone());
     tauri::async_runtime::spawn(service.policy.clone().run());

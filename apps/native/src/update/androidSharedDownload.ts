@@ -1,6 +1,8 @@
 import { DeviceEventEmitter, NativeModules } from 'react-native';
 import type { AppRelease } from './appUpdate';
 import { findUpdatePeers } from '../../../../shared/app-update/peerLookup';
+import { watchUpdatePeers } from '../../../../shared/app-update/peerDiscovery';
+import { updateMirrorUrl } from '../../../../shared/app-update/mirrorUrl';
 import { updateNotificationLabels } from './androidUpdateNotifications';
 
 interface UpdateModule {
@@ -9,6 +11,7 @@ interface UpdateModule {
   updatePath(version: string): Promise<string>;
   artifactId(metadata: string): Promise<string>;
   downloadPeers(options: string): Promise<string>;
+  addUpdatePeers?(options: string): Promise<boolean>;
   downloadOfficial(options: string): Promise<string>;
   verifyPackage(options: string): Promise<boolean>;
 }
@@ -37,9 +40,14 @@ export async function downloadSharedAndroidUpdate(options: {
     const { loadSession } = await import('../api/client');
     const session = await loadSession();
     const artifact = await native.artifactId(JSON.stringify(metadata));
-    if (session) lease = await findUpdatePeers(session, artifact, { protocol: native.sharingProtocol === 2 ? 2 : 0 })
-      .catch(() => undefined);
+    if (session) {
+      lease = await (native.addUpdatePeers
+        ? watchUpdatePeers({ session, artifact, onPeers: configs => native.addUpdatePeers!(JSON.stringify({ artifact, configs })) })
+        : findUpdatePeers(session, artifact, { protocol: native.sharingProtocol === 2 ? 2 : 0 }))
+        .catch(() => undefined);
+    }
     return await native.downloadPeers(JSON.stringify({ ...metadata, path: options.path,
+      mirrorUrl: session ? updateMirrorUrl(session.baseUrl, asset.downloadUrl) : undefined,
       notification: updateNotificationLabels(),
       wifiOnly: options.wifiOnly, artifact, configs: lease?.configs ?? [] }));
   } catch {

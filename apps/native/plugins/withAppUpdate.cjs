@@ -28,8 +28,9 @@ module.exports = function withAppUpdate(config) {
     const target = path.join(result.modRequest.platformProjectRoot, 'app/src/main/java/com/codexswitch/update');
     await fs.mkdir(target, { recursive: true });
     for (const name of ['AppUpdatePackage.kt', 'AppUpdateModule.kt', 'UpdateFiles.kt',
-      'UpdatePeerDownload.kt', 'UpdateOfficialDownload.kt', 'UpdateBlockSession.kt',
-      'UpdateBlockDownload.kt', 'UpdateBlockPlan.kt', 'UpdateOriginBlocks.kt', 'UpdateCheckpoint.kt',
+      'UpdatePeerDownload.kt', 'UpdateOfficialDownload.kt', 'UpdateBlockSession.kt', 'UpdateBlockWire.kt',
+      'UpdateBlockDownload.kt', 'UpdateBlockPlan.kt', 'UpdateRequestWindow.kt', 'UpdateMirrorUrl.kt',
+      'UpdateOriginBlocks.kt', 'UpdateCheckpoint.kt',
       'UpdateDownloadProgress.kt', 'UpdateDownloadNotification.kt']) {
       await fs.copyFile(path.join(__dirname, 'appUpdate', name), path.join(target, name));
     }

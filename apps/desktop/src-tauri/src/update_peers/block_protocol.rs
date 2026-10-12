@@ -6,7 +6,7 @@ use super::{
 };
 use csw_chat_connectivity::{Connection, Event};
 use serde::{Deserialize, Serialize};
-use std::{sync::Arc, time::Duration};
+use std::{collections::VecDeque, sync::Arc, time::Duration};
 
 const OPEN_TIMEOUT: Duration = Duration::from_secs(12);
 const PREPARE_TIMEOUT: Duration = Duration::from_secs(45);
@@ -16,10 +16,26 @@ const PACKET_BYTES: usize = 64 * 1024;
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 enum Message {
-    Describe { artifact: String },
-    Manifest { size: usize, hashes: Vec<String> },
-    Read { index: usize },
-    Block { index: usize, length: usize },
+    Describe {
+        artifact: String,
+    },
+    Manifest {
+        size: usize,
+        hashes: Vec<String>,
+        #[serde(default = "legacy_window", rename = "requestWindow")]
+        request_window: usize,
+    },
+    Read {
+        index: usize,
+    },
+    Block {
+        index: usize,
+        length: usize,
+    },
+}
+
+fn legacy_window() -> usize {
+    1
 }
 
 async fn send(connection: &Connection, message: &Message) -> Result<()> {
@@ -77,43 +93,83 @@ pub(super) async fn manifest(connection: &Connection, artifact: &str) -> Result<
     let response = tokio::time::timeout(PREPARE_TIMEOUT, receive(connection))
         .await
         .map_err(|_| Error::Unavailable)??;
-    let Message::Manifest { size, hashes } = response else {
+    let Message::Manifest {
+        size,
+        hashes,
+        request_window,
+    } = response
+    else {
         return Err(Error::Invalid);
     };
-    let manifest = Manifest { size, hashes };
+    let manifest = Manifest {
+        size,
+        hashes,
+        request_window: request_window.clamp(1, super::snapshot::MAX_REQUESTS),
+    };
     manifest.validate()?;
     Ok(manifest)
 }
 
-pub(super) async fn block(
-    connection: &Connection,
-    manifest: &Manifest,
-    index: usize,
-) -> Result<Vec<u8>> {
-    let length = manifest.length(index)?;
-    send(connection, &Message::Read { index }).await?;
-    match receive(connection).await? {
-        Message::Block {
-            index: received,
-            length: offered,
-        } if received == index && offered == length => {}
-        _ => return Err(Error::Invalid),
+pub(super) struct Reader {
+    connection: Arc<Connection>,
+    pub manifest: Manifest,
+    headers: VecDeque<Message>,
+}
+
+impl Reader {
+    pub async fn open(connection: Arc<Connection>, artifact: &str) -> Result<Self> {
+        let manifest = manifest(&connection, artifact).await?;
+        Ok(Self {
+            connection,
+            manifest,
+            headers: VecDeque::new(),
+        })
     }
-    let mut bytes = Vec::with_capacity(length);
-    while bytes.len() < length {
-        tokio::select! {
-            packet = connection.receive_packet() => {
-                let packet = packet.ok_or(Error::Unavailable)?;
-                if packet.is_empty() || packet.len() > PACKET_BYTES || packet.len() > length - bytes.len() {
-                    return Err(Error::Invalid);
-                }
-                bytes.extend_from_slice(&packet);
-            }
-            message = receive(connection) => { message?; return Err(Error::Invalid); }
+
+    pub async fn request(&self, indices: &[usize]) -> Result<()> {
+        if indices.is_empty() || indices.len() > self.manifest.request_window {
+            return Err(Error::Invalid);
         }
+        for &index in indices {
+            self.manifest.length(index)?;
+            send(&self.connection, &Message::Read { index }).await?;
+        }
+        Ok(())
     }
-    manifest.verify(index, &bytes)?;
-    Ok(bytes)
+
+    pub async fn block(&mut self, index: usize) -> Result<Vec<u8>> {
+        let length = self.manifest.length(index)?;
+        let header = match self.headers.pop_front() {
+            Some(header) => header,
+            None => receive(&self.connection).await?,
+        };
+        match header {
+            Message::Block {
+                index: received,
+                length: offered,
+            } if received == index && offered == length => {}
+            _ => return Err(Error::Invalid),
+        }
+        let mut bytes = Vec::with_capacity(length);
+        while bytes.len() < length {
+            tokio::select! {
+                packet = self.connection.receive_packet() => {
+                    let packet = packet.ok_or(Error::Unavailable)?;
+                    if packet.is_empty() || packet.len() > PACKET_BYTES || packet.len() > length - bytes.len() {
+                        return Err(Error::Invalid);
+                    }
+                    bytes.extend_from_slice(&packet);
+                }
+                message = receive(&self.connection) => {
+                    if self.headers.len() >= self.manifest.request_window { return Err(Error::Invalid); }
+                    // Control frames can overtake payload consumption across the two bounded queues.
+                    self.headers.push_back(message?);
+                }
+            }
+        }
+        self.manifest.verify(index, &bytes)?;
+        Ok(bytes)
+    }
 }
 
 pub(super) async fn seed(
@@ -136,6 +192,7 @@ pub(super) async fn seed(
         &Message::Manifest {
             size: snapshot.manifest.size,
             hashes: snapshot.manifest.hashes.clone(),
+            request_window: super::snapshot::MAX_REQUESTS,
         },
     )
     .await?;

@@ -10,11 +10,18 @@ use std::{
 };
 
 pub(super) const BLOCK_BYTES: usize = 512 * 1024;
+pub(super) const MAX_REQUESTS: usize = 8;
+
+fn legacy_window() -> usize {
+    1
+}
 
 #[derive(Clone, Deserialize, Serialize)]
 pub(super) struct Manifest {
     pub size: usize,
     pub hashes: Vec<String>,
+    #[serde(default = "legacy_window", rename = "requestWindow")]
+    pub request_window: usize,
 }
 
 impl Manifest {
@@ -64,6 +71,7 @@ impl Snapshot {
             manifest: Manifest {
                 size: bytes.len(),
                 hashes: bytes.chunks(BLOCK_BYTES).map(digest).collect(),
+                request_window: MAX_REQUESTS,
             },
             file: Mutex::new(file),
         }))

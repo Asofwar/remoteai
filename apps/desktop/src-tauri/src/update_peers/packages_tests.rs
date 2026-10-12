@@ -27,6 +27,7 @@ fn service(path: &Path) -> Arc<Service> {
     Arc::new(Service {
         cache: Arc::new(Cache::new(path.into(), String::new())),
         broker: watch::channel(None).0,
+        mirror_base: watch::channel(None).0,
         uploads: Arc::new(Semaphore::new(2)),
         downloads: Semaphore::new(1),
         policy: super::super::policy::Policy::testing(),

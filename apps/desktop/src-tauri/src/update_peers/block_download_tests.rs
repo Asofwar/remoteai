@@ -15,10 +15,10 @@ async fn origin_ranges_finish_without_waiting_for_an_unresponsive_peer() {
     let coordinator = network_fixture::coordinator("origin-hedge").await;
     let config = network_fixture::client(&coordinator, "missing-seed");
     let (sender, _receiver) = mpsc::channel(16);
-    let leases = vec![Lease::binary(config, sender).unwrap()];
+    let mut leases = vec![Lease::binary(config, sender).unwrap()];
     let result = tokio::time::timeout(
         Duration::from_secs(10),
-        block_download::download(&leases, &artifact, &service, |_, _| {}),
+        block_download::download(&mut leases, &artifact, &service, |_, _| {}),
     )
     .await;
     drop(leases);
@@ -79,7 +79,7 @@ async fn disconnected_source_does_not_discard_other_peers_blocks() {
     artifact.url = "http://127.0.0.1:9/unavailable".into();
     let result = tokio::time::timeout(
         Duration::from_secs(40),
-        block_download::download(&leases, &artifact, &seed_service, |_, _| {}),
+        block_download::download(&mut leases, &artifact, &seed_service, |_, _| {}),
     )
     .await;
     for seed in seeds {

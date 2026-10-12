@@ -10,6 +10,8 @@ mod block_tests;
 mod parallel_tests;
 #[path = "peer_download_tests.rs"]
 mod peer_tests;
+#[path = "block_pipeline_tests.rs"]
+mod pipeline_tests;
 
 struct Origin {
     url: url::Url,
@@ -127,6 +129,7 @@ fn service(path: &std::path::Path, key: &str) -> Arc<Service> {
     Arc::new(Service {
         cache: Arc::new(Cache::new(path.into(), key.into())),
         broker: watch::channel(None).0,
+        mirror_base: watch::channel(None).0,
         uploads: Arc::new(Semaphore::new(2)),
         downloads: Semaphore::new(1),
         policy: super::super::policy::Policy::testing(),

@@ -12,6 +12,7 @@ internal const val UPDATE_ORIGIN_REQUEST_BYTES = 8L * 1024 * 1024
 /** Read consecutive checkpoint blocks from each bounded HTTP response. */
 internal class UpdateOriginBlocks(
   private val files: UpdateFiles, private val input: JSONObject,
+  private val sourceUrl: String = input.getString("url"),
   private val openConnection: (URL) -> HttpURLConnection = { url -> openOriginConnection(files, input, url) },
 ) : Closeable {
   private val size = input.getLong("size").also { require(it in 1..MAX_UPDATE_BYTES) }
@@ -43,8 +44,8 @@ internal class UpdateOriginBlocks(
   private fun open(start: Long) {
     close()
     val url = input.getString("url")
-    require(officialUrl(url))
-    val request = openConnection(URL(url))
+    require(officialUrl(url) && (sourceUrl == url || validMirrorUrl(sourceUrl, url)))
+    val request = openConnection(URL(sourceUrl))
     connection = request
     request.connectTimeout = REQUEST_TIMEOUT_MS
     request.readTimeout = REQUEST_TIMEOUT_MS

@@ -10,11 +10,13 @@ import com.facebook.react.bridge.ReactMethod
 import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import org.json.JSONObject
 
 class AppUpdateModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
   private val worker = Executors.newFixedThreadPool(2)
   private val downloading = AtomicBoolean(false)
+  private val activeSharedDownload = AtomicReference<UpdateBlockDownload?>()
   private val files = UpdateFiles(context)
   override fun getName() = "AppUpdate"
   override fun getConstants(): MutableMap<String, Any> = hashMapOf("sharingProtocol" to 2)
@@ -35,8 +37,16 @@ class AppUpdateModule(private val context: ReactApplicationContext) : ReactConte
   fun downloadPeers(options: String, promise: Promise) = download(options, promise) { input, progress ->
     val configs = input.getJSONArray("configs")
     if ((0 until configs.length()).all { configs.getJSONObject(it).optInt("packageProtocol") >= 2 }) {
-      UpdateBlockDownload(context, files, input, progress).download()
+      val transfer = UpdateBlockDownload(context, files, input, progress)
+      activeSharedDownload.set(transfer)
+      try { transfer.download() } finally { activeSharedDownload.compareAndSet(transfer, null) }
     } else { UpdatePeerDownload(files, input, progress).download() }
+  }
+
+  @ReactMethod
+  fun addUpdatePeers(options: String, promise: Promise) = task(promise) {
+    val input = JSONObject(options)
+    activeSharedDownload.get()?.addPeers(input.getString("artifact"), input.getJSONArray("configs")) ?: false
   }
 
   @ReactMethod

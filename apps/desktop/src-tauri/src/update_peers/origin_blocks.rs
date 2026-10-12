@@ -8,6 +8,11 @@ use std::time::Duration;
 pub(super) struct Origin {
     client: Client,
     url: String,
+    response: Option<Response>,
+    buffered: Vec<u8>,
+    cursor: usize,
+    offset: usize,
+    end: usize,
 }
 
 impl Origin {
@@ -19,9 +24,14 @@ impl Origin {
         }
         Ok(Self {
             url: url.into(),
+            response: None,
+            buffered: Vec::new(),
+            cursor: 0,
+            offset: 0,
+            end: 0,
             client: Client::builder()
                 .connect_timeout(Duration::from_secs(10))
-                .timeout(Duration::from_secs(30))
+                .read_timeout(Duration::from_secs(8))
                 .build()
                 .map_err(|_| Error::Unavailable)?,
         })
@@ -46,22 +56,67 @@ impl Origin {
             .map_err(|_| Error::Unavailable)
     }
 
-    pub async fn block(&self, offset: usize, length: usize, size: usize) -> Result<Vec<u8>> {
-        let mut response = self.request(offset, length).await?;
-        if content_range(&response)? != (offset, offset + length - 1, size) {
+    pub async fn block(&mut self, offset: usize, length: usize, size: usize) -> Result<Vec<u8>> {
+        if length == 0 || offset.checked_add(length).is_none_or(|end| end > size) {
             return Err(Error::Invalid);
+        }
+        if self.response.is_none() || offset != self.offset {
+            self.open(offset, size).await?;
         }
         let mut bytes = Vec::with_capacity(length);
-        while let Some(chunk) = response.chunk().await.map_err(|_| Error::Unavailable)? {
-            if chunk.len() > length - bytes.len() {
+        while bytes.len() < length {
+            if self.cursor == self.buffered.len() {
+                let chunk = self
+                    .response
+                    .as_mut()
+                    .ok_or(Error::Invalid)?
+                    .chunk()
+                    .await
+                    .map_err(|_| Error::Unavailable)?
+                    .ok_or(Error::Invalid)?;
+                if chunk.len() > self.end - self.offset {
+                    return Err(Error::Invalid);
+                }
+                self.buffered = chunk.to_vec();
+                self.cursor = 0;
+            }
+            let count = (length - bytes.len()).min(self.buffered.len() - self.cursor);
+            bytes.extend_from_slice(&self.buffered[self.cursor..self.cursor + count]);
+            self.cursor += count;
+            self.offset += count;
+        }
+        if self.offset == self.end {
+            if self.cursor != self.buffered.len()
+                || self
+                    .response
+                    .as_mut()
+                    .ok_or(Error::Invalid)?
+                    .chunk()
+                    .await
+                    .map_err(|_| Error::Unavailable)?
+                    .is_some()
+            {
                 return Err(Error::Invalid);
             }
-            bytes.extend_from_slice(&chunk);
-        }
-        if bytes.len() != length {
-            return Err(Error::Invalid);
+            self.response = None;
         }
         Ok(bytes)
+    }
+
+    async fn open(&mut self, offset: usize, size: usize) -> Result<()> {
+        const RESPONSE_BYTES: usize = 8 * 1024 * 1024;
+        self.response = None;
+        self.buffered.clear();
+        self.cursor = 0;
+        let end = size.min(offset + RESPONSE_BYTES);
+        let response = self.request(offset, end - offset).await?;
+        if content_range(&response)? != (offset, end - 1, size) {
+            return Err(Error::Invalid);
+        }
+        self.response = Some(response);
+        self.offset = offset;
+        self.end = end;
+        Ok(())
     }
 }
 

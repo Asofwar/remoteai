@@ -8,6 +8,7 @@ import java.security.MessageDigest
 object UpdateDownloadProbe {
   @JvmStatic fun main(args: Array<String>) {
     UpdateOriginChecks.run()
+    UpdatePipelineChecks.run()
     UpdateStorageChecks.run()
     if (args.isNotEmpty()) downloadRelease(args)
   }
@@ -18,7 +19,7 @@ object UpdateDownloadProbe {
     val started = SystemClock.elapsedRealtime()
     var received = 0L
     var requests = 0
-    UpdateOriginBlocks(storage.files, input, { url ->
+    UpdateOriginBlocks(storage.files, input, openConnection = { url ->
       requests++
       val target = if (args.size > 3) java.net.URL(args[3]) else url
       target.openConnection() as HttpURLConnection

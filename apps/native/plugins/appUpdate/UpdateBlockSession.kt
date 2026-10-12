@@ -1,18 +1,22 @@
 package com.codexswitch.update
 
 import android.os.SystemClock
-import com.codexswitch.connectivity.NativeConnectivity
 import org.json.JSONObject
 import java.security.MessageDigest
+import java.util.ArrayDeque
 
 /** One negotiated binary session; payloads never cross the React Native bridge. */
 internal class UpdateBlockSession(
-  private val owner: String, private val files: UpdateFiles,
+  private val files: UpdateFiles,
   private val input: JSONObject, private val config: JSONObject,
+  private val wire: UpdateBlockWire = NativeUpdateBlockWire(),
 ) {
   private var id: String? = null
   private var hashes = emptyList<String>()
   private val size = input.getLong("size")
+  private val headers = ArrayDeque<JSONObject>()
+  private var window = UpdateRequestWindow(1)
+  val requestWindow: Int get() = window.size
 
   private fun active() {
     check(!Thread.currentThread().isInterrupted)
@@ -20,9 +24,7 @@ internal class UpdateBlockSession(
   }
 
   private fun call(request: JSONObject): Any? {
-    val result = JSONObject(NativeConnectivity.call(request.put("owner", owner).toString()))
-    check(!result.has("error"))
-    return result.opt("data").takeUnless { it == JSONObject.NULL }
+    return wire.call(request)
   }
 
   private fun event(): JSONObject? {
@@ -60,6 +62,7 @@ internal class UpdateBlockSession(
     hashes = (0 until offered.length()).map { offered.getString(it).also { hash ->
       check(hash.matches(Regex("[0-9a-f]{64}")))
     } }
+    window = UpdateRequestWindow(manifest.optInt("requestWindow", 1).coerceIn(1, MAX_UPDATE_REQUESTS))
   }
 
   private fun send(frame: JSONObject) {
@@ -79,24 +82,45 @@ internal class UpdateBlockSession(
     error("Update transfer timed out")
   }
 
-  fun block(index: Int): ByteArray {
+  fun blocks(indices: List<Int>, accept: (Int, ByteArray) -> Unit) {
+    require(indices.isNotEmpty() && indices.size <= requestWindow && indices.distinct().size == indices.size)
+    val started = SystemClock.elapsedRealtime()
+    indices.forEach { index ->
+      require(index in hashes.indices)
+      send(JSONObject().put("type", "read").put("index", index))
+    }
+    var received = 0L
+    indices.forEach { index ->
+      val bytes = receiveBlock(index)
+      received += bytes.size
+      accept(index, bytes)
+    }
+    check(headers.isEmpty())
+    window.observe(received, SystemClock.elapsedRealtime() - started)
+  }
+
+  private fun receiveBlock(index: Int): ByteArray {
     val deadline = SystemClock.elapsedRealtime() + 25_000
     val length = minOf(UPDATE_BLOCK_BYTES.toLong(), size - index.toLong() * UPDATE_BLOCK_BYTES).toInt()
     require(index in hashes.indices && length > 0)
-    send(JSONObject().put("type", "read").put("index", index))
-    val header = message(deadline)
+    val header = headers.pollFirst() ?: message(deadline)
     check(header.getString("type") == "block" && header.getInt("index") == index && header.getInt("length") == length)
     val bytes = ByteArray(length)
     var offset = 0
     while (offset < length && SystemClock.elapsedRealtime() < deadline) {
       active()
-      val packet = NativeConnectivity.receivePacket(owner, checkNotNull(id)) ?: error("Update connection interrupted")
+      val packet = wire.packet(checkNotNull(id)) ?: error("Update connection interrupted")
       check(packet.size <= 64 * 1024 && packet.size <= length - offset)
       packet.copyInto(bytes, offset); offset += packet.size
       val status = event()
       when (status?.optString("type")) {
         "status" -> route(status)
-        "closed", "open", "data" -> error("Update connection interrupted")
+        // Text and binary queues are independent; the next header can arrive before this payload is drained.
+        "data" -> {
+          check(headers.size < MAX_UPDATE_REQUESTS)
+          headers.addLast(JSONObject(status.getString("text")))
+        }
+        "closed", "open" -> error("Update connection interrupted")
       }
     }
     check(offset == length && hex(MessageDigest.getInstance("SHA-256").digest(bytes)) == hashes[index])

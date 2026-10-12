@@ -100,14 +100,25 @@ pub(super) async fn download_peer(
         return Err(Error::Unavailable);
     }
     let scope = service.policy.preferences().scope;
-    let leases = match service.find_peers(&artifact.id).await {
+    let mut leases = match service.find_peers(&artifact.id).await {
         Ok(leases) => leases,
-        Err(_) if service.cache.has_partial(&artifact.id).await => Vec::new(),
-        Err(error) => return Err(error),
+        Err(error) => {
+            let discovery = service
+                .broker
+                .borrow()
+                .as_ref()
+                .is_some_and(|sender| !sender.is_closed());
+            let mirror = service.mirror_base.borrow().is_some();
+            if !discovery && !mirror && !service.cache.has_partial(&artifact.id).await {
+                return Err(error);
+            }
+            // Keep discovery alive while HTTP supplies pieces, even when the swarm starts empty.
+            Vec::new()
+        }
     };
     let transfer = async {
         if leases.iter().all(|lease| lease.protocol >= 2) {
-            super::block_download::download(&leases, artifact, service, progress).await
+            super::block_download::download(&mut leases, artifact, service, progress).await
         } else {
             parallel::download(&leases, &artifact.id, progress).await
         }

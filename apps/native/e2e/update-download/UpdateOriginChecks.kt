@@ -21,7 +21,22 @@ internal object UpdateOriginChecks {
     cancellationClosesTheResponse()
     peerSchedulingKeepsOriginContiguous()
     schedulingRecoversFailedAndSlowSources()
+    serverCopyPreservesOfficialIdentity()
     println("PASS: continuous response, resume, gaps, validation, cancellation and peer scheduling")
+  }
+
+  private fun serverCopyPreservesOfficialIdentity() {
+    val mirror = "https://example.test/api/update-packages/test/android.apk"
+    val request = response()
+    UpdateOriginBlocks(files, input(), mirror) { url ->
+      check(url.toString() == mirror)
+      request
+    }.use { download -> repeat(3) { assertBytes(download.block(it), it) } }
+    check(validMirrorUrl(mirror, URL_VALUE))
+    check(!validMirrorUrl(mirror.replace("https:", "http:"), URL_VALUE))
+    check(!validMirrorUrl(mirror.replace("android.apk", "other.apk"), URL_VALUE))
+    check(!validMirrorUrl(mirror + "?redirect=other", URL_VALUE))
+    check(input().getString("url") == URL_VALUE)
   }
 
   private fun input() = JSONObject().put("url", URL_VALUE).put("size", SIZE).put("wifiOnly", false)

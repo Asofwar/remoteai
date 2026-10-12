@@ -160,6 +160,12 @@ pub(crate) struct Bridge {
 }
 
 impl Bridge {
+    pub fn server(&self, websocket_url: &str) {
+        self.service
+            .mirror_base
+            .send_replace(super::mirror::base_from_socket(websocket_url));
+    }
+
     pub fn new<R: Runtime>(app: &tauri::AppHandle<R>) -> Self {
         let service = app.state::<Arc<Service>>().inner().clone();
         let (sender, receiver) = mpsc::channel(32);
@@ -236,7 +242,7 @@ impl Bridge {
             Request::Find { artifact, reply } if !reply.is_closed() && self.pending.is_empty() => {
                 let id = uuid::Uuid::new_v4().to_string();
                 let message = json!({"type":"update-peer-find", "requestId":id,
-                    "artifact":artifact, "maxPeers":MAX_DOWNLOAD_PEERS, "packageProtocol":2,
+                    "artifact":artifact, "maxPeers":MAX_DOWNLOAD_PEERS, "packageProtocol":2, "refill":true,
                     "ownOnly":self.service.policy.preferences().scope == super::policy::SharingScope::Own});
                 self.pending.insert(
                     id,

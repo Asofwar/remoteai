@@ -1,325 +1,396 @@
-//! Work stealing preserves completed blocks when one source disappears. Origin joins after a short grace period.
+//! Bounded request pipelines, continuing discovery and independently verified checkpoints.
 use super::{
-    block_protocol,
+    block_plan::{request_window, Plan},
+    block_protocol::Reader,
+    cache::Artifact,
     checkpoint::Checkpoint,
     origin_blocks::Origin,
-    policy::Metrics,
     signaling::Lease,
-    snapshot::{Manifest, BLOCK_BYTES},
-    Error, Result,
+    snapshot::BLOCK_BYTES,
+    Error, Result, Service, MAX_DOWNLOAD_PEERS,
 };
 use futures_util::{future::BoxFuture, stream::FuturesUnordered, FutureExt, StreamExt};
-use std::{sync::atomic::Ordering, time::Duration};
+use std::{
+    sync::{atomic::Ordering, Arc},
+    time::Duration,
+};
+use tokio::{sync::mpsc, time::Instant};
 
-const ORIGIN_DELAY: Duration = Duration::from_secs(2);
+const ORIGIN: usize = MAX_DOWNLOAD_PEERS;
+const MIRROR: usize = ORIGIN + 1;
+const SOURCES: usize = ORIGIN + 2;
+const REFILL_INTERVAL: Duration = Duration::from_secs(12);
 const BLOCK_TIMEOUT: Duration = Duration::from_secs(25);
-const STEAL_DELAY: Duration = Duration::from_secs(2);
+const STALL_TIMEOUT: Duration = Duration::from_secs(75);
 
-enum Event {
-    Ready(Manifest),
-    Origin(usize),
-    Block(usize, Vec<u8>),
-}
-type Job<'a> = BoxFuture<'a, (usize, Result<Event>)>;
-
-struct Plan {
-    size: usize,
-    done: Vec<bool>,
-    busy: Vec<Option<(usize, tokio::time::Instant)>>,
-    disabled: Vec<bool>,
-    completed: usize,
+enum Source {
+    Peer { reader: Reader, window: usize },
+    Http { origin: Origin, size: usize },
 }
 
-impl Plan {
-    fn new(size: usize, sources: usize) -> Self {
-        Self {
-            size,
-            done: vec![false; size.div_ceil(BLOCK_BYTES)],
-            busy: vec![None; sources],
-            disabled: vec![false; sources],
-            completed: 0,
+impl Source {
+    fn size(&self) -> usize {
+        match self {
+            Self::Peer { reader, .. } => reader.manifest.size,
+            Self::Http { size, .. } => *size,
         }
     }
-
-    fn next(&self, source: usize) -> Option<usize> {
-        if self.disabled[source] || self.busy[source].is_some() {
-            return None;
+    fn window(&self) -> usize {
+        match self {
+            Self::Peer { window, .. } => *window,
+            Self::Http { .. } => super::snapshot::MAX_REQUESTS,
         }
-        let pending = self.done.iter().enumerate().find(|(index, done)| {
-            !**done && !self.busy.iter().flatten().any(|(busy, _)| busy == index)
-        });
-        if let Some((index, _)) = pending {
-            return Some(index);
-        }
-        self.busy
-            .iter()
-            .flatten()
-            .find(|(index, started)| {
-                !self.done[*index]
-                    && started.elapsed() >= STEAL_DELAY
-                    && self
-                        .busy
-                        .iter()
-                        .flatten()
-                        .filter(|(busy, _)| busy == index)
-                        .count()
-                        == 1
-            })
-            .map(|(index, _)| *index)
     }
-
-    fn length(&self, index: usize) -> usize {
-        BLOCK_BYTES.min(self.size - index * BLOCK_BYTES)
-    }
-}
-
-pub(super) async fn download(
-    leases: &[Lease],
-    artifact: &super::cache::Artifact,
-    service: &super::Service,
-    mut progress: impl FnMut(usize, Option<u64>),
-) -> Result<Vec<u8>> {
-    let metrics = &service.policy.metrics;
-    let origin = Origin::new(&artifact.url)?;
-    let mut jobs: FuturesUnordered<Job<'_>> = FuturesUnordered::new();
-    let mut manifests = vec![None; leases.len()];
-    for (source, lease) in leases.iter().enumerate() {
-        jobs.push(
-            async move {
-                (
-                    source,
-                    block_protocol::manifest(&lease.connection, &artifact.id)
-                        .await
-                        .map(Event::Ready),
-                )
-            }
-            .boxed(),
-        );
-    }
-    let origin_ref = &origin;
-    jobs.push(
-        async move {
-            if !leases.is_empty() {
-                tokio::time::sleep(ORIGIN_DELAY).await;
-            }
-            (leases.len(), origin_ref.size().await.map(Event::Origin))
-        }
-        .boxed(),
-    );
-    let mut state = Download {
-        directory: service.cache.partial_directory(),
-        id: artifact.id.clone(),
-        plan: None,
-        destination: None,
-        origin_ready: false,
-        failed: vec![false; leases.len() + 1],
-    };
-    while !jobs.is_empty() {
-        tokio::select! {
-            Some((source, result)) = jobs.next() => {
-                if result.is_err() && source < leases.len() { leases[source].failed(); }
-                state.accept((source, result), &mut manifests, Report {
-                    expected_size: artifact.size, metrics, progress: &mut progress,
-                }).await?;
-            }
-            _ = tokio::time::sleep(Duration::from_millis(250)) => {}
-        }
-        let Some(plan) = state.plan.as_mut() else {
-            continue;
-        };
-        if plan.completed == plan.done.len() {
-            for (source, lease) in leases.iter().enumerate() {
-                if plan.busy[source].is_some_and(|(_, started)| started.elapsed() >= STEAL_DELAY) {
-                    lease.failed();
-                    metrics.failures.fetch_add(1, Ordering::Relaxed);
-                }
-            }
-            drop(jobs);
-            return state
-                .destination
-                .ok_or(Error::Invalid)?
-                .finish(plan.size)
-                .await;
-        }
-        schedule(
-            &mut jobs,
-            plan,
-            (&manifests, leases),
-            (&origin, state.origin_ready, metrics),
-        );
-    }
-    Err(Error::Unavailable)
-}
-
-struct Download {
-    plan: Option<Plan>,
-    destination: Option<std::sync::Arc<Checkpoint>>,
-    directory: std::path::PathBuf,
-    id: String,
-    origin_ready: bool,
-    failed: Vec<bool>,
-}
-
-struct Report<'a, F> {
-    expected_size: usize,
-    metrics: &'a Metrics,
-    progress: &'a mut F,
-}
-
-impl Download {
-    async fn accept<F: FnMut(usize, Option<u64>)>(
+    async fn transfer(
         &mut self,
-        (source, result): (usize, Result<Event>),
-        manifests: &mut [Option<Manifest>],
-        report: Report<'_, F>,
+        indices: Vec<usize>,
+        report: (usize, mpsc::Sender<Block>),
     ) -> Result<()> {
-        let Report {
-            expected_size,
-            metrics,
-            progress,
-        } = report;
-        let event = match result {
-            Ok(event) => event,
-            Err(_) => {
-                self.failed[source] = true;
-                metrics.failures.fetch_add(1, Ordering::Relaxed);
-                if let Some(plan) = &mut self.plan {
-                    if plan.busy[source].take().is_some() {
-                        metrics.retries.fetch_add(1, Ordering::Relaxed);
+        let started = Instant::now();
+        if let Self::Peer { reader, .. } = self {
+            reader.request(&indices).await?;
+        }
+        let mut received = 0;
+        for index in indices {
+            let operation = async {
+                match self {
+                    Self::Peer { reader, .. } => reader.block(index).await,
+                    Self::Http { origin, size } => {
+                        origin
+                            .block(
+                                index * BLOCK_BYTES,
+                                BLOCK_BYTES.min(*size - index * BLOCK_BYTES),
+                                *size,
+                            )
+                            .await
                     }
-                    plan.disabled[source] = true;
                 }
-                return Ok(());
-            }
-        };
-        match event {
-            Event::Ready(manifest) => {
-                let restored = self.initialize(manifest.size, expected_size).await?;
-                progress(restored, Some(manifest.size as u64));
-                manifests[source] = Some(manifest);
-            }
-            Event::Origin(size) => {
-                let restored = self.initialize(size, expected_size).await?;
-                progress(restored, Some(size as u64));
-                self.origin_ready = true;
-            }
-            Event::Block(index, bytes) => {
-                let plan = self.plan.as_mut().ok_or(Error::Invalid)?;
-                plan.busy[source] = None;
-                if plan.done[index] {
-                    return Ok(());
-                }
-                let length = bytes.len();
-                self.destination
-                    .as_ref()
-                    .ok_or(Error::Invalid)?
-                    .write(index, bytes)
-                    .await?;
-                plan.done[index] = true;
-                plan.completed += 1;
-                let counter = if source == manifests.len() {
-                    &metrics.origin_bytes
-                } else {
-                    &metrics.peer_bytes
-                };
-                counter.fetch_add(length as u64, Ordering::Relaxed);
-                progress(length, Some(plan.size as u64));
-            }
+            };
+            let bytes = tokio::time::timeout(BLOCK_TIMEOUT, operation)
+                .await
+                .map_err(|_| Error::Unavailable)??;
+            received += bytes.len();
+            report
+                .1
+                .send(Block {
+                    source: report.0,
+                    index,
+                    bytes,
+                })
+                .await
+                .map_err(|_| Error::Unavailable)?;
+        }
+        if let Self::Peer { reader, window } = self {
+            *window = request_window(received, started.elapsed(), reader.manifest.request_window);
         }
         Ok(())
     }
+}
 
-    async fn initialize(&mut self, size: usize, expected: usize) -> Result<usize> {
-        if size == 0 || size > super::MAX_PACKAGE_BYTES || (expected != 0 && expected != size) {
-            return Err(Error::Invalid);
+struct Block {
+    source: usize,
+    index: usize,
+    bytes: Vec<u8>,
+}
+type Job<'a> = BoxFuture<'a, (usize, Result<Source>)>;
+type Discovery<'a> = Option<BoxFuture<'a, Result<Vec<Lease>>>>;
+
+struct Download<'a> {
+    artifact: &'a Artifact,
+    service: &'a Service,
+    leases: &'a mut Vec<Lease>,
+    slots: Vec<Option<usize>>,
+    ready: Vec<Option<Source>>,
+    jobs: FuturesUnordered<Job<'a>>,
+    plan: Option<Plan>,
+    destination: Option<Arc<Checkpoint>>,
+    origin_attempts: usize,
+}
+
+pub(super) async fn download(
+    leases: &mut Vec<Lease>,
+    artifact: &Artifact,
+    service: &Service,
+    mut progress: impl FnMut(usize, Option<u64>),
+) -> Result<Vec<u8>> {
+    let (sender, mut blocks) = mpsc::channel(16);
+    let mut state = Download::new(leases, artifact, service);
+    state.start();
+    let mut next_refill = Instant::now() + REFILL_INTERVAL;
+    let mut discovery: Discovery<'_> = None;
+    let mut last_progress = Instant::now();
+    loop {
+        tokio::select! {
+            biased;
+            Some(block) = blocks.recv() => {
+                if state.accept_block(block, &mut progress).await? { last_progress = Instant::now(); }
+            }
+            Some((source, result)) = state.jobs.next(), if !state.jobs.is_empty() => {
+                state.accept_source(source, result, &mut progress).await?;
+            }
+            found = discover(&mut discovery), if discovery.is_some() => {
+                if let Ok(leases) = found { state.add_peers(leases); }
+                discovery = None;
+            }
+            _ = tokio::time::sleep(Duration::from_millis(100)) => {}
         }
-        if let Some(plan) = &self.plan {
-            return if plan.size == size {
-                Ok(0)
-            } else {
-                Err(Error::Invalid)
-            };
+        if state.complete() {
+            return state.finish().await;
         }
-        let mut plan = Plan::new(size, self.failed.len());
-        let (destination, done) =
-            Checkpoint::open(self.directory.clone(), self.id.clone(), size).await?;
-        plan.done = done;
-        plan.completed = plan.done.iter().filter(|done| **done).count();
-        let restored = plan
-            .done
-            .iter()
-            .enumerate()
-            .filter(|(_, done)| **done)
-            .map(|(index, _)| plan.length(index))
-            .sum();
-        plan.disabled.clone_from(&self.failed);
-        self.plan = Some(plan);
-        self.destination = Some(destination);
-        Ok(restored)
+        if Instant::now() >= next_refill
+            && discovery.is_none()
+            && state.slots.iter().any(Option::is_none)
+        {
+            discovery = Some(service.find_peers(&artifact.id).boxed());
+            next_refill = Instant::now() + REFILL_INTERVAL;
+        }
+        state.schedule(&sender);
+        if last_progress.elapsed() > STALL_TIMEOUT
+            || (state.jobs.is_empty()
+                && state.ready.iter().all(Option::is_none)
+                && service.broker.borrow().is_none())
+        {
+            return Err(Error::Unavailable);
+        }
     }
 }
 
-fn schedule<'a>(
-    jobs: &mut FuturesUnordered<Job<'a>>,
-    plan: &mut Plan,
-    peers: (&[Option<Manifest>], &'a [Lease]),
-    origin: (&'a Origin, bool, &Metrics),
-) {
-    for source in 0..plan.busy.len() {
-        let Some(index) = plan.next(source) else {
-            continue;
-        };
-        let length = plan.length(index);
-        let size = plan.size;
-        let operation: BoxFuture<'a, Result<Vec<u8>>> = if source == peers.1.len() {
-            if !origin.1 {
-                continue;
-            }
-            async move { origin.0.block(index * BLOCK_BYTES, length, size).await }.boxed()
-        } else {
-            let Some(manifest) = peers.0[source].clone() else {
-                continue;
-            };
-            async move { block_protocol::block(&peers.1[source].connection, &manifest, index).await }.boxed()
-        };
-        if plan.busy.iter().flatten().any(|(busy, _)| *busy == index) {
-            origin.2.retries.fetch_add(1, Ordering::Relaxed);
+async fn discover(discovery: &mut Discovery<'_>) -> Result<Vec<Lease>> {
+    match discovery {
+        Some(pending) => pending.await,
+        None => std::future::pending().await,
+    }
+}
+
+impl<'a> Download<'a> {
+    fn new(leases: &'a mut Vec<Lease>, artifact: &'a Artifact, service: &'a Service) -> Self {
+        Self {
+            artifact,
+            service,
+            leases,
+            slots: vec![None; MAX_DOWNLOAD_PEERS],
+            ready: (0..SOURCES).map(|_| None).collect(),
+            jobs: FuturesUnordered::new(),
+            plan: None,
+            destination: None,
+            origin_attempts: 0,
         }
-        plan.busy[source] = Some((index, tokio::time::Instant::now()));
-        jobs.push(
+    }
+
+    fn start(&mut self) {
+        for index in 0..self.leases.len().min(MAX_DOWNLOAD_PEERS) {
+            self.start_peer(index, index);
+        }
+        self.start_origin();
+        let mirror = self
+            .service
+            .mirror_base
+            .borrow()
+            .as_ref()
+            .and_then(|base| super::mirror::package_url(base, &self.artifact.url));
+        if let Some(url) = mirror {
+            self.start_http(MIRROR, url, 0);
+        }
+    }
+
+    fn start_peer(&mut self, slot: usize, index: usize) {
+        self.slots[slot] = Some(index);
+        let connection = self.leases[index].connection.clone();
+        let artifact = self.artifact.id.clone();
+        self.jobs.push(
             async move {
-                let result = tokio::time::timeout(BLOCK_TIMEOUT, operation)
-                    .await
-                    .map_err(|_| Error::Unavailable)
-                    .and_then(|value| value);
-                (source, result.map(|bytes| Event::Block(index, bytes)))
+                let result = Reader::open(connection, &artifact).await.map(|reader| {
+                    let window = reader.manifest.request_window.min(2);
+                    Source::Peer { reader, window }
+                });
+                (slot, result)
             }
             .boxed(),
         );
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn failed_source_releases_only_its_unfinished_block() {
-        let mut plan = Plan::new(BLOCK_BYTES * 3, 3);
-        plan.done[0] = true;
-        plan.completed = 1;
-        plan.busy[0] = Some((1, tokio::time::Instant::now()));
-        assert_eq!(plan.next(1), Some(2));
-        plan.busy[0] = None;
-        plan.disabled[0] = true;
-        assert_eq!(plan.next(1), Some(1));
-        assert!(plan.done[0]);
+    fn start_origin(&mut self) {
+        self.origin_attempts += 1;
+        let url = self.artifact.url.clone();
+        let delay = if self.origin_attempts == 1 && self.leases.is_empty() {
+            0
+        } else {
+            2
+        };
+        self.start_http(ORIGIN, url, delay);
     }
-    #[test]
-    fn idle_source_can_take_over_a_slow_final_block() {
-        let mut plan = Plan::new(BLOCK_BYTES, 3);
-        plan.busy[0] = Some((0, tokio::time::Instant::now() - STEAL_DELAY));
-        assert_eq!(plan.next(1), Some(0));
-        plan.busy[1] = Some((0, tokio::time::Instant::now()));
-        assert_eq!(plan.next(2), None);
+
+    fn start_http(&mut self, slot: usize, url: String, delay: u64) {
+        self.jobs.push(
+            async move {
+                tokio::time::sleep(Duration::from_secs(delay)).await;
+                let result = async {
+                    let origin = Origin::new(&url)?;
+                    let size = origin.size().await?;
+                    Ok(Source::Http { origin, size })
+                }
+                .await;
+                (slot, result)
+            }
+            .boxed(),
+        );
+    }
+
+    fn add_peers(&mut self, leases: Vec<Lease>) {
+        for lease in leases {
+            if lease.protocol < 2 {
+                continue;
+            }
+            let Some(slot) = self.slots.iter().position(Option::is_none) else {
+                break;
+            };
+            // A slot owns one lease; completed/failed engines must not accumulate through repeated refreshes.
+            if slot < self.leases.len() {
+                self.leases[slot] = lease;
+            } else {
+                self.leases.push(lease);
+            }
+            self.start_peer(slot, slot);
+        }
+    }
+
+    async fn accept_source(
+        &mut self,
+        source: usize,
+        result: Result<Source>,
+        progress: &mut impl FnMut(usize, Option<u64>),
+    ) -> Result<()> {
+        let worker = match result {
+            Ok(worker) if self.valid_size(worker.size()) => worker,
+            _ => {
+                self.failed(source);
+                return Ok(());
+            }
+        };
+        if self.plan.is_none() {
+            let size = worker.size();
+            let (destination, done) = Checkpoint::open(
+                self.service.cache.partial_directory(),
+                self.artifact.id.clone(),
+                size,
+            )
+            .await?;
+            let mut plan = Plan::new(size, SOURCES);
+            plan.completed = done.iter().filter(|done| **done).count();
+            plan.done = done;
+            let restored = (0..plan.done.len())
+                .filter(|&i| plan.done[i])
+                .map(|i| plan.length(i))
+                .sum();
+            progress(restored, Some(size as u64));
+            self.plan = Some(plan);
+            self.destination = Some(destination);
+        }
+        self.ready[source] = Some(worker);
+        Ok(())
+    }
+
+    fn valid_size(&self, size: usize) -> bool {
+        size > 0
+            && size <= super::MAX_PACKAGE_BYTES
+            && (self.artifact.size == 0 || size == self.artifact.size)
+            && self.plan.as_ref().is_none_or(|plan| plan.size == size)
+    }
+
+    fn failed(&mut self, source: usize) {
+        let metrics = &self.service.policy.metrics;
+        metrics.failures.fetch_add(1, Ordering::Relaxed);
+        if let Some(plan) = &mut self.plan {
+            metrics
+                .retries
+                .fetch_add(plan.busy[source].len() as u64, Ordering::Relaxed);
+            plan.busy[source].clear();
+        }
+        if source < MAX_DOWNLOAD_PEERS {
+            if let Some(index) = self.slots[source].take() {
+                self.leases[index].failed();
+            }
+        } else if source == ORIGIN && self.origin_attempts < 3 {
+            self.start_origin();
+        }
+    }
+
+    async fn accept_block(
+        &mut self,
+        block: Block,
+        progress: &mut impl FnMut(usize, Option<u64>),
+    ) -> Result<bool> {
+        let plan = self.plan.as_mut().ok_or(Error::Invalid)?;
+        let length = block.bytes.len();
+        if !plan.done[block.index] {
+            self.destination
+                .as_ref()
+                .ok_or(Error::Invalid)?
+                .write(block.index, block.bytes)
+                .await?;
+        }
+        if !plan.finish(block.source, block.index) {
+            return Ok(false);
+        }
+        let metrics = &self.service.policy.metrics;
+        let counter = if block.source >= ORIGIN {
+            &metrics.origin_bytes
+        } else {
+            &metrics.peer_bytes
+        };
+        counter.fetch_add(length as u64, Ordering::Relaxed);
+        progress(length, Some(plan.size as u64));
+        Ok(true)
+    }
+
+    fn schedule(&mut self, sender: &mpsc::Sender<Block>) {
+        let Some(plan) = &mut self.plan else { return };
+        for slot in 0..SOURCES {
+            let Some(worker) = &self.ready[slot] else {
+                continue;
+            };
+            let indices = plan.claim(slot, worker.window(), slot < ORIGIN);
+            let duplicated = indices
+                .iter()
+                .filter(|index| {
+                    plan.busy
+                        .iter()
+                        .flatten()
+                        .filter(|(busy, _)| busy == *index)
+                        .count()
+                        > 1
+                })
+                .count();
+            self.service
+                .policy
+                .metrics
+                .retries
+                .fetch_add(duplicated as u64, Ordering::Relaxed);
+            if indices.is_empty() {
+                continue;
+            }
+            let Some(mut worker) = self.ready[slot].take() else {
+                continue;
+            };
+            let report = (slot, sender.clone());
+            self.jobs.push(
+                async move {
+                    let result = worker.transfer(indices, report).await.map(|()| worker);
+                    (slot, result)
+                }
+                .boxed(),
+            );
+        }
+    }
+
+    fn complete(&self) -> bool {
+        self.plan
+            .as_ref()
+            .is_some_and(|plan| plan.completed == plan.done.len())
+    }
+
+    async fn finish(self) -> Result<Vec<u8>> {
+        let size = self.plan.ok_or(Error::Invalid)?.size;
+        self.destination.ok_or(Error::Invalid)?.finish(size).await
     }
 }

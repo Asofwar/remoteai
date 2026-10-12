@@ -45,7 +45,7 @@ function optionValues() {
 }
 
 describe.each([
-  { fieldKey: "model", selected: "gpt-6-astra", custom: "my-custom-model", initial: "gpt-5.6-sol" },
+  { fieldKey: "model", selected: "gpt-6.1-sol", custom: "my-custom-model", initial: "gpt-6-astra" },
   { fieldKey: "model_provider", selected: "openai", custom: "my-provider", initial: "codex-switch-local" },
 ])("editable $fieldKey selection", ({ fieldKey, selected, custom, initial }) => {
   it("shows presets with an existing value and saves a selection only once", async () => {

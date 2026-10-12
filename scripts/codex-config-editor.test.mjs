@@ -69,6 +69,7 @@ function createEditorHarness(options = {}) {
   };
   const { useTomlEditor } = loadModule("../apps/desktop/src/pages/codexConfig/useTomlEditor.ts", {
     react: hooks.react,
+    "../../i18n/guiText": { guiText: (source) => source },
     "../../api/codexConfig": { validateCodexConfigDocument: options.validate ?? (async () => null) },
   }, { window: {
     setTimeout(callback) { timers.set(++timerId, callback); return timerId; },

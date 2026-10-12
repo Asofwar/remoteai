@@ -117,7 +117,7 @@ export const TYPE_LABELS: Record<string, string> = {
 
 export function stringSuggestions(key: string): string[] {
   if (key === "model") return [
-    "gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+    "gpt-6-astra", "gpt-6.1-sol", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     "gpt-5.5", "gpt-5.4-mini", "gpt-5.3-codex-spark",
   ];
   if (key === "model_provider") return ["codex-switch-local", "openai"];

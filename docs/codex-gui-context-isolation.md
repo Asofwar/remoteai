@@ -58,3 +58,28 @@ node scripts/codex-gui-context-pause-smoke.mjs <codex.exe路径>
 - 同一对话保留中断前的历史，恢复默认后回报测试配置原有的 190K。
 - 另一对话的 HTTP 请求在容量切换期间继续保持活动，其容量仍为 190K。
 - 任务执行期间连续读取对话状态成功；设置弹窗测试覆盖刷新未完成时的交互、保存等待和恢复失败。
+
+## 自动压缩阈值
+
+GUI 应用对话容量或模型默认容量时，同时把自动压缩阈值设置为容量的 90%，
+沿用 Codex 的默认预留比例。例如 1000K 对应 900K 的压缩阈值。
+CLI 仍会根据模型实际容量限制阈值；界面百分比使用 CLI 回报的可用容量，
+因此压缩阈值不一定对应界面上的 90%。
+
+此前只覆盖 `model_context_window`，继承的 `model_auto_compact_token_limit`
+或模型目录中的 `auto_compact_token_limit` 仍可能保持 250K。
+在本地模拟用量测试中，1000K 设置回报 950K 可用容量、285K 用量（30%）时即可触发压缩。
+现在新建、恢复对话和修改容量均通过同一处逻辑应用容量及压缩阈值。
+恢复默认后重新使用当前模型的默认容量；没有 GUI 容量配置时保留 Codex 原有配置。
+
+以下测试把 Rust 实际生成的配置传给已安装的 CLI，使用独立目录和本地模拟服务，
+不调用真实模型。覆盖旧配置与模型目录中的低阈值、达到新阈值时压缩、
+调小容量、恢复默认、其他对话隔离和重启后的重新应用：
+
+2026-10-12，Codex CLI 0.157.1 和 0.162.1 均通过以上验证。
+
+```powershell
+$env:CODEX_CONTEXT_TEST_CLI = '<codex.exe 路径>'
+cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml `
+  --test codex_switch_lib_tests real_cli_context_compaction_follows_gui_capacity -- --ignored --nocapture
+```

@@ -12,6 +12,8 @@ const DIRECTORY: &str = "codex-gui-context-settings";
 const MIN_CAPACITY: u64 = 1_000;
 const MAX_CAPACITY: u64 = 100_000_000;
 const MAX_ID_BYTES: usize = 200;
+const AUTO_COMPACT_PERCENT: u64 = 90;
+const FULL_PERCENT: u64 = 100;
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum ContextSettingsError {
@@ -171,6 +173,10 @@ pub(super) fn apply_capacity(params: &mut Value, settings: &ContextSettings) {
     }
     if let Some(capacity) = settings.capacity {
         params["config"]["model_context_window"] = capacity.into();
+        // Match Codex's default headroom, replacing stale config or catalog thresholds.
+        // Codex still clamps this against the model's resolved context window.
+        params["config"]["model_auto_compact_token_limit"] =
+            (capacity * AUTO_COMPACT_PERCENT / FULL_PERCENT).into();
     }
 }
 

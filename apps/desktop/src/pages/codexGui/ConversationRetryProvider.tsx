@@ -19,7 +19,7 @@ export function conversationRetryState(state: GuiState) {
 export async function retryConversation(controller: GuiController, target: TurnRetryTarget): Promise<boolean> {
   const current = conversationRetryState(controller.getSnapshot());
   if (current.disabled || !sameRetryTarget(current.target, target)) return false;
-  controller.capacityRetry.cancel();
+  controller.capacityRetry.cancel(target.threadId);
   return controller.send(CONTINUE_MESSAGE, []);
 }
 

@@ -11,7 +11,14 @@ export interface CapacityRetryState {
 interface RetryHost {
   getSnapshot: () => GuiState;
   patch: (patch: Partial<GuiState>) => void;
-  send: () => Promise<boolean>;
+  send: (threadId: string, canSend: () => boolean) => Promise<boolean>;
+}
+
+interface RetryEntry {
+  attempts: number;
+  deadline: number;
+  dispatching: boolean;
+  countdown?: CapacityRetryState;
 }
 
 const FIRST_RETRY_SECONDS = 1;
@@ -20,102 +27,113 @@ const RETRY_INCREMENT_SECONDS = 2;
 /** Only live terminal failures can start a retry; reading history must never send a message. */
 export class CapacityRetry {
   private timer?: ReturnType<typeof setTimeout>;
-  private threadId?: string;
-  private lastCompleted?: string;
-  private attempts = 0;
-  private deadline = 0;
-  private dispatching = false;
-  private enabled = false;
-  private generation = 0;
+  private entries = new Map<string, RetryEntry>();
+  private lastCompleted = new Map<string, string>();
 
   constructor(private host: RetryHost) {}
 
-  cancel = () => {
-    ++this.generation;
-    clearTimeout(this.timer);
-    this.timer = undefined;
-    this.threadId = undefined;
-    this.attempts = 0;
-    if (this.host.getSnapshot().capacityRetry) this.host.patch({ capacityRetry: undefined });
+  cancel = (threadId = this.host.getSnapshot().selected) => {
+    if (threadId) this.entries.delete(threadId);
+    this.publish();
+    this.schedule();
   };
 
-  setActive(active: boolean) {
-    this.enabled = active;
-    if (!active) this.cancel();
-  }
-
-  stop() {
-    const state = this.host.getSnapshot();
-    const turnId = state.selected ? state.conversations[state.selected]?.activeTurn : null;
-    if (turnId) this.lastCompleted = `${state.selected}:${turnId}`;
-    this.cancel();
-  }
-
-  /** Cancel a retry still waiting for resume, before it can submit a new turn. */
-  sendGuard() {
-    const generation = this.generation;
-    return this.dispatching ? () => generation === this.generation : () => true;
-  }
-
-  sync(previous: GuiState, next: GuiState) {
-    if (!this.threadId) return;
-    const conversation = next.conversations[this.threadId];
-    const manualSend = !previous.sending && next.sending && !this.dispatching;
-    const otherTurn = conversation?.activeTurn
-      && conversation.activeTurn !== previous.conversations[this.threadId]?.activeTurn && !this.dispatching;
-    if (next.selected !== this.threadId || next.connection !== "ready" || next.archived
-      || !conversation || next.workspaceBusy || next.deleting || next.compacting === this.threadId
-      || next.queued[this.threadId]?.length || manualSend || otherTurn) this.cancel();
-  }
-
-  receive(event: GuiEvent) {
-    if (event.method !== "turn/completed") return;
-    const { threadId, turn: incoming } = event.params;
-    const state = this.host.getSnapshot();
-    if (!this.enabled || !threadId || !incoming || state.selected !== threadId) return;
-    const current = state.conversations[threadId];
-    const turn = current?.turns.at(-1);
-    const key = `${threadId}:${incoming.id}`;
-    if (!turn || turn.status === "inProgress" || turn.id !== incoming.id || key === this.lastCompleted) return;
-    this.lastCompleted = key;
-    if (turn.status !== "failed" || !isModelCapacityError(turn.error)
-      || current.activeTurn || state.connection !== "ready" || state.archived
-      || state.workspaceBusy || state.deleting || state.compacting === threadId || state.queued[threadId]?.length) {
-      this.cancel();
-      return;
-    }
-    this.threadId = threadId;
-    const seconds = FIRST_RETRY_SECONDS + RETRY_INCREMENT_SECONDS * this.attempts++;
-    this.deadline = Date.now() + seconds * SECOND_MS;
-    this.host.patch({ capacityRetry: { threadId, turnId: turn.id, seconds } });
+  cancelAll() {
+    this.entries.clear();
+    this.publish();
     this.schedule();
   }
 
+  stop(threadId = this.host.getSnapshot().selected) {
+    const state = this.host.getSnapshot();
+    const turnId = threadId ? state.conversations[threadId]?.activeTurn : null;
+    if (threadId && turnId) this.lastCompleted.set(threadId, turnId);
+    this.cancel(threadId);
+  }
+
+  private unavailable(state: GuiState, threadId: string) {
+    return state.connection !== "ready" || !state.conversations[threadId] || state.workspaceBusy
+      || state.deleting === threadId || state.compacting === threadId || Boolean(state.queued[threadId]?.length);
+  }
+
+  sync(previous: GuiState, next: GuiState) {
+    for (const [threadId, entry] of this.entries) {
+      const activeTurn = next.conversations[threadId]?.activeTurn;
+      const manualSend = !previous.sending && next.sending
+        && (next.pendingRequest?.threadId ?? next.selected) === threadId;
+      const otherTurn = activeTurn && activeTurn !== previous.conversations[threadId]?.activeTurn;
+      if (this.unavailable(next, threadId) || (!entry.dispatching && (manualSend || otherTurn))) {
+        this.entries.delete(threadId);
+      }
+    }
+    this.publish();
+    if (!this.entries.size) this.schedule();
+  }
+
+  receive(event: GuiEvent) {
+    if (event.method === "thread/archived" && event.params.threadId) this.stop(event.params.threadId);
+    if (event.method !== "turn/completed") return;
+    const { threadId, turn: incoming } = event.params;
+    const state = this.host.getSnapshot();
+    if (!threadId || !incoming) return;
+    const current = state.conversations[threadId];
+    const turn = current?.turns.at(-1);
+    if (!turn || turn.status === "inProgress" || turn.id !== incoming.id
+      || incoming.id === this.lastCompleted.get(threadId)) return;
+    this.lastCompleted.set(threadId, incoming.id);
+    if (turn.status !== "failed" || !isModelCapacityError(turn.error)
+      || current.activeTurn || this.unavailable(state, threadId)) {
+      this.cancel(threadId);
+      return;
+    }
+    const entry = this.entries.get(threadId) ?? { attempts: 0, deadline: 0, dispatching: false };
+    const seconds = FIRST_RETRY_SECONDS + RETRY_INCREMENT_SECONDS * entry.attempts++;
+    entry.deadline = Date.now() + seconds * SECOND_MS;
+    entry.countdown = { threadId, turnId: turn.id, seconds };
+    this.entries.set(threadId, entry);
+    this.publish();
+    this.schedule();
+  }
+
+  private publish() {
+    const state = this.host.getSnapshot();
+    const capacityRetry = state.selected ? this.entries.get(state.selected)?.countdown : undefined;
+    if (state.capacityRetry !== capacityRetry) this.host.patch({ capacityRetry });
+  }
+
   private schedule() {
+    if ([...this.entries.values()].some(entry => entry.countdown)) {
+      this.timer ??= setTimeout(this.tick, SECOND_MS);
+      return;
+    }
     clearTimeout(this.timer);
-    this.timer = setTimeout(this.tick, SECOND_MS);
+    this.timer = undefined;
   }
 
   private tick = () => {
     this.timer = undefined;
-    const state = this.host.getSnapshot();
-    const retry = state.capacityRetry;
-    if (!retry || !this.threadId) return;
-    const seconds = Math.max(0, Math.ceil((this.deadline - Date.now()) / SECOND_MS));
-    if (seconds !== retry.seconds) this.host.patch({ capacityRetry: { ...retry, seconds } });
-    // A completion notification can arrive before the preceding send acknowledgement.
-    if (seconds || state.sending || state.modelSettingsLoading || this.dispatching) {
-      this.schedule();
-      return;
+    for (const [threadId, entry] of this.entries) {
+      if (!entry.countdown) continue;
+      const seconds = Math.max(0, Math.ceil((entry.deadline - Date.now()) / SECOND_MS));
+      if (seconds !== entry.countdown.seconds) entry.countdown = { ...entry.countdown, seconds };
+      const state = this.host.getSnapshot();
+      if (!seconds && !state.sending && !state.modelCatalogLoading && !entry.dispatching) {
+        void this.retry(threadId, entry);
+      }
     }
-    void this.retry();
+    this.publish();
+    this.schedule();
   };
 
-  private async retry() {
-    this.dispatching = true;
-    this.host.patch({ capacityRetry: undefined });
+  private async retry(threadId: string, entry: RetryEntry) {
+    entry.dispatching = true;
+    entry.countdown = undefined;
+    this.publish();
+    const canSend = () => this.entries.get(threadId) === entry
+      && !this.unavailable(this.host.getSnapshot(), threadId)
+      && !this.host.getSnapshot().conversations[threadId]?.activeTurn;
     try {
-      if (!await this.host.send()) this.cancel();
-    } finally { this.dispatching = false; }
+      if (!await this.host.send(threadId, canSend) && this.entries.get(threadId) === entry) this.cancel(threadId);
+    } finally { entry.dispatching = false; }
   }
 }

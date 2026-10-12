@@ -54,7 +54,6 @@ it('rejects stale actions after another turn starts or the selection changes', a
 
 it('cancels the capacity countdown before a manual retry so it cannot submit again', async () => {
   vi.useFakeTimers();
-  controller.capacityRetry.setActive(true);
   receive({ method: 'turn/started', params: { threadId: 'one',
     turn: { id: 'capacity', status: 'inProgress', items: [] } } });
   receive({ method: 'turn/completed', params: { threadId: 'one',

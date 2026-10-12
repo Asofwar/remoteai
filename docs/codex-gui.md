@@ -6,6 +6,14 @@ Providers (三方模型及中转). It supports project folders, text and image i
 streamed Markdown replies, command output, file diffs, plans, permission approvals, questions, interruption,
 history, search, renaming, pinning, and archiving/restoring conversations.
 
+When a live reply fails because the selected model is at capacity, its conversation retries after
+1, 3, 5, 7… seconds, adding two seconds after each consecutive capacity failure. Each conversation
+keeps its own countdown, even when another conversation or page is open. Retrying keeps the original
+conversation and its model and project choices; it does not switch the conversation you are viewing.
+Returning to a waiting conversation shows its remaining countdown. Stopping, archiving, deleting,
+or sending a new message in that conversation cancels its retry; disconnecting or closing the chat
+session cancels all pending retries. Opening an old failed reply does not start automatic retries.
+
 After a completed reply, an empty composer can show a short, translucent suggestion for the next
 message. On a keyboard, **Tab** accepts it into the draft; **Enter** then sends it on desktop.
 On a phone, tap the suggestion or **填入**, then use the normal send button. Native Android/iOS

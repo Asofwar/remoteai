@@ -1,6 +1,6 @@
 import { guiApi } from "./api";
 import { CapacityRetry } from "./capacityRetry";
-import { CONTINUE_MESSAGE } from "./continuation";
+import { sendCapacityRetry } from "./sendCapacityRetry";
 import { forkGuiConversation } from "./forkConversation";
 import { GuiMessageEditor } from "./editMessage";
 import { GuiGoals } from "./goals";
@@ -71,7 +71,11 @@ export class GuiController {
   };
   clearError = () => this.patch({ error: "" });
   readonly capacityRetry = new CapacityRetry({ getSnapshot: this.getSnapshot, patch: this.patch,
-    send: () => this.send(CONTINUE_MESSAGE, []) });
+    send: (threadId, canSend) => sendCapacityRetry({ getSnapshot: this.getSnapshot, patch: this.patch,
+      selection: (id) => this.modelSettings.ready(id), catalogGuard: () => this.modelCatalog.guard(),
+      acceptTurn: (id, turn) => this.acceptTurn(id, turn), report: this.report, refresh: () => this.refresh(),
+      flushQueue: () => Object.keys(this.state.queued).forEach(id => void this.queue.flush(id)),
+    }, threadId, canSend) });
   setWorkspaceBusy = (workspaceBusy: boolean) => {
     this.patch({ workspaceBusy });
     if (!workspaceBusy) Object.keys(this.state.queued).forEach((id) => void this.queue.flush(id));
@@ -342,7 +346,6 @@ export class GuiController {
       return accepted;
     }
     const startedAtMs = Date.now();
-    const canSend = this.capacityRetry.sendGuard();
     const currentCatalog = this.modelCatalog.guard();
     this.patch({ sending: true, pendingRequest: { threadId: selected, startedAtMs }, error: "" });
     try {
@@ -352,7 +355,7 @@ export class GuiController {
         : await guiApi.request<{ thread: Thread }>({ operation: "start", cwd: settings.cwd || undefined,
           model: settings.model || undefined, access: settings.access });
       const { thread } = response;
-      if (!canSend() || !currentCatalog()) return false;
+      if (!currentCatalog()) return false;
       this.acceptSentThread(thread, { selected, startedAtMs, projectOverride, settings });
       // Loaded threads can ignore resume overrides; apply project and access settings to each new turn.
       const { turn } = await guiApi.request<{ turn: Turn }>({ operation: "send", threadId: thread.id,
@@ -438,6 +441,7 @@ export class GuiController {
       this.report("请先发送或删除待发送消息，再归档对话。");
       return;
     }
+    if (operation === "archive") this.capacityRetry.stop(id);
     try {
       await guiApi.request(operation === "rename"
         ? { operation, threadId: id, name: name ?? "" } : { operation, threadId: id });
@@ -506,7 +510,7 @@ export class GuiController {
   };
   dispose = () => {
     this.modelCatalog.suspend();
-    this.capacityRetry.cancel();
+    this.capacityRetry.cancelAll();
     this.disposed = true; this.unlisten?.(); this.unlisten = undefined;
     clearTimeout(this.streamTimer); this.streamTimer = undefined; this.streamEvents = []; this.listeners.clear();
   };

@@ -82,10 +82,6 @@ function Workspace({ active, accountPicker, windowControls, plugins, hostPicker,
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   useOpenNotifiedThread({ target: notificationTarget, ready: active && state.connection === "ready", controller,
     showConversation: () => setView("conversation") });
-  useEffect(() => {
-    controller.capacityRetry.setActive(conversationActive);
-    return () => controller.capacityRetry.setActive(false);
-  }, [conversationActive, controller]);
   const [collapsed, setCollapsed] = useState(() => window.innerWidth < 900);
   const installer = useCliInstaller(active, controller, true);
   useEffect(retainGuiSession, [controller]);
@@ -169,7 +165,7 @@ function Workspace({ active, accountPicker, windowControls, plugins, hostPicker,
       {!installer.version ? <Installer installer={installer} /> :
         <ConversationRetryProvider controller={controller} state={state}>
         <Messages value={current} selected={state.selected} active={conversationActive}
-          retry={state.capacityRetry} onCancelRetry={controller.capacityRetry.cancel}
+          retry={state.capacityRetry} onCancelRetry={() => controller.capacityRetry.cancel()}
           editCwd={state.selected ? state.projectOverrides[state.selected] : undefined}
           onEdit={controller.messageEditor.submit} editDisabled={!canEditMessage(state)}
           onFork={controller.forkConversation} forkDisabled={!canForkConversation(state)}

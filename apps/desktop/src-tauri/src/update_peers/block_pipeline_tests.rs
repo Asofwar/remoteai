@@ -103,13 +103,16 @@ async fn an_empty_swarm_discovers_a_new_source_without_restarting_download() {
     let coordinator = network_fixture::coordinator("late-update-seed").await;
     let mut config = network_fixture::client(&coordinator, "late-update-seed");
     config.desktop = true;
-    let seed = Connection::start_with_packets(config.clone()).unwrap();
-    let host = seed.clone();
+    let seed_config = config.clone();
     let id = artifact.id.clone();
     let policy = service.policy.clone();
     let (begin, mut started) = watch::channel(false);
+    let (connected, mut seed) = tokio::sync::oneshot::channel();
     let serving = tokio::spawn(async move {
         started.changed().await.unwrap();
+        // Real upload grants start both engines at lookup time, without an idle seed engine.
+        let host = Connection::start_with_packets(seed_config).unwrap();
+        connected.send(host.clone()).ok().unwrap();
         block_protocol::seed(&host, snapshot, &id, &policy).await
     });
     config.desktop = false;
@@ -135,10 +138,25 @@ async fn an_empty_swarm_discovers_a_new_source_without_restarting_download() {
     )
     .await;
     drop(leases);
-    seed.close();
-    serving.abort();
+    let seed_result = if serving.is_finished() {
+        Some(serving.await.unwrap())
+    } else {
+        serving.abort();
+        None
+    };
+    if let Ok(seed) = seed.try_recv() {
+        seed.close();
+    }
     coordinator.stop().await;
+    assert!(
+        discovering.is_finished(),
+        "no refill request before the download deadline"
+    );
     discovering.await.unwrap();
+    assert!(
+        result.is_ok(),
+        "download deadline elapsed; seed result: {seed_result:?}"
+    );
     assert_eq!(result.unwrap().unwrap(), bytes);
     assert_eq!(
         service.policy.metrics.peer_bytes.load(Ordering::Relaxed),

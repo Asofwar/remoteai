@@ -1,16 +1,8 @@
 name: Star History
 
 on:
-  push:
-    branches:
-      - master
-    paths:
-      - .github/workflows/star-history.yml
   schedule:
-    - cron: "23 */6 * * *"
-  watch:
-    types:
-      - started
+    - cron: "23 */12 * * *"
   workflow_dispatch:
 
 permissions:

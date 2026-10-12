@@ -37,6 +37,10 @@
 .divider { height: 1px; margin: 7px 10px 5px; background: var(--line, #e7e7e7); }
 .newProject { color: var(--muted); }
 .empty { padding: 12px 10px; margin: 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.dropHint { position: absolute; inset: 0 28px 14px; z-index: 2;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  border: 2px dashed var(--green); border-radius: 18px; background: var(--panel);
+  color: var(--ink); pointer-events: none; text-align: center; overflow-wrap: anywhere; }
 .name:focus-visible, .remove:focus-visible, .option:focus-visible { outline: 2px solid #4096ff; outline-offset: -2px; }
 @media (hover: none) {
   .remove:not(:disabled) { .cross { opacity: 1; } .folder { opacity: 0; } }

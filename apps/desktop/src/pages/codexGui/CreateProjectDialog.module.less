@@ -16,11 +16,18 @@
   > svg, > small { color: var(--muted); }
   > span { max-width: 400px; overflow-wrap: anywhere; }
   &:hover:not(:disabled) { border-color: var(--muted); }
+  &[data-dragging="true"] {
+    border-color: var(--green, #159570);
+    background: color-mix(in srgb, var(--green-soft, #e8f6f0) 72%, #fff);
+  }
   &:focus-visible { outline: 2px solid #4096ff; outline-offset: 2px; }
   &:disabled { opacity: .6; cursor: default; }
 }
 .path { font-size: 12px; color: var(--muted); }
 :global(:root[data-theme='dark']) .folder { background: #1b1d1f; }
+:global(:root[data-theme='dark']) .folder[data-dragging="true"] {
+  background: color-mix(in srgb, #159570 20%, #1b1d1f);
+}
 .hostFolder { padding: 18px; border: 1px solid var(--line); border-radius: 13px;
   p { max-width: 400px; margin: 10px 0 0; color: var(--muted); font-size: 12px; }
 }

@@ -41,6 +41,7 @@ export const Composer = forwardRef<ComposerHandle, {
 }>(function Composer({ state, controller, active, hostPicker }, ref) {
   const fileInput = useRef<HTMLInputElement>(null);
   const composer = useRef<HTMLDivElement>(null);
+  const dropTarget = useRef<HTMLDivElement>(null);
   const skillInput = useRef<SkillInputHandle>(null);
   const key = state.selected ?? "new";
   const [dialog, setDialog] = useState<"files" | "goal" | null>(null);
@@ -64,7 +65,9 @@ export const Composer = forwardRef<ComposerHandle, {
     subscribe: isDesktopApp ? subscribeFileDrop : undefined,
     addPaths: async (paths, current) => {
       const references = await droppedReferences(paths);
-      if (current()) { addAttachments(references); skillInput.current?.focus(); }
+      // On a new conversation folders become projects; files retain the attachment behavior.
+      const attachments = state.selected ? references : references.filter(reference => reference.kind !== 'folder');
+      if (current()) { addAttachments(attachments); skillInput.current?.focus(); }
     }, addFiles: files => {
       const images = files.filter(file => file.type.startsWith('image/'));
       if (images.length) addImages(images);
@@ -95,10 +98,10 @@ export const Composer = forwardRef<ComposerHandle, {
     flushSync(() => { restored = editQueued(id); });
     if (restored) skillInput.current?.focus();
   };
-  return <div className={styles.composerWrap}>
+  return <div ref={dropTarget} className={styles.composerWrap}>
     <RunningChangesSummary value={current} />
     {(!running || isDesktopApp || hostPicker) && <ProjectPicker key={key} value={project}
-      projects={state.projects} hostPicker={hostPicker} running={running}
+      projects={state.projects} hostPicker={hostPicker} running={running} active={active} dropTarget={dropTarget}
       actions={isDesktopApp && <GuiToolbox trigger="git" active={active} connected={!workspaceBusy}
         cwd={project} deviceName={guiText("本机")} git={localGitClient} />}
       disabled={running || state.sending || state.archived || workspaceBusy} gitEnabled={!state.selected}

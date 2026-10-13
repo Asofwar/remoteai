@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { Thread } from '../src/chat/types';
 
 const paths = ['src/first/index.ts', 'src/second/index.ts', 'src/third.ts', 'src/fourth.ts', 'src/fifth.ts'];
@@ -114,4 +114,64 @@ test('translates desktop diff controls without translating file paths or code', 
   await expect(panel(page).getByText('修改前', { exact: true })).toBeVisible();
   await expect(panel(page)).toContainText('const newValue = 0;');
   await panel(page).getByRole('button', { name: '关闭详情抽屉' }).click();
+});
+
+function largeDiffFixture() {
+  const value = fixture();
+  value.turns![0].items[1].changes = [{ path: paths[0], kind: { type: 'add' },
+    diff: '@@ -0,0 +1,450 @@\n' + Array.from({ length: 450 }, (_, index) =>
+      `+const row_${index} = "${'long code '.repeat(30)}";`).join('\n') + '\n' }];
+  return value;
+}
+
+async function scrollToDiffEnd(scroller: Locator) {
+  return scroller.evaluate(node => {
+    node.scrollTop = node.scrollHeight - node.clientHeight;
+    return node.scrollTop;
+  });
+}
+
+test('automatically appends large diffs while keeping the scroll position in mobile and desktop layouts',
+  async ({ page }, info) => {
+    await open(page, largeDiffFixture());
+    const mobile = info.project.name === 'mobile';
+    if (mobile) {
+      await page.getByRole('button', { name: '查看本轮修改：1 个文件', exact: true }).click();
+      await page.locator('.chat-diff-file summary').first().click();
+    } else {
+      await summary(page).getByRole('button', { name: `查看 ${paths[0]} 的差异`, exact: true }).click();
+    }
+    const code = mobile ? page.locator('.chat-diff-content pre')
+      : panel(page).getByLabel(`${paths[0]} 的代码差异`, { exact: true });
+    const scroller = mobile ? code : panel(page).locator('> div[class*="_content_"]');
+    const rows = code.locator(mobile ? '.chat-diff-line' : 'code');
+    const initial = mobile ? 160 : 200;
+    await expect(rows).toHaveCount(initial);
+    // Horizontal movement must neither hide the end marker nor eagerly load a full-height diff.
+    await code.evaluate(node => { node.scrollLeft = node.scrollWidth - node.clientWidth; });
+    await expect(rows).toHaveCount(initial);
+    const position = await scrollToDiffEnd(scroller);
+    await expect(rows).toHaveCount(initial * 2);
+    expect(await scroller.evaluate(node => node.scrollTop)).toBeCloseTo(position, 0);
+    await scrollToDiffEnd(scroller);
+    await expect(rows).toHaveCount(451);
+    await scrollToDiffEnd(scroller);
+    await expect(code).toContainText('const row_449');
+    await expect(page.getByRole('button', { name: /显示更多差异|继续显示/ })).toHaveCount(0);
+    await page.screenshot({ path: `../../.codex-tmp/diff-auto-load-${info.project.name}.png` });
+  });
+
+test('automatically appends side-by-side diffs to the last line', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop');
+  await open(page, largeDiffFixture());
+  await summary(page).getByRole('button', { name: `查看 ${paths[0]} 的差异`, exact: true }).click();
+  await panel(page).getByRole('button', { name: '并排', exact: true }).click();
+  const code = panel(page).getByLabel(`${paths[0]} 的代码差异`, { exact: true });
+  const scroller = panel(page).locator('> div[class*="_content_"]');
+  await expect(code).not.toContainText('const row_399');
+  await scrollToDiffEnd(scroller);
+  await expect(code).toContainText('const row_398');
+  await scrollToDiffEnd(scroller);
+  await expect(code).toContainText('const row_449');
+  await expect(panel(page).getByRole('button', { name: /继续显示/ })).toHaveCount(0);
 });

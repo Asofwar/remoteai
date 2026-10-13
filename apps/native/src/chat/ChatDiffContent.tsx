@@ -8,8 +8,9 @@ import { INLINE_COPY_WIDTH, type CopyAction } from './CopyTextButton';
 import { ChatFileContext } from './ChatFilePreview';
 import { HighlightedCode, fileLanguage } from './ChatCodeHighlight';
 import { palette, useStyles } from './styles';
+import { SheetScrollView } from '../components/SheetScrollView';
+import { useDiffScroll } from './useDiffScroll';
 
-const PAGE_LINES = 200;
 const NUMBER_COLUMN_WIDTH = 34;
 const MIN_SCROLL_COLUMN_WIDTH = 320;
 const CELL_BORDER_WIDTH = 1;
@@ -104,7 +105,6 @@ export function ChatDiffContent({ file, onComment }: { file: DiffFile; onComment
   const styles = useStyles();
   const diffStyles = useDiffStyles();
   useLanguage();
-  const [limit, setLimit] = useState(PAGE_LINES);
   const [wrap, setWrap] = useState(false);
   const [split, setSplit] = useState(false);
   const openFile = useContext(ChatFileContext);
@@ -113,12 +113,13 @@ export function ChatDiffContent({ file, onComment }: { file: DiffFile; onComment
   const pairs = useMemo(() => split ? pairDiffLines(lines) : [], [lines, split]);
   const language = fileLanguage(file.path);
   const total = split ? pairs.length : lines.length;
+  const { limit, loadMore, scrollProps } = useDiffScroll(total);
   const copy = { text: file.raw, label: t("复制 diff") };
   const rows = split ? <SplitRows pairs={pairs.slice(0, limit)} language={language} wrap={wrap} copy={copy} />
     : <View>{lines.slice(0, limit).map((line, index) =>
       <UnifiedRow key={index} line={line} language={language} wrap={wrap} onComment={onComment}
         copy={index === Math.min(lines.length, limit) - 1 ? copy : undefined} />)}</View>;
-  return <View style={{ gap: 10 }}>
+  return <SheetScrollView {...scrollProps} contentContainerStyle={{ gap: 10, paddingBottom: 20 }}>
     {file.previousPath && <SelectableChatText style={styles.subtitle}>
       {file.previousPath} → {file.path}</SelectableChatText>}
     <View style={diffStyles.toolbar}>
@@ -133,9 +134,9 @@ export function ChatDiffContent({ file, onComment }: { file: DiffFile; onComment
     {!total && <SelectableChatText style={styles.subtitle} copy={copy}>
       {file.kind === 'add' ? t("新增空文件") : t("此文件没有可显示的文本差异。")}</SelectableChatText>}
     {total > limit && <Pressable accessibilityRole="button" style={styles.button}
-      onPress={() => setLimit(limit + PAGE_LINES)}>
+      onPress={loadMore}>
       <Text style={styles.buttonText}>{t("继续显示（还有")}{' '}{total - limit}{' '}{t("行）")}</Text></Pressable>}
-  </View>;
+  </SheetScrollView>;
 }
 
 const useDiffStyles = createThemedStyles((color) => ({

@@ -7,11 +7,22 @@ import { changedFiles } from "./diff";
 
 let root: Root;
 let container: HTMLDivElement;
+let revealEnd: () => void;
+const disconnect = vi.fn();
 const files = changedFiles([{ path: "src/example.ts", kind: { type: "update" },
   diff: "@@ -3 +3,2 @@\n-const value = 1;\n+const value = 2;\n+run(value);\n" }]);
 
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  disconnect.mockClear();
+  vi.stubGlobal("IntersectionObserver", class {
+    constructor(callback: IntersectionObserverCallback) {
+      revealEnd = () => callback([{ isIntersecting: true } as IntersectionObserverEntry],
+        this as unknown as IntersectionObserver);
+    }
+    observe() {}
+    disconnect = disconnect;
+  });
   container = document.createElement("div");
   root = createRoot(container);
 });
@@ -45,4 +56,20 @@ it("loads long diffs in pages and keeps the remainder accessible", async () => {
   await act(async () => more().click());
   expect(container.querySelectorAll("code")).toHaveLength(450);
   expect(container.textContent).toContain("line-449");
+});
+
+it("automatically appends one batch per visible end and releases observers after the final page", async () => {
+  const large = changedFiles([{ path: "large.txt", kind: { type: "add" },
+    diff: Array.from({ length: 450 }, (_, index) => `line-${index}`).join("\n") }]);
+  await act(async () => root.render(<DiffView files={large} />));
+  await act(async () => (container.querySelector("button[aria-expanded]") as HTMLButtonElement).click());
+  expect(container.querySelectorAll("code")).toHaveLength(200);
+  await act(async () => { revealEnd(); revealEnd(); });
+  expect(container.querySelectorAll("code")).toHaveLength(400);
+  expect(disconnect).toHaveBeenCalledTimes(1);
+  await act(async () => revealEnd());
+  expect(container.querySelectorAll("code")).toHaveLength(450);
+  expect(container.textContent).toContain("line-449");
+  expect(disconnect).toHaveBeenCalledTimes(2);
+  expect(container.textContent).not.toContain("继续显示");
 });

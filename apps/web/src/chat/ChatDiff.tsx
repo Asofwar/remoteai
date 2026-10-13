@@ -1,31 +1,32 @@
 import { t, useLanguage } from '../i18n';
-import { useContext, useState } from 'react';
+import { useContext } from 'react';
 import { ChevronDown, FileText, Folder } from 'lucide-react';
 import type { DiffFile, DiffLine } from '../../../../shared/chat/diff';
 import { groupDiffFiles } from '../../../../shared/chat/diffGroups';
 import { ChatCopyButton } from './ChatCopyButton';
 import { DetailsContext } from '../../../desktop/src/pages/codexGui/detailsContext';
 import { ChatFilesSummary } from './ChatFilesSummary';
+import { useDiffAutoLoad } from '../../../../shared/chat/useDiffAutoLoad';
 
 const PAGE_LINES = 160;
 function DiffContent({ file, onComment }: { file: DiffFile; onComment?: (file: DiffFile, line: DiffLine) => void }) {
   useLanguage();
-  const [limit, setLimit] = useState(PAGE_LINES);
+  const { limit, loadMore, endRef, onScroll } = useDiffAutoLoad(file.lines.length, PAGE_LINES);
   return <div className="chat-diff-content">
     <ChatCopyButton text={file.raw} label={t("复制差异")} />
-    <pre tabIndex={0} onScroll={event => {
-      const node = event.currentTarget;
-      if (node.scrollHeight - node.scrollTop - node.clientHeight < 100) setLimit(value => value + PAGE_LINES);
-    }}>{file.lines.slice(0, limit).map((line, index) =>
+    <pre tabIndex={0} onScroll={onScroll}>{file.lines.slice(0, limit).map((line, index) =>
       <span className={`chat-diff-line ${line.kind}`} key={index}>
         {onComment && (line.oldLine || line.newLine) && <button type="button" className="chat-diff-comment"
           aria-label={t('对第 {value1} 行留言', { value1: line.newLine ?? line.oldLine ?? 0 })}
           onClick={() => onComment(file, line)}>{t('留言')}</button>}
         <span>{line.oldLine ?? ''}</span><span>{line.newLine ?? ''}</span>
         <code>{line.kind === 'add' ? '+' : line.kind === 'remove' ? '−' : ' '}{line.text}{'\n'}</code>
-      </span>)}</pre>
+      </span>)}
+      {limit < file.lines.length && <span ref={endRef} aria-hidden
+        style={{ display: 'block', position: 'sticky', left: 0, width: 1, height: 1 }} />}
+    </pre>
     {limit < file.lines.length && <button type="button" className="chat-text-action"
-      onClick={() => setLimit(value => value + PAGE_LINES)}>{t("显示更多差异")}</button>}
+      onClick={loadMore}>{t("显示更多差异")}</button>}
   </div>;
 }
 

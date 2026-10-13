@@ -6,7 +6,6 @@ import { Pressable, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import type { DiffFile, DiffLine } from '../../../../shared/chat/diff';
 import { BottomSheet } from '../components/BottomSheet';
-import { SheetScrollView } from '../components/SheetScrollView';
 import { ChatDiffContent } from './ChatDiffContent';
 import { groupDiffFiles } from './diffGroups';
 import { palette, useStyles } from './styles';
@@ -63,11 +62,9 @@ export function ChatDiff({ files, copy, onComment }: {
     </View>)}
     {selected && <BottomSheet fullWidthContent visible tall title={t("文件差异")} subtitle={selected.path}
       onClose={() => setSelectedKey(null)} onBack={() => setSelectedKey(null)} dragFromHeaderOnly>
-      <SheetScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
-        <ChatDiffContent key={selectedKey} file={selected} onComment={onComment ? line => {
-          setSelectedKey(null); onComment(selected, line);
-        } : undefined} />
-      </SheetScrollView>
+      <ChatDiffContent key={selectedKey} file={selected} onComment={onComment ? line => {
+        setSelectedKey(null); onComment(selected, line);
+      } : undefined} />
     </BottomSheet>}
   </View>;
 }

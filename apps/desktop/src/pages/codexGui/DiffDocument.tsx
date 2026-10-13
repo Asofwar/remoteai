@@ -5,10 +5,10 @@ import { pairDiffLines } from "./diff";
 import { CopyButton } from "./CopyButton";
 import { useDiffText } from "../../../../../shared/chat/diffText";
 import { groupDiffFiles } from "../../../../../shared/chat/diffGroups";
+import { useDiffAutoLoad } from "../../../../../shared/chat/useDiffAutoLoad";
 import { fileLanguage, HighlightedCode } from "./CodeHighlight";
 import styles from "./DiffView.module.less";
 
-const PAGE_LINES = 200;
 const KIND_LABELS: Record<string, string> = { add: "新增", delete: "删除", update: "修改" };
 const REDUNDANT_DIFF_HEADER = /^(diff --git |index |--- |\+\+\+ |new file mode |deleted file mode )/;
 
@@ -37,18 +37,19 @@ function SplitCell({ line, side, language }: { line?: DiffLine; side: "left" | "
 
 function DiffContent({ file, split }: { file: DiffFile; split: boolean }) {
   const t = useDiffText();
-  const [limit, setLimit] = useState(PAGE_LINES);
   const lines = useMemo(() => file.lines.filter((line) => line.kind !== "meta"
     || !REDUNDANT_DIFF_HEADER.test(line.text)), [file.lines]);
   const pairs = useMemo(() => split ? pairDiffLines(lines) : [], [lines, split]);
   const language = fileLanguage(file.path);
   const total = split ? pairs.length : lines.length;
+  const { limit, loadMore, endRef, onScroll } = useDiffAutoLoad(total);
   return <>
     <div className={styles.fileToolbar}>
       <span>{file.previousPath ? `${file.previousPath} → ${file.path}` : file.path}</span>
       <CopyButton text={file.raw} label={t("复制 diff")} />
     </div>
-    {total ? <div className={styles.codeScroll} tabIndex={0} aria-label={t("{path} 的代码差异", { path: file.path })}>
+    {total ? <div className={styles.codeScroll} tabIndex={0} onScroll={onScroll}
+      aria-label={t("{path} 的代码差异", { path: file.path })}>
       {split ? <div className={styles.split}>
         <div className={styles.splitLabels}><span>{t("修改前")}</span><span>{t("修改后")}</span></div>
         {pairs.slice(0, limit).map((pair, index) => pair.heading
@@ -58,8 +59,10 @@ function DiffContent({ file, split }: { file: DiffFile; split: boolean }) {
             <SplitCell line={pair.right} side="right" language={language} />
           </div>)}
       </div> : lines.slice(0, limit).map((line, index) => <UnifiedLine line={line} language={language} key={index} />)}
+      {limit < total && <span ref={endRef} aria-hidden
+        style={{ display: 'block', position: 'sticky', left: 0, width: 1, height: 1 }} />}
     </div> : <p className={styles.notice}>{t(file.kind === "add" ? "新增空文件" : "此文件没有可显示的文本差异。")}</p>}
-    {limit < total && <button className={styles.more} onClick={() => setLimit((value) => value + PAGE_LINES)}>
+    {limit < total && <button className={styles.more} onClick={loadMore}>
       {t("继续显示（还有 {count} 行）", { count: total - limit })}</button>}
   </>;
 }

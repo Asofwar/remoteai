@@ -7,6 +7,7 @@ import { fileApi, FileThreadContext, type FileAction, type FileApplication } fro
 import type { FileReference } from "./fileReference";
 import { DetailsContext } from "./detailsContext";
 import { FileEnvironmentContext } from './fileEnvironment';
+import { isDownloadOnlyFile } from '../../../../../shared/remote-chat/filePreview';
 
 const FEEDBACK_STYLE = { maxWidth: 400, marginInline: "auto" };
 
@@ -61,7 +62,15 @@ export function useFileMenu(target: FileReference) {
     if (flight.current) return;
     flight.current = true; setBusy(true); setOpen(false);
     try {
-      if (!panel || !await panel.openFile({ ...target, threadId })) setOpen(true);
+      const file = { ...target, threadId };
+      const remotePreview = environment && !isDownloadOnlyFile(target.path) ? panel?.openRemoteFile : undefined;
+      try {
+        if (panel && await panel.openFile(file)) return;
+      } catch (error) {
+        // Older peers and unavailable preview tunnels still support ordinary remote file reads.
+        if (!remotePreview) throw error;
+      }
+      if (!remotePreview || !await remotePreview(file)) setOpen(true);
     } catch (error) {
       setOpen(true);
       void message.error({ content: typeof error === "string" ? error : guiText("预览未能打开，请选择其他打开方式。"),

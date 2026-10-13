@@ -8,6 +8,7 @@ import { externalCodePath, longMarkdown, markdown, sourceCode } from './file-pre
 import '../src/styles.css';
 import '../src/chat/chat.css';
 import '../src/chat/messages.css';
+import '../src/chat/desktopMessages.css';
 
 const params = new URLSearchParams(location.search);
 const DOWNLOAD_BYTES = 8 * 1024 * 1024;
@@ -44,7 +45,8 @@ const context: FilePreviewContext = {
 };
 const path = params.get('path') ?? 'verification.md';
 createRoot(document.getElementById('root')!).render(
-  params.has('pc') ? <PcFilePreviewFixture /> : params.has('workspace') ? <div className="chat-page" style={{ height: '100dvh' }}>
+  params.has('pc') ? <PcFilePreviewFixture legacy={params.has('legacy')} />
+  : params.has('workspace') ? <div className="chat-page" style={{ height: '100dvh' }}>
     <ChatFileContext.Provider value={context}>
       <ChatDetailsWorkspace selected={context.threadId} active enabled>
         <ChatMarkdown text="[交接文档](F:/remote/docs/handoff.md)" />

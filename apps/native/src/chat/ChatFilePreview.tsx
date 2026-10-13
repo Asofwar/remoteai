@@ -19,8 +19,7 @@ import type { FileClient } from '../../../../shared/remote-chat/fileDownload';
 import { useManagedDownload } from '../downloads/useManagedDownload';
 import type { PreviewLoadOptions, PreviewProgress } from '../../../../shared/remote-chat/previewProgress';
 import { PreviewTransferProgress } from './PreviewTransferProgress';
-
-const BINARY_FILE = /\.(?:exe|apk|aab|msi|zip|7z|rar|gz|tar|dmg|pdf|docx?|xlsx?|pptx?|png|jpe?g|gif|webp|mp3|wav)$/i;
+import { isDownloadOnlyFile } from '../../../../shared/remote-chat/filePreview';
 
 export const ChatFileContext = createContext<((file: FileReference) => void) | null>(null);
 interface Props {
@@ -43,7 +42,7 @@ function FilePreview({ file, threadId, ready, load, files, close }: PreviewProps
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [progress, setProgress] = useState<PreviewProgress>();
-  const binary = BINARY_FILE.test(file.path);
+  const binary = isDownloadOnlyFile(file.path);
   const html = isHtmlPath(file.path);
   const markdown = isMarkdownPath(file.path);
   const download = useManagedDownload({ client: files, threadId, ready, path: file.path });

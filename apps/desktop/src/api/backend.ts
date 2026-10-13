@@ -6,8 +6,10 @@ import { hasDirectChatInput } from "../../../../shared/remote-chat/uploadMode";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { exit as exitApp, relaunch } from "@tauri-apps/plugin-process";
-import type { DownloadEvent, Update } from "@tauri-apps/plugin-updater";
+import type { Update } from "@tauri-apps/plugin-updater";
 import { checkAvailableAppUpdate } from "./appUpdateCheck";
+import { downloadWithAppUpdateProgress, type AppUpdateDownloadProgress,
+  type AppUpdateProgressListener } from "./appUpdateProgress";
 import { chooseBrowserAccountFile } from "./browserAccountImport";
 import { isAutoUpdateEnabled } from "./appUpdatePreferences";
 import type { CodexConnectionStatus, CodexConnectResult } from "./codexConnectionTypes";
@@ -254,6 +256,8 @@ const PENDING_APP_UPDATE_VERSION_KEY = "codex-switch:pending-app-update-version"
 let pendingAppUpdate: Update | null = null;
 let appUpdateDownloaded = false;
 let updateDownloadPromise: Promise<void> | null = null;
+const updateProgressListeners = new Set<AppUpdateProgressListener>();
+let latestUpdateProgress: AppUpdateDownloadProgress | null = null;
 let updateInstallInProgress = false;
 let pendingUpdateInstallPromise: Promise<void> | null = null;
 const LAUNCH_AT_STARTUP_PREVIEW_KEY = "codex-switch:launch-at-startup";
@@ -3252,48 +3256,40 @@ function isVersionNewer(candidate: string, current: string): boolean {
   return false;
 }
 
-export async function downloadAvailableUpdate(onProgress?: (progress: number | null) => void): Promise<void> {
+export async function downloadAvailableUpdate(onProgress?: AppUpdateProgressListener): Promise<void> {
   if (!isDesktopApp) return;
   if (appUpdateDownloaded) return;
-  if (updateDownloadPromise) return updateDownloadPromise;
-
-  const download = async () => {
-    const info = pendingAppUpdate ? toUpdateInfo(pendingAppUpdate) : await getAvailableAppUpdate();
-    const update = pendingAppUpdate;
-    if (!info || !update) return;
-
-    let downloadedBytes = 0;
-    let totalBytes: number | undefined;
-    const reportProgress = (event: DownloadEvent) => {
-      if (event.event === "Started") {
-        downloadedBytes = 0;
-        totalBytes = event.data.contentLength;
-        onProgress?.(totalBytes ? 0 : null);
-      } else if (event.event === "Progress") {
-        downloadedBytes += event.data.chunkLength;
-        onProgress?.(totalBytes ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : null);
-      } else if (event.event === "Finished") {
-        onProgress?.(100);
-      }
-    };
-
-    try {
-      await update.download(reportProgress);
-      appUpdateDownloaded = true;
-      rememberPendingAppUpdate(update.version);
-    } catch (error) {
-      await update.close();
-      if (pendingAppUpdate === update) pendingAppUpdate = null;
-      throw error;
-    }
-  };
-
-  const request = download();
-  updateDownloadPromise = request;
+  if (!updateDownloadPromise) latestUpdateProgress = null;
+  if (onProgress) updateProgressListeners.add(onProgress);
+  let request = updateDownloadPromise;
   try {
+    if (latestUpdateProgress) onProgress?.(latestUpdateProgress.percent, latestUpdateProgress);
+    if (!request) {
+      request = downloadPendingAppUpdate();
+      updateDownloadPromise = request;
+    }
     await request;
   } finally {
+    if (onProgress) updateProgressListeners.delete(onProgress);
     if (updateDownloadPromise === request) updateDownloadPromise = null;
+  }
+}
+
+async function downloadPendingAppUpdate(): Promise<void> {
+  const info = pendingAppUpdate ? toUpdateInfo(pendingAppUpdate) : await getAvailableAppUpdate();
+  const update = pendingAppUpdate;
+  if (!info || !update) return;
+  try {
+    await downloadWithAppUpdateProgress(update, (percent, details) => {
+      latestUpdateProgress = details;
+      updateProgressListeners.forEach((listener) => listener(percent, details));
+    });
+    appUpdateDownloaded = true;
+    rememberPendingAppUpdate(update.version);
+  } catch (error) {
+    await update.close();
+    if (pendingAppUpdate === update) pendingAppUpdate = null;
+    throw error;
   }
 }
 

@@ -83,6 +83,33 @@ describe("automatic app updates", () => {
     expect(update.install).toHaveBeenCalledOnce();
   });
 
+  it("shares current and subsequent download details with callers joining a background download", async () => {
+    const downloading = deferred<undefined>();
+    let send!: (event: DownloadEvent) => void;
+    update.download.mockImplementation((report) => { send = report!; return downloading.promise; });
+    const { backend } = await loadApp();
+    await backend.checkForUpdate();
+    const firstProgress = vi.fn();
+    const first = backend.downloadAvailableUpdate(firstProgress);
+    send({ event: "Started", data: { contentLength: 1_024 } });
+    send({ event: "Progress", data: { chunkLength: 512 } });
+    const secondProgress = vi.fn();
+    const second = backend.downloadAvailableUpdate(secondProgress);
+    expect(secondProgress).toHaveBeenLastCalledWith(50, {
+      percent: 50, downloadedBytes: 512, totalBytes: 1_024, bytesPerSecond: 0,
+    });
+    send({ event: "Finished" });
+    downloading.resolve(undefined);
+    await Promise.all([first, second]);
+    expect(update.download).toHaveBeenCalledOnce();
+    for (const listener of [firstProgress, secondProgress]) {
+      expect(listener).toHaveBeenLastCalledWith(100, expect.objectContaining({ downloadedBytes: 1_024 }));
+    }
+    const calls = secondProgress.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(secondProgress).toHaveBeenCalledTimes(calls);
+  });
+
   it("does not start a second installer when local and remote requests overlap", async () => {
     const { backend } = await loadApp();
     await backend.downloadAvailableUpdate();

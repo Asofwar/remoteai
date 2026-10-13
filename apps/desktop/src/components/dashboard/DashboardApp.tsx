@@ -945,7 +945,7 @@ export function DashboardApp() {
     availableUpdate, checkAboutVersion, checkForUpdates, downloadingUpdate,
     downloadRequested: installAfterDownloadRequested, downloadUpdate, helpVersionState,
     installingUpdate, installUpdate, setShowUpdatePrompt, showAvailableUpdate, showUpdatePrompt,
-    updateDownloaded, updateInstallError, updateProgress,
+    updateDownloaded, updateInstallError, updateDownloadProgress,
   } = appUpdate;
   const openAbout = useCallback(() => {
     setShowAbout(true);
@@ -1676,7 +1676,7 @@ export function DashboardApp() {
           onInstall={() => void installUpdate()} downloading={downloadingUpdate}
           downloadRequested={installAfterDownloadRequested} downloaded={updateDownloaded}
           checking={appUpdate.checkingBeforeInstall} installing={installingUpdate}
-          progress={updateProgress} error={updateInstallError} t={t} />}
+          progress={updateDownloadProgress} error={updateInstallError} t={t} />}
         <ProxySettingsModal open={showProxySettings} proxy={providerManager.localProxy}
           loading={providerManager.proxyBusy || chatGptOperation !== null}
           onClose={() => setShowProxySettings(false)}

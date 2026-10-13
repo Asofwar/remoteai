@@ -1,6 +1,8 @@
 import { Download, Rocket, X } from "lucide-react";
 import type { Translate } from "../../i18n";
 import type { UpdateInfo } from "../../types";
+import type { AppUpdateDownloadProgress } from "../../api/appUpdateProgress";
+import { UpdateDownloadProgress } from "./UpdateDownloadProgress";
 
 interface UpdateModalProps {
   update: UpdateInfo;
@@ -12,7 +14,7 @@ interface UpdateModalProps {
   downloaded: boolean;
   installing: boolean;
   checking: boolean;
-  progress: number | null;
+  progress: AppUpdateDownloadProgress | null;
   error: string | null;
   t: Translate;
 }
@@ -33,11 +35,6 @@ export function UpdateModal({
 }: UpdateModalProps) {
   const busy = checking || installing;
   const busyLabel = t(checking ? "update.checking" : "update.installing");
-  const handleDownload = () => {
-    onDownload();
-    onClose();
-  };
-
   return (
     <div className="modal-backdrop" onClick={busy ? undefined : onClose}>
       <section className="modal update-modal" role="dialog" aria-modal="true"
@@ -58,9 +55,7 @@ export function UpdateModal({
             <pre>{update.releaseNotes}</pre>
           </div>
         )}
-        {downloading && !downloaded && <p role="status">{progress === null
-          ? t("update.backgroundDownloading")
-          : t("update.downloading", { progress })}</p>}
+        {downloading && !downloaded && <UpdateDownloadProgress progress={progress} t={t} />}
         {busy && <p role="status">{busyLabel}</p>}
         {error && <p role="alert">{t("update.installError", { error })}</p>}
         <div className="update-actions">
@@ -70,7 +65,7 @@ export function UpdateModal({
               <Download size={17} />{busy ? busyLabel : t("update.download")}
             </button>
           ) : (
-            <button type="button" className="primary-button" disabled={busy || downloadRequested} onClick={handleDownload}>
+            <button type="button" className="primary-button" disabled={busy || downloadRequested} onClick={onDownload}>
               <Download size={17} />{downloadRequested ? t("update.waitingToInstall") : t("update.downloadAndInstall")}
             </button>
           )}

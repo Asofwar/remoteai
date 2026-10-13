@@ -86,6 +86,24 @@ it("installs the downloaded release when the fresh check returns the same versio
   expect(installDownloadedUpdate).toHaveBeenCalledOnce();
 });
 
+it("keeps live download details when the prompt is closed and reopened", async () => {
+  const downloading = deferred<void>();
+  const details = { percent: 41, downloadedBytes: 41_000, totalBytes: 100_000, bytesPerSecond: 2_048 };
+  vi.mocked(downloadAvailableUpdate).mockImplementationOnce((report) => {
+    report?.(details.percent, details);
+    return downloading.promise;
+  });
+  let request!: Promise<boolean>;
+  await act(async () => { request = controls.downloadUpdate(newerUpdate, true); });
+  expect(controls.updateProgress).toBe(41);
+  expect(controls.updateDownloadProgress).toEqual(details);
+  await act(async () => controls.setShowUpdatePrompt(false));
+  await act(async () => controls.showAvailableUpdate());
+  expect(controls.updateDownloadProgress).toEqual(details);
+  await act(async () => { downloading.resolve(); await request; });
+  expect(controls.updateDownloaded).toBe(true);
+});
+
 it("blocks duplicate clicks and background refreshes during the pre-install check", async () => {
   const checking = deferred<UpdateInfo | null>();
   vi.mocked(checkForUpdate).mockReturnValueOnce(checking.promise);

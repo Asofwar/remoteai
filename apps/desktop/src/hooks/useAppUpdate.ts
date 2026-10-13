@@ -12,6 +12,7 @@ import type { HelpVersionState } from "../components/modals/HelpModal";
 import type { Translate } from "../i18n";
 import type { UpdateInfo } from "../types";
 import { appUpdateErrorMessage } from "../api/appUpdateErrors";
+import type { AppUpdateDownloadProgress } from "../api/appUpdateProgress";
 import { useBackgroundUpdateCheck } from "./useBackgroundUpdateCheck";
 import { usePendingAppUpdateInstall } from "./usePendingAppUpdateInstall";
 import { useAutoUpdatePreference } from "./useAutoUpdatePreference";
@@ -24,7 +25,7 @@ export function useAppUpdate(notify: (message: string) => void, t: Translate) {
   const [checkingForUpdate, setCheckingForUpdate] = useState(false);
   const [downloadingUpdate, setDownloadingUpdate] = useState(false);
   const [updateDownloaded, setUpdateDownloaded] = useState(false);
-  const [updateProgress, setUpdateProgress] = useState<number | null>(null);
+  const [updateDownloadProgress, setUpdateDownloadProgress] = useState<AppUpdateDownloadProgress | null>(null);
   const [downloadRequested, setDownloadRequested] = useState(false);
   const [installingUpdate, setInstallingUpdate] = useState(false);
   const [updateInstallError, setUpdateInstallError] = useState<string | null>(null);
@@ -55,10 +56,10 @@ export function useAppUpdate(notify: (message: string) => void, t: Translate) {
     updateDownloadedRef.current = false;
     setUpdateDownloaded(false);
     setDownloadingUpdate(true);
-    setUpdateProgress(null);
+    setUpdateDownloadProgress(null);
     setUpdateInstallError(null);
     try {
-      await downloadAvailableUpdate(setUpdateProgress);
+      await downloadAvailableUpdate((_percent, details) => setUpdateDownloadProgress(details));
       rememberUpdate(update);
       setUpdateDownloaded(true);
       updateDownloadedRef.current = true;
@@ -146,6 +147,6 @@ export function useAppUpdate(notify: (message: string) => void, t: Translate) {
     availableUpdate, checkingBeforeInstall, checkingForUpdate, checkAboutVersion, checkForUpdates, downloadingUpdate,
     downloadRequested, downloadUpdate, helpVersionState, installingUpdate, installUpdate,
     setShowUpdatePrompt, showAvailableUpdate, showUpdatePrompt, updateDownloaded,
-    updateInstallError, updateProgress,
+    updateInstallError, updateDownloadProgress, updateProgress: updateDownloadProgress?.percent ?? null,
   };
 }

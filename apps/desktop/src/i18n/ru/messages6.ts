@@ -115,6 +115,8 @@ export const messages6 = {
   "update.waitingToInstall": "Загрузка в фоновом режиме",
   "update.backgroundDownloading": "Загрузка обновления в фоновом режиме…",
   "update.downloading": "Загрузка обновления… {progress}%",
+  "update.downloadProgress": "Загрузка обновления",
+  "update.unknownSize": "Размер неизвестен",
   "update.installing": "Установка обновления…",
   "update.installError": "Не удалось обновить: {error}",
   "toast.previewLogin": "Режим предварительного просмотра браузера не запускает реальный вход в систему.",

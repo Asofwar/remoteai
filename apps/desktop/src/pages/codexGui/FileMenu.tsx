@@ -27,7 +27,8 @@ export function FileMenu({ path, line, column, children, className, onReview, pr
     onClick: () => openApplication(app.id),
   }));
   const items: MenuProps["items"] = [
-    { key: "open", label: guiText("打开文件"), icon: <File size={16} />, disabled: !menu.desktop,
+    { key: "open", label: guiText(menu.remote ? "在远程电脑上打开" : "打开文件"), icon: <File size={16} />,
+      disabled: !menu.desktop,
       onClick: () => openApplication("default") },
     ...(vscode ? [{ key: "vscode", label: guiText("在 VS Code 中打开"),
       icon: <FileApplicationIcon application={vscode} />, onClick: () => openApplication("vscode") }] : []),
@@ -40,15 +41,18 @@ export function FileMenu({ path, line, column, children, className, onReview, pr
       ] },
     { type: "divider" },
     ...(onReview ? [{ key: "review", label: guiText("查看差异"), icon: <FileDiff size={16} />, onClick: onReview }] : []),
-    { key: "saveAs", label: guiText("另存为…"), icon: <Save size={16} />, disabled: !menu.desktop,
+    { key: "saveAs", label: guiText(menu.remote ? "下载到本机…" : "另存为…"), icon: <Save size={16} />,
+      disabled: !menu.desktop,
       onClick: () => { void menu.perform({ type: "saveAs" }); } },
-    { key: "copyFile", label: guiText("复制文件"), icon: <Copy size={16} />, disabled: !menu.desktop,
+    { key: "copyFile", label: guiText(menu.remote ? "在远程电脑上复制文件" : "复制文件"), icon: <Copy size={16} />,
+      disabled: !menu.desktop,
       onClick: () => { void menu.perform({ type: "copyFile" }); } },
     { key: "copyPath", label: guiText("复制路径"), icon: <Copy size={16} />,
       onClick: () => { void menu.perform({ type: "copyPath" }); } },
     { key: "copyContents", label: guiText("复制文件内容"), icon: <Copy size={16} />, disabled: !menu.desktop,
       onClick: () => { void menu.perform({ type: "copyContents" }); } },
-    { key: "reveal", label: guiText("在文件管理器中显示"), icon: <FolderOpen size={16} />, disabled: !menu.desktop,
+    { key: "reveal", label: guiText(menu.remote ? "在远程文件管理器中显示" : "在文件管理器中显示"),
+      icon: <FolderOpen size={16} />, disabled: !menu.desktop,
       onClick: () => { void menu.perform({ type: "reveal" }); } },
   ];
   // The browser retains its existing diff shortcut; local file operations belong to the desktop.

@@ -13,6 +13,7 @@ import { ChatMarkdown } from './ChatMarkdown';
 import { ChatDiff } from './ChatDiff';
 import { ChatToolResult } from './ChatToolResult';
 import { ChatImage } from './ChatImage';
+import { ChatFileLink } from './ChatFileLink';
 
 const FILE_CHANGE_STATUS: Record<string, string> = {
   declined: '未应用', failed: '修改失败', inProgress: '正在修改',
@@ -24,11 +25,11 @@ function SearchContent({ item }: { item: Item }) {
     {(item.action?.queries ?? [item.action?.query || item.query]).filter(Boolean).map((query, index) =>
       <p key={index}>{query}</p>)}
     {item.action?.url && /^https?:\/\//i.test(item.action.url) &&
-      <a href={item.action.url} target="_blank" rel="noreferrer">{item.action.url}</a>}
+      <ChatFileLink href={item.action.url}>{item.action.url}</ChatFileLink>}
     {item.action?.pattern && <p>{t("查找：")}{item.action.pattern}</p>}
     {item.results?.map((result, index) => <article key={index}>
-      <a href={/^https?:\/\//i.test(result.url ?? '') ? result.url : undefined}
-        target="_blank" rel="noreferrer">{result.title || result.url}</a><p>{result.snippet}</p></article>)}
+      <ChatFileLink href={/^https?:\/\//i.test(result.url ?? '') ? result.url : undefined}>
+        {result.title || result.url}</ChatFileLink><p>{result.snippet}</p></article>)}
   </div>;
 }
 

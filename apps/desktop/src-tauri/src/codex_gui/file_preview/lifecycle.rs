@@ -10,6 +10,7 @@ fn clear_files(app: &tauri::AppHandle, owner: String) {
         .fetch_add(1, Ordering::AcqRel);
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
+        crate::gui_terminal::links::resources::clear(&app).await;
         app.state::<PreviewSessions>()
             .sessions
             .lock()

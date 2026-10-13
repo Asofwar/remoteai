@@ -1,4 +1,5 @@
-import type { ReactElement } from 'react';
+import { useContext, type ReactElement } from 'react';
+import { FileEnvironmentContext } from './fileEnvironment';
 import { Dropdown, message } from 'antd';
 import { isTauri } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
@@ -10,14 +11,16 @@ function reportLinkError() {
     style: { maxWidth: 400, marginInline: 'auto' } });
 }
 
-export async function openWebsiteInBrowser(url: string) {
+export async function openWebsiteInBrowser(url: string, resolve?: (url: string) => Promise<string>) {
   try {
+    if (resolve) url = await resolve(url);
     if (isTauri()) await openUrl(url);
     else window.open(url, '_blank', 'noopener,noreferrer');
   } catch { reportLinkError(); }
 }
 
 export function WebsiteLinkMenu({ href, children }: { href: string; children: ReactElement }) {
+  const environment = useContext(FileEnvironmentContext);
   // WebView's built-in new-window action bypasses React clicks and does not open the system browser.
   // Browser pages retain their own context menu and popup handling.
   if (!isTauri()) return children;
@@ -27,7 +30,8 @@ export function WebsiteLinkMenu({ href, children }: { href: string; children: Re
       style: { maxWidth: 400, marginInline: 'auto' } }); }
   };
   return <Dropdown trigger={['contextMenu']} overlayStyle={{ maxWidth: 400 }} menu={{ items: [
-    { key: 'open', label: guiText('在浏览器中打开'), onClick: () => { void openWebsiteInBrowser(href); } },
+    { key: 'open', label: guiText('在浏览器中打开'),
+      onClick: () => { void openWebsiteInBrowser(href, environment?.resolveWebsite); } },
     { key: 'copy', label: guiText('复制链接'), onClick: () => { void copy(); } },
   ] }}>{children}</Dropdown>;
 }

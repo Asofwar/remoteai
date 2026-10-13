@@ -1,5 +1,6 @@
 import { guiText } from "../../i18n/guiText";
-import { useState } from "react";
+import { useContext, useState } from "react";
+import { FileEnvironmentContext } from './fileEnvironment';
 import { ImagePreview } from "./ImagePreview";
 import styles from "./MessageImage.module.less";
 import { useImageSource } from "./useImageSource";
@@ -10,7 +11,12 @@ import { parseFileReference } from "./fileReference";
 
 interface MessageImageProps { src?: string; alt?: string; title?: string }
 
-export function MessageImage({ src, alt, title }: MessageImageProps) {
+export function MessageImage(props: MessageImageProps) {
+  const environment = useContext(FileEnvironmentContext);
+  return environment ? environment.image(props) : <LocalMessageImage {...props} />;
+}
+
+function LocalMessageImage({ src, alt, title }: MessageImageProps) {
   const [failedSource, setFailedSource] = useState<string>();
   const [preview, setPreview] = useState(false);
   const image = useImageSource(src);

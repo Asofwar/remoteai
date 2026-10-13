@@ -1,4 +1,5 @@
 import type { TerminalRead, TerminalInfo, TerminalSize } from '../terminal/types';
+import { createGuiFilesClient } from './files';
 import type { TerminalLinkRequest, TerminalLinkReply } from '../terminal/links';
 import { desktopClient } from '../remote-desktop/protocol';
 import { createReviewClient } from './taskReview';
@@ -32,6 +33,7 @@ export function createGuiToolsClient(request: <T>(body: object) => Promise<T>,
   diagnostic?: import('./diagnostics').ConnectionDiagnostic,
   nativeMedia?: import('../remote-desktop/nativeMedia').NativeMediaFactory) {
   return {
+    files: createGuiFilesClient(request),
     projects: {
       list: () => request<ChatProject[]>({ operation: PROJECT_LIST_OPERATION }),
       select: (input: ProjectSelection) => request<ChatProject>({ ...input, operation: PROJECT_SELECT_OPERATION }),

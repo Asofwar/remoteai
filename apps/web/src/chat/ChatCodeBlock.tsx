@@ -1,6 +1,7 @@
 import { syntaxColorRoles } from '../../../../shared/theme/syntax';
 import { t, useLanguage } from '../i18n';
-import { useMemo, useState } from 'react';
+import { useContext, useMemo, useState } from 'react';
+import { FileEnvironmentContext } from '../../../desktop/src/pages/codexGui/fileEnvironment';
 import { Code2, WrapText } from 'lucide-react';
 import { highlightCode } from '../../../../shared/chat/codeHighlight';
 import { ChatCopyButton } from './ChatCopyButton';
@@ -18,6 +19,8 @@ export function ChatCodeBlock({ text, language = '', label, copyLabel = t("Â§çÂà
   text: string; language?: string; label?: string; copyLabel?: string; copyText?: string; desktop?: boolean;
 }) {
   useLanguage();
+  const environment = useContext(FileEnvironmentContext);
+  desktop = desktop || Boolean(environment);
   const [limit, setLimit] = useState(PAGE_CHARACTERS);
   const [wrapped, setWrapped] = useState(false);
   // Bound highlighting and DOM work while progressively exposing the complete output.

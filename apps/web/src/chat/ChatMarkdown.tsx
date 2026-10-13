@@ -1,5 +1,7 @@
 import { t, useLanguage } from '../i18n';
-import { Children, isValidElement, useEffect, useRef, type ReactNode } from 'react';
+import { Children, isValidElement, useContext, useEffect, useRef, type ReactNode } from 'react';
+import { FileEnvironmentContext } from '../../../desktop/src/pages/codexGui/fileEnvironment';
+import { RichText } from '../../../desktop/src/pages/codexGui/RichText';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -44,8 +46,10 @@ export function ChatMarkdown({ text, process = false, desktop = false }: {
   text: string; process?: boolean; desktop?: boolean;
 }) {
   useLanguage();
+  const environment = useContext(FileEnvironmentContext);
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => root.current ? installTouchTextSelection(root.current) : undefined, []);
+  if (environment) return <div className={process ? 'chat-process-prose' : undefined}><RichText text={text} /></div>;
   return <div ref={root} className={`chat-markdown${process ? ' chat-process-prose' : ''}`}>
     <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath, remarkBreaks]} rehypePlugins={[[rehypeKatex, mathOptions]]}
       components={desktop ? desktopComponents : components}

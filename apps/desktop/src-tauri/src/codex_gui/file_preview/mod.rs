@@ -114,3 +114,23 @@ pub(crate) async fn codex_gui_close_file_preview(
     }
     Ok(())
 }
+
+/// Authorize only the exact loopback listener created by the authenticated preview viewer.
+#[tauri::command]
+pub(crate) async fn codex_gui_file_preview_host(
+    webview: Webview,
+    session_id: String,
+    host: String,
+) -> std::result::Result<(), String> {
+    website::validate_owner(&webview).map_err(|error| error.to_string())?;
+    let state = webview.state::<PreviewSessions>();
+    let sessions = state.sessions.lock().await;
+    let session = sessions
+        .get(&session_id)
+        .filter(|session| session.owner == webview.label())
+        .ok_or_else(|| PreviewError::Open.to_string())?;
+    session
+        ._server
+        .forward_host(host)
+        .map_err(|error| error.to_string())
+}

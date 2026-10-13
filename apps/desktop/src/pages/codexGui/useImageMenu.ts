@@ -6,7 +6,7 @@ import { Menu } from "@tauri-apps/api/menu";
 
 type ImageAction = "copy" | "saveAs";
 
-export function useImageMenu() {
+export function useImageMenu(prepare?: (url: string) => Promise<string>) {
   const [feedback, setFeedback] = useState("");
   const source = useRef("");
   const busy = useRef(false);
@@ -22,7 +22,7 @@ export function useImageMenu() {
     setFeedback(action === "copy" ? guiText("正在复制图片…") : guiText("正在准备保存…"));
     try {
       const result = await invoke<{ completed: boolean }>("codex_gui_image_action", {
-        request: { source: source.current, action },
+        request: { source: prepare ? await prepare(source.current) : source.current, action },
       });
       setFeedback(result.completed ? (action === "copy" ? guiText("图片已复制") : guiText("图片已保存")) : "");
     } catch {

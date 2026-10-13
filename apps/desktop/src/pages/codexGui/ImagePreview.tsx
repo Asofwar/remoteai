@@ -7,10 +7,12 @@ interface Props {
   description: string;
   load: () => Promise<string>;
   close: () => void;
+  prepare?: (url: string) => Promise<string>;
+  download?: (url: string) => void | Promise<void>;
 }
 
 export function ImagePreview(props: Props) {
-  const menu = useImageMenu();
+  const menu = useImageMenu(props.prepare);
   return <span className={styles.preview}><ImageViewer {...props} {...menu} translate={guiText} /></span>;
 }
 import { guiText } from "../../i18n/guiText";

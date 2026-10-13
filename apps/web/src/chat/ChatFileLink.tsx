@@ -4,6 +4,9 @@ import { parseFileReference } from '../../../../shared/chat/fileReference';
 import { DetailsContext } from '../../../desktop/src/pages/codexGui/detailsContext';
 import { previewReference } from '../../../desktop/src/pages/codexGui/filePreview/references';
 import { isDownloadOnlyFile } from './ChatDownloadFile';
+import { FileEnvironmentContext } from '../../../desktop/src/pages/codexGui/fileEnvironment';
+import { MessageLink } from '../../../desktop/src/pages/codexGui/MessageLink';
+import { FileMenu } from '../../../desktop/src/pages/codexGui/FileMenu';
 
 export const ChatFileContext = createContext<FilePreviewContext | null>(null);
 
@@ -25,7 +28,10 @@ function FilePreviewLink({ path, line, children }: { path: string; line?: number
 
 export function ChatFileLink({ href, children }: { href?: string; children?: ReactNode }) {
   const context = useContext(ChatFileContext);
+  const environment = useContext(FileEnvironmentContext);
   const file = context?.basePath ? previewReference(href ?? '', context.basePath) : parseFileReference(href ?? '');
+  if (environment) return file ? <FileMenu {...file} preview>{children}</FileMenu>
+    : <MessageLink href={href}>{children}</MessageLink>;
   if (file && context) return <FilePreviewLink key={`${context.threadId}:${file.path}`}
     path={file.path} line={file.line}>
     {children}</FilePreviewLink>;

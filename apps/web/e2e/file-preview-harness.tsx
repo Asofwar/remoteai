@@ -3,6 +3,7 @@ import { ChatFilePreview, type FilePreviewContext } from '../src/chat/ChatFilePr
 import { ChatFileContext } from '../src/chat/ChatFileLink';
 import { ChatDetailsWorkspace } from '../src/chat/ChatDetailsWorkspace';
 import { ChatMarkdown } from '../src/chat/ChatMarkdown';
+import { PcFilePreviewFixture } from './pc-file-preview-fixture';
 import { externalCodePath, longMarkdown, markdown, sourceCode } from './file-preview-fixture';
 import '../src/styles.css';
 import '../src/chat/chat.css';
@@ -43,7 +44,7 @@ const context: FilePreviewContext = {
 };
 const path = params.get('path') ?? 'verification.md';
 createRoot(document.getElementById('root')!).render(
-  params.has('workspace') ? <div className="chat-page" style={{ height: '100dvh' }}>
+  params.has('pc') ? <PcFilePreviewFixture /> : params.has('workspace') ? <div className="chat-page" style={{ height: '100dvh' }}>
     <ChatFileContext.Provider value={context}>
       <ChatDetailsWorkspace selected={context.threadId} active enabled>
         <ChatMarkdown text="[交接文档](F:/remote/docs/handoff.md)" />

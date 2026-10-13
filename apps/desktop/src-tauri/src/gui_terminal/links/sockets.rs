@@ -65,6 +65,7 @@ struct Listener {
 /// Handles are scoped to one terminal or one loopback listener and expire when their client leaves.
 #[derive(Default)]
 pub(crate) struct LinkState {
+    pub(super) resources: Mutex<HashMap<String, String>>,
     sockets: Mutex<HashMap<String, Arc<Socket>>>,
     listeners: Mutex<HashMap<String, Arc<Listener>>>,
 }

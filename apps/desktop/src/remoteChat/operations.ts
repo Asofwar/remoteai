@@ -29,6 +29,8 @@ import { readTokenSummary } from './tokenSummary';
 import { CONTEXT_READ_OPERATION, CONTEXT_WRITE_OPERATION } from '../../../../shared/remote-chat/contextSettings';
 import { contextSettingsRequest } from './contextSettings';
 import { GUI_TOOL_OPERATIONS } from '../../../../shared/remote-chat/guiTools';
+import { GUI_FILE_OPERATIONS } from '../../../../shared/remote-chat/files';
+import { RemoteFiles } from './files';
 import { guiToolRequest } from './guiTools';
 import { remoteTerminals, type RemoteTerminals } from './terminals';
 import { deleteRemoteThread, pinRemoteThread } from './threadActions';
@@ -55,12 +57,13 @@ interface Cached {
 }
 function terminalLinkRequest(request: RpcRequest): Cached['terminalLink'] {
   const body = request.body as { operation?: unknown; id?: unknown; request?: unknown } | undefined;
-  if (request.method !== 'request' || body?.operation !== 'guiTerminalLink'
+  if (request.method !== 'request' || !body || !['guiTerminalLink', 'guiResourceLink'].includes(String(body.operation))
     || !body.request || typeof body.request !== 'object' || Array.isArray(body.request)) return;
   const stream = object(body.request);
-  return { terminal: body.id, stream: stream.id, action: stream.type };
+  return { terminal: JSON.stringify([body.operation, body.id]), stream: stream.id, action: stream.type };
 }
 const READ_OPERATIONS = new Set([
+  'guiFileApplications', 'guiFilePreviewClose', 'guiFilePreviewHost', 'guiResourceClose',
   'suggestNextPrompt',
   PROJECT_LIST_OPERATION,
   'downloadOpen', 'downloadBrowse', 'previewOpen',
@@ -95,6 +98,7 @@ function response(request: RpcRequest, data: unknown, mode: ConnectionMode): Rpc
 }
 
 export class ChatOperations {
+  private readonly files = new RemoteFiles();
   readonly desktop = new RemoteDesktopHost();
   constructor(private readonly terminals: RemoteTerminals = remoteTerminals) {}
   private readonly cache = new Map<string, Cached>();
@@ -116,7 +120,9 @@ export class ChatOperations {
     this.prune();
     if (this.cache.size >= 512) return Promise.reject(new Error('请求较多，请稍后重试。'));
     const operation = (request.body as { operation?: string } | undefined)?.operation;
-    const running = request.method === 'request' && operation === DESKTOP_OPERATION
+    const running = request.method === 'request' && GUI_FILE_OPERATIONS.has(operation ?? '')
+      ? this.files.request(object(request.body), owner)
+      : request.method === 'request' && operation === DESKTOP_OPERATION
       ? this.desktop.request(request.body, owner) : this.run(request, mode, terminalOwner);
     const result = running.then((data) => response(request, data, mode))
       .catch((error: unknown): RpcResponse => ({ kind: 'response', id: request.id, error: operationError(error) }));
@@ -143,6 +149,7 @@ export class ChatOperations {
   }
 
   release(owner?: string) {
+    this.files.release(owner);
     this.desktop.release(owner);
     if (owner === undefined) this.titles.clear();
     for (const key of this.cache.keys()) {

@@ -48,7 +48,8 @@ test('an immediate paste waits for a remote copy instead of sending the previous
   await expect.poll(() => page.evaluate(() => window.desktopTest.clipboard.pastes)).toBe(1);
   expect(await page.evaluate(() => window.desktopTest.clipboard.content))
     .toEqual({ format: 'text', text: 'Remote clipboard 测试' });
-  expect(await page.evaluate(() => window.desktopTest.localClipboard.calls)).toEqual(['write']);
+  expect(await page.evaluate(() => window.desktopTest.clipboard.writes)).toBe(0);
+  expect(await page.evaluate(() => window.desktopTest.clipboard.nativePastes)).toBe(1);
   await expect(page.getByRole('complementary', { name: '剪贴板' })).toHaveCount(0);
 });
 
@@ -57,10 +58,10 @@ test('a temporary local clipboard lock recovers silently without repeating a cut
   await page.keyboard.press('Control+x');
   await expect.poll(() => page.evaluate(() => window.desktopTest.localClipboard.content))
     .toEqual({ format: 'text', text: 'Remote clipboard 测试' });
-  expect(await page.evaluate(() => window.desktopTest.localClipboard.calls)).toEqual(['write', 'write']);
+  expect(await page.evaluate(() => window.desktopTest.localClipboard.calls)).toEqual(['read', 'write', 'write']);
   expect(await page.evaluate(() => window.desktopTest.clipboard.requests
-    .filter(message => message.request.action === 'read').map(message => message.request)))
-    .toEqual([{ action: 'read', shortcut: 'cut' }]);
+    .filter(message => message.request.action === 'copy').map(message => message.request)))
+    .toEqual([{ action: 'copy', shortcut: 'cut' }]);
   await expect(page.getByRole('complementary', { name: '剪贴板' })).toHaveCount(0);
   await expect(page.locator('.rd-clipboard-notice')).toHaveCount(0);
   await expect(page.locator('.rd-key-capture')).toBeFocused();

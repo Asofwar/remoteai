@@ -217,6 +217,13 @@ export async function desktopRequest<T>(body: object): Promise<T> {
     if (request.action === 'open' && new URLSearchParams(location.search).has('legacy')) {
       delete (result as { capabilities?: unknown }).capabilities;
     }
+    if (request.action === 'open' && new URLSearchParams(location.search).has('clipboard-disabled')) {
+      (result as { capabilities: { clipboard: boolean } }).capabilities.clipboard = false;
+      clipboardFixture.readAllowed = false; clipboardFixture.writeAllowed = false;
+    }
+    if (request.action === 'open' && new URLSearchParams(location.search).has('clipboard-legacy')) {
+      delete (result as { capabilities: { clipboardNative?: boolean } }).capabilities.clipboardNative;
+    }
     return result as T;
   }
   catch (error) { desktopTest.errors.push(String(error)); throw error; }

@@ -73,21 +73,40 @@ export class DesktopClipboard {
   read(shortcut?: 'copy' | 'cut', progress?: ClipboardProgress) {
     return this.transfer(async id => {
       const { length } = await this.request(id, { action: 'read', shortcut });
-      if (!Number.isInteger(length) || !length || length > MAX_CLIPBOARD_WIRE_BYTES) {
-        throw new Error('剪贴板内容过大，请分批复制。');
-      }
-      const bytes = new Uint8Array(length);
-      await this.chunks(length, offset => this.request(id, { action: 'chunk', offset }), (offset, { data }) => {
-        const chunk = decodeClipboardBytes(data ?? '');
-        if (chunk.length !== Math.min(CLIPBOARD_CHUNK_BYTES, length - offset)) {
-          throw new Error('剪贴板内容无效，请重新复制。');
-        }
-        bytes.set(chunk, offset); progress?.(offset + chunk.length, length);
-      });
-      return validateClipboardContent(JSON.parse(new TextDecoder().decode(bytes)) as unknown);
+      return this.download(id, length, progress);
     });
   }
-  write(content: ClipboardContent, paste = true, progress?: ClipboardProgress) {
+  copy(shortcut: 'copy' | 'cut', progress?: ClipboardProgress) {
+    return this.transfer(async id => {
+      const { length } = await this.request(id, { action: 'copy', shortcut });
+      // Native copy succeeds even when sharing its contents is disabled or unsupported.
+      return length === undefined ? undefined : this.download(id, length, progress);
+    });
+  }
+  /** Undefined means the host already pasted its original clipboard. Never repeat that gesture. */
+  paste(preferLocal: boolean) {
+    return this.transfer(async id => {
+      const result = await this.request(id, { action: 'paste', preferLocal });
+      if (result.pasted === true) return undefined;
+      if (result.pasted === false && result.revision) return result.revision;
+      throw new Error('剪贴板操作未能完成，请重试。');
+    });
+  }
+  private async download(id: string, length: number | undefined, progress?: ClipboardProgress) {
+    if (!Number.isInteger(length) || !length || length > MAX_CLIPBOARD_WIRE_BYTES) {
+      throw new Error('剪贴板内容过大，请分批复制。');
+    }
+    const bytes = new Uint8Array(length);
+    await this.chunks(length, offset => this.request(id, { action: 'chunk', offset }), (offset, { data }) => {
+      const chunk = decodeClipboardBytes(data ?? '');
+      if (chunk.length !== Math.min(CLIPBOARD_CHUNK_BYTES, length - offset)) {
+        throw new Error('剪贴板内容无效，请重新复制。');
+      }
+      bytes.set(chunk, offset); progress?.(offset + chunk.length, length);
+    });
+    return validateClipboardContent(JSON.parse(new TextDecoder().decode(bytes)) as unknown);
+  }
+  write(content: ClipboardContent, paste = true, progress?: ClipboardProgress, expectedRevision?: string) {
     return this.transfer(async id => {
       const bytes = new TextEncoder().encode(JSON.stringify(content));
       if (bytes.length > MAX_CLIPBOARD_WIRE_BYTES) throw new Error('剪贴板内容过大，请分批复制。');
@@ -96,7 +115,7 @@ export class DesktopClipboard {
         const chunk = bytes.subarray(offset, offset + CLIPBOARD_CHUNK_BYTES);
         return this.request(id, { action: 'append', offset, data: encodeClipboardBytes(chunk) });
       }, offset => progress?.(Math.min(offset + CLIPBOARD_CHUNK_BYTES, bytes.length), bytes.length));
-      await this.request(id, { action: 'commit', paste });
+      await this.request(id, { action: 'commit', paste, ...(expectedRevision ? { expectedRevision } : {}) });
     });
   }
   stop() {

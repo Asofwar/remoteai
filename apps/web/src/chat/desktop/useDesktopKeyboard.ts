@@ -30,7 +30,9 @@ export function useDesktopKeyboard(options: Options) {
       onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => {
         if (!options.active || event.nativeEvent.isComposing || composing.current || event.key === 'Process') return;
         const command = event.ctrlKey || event.metaKey;
-        if ((command && event.code === 'KeyV') || (event.shiftKey && event.code === 'Insert')) {
+        const paste = command && !event.shiftKey && !event.altKey && event.code === 'KeyV';
+        const insert = event.shiftKey && !command && !event.altKey && event.code === 'Insert';
+        if (paste || insert) {
           keyboard.release();
           if (options.pasteShortcut) {
             event.preventDefault();

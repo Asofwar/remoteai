@@ -43,6 +43,15 @@ export async function readBrowserClipboard(): Promise<ClipboardContent> {
   throw new Error('剪贴板中没有可发送的内容，请重新复制或选择文件。');
 }
 
+/** Observing provenance must not trigger a new clipboard-read permission prompt during copy. */
+export async function readBrowserClipboardBaseline(): Promise<ClipboardContent | undefined> {
+  try {
+    const permission = await navigator.permissions?.query({ name: 'clipboard-read' as PermissionName });
+    if (permission?.state === 'granted') return await readBrowserClipboard();
+  } catch { /* Browsers without a readable baseline conservatively preserve the remote clipboard. */ }
+  return undefined;
+}
+
 export async function writeBrowserClipboard(content: ClipboardContent) {
   if (!navigator.clipboard) throw new Error('浏览器未开放剪贴板，请手动复制下面的内容。');
   if (content.format === 'text') return navigator.clipboard.writeText(content.text);

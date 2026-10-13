@@ -118,6 +118,7 @@ export const remoteDesktopMessages: Record<string, string> = {
   '每次最多 64 MB、32 个文件。远程文件会下载到本机；文件夹请先压缩。':
     'Up to 64 MB and 32 files at a time. Remote files download to this device. Zip folders before copying.',
   '正在传输剪贴板…': 'Transferring clipboard…', '已粘贴到远程电脑。': 'Pasted to the remote computer.',
+  '剪贴板操作未能完成，请重试。': 'The clipboard operation could not be completed. Please try again.',
   '已复制到本机。': 'Copied to this device.', '文件已收到，可在下方下载。': 'Files received. Download them below.',
   '文件已收到，点击“下载文件”保存。': 'Files received. Select “Download files” to save them.',
   '下载文件': 'Download files',

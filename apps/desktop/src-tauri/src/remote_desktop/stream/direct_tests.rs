@@ -353,6 +353,7 @@ async fn retaining_a_relay_invalidates_a_pending_backup_commit() {
             touched: Instant::now(),
             deadline: Instant::now() + Duration::from_secs(60),
             clipboard: None,
+            clipboard_revision: None,
             display: stream.display.borrow().clone(),
             privacy: None,
             input: Default::default(),

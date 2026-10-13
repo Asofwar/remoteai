@@ -5,7 +5,7 @@ import { DesktopRecovery, DESKTOP_OFFLINE_STATUS } from './recovery';
 import { DesktopDirectRetry } from './directRetry';
 import { changeDesktopDisplay } from './displayActions';
 import { waitingForDesktopPermission } from './permissionWait';
-import type { ClipboardContent, ClipboardProgress } from './clipboard';
+import { sessionClipboard } from './sessionClipboard';
 import { DEFAULT_SETTINGS, validateSettings, type DesktopCapabilities, type DesktopClient, type DesktopDisplay,
   type DesktopResolution, type DesktopSettings, type DesktopStats }
   from './protocol';
@@ -103,18 +103,7 @@ export function useDesktopSession({ client, active, connected = true, createPeer
     change: (size: DesktopResolution) => changeDesktopDisplay({ ...displayAction,
       allowed: capabilities.resolution === true && capabilities.control !== false,
       message: '正在切换分辨率，请稍候。', run: current => current.resolution(size) }) };
-  const currentClipboard = () => {
-    if (!capabilities.clipboard) throw new Error(capabilities.control === undefined
-      ? '请更新远程电脑上的应用，启用实体键盘和剪贴板。' : '电脑未允许剪贴板操作，请在电脑的设置中调整。');
-    if (!receiver.current) throw new Error('请等待桌面连接后重试。');
-    return receiver.current.clipboard;
-  };
-  const clipboard = {
-    read: async (shortcut?: 'copy' | 'cut', progress?: ClipboardProgress) =>
-      currentClipboard().read(shortcut, progress),
-    write: async (content: ClipboardContent, paste = true, progress?: ClipboardProgress) =>
-      currentClipboard().write(content, paste, progress),
-  };
+  const clipboard = sessionClipboard(() => receiver.current, capabilities);
   return { stream, status, stats, settings, displays, update, saving, pointer, muted, mute, hasAudio, clipboard, capabilities,
     privacyScreen, togglePrivacy, resolution, frameRendered: () => receiver.current?.frameRendered(stream),
     waitingForPermission: waitingForDesktopPermission(status),

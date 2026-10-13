@@ -24,7 +24,8 @@ vi.mock('react', async importOriginal => ({
   useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),
 }));
 vi.mock('react-native', () => ({ ActivityIndicator: 'Spinner', Modal: 'Modal', Pressable: 'Button',
-  Text: 'Text', View: 'View', Keyboard: { dismiss: vi.fn() }, StyleSheet: {
+  Text: 'Text', View: 'View', KeyboardAvoidingView: 'View', Platform: { OS: 'android' },
+  Keyboard: { dismiss: vi.fn() }, StyleSheet: {
     create: <T,>(styles: T) => styles, absoluteFillObject: {},
   } }));
 vi.mock('react-native-gesture-handler', () => ({ GestureDetector: 'Gesture', GestureHandlerRootView: 'View' }));

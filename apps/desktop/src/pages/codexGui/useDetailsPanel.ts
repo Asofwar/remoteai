@@ -5,8 +5,8 @@ import { usePreviewHistory } from "./filePreview/usePreviewHistory";
 
 const EMPTY_CHANGES: DiffPanelEntry = { id: "conversation-changes", get title() { return guiText("文件更改"); }, files: [] };
 
-export function useDetailsPanel({ selected, active, enabled }: {
-  selected: string | null; active: boolean; enabled: boolean;
+export function useDetailsPanel({ selected, active, enabled, remoteFiles = false }: {
+  selected: string | null; active: boolean; enabled: boolean; remoteFiles?: boolean;
 }) {
   const [entry, setEntry] = useState<DiffPanelEntry | null>(null);
   const [showingChanges, setShowingChanges] = useState(true);
@@ -24,7 +24,7 @@ export function useDetailsPanel({ selected, active, enabled }: {
     setShowingChanges(diff); setMinimized(false); setViewId(value => value + 1);
   }, []);
   const revealPreview = useCallback(() => reveal(false), [reveal]);
-  const { preview, navigation, openFile, openWebsite, cancel, reset } = usePreviewHistory({
+  const { preview, navigation, openFile, openRemoteFile, openWebsite, cancel, reset } = usePreviewHistory({
     onOpen: rememberOpener, onNavigate: revealPreview,
   });
   const visible = Boolean((entry || preview) && !minimized && active && enabled);
@@ -44,7 +44,8 @@ export function useDetailsPanel({ selected, active, enabled }: {
     return cancel;
   }, [selected, enabled, reset, cancel]);
   const context = useMemo(() => ({ open, update, close, openFile, openWebsite, setConversationChanges,
-    visible, showingChanges }), [open, update, close, openFile, openWebsite, setConversationChanges,
+    openRemoteFile: remoteFiles ? openRemoteFile : undefined, visible, showingChanges }),
+  [open, update, close, openFile, openRemoteFile, remoteFiles, openWebsite, setConversationChanges,
     visible, showingChanges]);
   return { context, entry, preview, navigation, showingChanges, visible, viewId, minimized, expanded, setExpanded,
     minimize: () => { setMinimized(true); opener.current?.focus(); },

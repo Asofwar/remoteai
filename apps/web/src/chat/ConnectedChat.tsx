@@ -94,6 +94,10 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
   return <ImageAiContext.Provider value={{ enabled: active && ready && !state.selectedArchived
     && !state.sending && !state.settingsBusy && !state.workspaceBusy && !state.compacting,
     send: imageAiSender(controller, prepareImageEdit) }}>
+    <ChatImageContext.Provider value={{ threadId: state.selected?.id ?? null, ready,
+      load: controller.imagePreview, save: controller.managedPreviews ? controller.savePreviewImage : undefined }}>
+    <ChatFileContext.Provider value={{ threadId: state.selected?.id ?? null, ready, client: controller.files,
+      load: controller.textPreview }}>
     <ChatDetailsWorkspace selected={state.selected?.id ?? null} active={active} enabled={showDesktopDiffs}>
     <ChatQuotesProvider scope={state.selected?.id ?? null} sending={state.sending}
     enabled={active && !state.selectedArchived}>
@@ -119,10 +123,6 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
     {!!error && <p role="alert" className="chat-error">{t(error)}</p>}
     {state.desktopOnly && <p className="chat-muted" style={{ maxWidth: 400 }}>
       {t('桌面已就绪。打开远程桌面，登录电脑后即可继续聊天。')}</p>}
-    <ChatImageContext.Provider value={{ threadId: state.selected?.id ?? null, ready,
-      load: controller.imagePreview, save: controller.managedPreviews ? controller.savePreviewImage : undefined }}>
-      <ChatFileContext.Provider value={{ threadId: state.selected?.id ?? null, ready, client: controller.files,
-        load: controller.textPreview }}>
       <TaskReviewProvider controller={controller} state={state} active={active && foreground}>
       <ChatRetryProvider controller={controller} state={state}>
       <ChatMessages key={state.selected?.id ?? 'new'} thread={state.selected} offline={!ready}
@@ -131,8 +131,6 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
         processing={runningTurn && <ChatProcessing key={runningTurn.id} turn={runningTurn}
           processing={state.processing} active={active && ready} />} />
       </ChatRetryProvider></TaskReviewProvider>
-      </ChatFileContext.Provider>
-    </ChatImageContext.Provider>
     {!!approvals.length && <div className="chat-approvals chat-scroll">
       {approvals.map((event) => <ChatApproval key={String(event.id)} event={event}
         ready={ready} respond={(reply) => controller.respond(reply)} />)}
@@ -179,5 +177,6 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
       deviceName={device?.name} onClose={() => setTokenSummary(false)} />}
     {pickingDevice && <ChatDevices chooseLocal={chooseLocal} devices={devices} onClose={() => setPickingDevice(false)}
       choose={(id) => { chooseDevice(id); setPickingDevice(false); }} />}
-  </ChatQuotesProvider></ChatDetailsWorkspace></ImageAiContext.Provider>;
+  </ChatQuotesProvider></ChatDetailsWorkspace>
+  </ChatFileContext.Provider></ChatImageContext.Provider></ImageAiContext.Provider>;
 }

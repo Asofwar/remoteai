@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import {
   AutoComplete,
@@ -88,6 +89,7 @@ import { AvailableQuota } from "../../TokenUsageDashboard/OfficialAccountUsage";
 import { getSwitchableAccounts } from "../accountSelectors";
 import { confirmOfficialAuthAccountChange } from "../confirmOfficialAuthAccountChange";
 import styles from "./index.module.less";
+import { isAccountControlTarget } from "./accountAreaInteraction";
 import {
   AccountNoteEditButton,
   AccountPrivacyToggle,
@@ -622,6 +624,13 @@ export function AccountTable({
     [accounts, hotSwitchEnabled],
   );
   const switchableAccountIds = new Set(switchableAccounts.map((account) => account.id));
+  const canSwitchFromAccountArea = (account: Account) => !concurrentRoutingActive
+    && !account.active && busyAccountId !== account.id && switchableAccountIds.has(account.id);
+  const handleAccountAreaClick = (event: MouseEvent<HTMLElement>, account: Account) => {
+    if (isAccountControlTarget(event.target)) return;
+    setContextMenu(null);
+    if (canSwitchFromAccountArea(account)) onSwitch(account.id);
+  };
   const accountSelectAccounts = activeAccount && !switchableAccountIds.has(activeAccount.id)
     ? [...switchableAccounts, activeAccount]
     : switchableAccounts;
@@ -1283,11 +1292,7 @@ export function AccountTable({
           ].filter(Boolean).join(" ")}
             title={switchBlocked ? switchBlockedReason : undefined}
             aria-disabled={switchBlocked}
-            onClick={(event) => {
-              if ((event.target as HTMLElement).closest("button, a, input, textarea, summary, details")) return;
-              setContextMenu(null);
-              if (!concurrentRoutingActive && !account.active && !switchBlocked) onSwitch(account.id);
-            }}
+            onClick={(event) => handleAccountAreaClick(event, account)}
             onContextMenu={(event) => {
               event.preventDefault();
               setContextMenu({
@@ -1534,6 +1539,7 @@ export function AccountTable({
           onChange: (keys) => setSelectedAccountIds(keys.map(String)),
         }}
         rowClassName={(account) => [
+          canSwitchFromAccountArea(account) ? "account-switchable-row" : "",
           isAccountHighlighted(
             account,
             concurrentRoutingActive,
@@ -1547,6 +1553,7 @@ export function AccountTable({
             ? "account-threshold-row" : "",
         ].filter(Boolean).join(" ")}
         onRow={(account) => ({
+          onClick: (event) => handleAccountAreaClick(event, account),
           onContextMenu: (event) => {
             event.preventDefault();
             setTableActionMenuAccountId(null);

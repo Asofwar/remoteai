@@ -401,7 +401,11 @@ async fn chat_streams(
         diagnostics::report(&events, Stage::StreamOpen, Snapshot::default());
         let _disconnected = stream::pump(
             stream,
-            (&mut incoming, &events, packets.as_ref()),
+            stream::StreamChannels {
+                incoming: &mut incoming,
+                events: &events,
+                packets: packets.as_ref(),
+            },
             route.clone(),
         )
         .await;

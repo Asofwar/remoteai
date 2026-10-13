@@ -1,22 +1,24 @@
 //! Text and negotiated binary packets share one ordered encrypted stream.
 use super::*;
 
+/// Borrowed channels for one stream generation; reconnects keep the same outgoing queue.
+pub(super) struct StreamChannels<'a> {
+    pub(super) incoming: &'a mut mpsc::Receiver<Frame>,
+    pub(super) events: &'a mpsc::Sender<Event>,
+    pub(super) packets: Option<&'a mpsc::Sender<Vec<u8>>>,
+}
+
 pub(super) async fn pump(
     stream: DataPlaneTcpStream,
-    queues: (
-        &mut mpsc::Receiver<Frame>,
-        &mpsc::Sender<Event>,
-        Option<&mpsc::Sender<Vec<u8>>>,
-    ),
+    channels: StreamChannels<'_>,
     route: watch::Receiver<RouteStatus>,
 ) -> Result<()> {
     let (read, write) = tokio::io::split(stream);
-    let (incoming, events, packets) = queues;
     // Each I/O future stays alive across health ticks; canceling a partial frame would corrupt framing.
     tokio::try_join!(
-        read_frames(read, events, packets),
-        write_frames(write, incoming),
-        monitor(route, events)
+        read_frames(read, channels.events, channels.packets),
+        write_frames(write, channels.incoming),
+        monitor(route, channels.events)
     )?;
     Ok(())
 }

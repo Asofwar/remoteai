@@ -256,6 +256,7 @@ fn model_presets_match_versioned_names_and_choose_the_longest_name() {
 }
 
 mod long_context;
+mod model_thresholds;
 mod remote_presets;
 
 #[test]

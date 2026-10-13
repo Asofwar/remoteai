@@ -261,6 +261,12 @@ export const messages5 = {
   "tokenCost.longContext.rule": "Когда входные данные одного запроса, включая кэшированные токены, превышают пороговое значение, множители применяются ко всему запросу.",
   "tokenCost.longContext.defaults": "По умолчанию: входных токенов более {threshold}; ввод {input}×, кэшированный ввод {cachedInput}×, вывод {output}×.",
   "tokenCost.longContext.thresholdTokens": "Порог длинного контекста (входные токены)",
+  "tokenCost.longContext.thresholdColumn": "Порог длинного контекста (токены)",
+  "tokenCost.longContext.modelThreshold": "{model}: порог длинного контекста",
+  "tokenCost.longContext.thresholdHint": "Задайте порог для каждой модели. Очистите поле, чтобы использовать "
+    + "предустановку; если порог не задан, применяется 272 000 токенов.",
+  "tokenCost.longContext.defaultMultipliers": "Множители по умолчанию: ввод {input}×, "
+    + "кэшированный ввод {cachedInput}×, вывод {output}×.",
   "tokenCost.longContext.inputMultiplier": "Входной множитель",
   "tokenCost.longContext.cachedInputMultiplier": "Кэшированный входной множитель",
   "tokenCost.longContext.outputMultiplier": "Выходной множитель",

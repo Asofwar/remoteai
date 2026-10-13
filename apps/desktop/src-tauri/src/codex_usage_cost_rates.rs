@@ -52,6 +52,8 @@ pub(crate) struct CostRates {
     #[serde(default)]
     long_context: LongContextCostSettings,
     #[serde(default)]
+    model_long_context_thresholds: BTreeMap<String, Option<u64>>,
+    #[serde(default)]
     custom_rules: Vec<CustomCostRule>,
     #[serde(default)]
     model_token_costs: BTreeMap<String, BTreeMap<String, f64>>,
@@ -66,6 +68,7 @@ impl Default for CostRates {
             model_fast_mode_multipliers: BTreeMap::new(),
             preset_catalog: None,
             long_context: LongContextCostSettings::default(),
+            model_long_context_thresholds: BTreeMap::new(),
             custom_rules: Vec::new(),
             model_token_costs: BTreeMap::new(),
         }
@@ -157,7 +160,11 @@ impl CostRates {
             Some("priority" | "fast") => self.fast_multiplier_for_model(&entry.model),
             _ => 1.0,
         };
-        self.long_context
+        let long_context = LongContextCostSettings {
+            threshold_tokens: self.long_context_threshold_for_model(&entry.model),
+            ..self.long_context
+        };
+        long_context
             .adjust_rate(rate, entry, self.preset_for_entry(&entry.model))
             .estimate(entry)
             * multiplier
@@ -246,6 +253,7 @@ impl CostRates {
             && catalog_valid
             && multiplier_valid
             && self.long_context.is_valid()
+            && self.valid_model_long_context_thresholds()
             && rule_count_valid
             && prices_count_valid
             && rules_valid

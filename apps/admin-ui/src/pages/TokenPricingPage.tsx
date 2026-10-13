@@ -42,8 +42,9 @@ export function TokenPricingPage({ api, canManage }: Props) {
     if (!document || saving) return;
     const updated = { ...document, models: rows.map(({ key: _key, ...model }) => model) };
     if (!isTokenCostPresetDocument(updated)) {
-      message.error({ content: zh ? "请检查名称、别名、价格和倍率，名称及别名不能重复。"
-        : "Check names, aliases, prices and multipliers. Names and aliases must be unique.", style: noticeStyle });
+      message.error({ content: zh ? "请检查名称、别名、价格、计费起点和倍率，名称及别名不能重复。"
+        : "Check names, aliases, prices, thresholds and multipliers. Names and aliases must be unique.",
+      style: noticeStyle });
       return;
     }
     setSaving(true);
@@ -68,8 +69,9 @@ export function TokenPricingPage({ api, canManage }: Props) {
         : "Prices are USD per million tokens. Add models and edit prices or Fast mode multipliers. PCs update on next startup."}
       </Typography.Paragraph>
       <Typography.Text type="secondary">{zh
-        ? "用户自定义的价格和倍率优先。开启长上下文计价的模型，默认在输入超过 272,000 Token 时使用长上下文倍率。"
-        : "Personal prices and multipliers take precedence. Long-context pricing starts above 272,000 input tokens."}
+        ? "用户自定义设置优先。单次输入（含缓存）超过起点时按长上下文计价，起点留空默认为 272,000 Token。"
+        : "Personal settings take precedence. Long-context pricing applies above the input threshold, including cache. "
+          + "Leave the threshold blank for 272,000 tokens."}
       </Typography.Text>
       <Typography.Paragraph type="secondary">{zh
         ? "快速模式倍率可单独设置；未公布时留空，按普通价格估算。"

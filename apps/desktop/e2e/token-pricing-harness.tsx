@@ -7,6 +7,7 @@ import { I18nProvider } from "../../admin-ui/src/i18n-context";
 import { translate, type Translate } from "../src/i18n";
 import { estimateTokenCost } from "../src/utils/tokenCost";
 import { FAST_MODE_COST_MULTIPLIER_EVENT } from "../src/utils/tokenCostFastMode";
+import { LONG_CONTEXT_COST_EVENT } from "../src/utils/tokenCostLongContext";
 import { applyTokenCostPresets, TOKEN_COST_REFERENCE_MODEL_EVENT } from "../src/utils/tokenCostPresets";
 import "antd/dist/reset.css";
 import "../src/styles.css";
@@ -23,10 +24,12 @@ function DesktopPrices() {
   useEffect(() => {
     const update = () => refresh((value) => value + 1);
     window.addEventListener(FAST_MODE_COST_MULTIPLIER_EVENT, update);
+    window.addEventListener(LONG_CONTEXT_COST_EVENT, update);
     window.addEventListener(TOKEN_COST_REFERENCE_MODEL_EVENT, update);
     void api<unknown>("/token-cost-presets").then(applyTokenCostPresets).catch(() => {});
     return () => {
       window.removeEventListener(FAST_MODE_COST_MULTIPLIER_EVENT, update);
+      window.removeEventListener(LONG_CONTEXT_COST_EVENT, update);
       window.removeEventListener(TOKEN_COST_REFERENCE_MODEL_EVENT, update);
     };
   }, []);

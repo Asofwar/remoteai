@@ -25,6 +25,8 @@ pub(crate) struct CostPreset {
     pub(super) aliases: Vec<String>,
     pub(super) long_context_pricing: bool,
     #[serde(default)]
+    pub(super) long_context_threshold_tokens: Option<u64>,
+    #[serde(default)]
     pub(super) fast_mode_multiplier: Option<f64>,
     #[serde(default)]
     source_url: String,
@@ -76,6 +78,9 @@ fn valid_presets(models: &[CostPreset]) -> bool {
     let mut names = std::collections::HashSet::new();
     models.iter().all(|preset| {
         preset.aliases.len() <= MAX_ALIASES
+            && preset
+                .long_context_threshold_tokens
+                .is_none_or(long_context::valid_threshold)
             && valid_source(&preset.source_url)
             && [
                 preset.rate.input,

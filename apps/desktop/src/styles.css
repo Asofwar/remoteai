@@ -543,7 +543,7 @@ h1 { margin: 5px 0 0; font: 700 26px/1.1 Manrope, sans-serif; letter-spacing: -.
 .custom-token-cost-table-scroll {
   min-width: 0; min-height: 0; max-height: 30vh; overflow: auto; overscroll-behavior: contain;
 }
-.custom-token-cost-preset-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.custom-token-cost-preset-table { width: 100%; min-width: 680px; border-collapse: collapse; font-size: 11px; }
 .custom-token-cost-preset-table th, .custom-token-cost-preset-table td {
   padding: 8px 6px; border-bottom: 1px solid var(--line); color: var(--ink); text-align: right;
   font-variant-numeric: tabular-nums;
@@ -567,9 +567,6 @@ h1 { margin: 5px 0 0; font: 700 26px/1.1 Manrope, sans-serif; letter-spacing: -.
 .custom-token-cost-fast-mode .custom-token-cost-source { justify-self: start; font-size: 11px; }
 .custom-token-cost-long-context {
   display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line);
-}
-.custom-token-cost-long-context-inputs {
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px;
 }
 .custom-token-cost-long-context-heading { display: flex; align-items: center; gap: 12px; }
 .custom-token-cost-long-context-heading label { color: var(--ink); font-size: 11px; font-weight: 700; }

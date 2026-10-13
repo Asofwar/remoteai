@@ -1,5 +1,7 @@
 import { Input, InputNumber, Switch, Table } from "antd";
-import type { TokenCostPreset } from "../../../../shared/token-cost-presets";
+import {
+  DEFAULT_LONG_CONTEXT_THRESHOLD_TOKENS, MAX_LONG_CONTEXT_THRESHOLD_TOKENS, type TokenCostPreset,
+} from "../../../../shared/token-cost-presets";
 
 export interface PricingRow extends TokenCostPreset { key: string }
 interface Props {
@@ -19,7 +21,7 @@ export function TokenPricingTable({ rows, onChange, disabled, zh }: Props) {
     min={field === "fastModeMultiplier" ? 0.01 : 0} max={field === "fastModeMultiplier" ? 100 : 1_000_000_000}
     placeholder={zh ? "未公布" : "Not listed"}
     onChange={(value) => update(row.key, { [field]: field === "fastModeMultiplier" ? value : value ?? 0 })} style={{ width: 105 }} />;
-  return <Table rowKey="key" dataSource={rows} pagination={false} scroll={{ x: 1100 }} size="small"
+  return <Table rowKey="key" dataSource={rows} pagination={false} scroll={{ x: 1300 }} size="small"
     columns={[
       { title: zh ? "模型" : "Model", key: "model", width: 190, render: (_, row) => <Input
         value={row.model} disabled={disabled} aria-label={zh ? "模型名称" : "Model name"}
@@ -35,6 +37,12 @@ export function TokenPricingTable({ rows, onChange, disabled, zh }: Props) {
       { title: zh ? "长上下文计价" : "Long context", key: "longContext", render: (_, row) => <Switch
         checked={row.longContextPricing} disabled={disabled} aria-label={row.model + " long context"}
         onChange={(value) => update(row.key, { longContextPricing: value })} /> },
+      { title: zh ? "长上下文计费起点（Token）" : "Long-context threshold (tokens)", key: "longContextThreshold",
+        width: 180, render: (_, row) => <InputNumber value={row.longContextThresholdTokens}
+          disabled={disabled || !row.longContextPricing} min={1} max={MAX_LONG_CONTEXT_THRESHOLD_TOKENS}
+          precision={0} placeholder={String(DEFAULT_LONG_CONTEXT_THRESHOLD_TOKENS)}
+          aria-label={row.model + " longContextThresholdTokens"} style={{ width: 140 }}
+          onChange={(value) => update(row.key, { longContextThresholdTokens: value })} /> },
       { title: zh ? "价格来源链接" : "Price source URL", key: "source", width: 190, render: (_, row) => <Input
         value={row.sourceUrl} disabled={disabled} placeholder="https://" aria-label={row.model + " source"}
         onChange={(event) => update(row.key, { sourceUrl: event.target.value.trim() })} /> },

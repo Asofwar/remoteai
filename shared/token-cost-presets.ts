@@ -5,6 +5,7 @@ export interface TokenCostPreset {
   cachedInput: number;
   output: number;
   longContextPricing: boolean;
+  longContextThresholdTokens?: number | null;
   fastModeMultiplier: number | null;
   sourceUrl: string;
 }
@@ -18,6 +19,8 @@ export interface TokenCostPresetDocument {
 export const MAX_TOKEN_COST_PRESETS = 1000;
 export const MAX_TOKEN_PRICE = 1_000_000_000;
 export const MAX_PRESET_MULTIPLIER = 100;
+export const DEFAULT_LONG_CONTEXT_THRESHOLD_TOKENS = 272_000;
+export const MAX_LONG_CONTEXT_THRESHOLD_TOKENS = 1_000_000_000;
 const MAX_IDENTIFIER_LENGTH = 128;
 const MAX_ALIASES = 20;
 const MAX_SOURCE_URL_LENGTH = 2048;
@@ -45,6 +48,7 @@ function validPreset(value: unknown): value is TokenCostPreset {
   const rates = [value.input, value.cachedInput, value.output];
   return rates.every((rate) => typeof rate === "number" && Number.isFinite(rate) && rate >= 0 && rate <= MAX_TOKEN_PRICE)
     && typeof value.longContextPricing === "boolean"
+    && (value.longContextThresholdTokens == null || isValidLongContextThreshold(value.longContextThresholdTokens))
     && (value.fastModeMultiplier === null || (typeof value.fastModeMultiplier === "number"
       && Number.isFinite(value.fastModeMultiplier)
       && value.fastModeMultiplier > 0 && value.fastModeMultiplier <= MAX_PRESET_MULTIPLIER))
@@ -59,4 +63,9 @@ export function isTokenCostPresetDocument(value: unknown): value is TokenCostPre
     || !validSource(value.sourceUrl)) return false;
   const names = value.models.flatMap((preset) => [preset.model, ...(preset.aliases ?? [])]);
   return new Set(names).size === names.length;
+}
+
+export function isValidLongContextThreshold(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value)
+    && value > 0 && value <= MAX_LONG_CONTEXT_THRESHOLD_TOKENS;
 }

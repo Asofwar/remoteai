@@ -6,6 +6,7 @@ import { useTokenCostDisplaySettings } from "../hooks/useTokenCostDisplaySetting
 import { formatTokenPrice } from "../utils/tokenCost";
 import { TokenCostFastModeSettings } from "./TokenCostFastModeSettings";
 import { TokenCostLongContextSettings } from "./TokenCostLongContextSettings";
+import { TokenCostModelLongContextSettings } from "./TokenCostModelLongContextSettings";
 import {
   TOKEN_COST_PRESETS,
   TOKEN_COST_REFERENCE_MODEL_EVENT,
@@ -47,6 +48,7 @@ export function TokenCostPresets({ referenceModel, onReferenceChange, t }: Token
           <th scope="col">{t("tokenCost.customBilling.presetInput")}</th>
           <th scope="col">{t("tokenCost.customBilling.presetCachedInput")}</th>
           <th scope="col">{t("tokenCost.customBilling.presetOutput")}</th>
+          <th scope="col">{t("tokenCost.longContext.thresholdColumn")}</th>
           <th scope="col">{t("tokenCost.customBilling.source")}</th>
           <th scope="col">{t("tokenCost.fastMode.multiplier")}</th>
         </tr></thead>
@@ -55,12 +57,14 @@ export function TokenCostPresets({ referenceModel, onReferenceChange, t }: Token
             <th scope="row"><code>{preset.model}</code></th>
             <td>{formatTokenPrice(preset.input, display)}</td><td>{formatTokenPrice(preset.cachedInput, display)}</td>
             <td>{formatTokenPrice(preset.output, display)}</td>
+            <td><TokenCostModelLongContextSettings preset={preset} t={t} /></td>
             <td><PriceSource model={preset.model} url={preset.sourceUrl} t={t} /></td>
             <td><TokenCostFastModeSettings model={preset.model} presetMultiplier={preset.fastModeMultiplier} t={t} /></td>
           </tr>)}
           {UNPRICED_PRESET_MODELS.map((model) => <tr key={model}>
             <th scope="row"><code>{model}</code></th>
             <td colSpan={3} className="custom-token-cost-unpriced">{t("tokenCost.customBilling.unpriced")}</td>
+            <td>—</td>
             <td><PriceSource model={model} url={TOKEN_COST_PRESETS_SOURCE_URL} t={t} /></td>
             <td>—</td>
           </tr>)}
@@ -77,6 +81,7 @@ export function TokenCostPresets({ referenceModel, onReferenceChange, t }: Token
         <small>{t("tokenCost.customBilling.priorityHint")}</small>
       </div>
       <small>{t("tokenCost.fastMode.hint")}</small>
+      <small>{t("tokenCost.longContext.thresholdHint")}</small>
     </div>
     <TokenCostLongContextSettings t={t} />
   </section>;

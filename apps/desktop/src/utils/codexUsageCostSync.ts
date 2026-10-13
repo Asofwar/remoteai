@@ -30,6 +30,8 @@ import {
   LONG_CONTEXT_COST_EVENT,
   LONG_CONTEXT_COST_STORAGE_KEY,
   loadLongContextCostSettings,
+  loadModelLongContextThresholds,
+  MODEL_LONG_CONTEXT_THRESHOLD_STORAGE_KEY,
 } from "./tokenCostLongContext";
 
 const RETRY_DELAY_MS = 30_000;
@@ -58,6 +60,7 @@ function createCostRatesSynchronizer() {
             modelFastModeMultipliers: loadModelFastModeCostMultipliers(),
             presetCatalog: currentTokenCostCatalog(),
             longContext: loadLongContextCostSettings(),
+            modelLongContextThresholds: loadModelLongContextThresholds(),
           },
         });
       }
@@ -89,6 +92,7 @@ export function installCodexUsageCostSync() {
       && event.key !== TOKEN_COST_DISPLAY_STORAGE_KEY
       && event.key !== MODEL_TOKEN_COSTS_STORAGE_KEY && event.key !== TOKEN_COST_REFERENCE_MODEL_STORAGE_KEY
       && event.key !== MODEL_FAST_MODE_COST_STORAGE_KEY
+      && event.key !== MODEL_LONG_CONTEXT_THRESHOLD_STORAGE_KEY
       && event.key !== FAST_MODE_COST_MULTIPLIER_STORAGE_KEY && event.key !== LONG_CONTEXT_COST_STORAGE_KEY) return;
     invalidateCustomTokenCostRulesCache();
     handleChange();

@@ -1856,6 +1856,12 @@ const translations = {
     "tokenCost.longContext.defaults": "Defaults: over {threshold} input tokens; "
       + "input {input}×, cached input {cachedInput}×, output {output}×.",
     "tokenCost.longContext.thresholdTokens": "Long-context threshold (input tokens)",
+    "tokenCost.longContext.thresholdColumn": "Long-context threshold (tokens)",
+    "tokenCost.longContext.modelThreshold": "{model} long-context threshold",
+    "tokenCost.longContext.thresholdHint": "Set a threshold for each model. Clear it to use the preset; "
+      + "models without a configured threshold use 272,000 tokens.",
+    "tokenCost.longContext.defaultMultipliers": "Default multipliers: input {input}×, "
+      + "cached input {cachedInput}×, output {output}×.",
     "tokenCost.longContext.inputMultiplier": "Input multiplier",
     "tokenCost.longContext.cachedInputMultiplier": "Cached input multiplier",
     "tokenCost.longContext.outputMultiplier": "Output multiplier",
@@ -4435,6 +4441,10 @@ const translations = {
     "tokenCost.longContext.rule": "单次请求的输入 Token（含缓存）超过阈值时，整次请求按以下倍率估算。",
     "tokenCost.longContext.defaults": "默认超过 {threshold} 个输入 Token 时，输入 {input} 倍、缓存输入 {cachedInput} 倍、输出 {output} 倍。",
     "tokenCost.longContext.thresholdTokens": "长上下文阈值（输入 Token）",
+    "tokenCost.longContext.thresholdColumn": "长上下文计费起点（Token）",
+    "tokenCost.longContext.modelThreshold": "{model} 长上下文计费起点",
+    "tokenCost.longContext.thresholdHint": "可按模型自定义计费起点，清空后恢复预设；未配置起点时默认使用 272,000 Token。",
+    "tokenCost.longContext.defaultMultipliers": "默认倍率：输入 {input} 倍、缓存输入 {cachedInput} 倍、输出 {output} 倍。",
     "tokenCost.longContext.inputMultiplier": "输入倍率",
     "tokenCost.longContext.cachedInputMultiplier": "缓存输入倍率",
     "tokenCost.longContext.outputMultiplier": "输出倍率",

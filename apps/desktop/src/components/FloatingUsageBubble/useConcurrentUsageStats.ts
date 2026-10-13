@@ -16,7 +16,9 @@ import {
   FAST_MODE_COST_MULTIPLIER_EVENT,
   FAST_MODE_COST_MULTIPLIER_STORAGE_KEY,
 } from "../../utils/tokenCostFastMode";
-import { LONG_CONTEXT_COST_EVENT, LONG_CONTEXT_COST_STORAGE_KEY } from "../../utils/tokenCostLongContext";
+import {
+  LONG_CONTEXT_COST_EVENT, LONG_CONTEXT_COST_STORAGE_KEY, MODEL_LONG_CONTEXT_THRESHOLD_STORAGE_KEY,
+} from "../../utils/tokenCostLongContext";
 
 const STATS_REFRESH_INTERVAL_MS = 60_000;
 
@@ -58,7 +60,8 @@ export function useConcurrentUsageStats(
     const refreshStoredMultiplier = (event: StorageEvent) => {
       if (event.storageArea !== window.localStorage
         || (event.key !== null && event.key !== FAST_MODE_COST_MULTIPLIER_STORAGE_KEY
-          && event.key !== LONG_CONTEXT_COST_STORAGE_KEY)) return;
+          && event.key !== LONG_CONTEXT_COST_STORAGE_KEY
+          && event.key !== MODEL_LONG_CONTEXT_THRESHOLD_STORAGE_KEY)) return;
       invalidateCustomTokenCostRulesCache();
       refreshCosts();
     };

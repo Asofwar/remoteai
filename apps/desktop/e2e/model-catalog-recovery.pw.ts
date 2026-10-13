@@ -58,6 +58,7 @@ for (const width of [1280, 390]) {
   test(`retries stalled model loading while usage polling remains responsive at ${width}px`, async ({ page }) => {
     const backend = modelSettingsBackend();
     backend.pauseModels();
+    await page.clock.install();
     await backend.attach(page.context());
     await page.setViewportSize({ width, height: 900 });
     try {
@@ -67,8 +68,12 @@ for (const width of [1280, 390]) {
       const beats = Number(await page.getByLabel("刷新次数").textContent());
       await page.getByRole("textbox", { name: "聊天消息" }).fill("加载完成后继续");
       await expect.poll(async () => Number(await page.getByLabel("刷新次数").textContent())).toBeGreaterThan(beats);
+      await page.clock.fastForward(120_000);
+      await expect(page.getByRole("button", { name: "正在加载模型…", exact: true })).toBeDisabled();
+      expect(backend.modelRequests()).toBe(1);
+      await page.clock.fastForward(MODEL_CATALOG_TIMEOUT_MS - 120_000 + 50);
       const retry = page.getByRole("button", { name: "模型加载失败，点击重试", exact: true });
-      await expect(retry).toBeEnabled({ timeout: MODEL_CATALOG_TIMEOUT_MS + 5_000 });
+      await expect(retry).toBeEnabled();
       await expect(page.getByRole("button", { name: "发送消息", exact: true })).toBeDisabled();
       await expect(page.getByText("正在刷新用量")).toBeVisible();
       await page.screenshot({ path: `../../.codex-tmp/model-retry-${width}.png`, animations: "disabled" });

@@ -6,7 +6,7 @@ use reqwest::{blocking::Client, Url};
 use serde_json::Value;
 use tauri::{AppHandle, Runtime};
 
-const CACHE_TIMEOUT: Duration = Duration::from_secs(3);
+const CACHE_TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_CATALOG_BYTES: u64 = 2 * 1024 * 1024;
 
 #[derive(Debug, thiserror::Error)]

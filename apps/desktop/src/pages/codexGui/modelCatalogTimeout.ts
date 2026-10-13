@@ -1,6 +1,7 @@
 import { guiText } from "../../i18n/guiText";
 
-export const MODEL_CATALOG_TIMEOUT_MS = 20_000;
+// Outlast the 130-second model/list RPC, including official and Admin discovery.
+export const MODEL_CATALOG_TIMEOUT_MS = 140_000;
 
 /** Bound waits before the backend timeout starts; callers must still ignore late IPC replies. */
 export async function withModelCatalogTimeout<T>(

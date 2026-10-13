@@ -29,6 +29,14 @@ fn assert_catalog(payload: UpstreamPayload, etag: &str) {
 }
 
 fn server(status: u16, body: Vec<u8>) -> (Url, thread::JoinHandle<()>) {
+    server_after_delay(status, body, Duration::ZERO)
+}
+
+fn server_after_delay(
+    status: u16,
+    body: Vec<u8>,
+    delay: Duration,
+) -> (Url, thread::JoinHandle<()>) {
     let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
     let url = catalog_url(&format!("http://{}", server.server_addr())).unwrap();
     let task = thread::spawn(move || {
@@ -44,6 +52,7 @@ fn server(status: u16, body: Vec<u8>) -> (Url, thread::JoinHandle<()>) {
         let response = tiny_http::Response::from_data(body)
             .with_status_code(status)
             .with_header(tiny_http::Header::from_bytes("ETag", "catalog-v3").unwrap());
+        thread::sleep(delay);
         request.respond(response).unwrap();
     });
     (url, task)
@@ -67,6 +76,19 @@ fn official_success_preserves_catalog_and_never_calls_admin() {
 #[test]
 fn official_transport_failure_falls_back_to_admin_and_preserves_capabilities() {
     let (url, task) = server(200, CATALOG.to_vec());
+    let client = Client::builder().no_proxy().build().unwrap();
+    let payload = prefer_official(
+        || Err("official request timed out".into()),
+        || request_catalog(&client, url),
+    )
+    .unwrap();
+    assert_catalog(payload, "catalog-v3");
+    task.join().unwrap();
+}
+
+#[test]
+fn admin_fallback_can_exceed_its_previous_three_second_timeout() {
+    let (url, task) = server_after_delay(200, CATALOG.to_vec(), Duration::from_millis(3100));
     let client = Client::builder().no_proxy().build().unwrap();
     let payload = prefer_official(
         || Err("official request timed out".into()),

@@ -82,7 +82,9 @@ fn discovery_budget_limits_credentials_and_restores_the_worker_afterward() {
     {
         let _scope = model_catalog_deadline::Scope::enter();
         let deadline = model_catalog_deadline::current().unwrap();
-        assert!(deadline - tokio::time::Instant::now() <= Duration::from_secs(8));
+        let remaining = deadline - tokio::time::Instant::now();
+        assert!(remaining > Duration::from_secs(59));
+        assert!(remaining <= Duration::from_secs(60));
         assert_eq!(
             model_catalog_deadline::credential_timeout(normal).unwrap(),
             Duration::from_secs(3)

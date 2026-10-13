@@ -1,8 +1,8 @@
-//! Model discovery must leave time for Admin fallback inside the GUI's twenty-second wait.
+//! Official discovery has its own budget; Admin fallback starts a separate sixty-second request.
 use std::{cell::Cell, time::Duration};
 use tokio::time::Instant;
 
-const OFFICIAL_TIMEOUT: Duration = Duration::from_secs(8);
+const OFFICIAL_TIMEOUT: Duration = Duration::from_secs(60);
 const CREDENTIAL_TIMEOUT: Duration = Duration::from_secs(3);
 
 thread_local! {

@@ -12,7 +12,6 @@ import {
   Tag,
   Tooltip,
 } from "antd";
-import type { TableProps } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
   CalendarClock,
@@ -28,6 +27,7 @@ import {
   MoreHorizontal,
   Pencil,
   RefreshCw,
+  ListOrdered,
   ToggleLeft,
   ToggleRight,
   Trash2,
@@ -88,6 +88,9 @@ import { AvailableQuota } from "../../TokenUsageDashboard/OfficialAccountUsage";
 import { getSwitchableAccounts } from "../accountSelectors";
 import { confirmOfficialAuthAccountChange } from "../confirmOfficialAuthAccountChange";
 import styles from "./index.module.less";
+import { AccountOrderModal } from "./AccountOrderModal";
+import { accountOrderLabels } from "./accountOrderLabels";
+import { useAccountOrder, type AccountSortOrder } from "./useAccountOrder";
 import {
   AccountNoteEditButton,
   AccountPrivacyToggle,
@@ -159,7 +162,6 @@ interface AccountTableProps {
   t: Translate;
 }
 
-const USAGE_SORT_STORAGE_KEY = "codex-switch:account-table-usage-sort";
 const HIDDEN_COLUMNS_STORAGE_KEY = "codex-switch:account-table-hidden-columns";
 const GROUP_COLUMN_PREFERENCE_STORAGE_KEY = "codex-switch:account-table-group-column-preference";
 const GPT_5_6_SOL_CONTEXT_WINDOW_OPTIONS = GPT_5_6_SOL_CONTEXT_WINDOW_OPTIONS_K.map((value) => ({
@@ -173,8 +175,6 @@ function modelContextWindowTooltipKey(error: ModelContextWindowError) {
   return "table.modelContextWindowTooltip" as const;
 }
 
-type UsageSortColumn = "fiveHours" | "oneWeek";
-type UsageSortOrder = "ascend" | "descend";
 const ACCOUNT_TABLE_COLUMN_KEYS = [
   "account",
   "group",
@@ -203,11 +203,6 @@ const REORDERABLE_ACCOUNT_TABLE_COLUMN_KEYS: ReorderableAccountTableColumnKey[] 
 ];
 const COLUMN_ORDER_STORAGE_KEY = "codex-switch:account-table-column-order";
 
-interface UsageSortPreference {
-  column: UsageSortColumn;
-  order: UsageSortOrder;
-}
-
 interface AccountContextMenu {
   accountId: string;
   x: number;
@@ -225,34 +220,6 @@ function contextMenuPosition(event: { clientX: number; clientY: number }, menuHe
     x: Math.max(8, Math.min(event.clientX, window.innerWidth - ACCOUNT_CONTEXT_MENU_WIDTH - 8)),
     y: Math.max(8, Math.min(event.clientY, window.innerHeight - menuHeight - 8)),
   };
-}
-
-function isUsageSortColumn(value: unknown): value is UsageSortColumn {
-  return value === "fiveHours" || value === "oneWeek";
-}
-
-function isUsageSortOrder(value: unknown): value is UsageSortOrder {
-  return value === "ascend" || value === "descend";
-}
-
-function loadUsageSortPreference(): UsageSortPreference | null {
-  try {
-    const parsed: unknown = JSON.parse(window.localStorage.getItem(USAGE_SORT_STORAGE_KEY) ?? "null");
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    const preference = parsed as Partial<UsageSortPreference>;
-    if (!isUsageSortColumn(preference.column) || !isUsageSortOrder(preference.order)) return null;
-    return { column: preference.column, order: preference.order };
-  } catch {
-    return null;
-  }
-}
-
-function persistUsageSortPreference(preference: UsageSortPreference | null) {
-  if (!preference) {
-    window.localStorage.removeItem(USAGE_SORT_STORAGE_KEY);
-    return;
-  }
-  window.localStorage.setItem(USAGE_SORT_STORAGE_KEY, JSON.stringify(preference));
 }
 
 function isAccountTableColumnKey(value: unknown): value is AccountTableColumnKey {
@@ -335,7 +302,7 @@ function compareKeepingAttentionLast(
   right: Account,
   hotSwitchEnabled: boolean,
   showUsageNetworkErrors: boolean,
-  sortOrder: UsageSortOrder | null | undefined,
+  sortOrder: AccountSortOrder | null | undefined,
   compare: (left: Account, right: Account) => number,
 ) {
   const attentionOrder = Number(needsAccountAttention(left, hotSwitchEnabled, showUsageNetworkErrors))
@@ -418,7 +385,7 @@ export function AccountTable({
   const [bulkEnableBusy, setBulkEnableBusy] = useState(false);
   const [bulkDisableBusy, setBulkDisableBusy] = useState(false);
   const [openaiAuthPendingAccountId, setOpenaiAuthPendingAccountId] = useState<string | null>(null);
-  const [usageSort, setUsageSort] = useState<UsageSortPreference | null>(loadUsageSortPreference);
+  const [accountOrderOpen, setAccountOrderOpen] = useState(false);
   const [hiddenColumns, setHiddenColumns] = useState<AccountTableColumnKey[]>(loadHiddenColumns);
   const [columnOrder, setColumnOrder] = useState<ReorderableAccountTableColumnKey[]>(loadColumnOrder);
   const draggedColumnRef = useRef<ReorderableAccountTableColumnKey | null>(null);
@@ -583,10 +550,11 @@ export function AccountTable({
     () => createAccountTokenUsageLookup(accounts, accountTokenUsage),
     [accounts, accountTokenUsage],
   );
-  const orderedAccounts = useMemo(() => [...accounts].sort(
+  const defaultOrderedAccounts = useMemo(() => [...accounts].sort(
     (left, right) => Number(needsAccountAttention(left, hotSwitchEnabled, showUsageNetworkErrors))
       - Number(needsAccountAttention(right, hotSwitchEnabled, showUsageNetworkErrors)),
   ), [accounts, hotSwitchEnabled, showUsageNetworkErrors]);
+  const { orderedAccounts, columnSort, handleTableChange, saveOrder } = useAccountOrder(defaultOrderedAccounts);
   const selectedAccountIdSet = new Set(selectedAccountIds);
   const consumableSelectedAccountIds = accounts
     .filter((account) => selectedAccountIdSet.has(account.id) && account.autoSwitchEnabled)
@@ -630,16 +598,6 @@ export function AccountTable({
     value: account.id,
     disabled: !switchableAccountIds.has(account.id),
   }));
-  const handleTableChange: NonNullable<TableProps<Account>["onChange"]> = (_, __, sorter) => {
-    const activeSorter = Array.isArray(sorter) ? sorter[0] : sorter;
-    const nextSort = isUsageSortColumn(activeSorter.columnKey) && isUsageSortOrder(activeSorter.order)
-      ? { column: activeSorter.columnKey, order: activeSorter.order }
-      : null;
-
-    setUsageSort(nextSort);
-    persistUsageSortPreference(nextSort);
-  };
-
   const columns: ColumnsType<Account> = [
     Table.EXPAND_COLUMN as ColumnsType<Account>[number],
     {
@@ -648,8 +606,15 @@ export function AccountTable({
           <span>{t("table.account")}</span>
           <AccountPrivacyToggle enabled={privacyMode} loading={privacyModeLoading}
             onChange={onPrivacyModeChange} t={t} />
+          <Tooltip title={accountOrderLabels(language).title} styles={{ root: { maxWidth: 400 } }}>
+            <Button type="text" size="small" className="account-privacy-toggle"
+              aria-label={accountOrderLabels(language).title} icon={<ListOrdered size={16} />}
+              onKeyDown={(event) => event.stopPropagation()}
+              onClick={(event) => { event.stopPropagation(); setAccountOrderOpen(true); }} />
+          </Tooltip>
         </span>
       ), key: "account", dataIndex: "email", width: 280, fixed: "left",
+      sortOrder: columnSort?.column === "account" ? columnSort.order : null,
       sorter: (left, right, sortOrder) => compareKeepingAttentionLast(
         left,
         right,
@@ -713,6 +678,7 @@ export function AccountTable({
     },
     {
       title: t("accounts.group.column"), key: "group", dataIndex: "group", width: 150,
+      sortOrder: columnSort?.column === "group" ? columnSort.order : null,
       sorter: (left, right) => left.group.localeCompare(right.group),
       filters: [
         { text: t("accounts.group.ungrouped"), value: "" },
@@ -732,7 +698,7 @@ export function AccountTable({
         sortOrder,
         (first, second) => compareUsageRemaining(first, second, "primary"),
       ),
-      sortOrder: usageSort?.column === "fiveHours" ? usageSort.order : null,
+      sortOrder: columnSort?.column === "fiveHours" ? columnSort.order : null,
       // OpenAI currently reports the primary (5-hour) quota with a weekly reset window.
       // Render its reset time like the weekly quota so it does not show a misleading 5-hour countdown.
       render: (_, account) => <UsageMeter window={account.usage.primary} resetWindow="oneWeek"
@@ -748,7 +714,7 @@ export function AccountTable({
         sortOrder,
         (first, second) => compareUsageRemaining(first, second, "secondary"),
       ),
-      sortOrder: usageSort?.column === "oneWeek" ? usageSort.order : null,
+      sortOrder: columnSort?.column === "oneWeek" ? columnSort.order : null,
       render: (_, account) => <UsageMeter window={account.usage.secondary} resetWindow="oneWeek"
         language={language} t={t} />,
     },
@@ -1569,6 +1535,9 @@ export function AccountTable({
         scroll={tableScrollY ? { x: tableScrollX, y: tableScrollY } : { x: tableScrollX }} />
     </div>
     {tableContextMenu}
+    {accountOrderOpen && <AccountOrderModal accounts={orderedAccounts} privacyMode={privacyMode}
+      hideAccountNotes={hideAccountNotes} language={language} onClose={() => setAccountOrderOpen(false)}
+      onSave={saveOrder} />}
     {editingAccount && <AccountNoteModal key={editingAccount.id} account={editingAccount}
       loading={loadingAccountDetailsId === editingAccount.id}
       onClose={() => setEditingAccount(null)}

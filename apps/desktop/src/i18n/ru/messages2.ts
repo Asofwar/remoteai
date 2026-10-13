@@ -357,7 +357,7 @@ export const messages2 = {
   "windowMenu.cloud": "Облако",
   "windowMenu.help": "Помощь",
   "windowMenu.openCodexHome": "Открыть папку Codex Home",
-  "windowMenu.openAccountStore": "Открыть папку аккаунтов",
+  "windowMenu.openRemoteAiHome": "Открыть папку RemoteAI Home",
   "windowMenu.openTokenWindow": "Открыть статистику токенов",
   "windowMenu.restartApp": "Перезапустить Remote AI",
   "windowMenu.quit": "Выйти",

@@ -35,6 +35,7 @@ pub(crate) type ChatGptLaunchTarget = String;
 #[serde(rename_all = "camelCase")]
 pub(crate) enum ManagedFolder {
     CodexHome,
+    RemoteAiHome,
     AccountStore,
 }
 
@@ -58,20 +59,34 @@ fn app_info_blocking<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<AppInfo, S
 }
 
 #[tauri::command]
-pub(crate) fn open_managed_folder<R: Runtime>(
+pub(crate) async fn open_managed_folder<R: Runtime>(
     app: tauri::AppHandle<R>,
     target: ManagedFolder,
 ) -> Result<(), String> {
-    let paths = resolve_paths(&app)?;
+    tauri::async_runtime::spawn_blocking(move || open_managed_folder_blocking(&app, target))
+        .await
+        .map_err(|_| "暂时无法打开目录，请稍后重试。".to_string())?
+}
+
+fn open_managed_folder_blocking<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    target: ManagedFolder,
+) -> Result<(), String> {
+    use tauri::Manager;
+
     let path = match target {
-        ManagedFolder::CodexHome => paths.codex_home,
-        ManagedFolder::AccountStore => paths.accounts,
+        ManagedFolder::CodexHome => resolve_paths(app)?.codex_home,
+        ManagedFolder::RemoteAiHome => app
+            .path()
+            .app_data_dir()
+            .map_err(|_| "暂时无法找到 RemoteAI Home 目录，请稍后重试。".to_string())?,
+        ManagedFolder::AccountStore => resolve_paths(app)?.accounts,
     };
     fs::create_dir_all(&path)
-        .map_err(|error| format!("Failed to create {}: {error}", path.display()))?;
+        .map_err(|_| "无法创建目录，请检查文件夹权限后重试。".to_string())?;
     app.opener()
         .open_path(path.display().to_string(), None::<&str>)
-        .map_err(|error| format!("Failed to open {}: {error}", path.display()))
+        .map_err(|_| "无法打开目录，请稍后重试。".to_string())
 }
 
 pub(crate) fn list_accounts_blocking<R: Runtime>(

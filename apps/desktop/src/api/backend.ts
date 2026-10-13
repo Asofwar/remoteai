@@ -2946,7 +2946,7 @@ export async function restartOpenCode(): Promise<void> {
   if (hasLocalBackend) await invoke("restart_open_code");
 }
 
-export async function openManagedFolder(target: "codexHome" | "accountStore"): Promise<void> {
+export async function openManagedFolder(target: "codexHome" | "remoteAiHome" | "accountStore"): Promise<void> {
   if (hasLocalBackend) await invoke("open_managed_folder", { target });
 }
 

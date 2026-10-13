@@ -358,10 +358,10 @@ fn dispatch_extended_command(app: AppHandle, command: &str, args: Value) -> Resu
             crate::codex_connection::get_codex_connection_status(),
         )),
         "connect_codex" => serialize(block_on(crate::codex_connection::connect_codex())),
-        "open_managed_folder" => serialize(crate::commands::open_managed_folder(
+        "open_managed_folder" => serialize(block_on(crate::commands::open_managed_folder(
             app,
             argument(&args, "target")?,
-        )),
+        ))),
         "get_dream_skin_status" => serialize(block_on(crate::dream_skin::get_dream_skin_status())),
         "get_dream_skin_resources_status" => {
             serialize(Ok(crate::dream_skin::get_dream_skin_resources_status()))

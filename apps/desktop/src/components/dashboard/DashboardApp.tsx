@@ -180,7 +180,7 @@ type SystemMenuAction =
   | "import-archive"
   | "export-archive"
   | "open-codex-home"
-  | "open-account-store"
+  | "open-remote-ai-home"
   | "restart-app"
   | "quit-app"
   | `navigation-style-${NavigationStyle}`
@@ -789,7 +789,7 @@ export function DashboardApp() {
   const changeHideAccountNotes = useCallback((enabled: boolean) => {
     void privacyMode.setHideAccountNotes(enabled);
   }, [privacyMode.setHideAccountNotes]);
-  const openFolder = useCallback((target: "codexHome" | "accountStore") => {
+  const openFolder = useCallback((target: Parameters<typeof openManagedFolder>[0]) => {
     if (!hasLocalBackend) {
       notify(t("toast.previewOpenFolder"));
       return;
@@ -970,8 +970,8 @@ export function DashboardApp() {
       case "open-codex-home":
         openCodexHome();
         break;
-      case "open-account-store":
-        openAccountStore();
+      case "open-remote-ai-home":
+        openFolder("remoteAiHome");
         break;
       case "restart-app":
         void restartApplication();

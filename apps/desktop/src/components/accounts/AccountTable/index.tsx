@@ -782,8 +782,9 @@ export function AccountTable({
     {
       title: officialUsageLabels(language, tokenCostDisplay.unit).remaining,
       key: "availableQuota", width: 190, align: "center" as const,
-      render: (_: unknown, account: Account) => <AvailableQuota account={officialUsageById.get(account.id)}
-        language={language} settings={tokenCostDisplay} />,
+      render: (_: unknown, account: Account) => <strong>
+        <AvailableQuota account={officialUsageById.get(account.id)} language={language} settings={tokenCostDisplay} />
+      </strong>,
     },
     ...(customPriorityActive ? [{
       title: t("table.autoSwitchPriority"), key: "autoSwitchPriority", width: 150,

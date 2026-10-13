@@ -129,17 +129,17 @@ it('updates the quota unit and amount with cost display settings without reloadi
   });
   await render({ displayMode: 'table' });
   expect(container.textContent).toContain('Estimated available (USD)');
-  expect(container.textContent).toContain('30/100USD');
+  expect(container.textContent).toContain('30 / 100USD');
   await act(async () => saveTokenCostDisplaySettings({ unit: '元', usdMultiplier: 7, currencyCode: 'CNY' }));
   expect(container.textContent).toContain('Estimated available (元)');
-  expect(container.textContent).toContain('210/700元');
+  expect(container.textContent).toContain('210 / 700元');
   expect(container.textContent).not.toContain('Estimated available (USD)');
   await act(async () => saveTokenCostDisplaySettings({ unit: '积分', usdMultiplier: 100, currencyCode: null }));
   expect(container.textContent).toContain('Estimated available (积分)');
-  expect(container.textContent).toContain('3000/10000积分');
+  expect(container.textContent).toContain('3000 / 10000积分');
   await act(async () => saveTokenCostDisplaySettings({ unit: 'USD', usdMultiplier: 1, currencyCode: null }));
   expect(container.textContent).toContain('Estimated available (USD)');
-  expect(container.textContent).toContain('30/100USD');
+  expect(container.textContent).toContain('30 / 100USD');
   expect(loadOfficialUsage).toHaveBeenCalledTimes(1);
 });
 

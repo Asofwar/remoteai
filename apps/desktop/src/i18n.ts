@@ -3738,7 +3738,7 @@ const translations = {
     "table.creditsUnknown": "暂未获取到额度，请刷新后重试。",
     "table.creditsHint": "Codex 剩余点数，可在套餐用量耗尽后继续使用。",
     "table.tokenTotals": "今日 Token",
-    "table.estimatedTokenCost": "Token 预估成本",
+    "table.estimatedTokenCost": "预估成本",
     "table.estimatedTokenCostHint": "按模型每百万 Token 单价估算，当前显示单位为 {unit}。",
     "table.autoSwitchPriority": "自动切换优先级",
     "table.cardSwitchPriority": "优先级",

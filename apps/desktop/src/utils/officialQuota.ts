@@ -18,5 +18,5 @@ export function formatAvailableQuota(
   const quota = [account.primary, account.secondary].find((item) => item?.remainingUsd === account.remainingUsd);
   const remaining = formatQuotaAmount(account.remainingUsd, settings);
   const capacity = quota?.capacityUsd == null ? '—' : formatQuotaAmount(quota.capacityUsd, settings);
-  return `${remaining}/${capacity}${settings.unit}`;
+  return `${remaining} / ${capacity}${settings.unit}`;
 }

@@ -7,6 +7,11 @@
 - NestJS 源码仅保留为历史接口契约和本地兼容对照测试基线。不要为更新契约或通过测试而修改已冻结的 NestJS 实现；新功能应在 Go 中实现并增加对应测试。
 - 生产构建、部署配置和运维文档不得重新引入 NestJS 服务。更新和回滚均使用已经验证的 admin-go 镜像。
 - `apps/admin-go/sql` 是数据库升级脚本目录；生产部署说明以 `apps/admin-go/DEPLOYMENT.md` 为准。
+- admin-go 更新和回滚统一使用 `apps/admin-go/scripts/deployment_compose.py` 的 `check`、`up`、`verify`。
+  保留当前容器记录的完整 Compose 文件列表；已启用 TURN 时必须保留 `compose.desktop-relay.yml`。
+  部署前后核对中继端口和网络，不能仅凭 HTTP、聊天 WebSocket 或 STUN 正常就判定远程桌面可用。
+- 新增 Go 接口时同步检查 `apps/admin-go/kong/existing-kong.example.yml` 的覆盖范围及鉴权规则；
+  `go -C apps/admin-go test ./internal/server -run TestKong` 必须通过，线上已有路由也要保存在项目中。
 
 ## Automatic Commit and Push
 

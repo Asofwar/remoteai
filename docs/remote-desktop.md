@@ -236,6 +236,9 @@ Ctrl+C/Ctrl+X in the remote desktop copies the selection into the local system c
 be pasted directly into Explorer without downloading or opening the Clipboard panel. File entries survive
 closing the viewer. Clipboard I/O runs on blocking workers, and gestures queue in order so an immediate
 paste waits for an earlier copy to finish. Queued work is discarded when the viewer disconnects or closes.
+An immediate paste uses that copy's content even if writing the local clipboard failed; a failed remote
+copy never falls back to stale local content. Local clipboard access retries brief OS locks up to three times
+without repeating the remote copy/cut operation.
 
 The Web clipboard supports bidirectional text and PNG images, plus copying files into the remote Windows
 clipboard and downloading remote clipboard files. Ctrl+C/Ctrl+X copy the remote selection; Ctrl+V consumes
@@ -245,6 +248,10 @@ cannot create arbitrary Explorer/Finder file clipboard entries; multiple remote 
 download buttons. Folders must be zipped first. A copied image file can be sent as a file with the picker.
 Clipboard access requires the browser's normal permissions; denied writes retain received content for a
 user-initiated retry. Content is transferred only after a paste/copy action, with no background clipboard polling.
+Copy and paste never open the panel automatically, including errors and file downloads. Successful transfers
+are silent; progress appears only after 800 ms. Failures use a compact notice with an explicit local-copy retry
+when needed, preserving keyboard focus. Single browser files download directly; multiple files offer a button
+to open the download list. The Clipboard toolbar button remains an optional, manually opened toolbox.
 
 Clipboard transfers use the authenticated desktop's ordered, encrypted control channel in acknowledged
 32 KiB chunks, capped at 64 MiB and 32 files. Native and WebView capture paths share the same clipboard

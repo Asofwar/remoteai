@@ -34,7 +34,7 @@ test('Ctrl+C copies remote files into the native clipboard without downloads or 
   await page.evaluate(content => { window.desktopTest.clipboard.content = content; }, content);
   await page.keyboard.press('Control+c');
   await expect.poll(() => page.evaluate(() => window.desktopTest.localClipboard.content)).toEqual(content);
-  await expect(page.getByText('已复制到本机，可直接粘贴。')).toBeVisible();
+  await expect(page.locator('.rd-clipboard-notice')).toHaveCount(0);
   await expect(page.getByRole('complementary', { name: '剪贴板' })).toHaveCount(0);
   await page.getByRole('button', { name: '关闭', exact: true }).click();
   expect(await page.evaluate(() => window.desktopTest.localClipboard.content)).toEqual(content);
@@ -48,8 +48,34 @@ test('an immediate paste waits for a remote copy instead of sending the previous
   await expect.poll(() => page.evaluate(() => window.desktopTest.clipboard.pastes)).toBe(1);
   expect(await page.evaluate(() => window.desktopTest.clipboard.content))
     .toEqual({ format: 'text', text: 'Remote clipboard 测试' });
-  expect(await page.evaluate(() => window.desktopTest.localClipboard.calls)).toEqual(['write', 'read']);
+  expect(await page.evaluate(() => window.desktopTest.localClipboard.calls)).toEqual(['write']);
   await expect(page.getByRole('complementary', { name: '剪贴板' })).toHaveCount(0);
+});
+
+test('a temporary local clipboard lock recovers silently without repeating a cut', async ({ page }) => {
+  await page.evaluate(() => { window.desktopTest.localClipboard.writeFailures = 1; });
+  await page.keyboard.press('Control+x');
+  await expect.poll(() => page.evaluate(() => window.desktopTest.localClipboard.content))
+    .toEqual({ format: 'text', text: 'Remote clipboard 测试' });
+  expect(await page.evaluate(() => window.desktopTest.localClipboard.calls)).toEqual(['write', 'write']);
+  expect(await page.evaluate(() => window.desktopTest.clipboard.requests
+    .filter(message => message.request.action === 'read').map(message => message.request)))
+    .toEqual([{ action: 'read', shortcut: 'cut' }]);
+  await expect(page.getByRole('complementary', { name: '剪贴板' })).toHaveCount(0);
+  await expect(page.locator('.rd-clipboard-notice')).toHaveCount(0);
+  await expect(page.locator('.rd-key-capture')).toBeFocused();
+});
+
+test('remote errors keep keyboard focus and never open the clipboard panel', async ({ page }) => {
+  await page.evaluate(() => { window.desktopTest.clipboard.error = '未能复制所选内容，请确认远程窗口后重试。'; });
+  await page.keyboard.press('Control+c');
+  await expect(page.locator('.rd-clipboard-notice')).toContainText('未能复制所选内容');
+  await expect(page.getByRole('complementary', { name: '剪贴板' })).toHaveCount(0);
+  await expect(page.locator('.rd-key-capture')).toBeFocused();
+  await page.evaluate(() => { window.desktopTest.clipboard.error = ''; });
+  await page.keyboard.press('Control+v');
+  await expect.poll(() => page.evaluate(() => window.desktopTest.clipboard.pastes)).toBe(1);
+  await expect(page.locator('.rd-clipboard-notice')).toHaveCount(0);
 });
 
 test('native text and PNG images transfer in both directions with regular copy and paste', async ({ page }) => {

@@ -24,6 +24,8 @@
 .rd-clipboard-notice { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
   max-width: min(400px, calc(100% - 24px)); padding: 8px 12px; border-radius: 8px; background: #202634ed;
   color: var(--app-faint, #e7edf8); font-size: 13px; overflow-wrap: anywhere; pointer-events: none; z-index: 3; }
+.rd-clipboard-notice button { pointer-events: auto; background: #355987; border-radius: 5px;
+  padding: 5px 8px; margin: 4px 0 0 8px; }
 @media (any-pointer: fine) {
   .rd-touch { cursor: default; }
 }

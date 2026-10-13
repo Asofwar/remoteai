@@ -94,7 +94,7 @@ test('copies remote text with Ctrl+C and Ctrl+X, and pastes local text through t
   await expect.poll(() => page.evaluate(() => window.desktopTest.clipboard.requests
     .filter(message => message.request.action === 'read').map(message => message.request)))
     .toEqual([{ action: 'read', shortcut: 'copy' }, { action: 'read', shortcut: 'cut' }]);
-  await expect(page.getByText('已复制到本机，可直接粘贴。')).toBeVisible();
+  await expect(page.locator('.rd-clipboard-notice')).toHaveCount(0);
   await page.locator('.rd-key-capture').evaluate(element => {
     const data = new DataTransfer(); data.setData('text/plain', '本机 → 远程\nclipboard');
     element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
@@ -151,13 +151,18 @@ test('retains received content when clipboard permission is denied and permits a
   await focusDesktop(page);
   await page.evaluate(() => { window.browserClipboard.denied = true; });
   await page.keyboard.press('Control+c');
-  await expect(page.getByRole('textbox', { name: '远程剪贴板文本' })).toHaveValue('Remote clipboard 测试');
+  await expect(page.getByRole('complementary', { name: '剪贴板' })).toHaveCount(0);
+  await expect(page.locator('.rd-key-capture')).toBeFocused();
   await expect(page.getByText('内容已收到，请点击“复制到本机”。')).toBeVisible();
+  const bounds = (await page.locator('.rd-clipboard-notice').boundingBox())!;
+  expect(bounds.width).toBeLessThanOrEqual(400);
   await page.evaluate(() => { window.browserClipboard.denied = false; });
   await page.getByRole('button', { name: '复制到本机' }).click();
   await expect.poll(() => page.evaluate(() => window.browserClipboard.text)).toBe('Remote clipboard 测试');
-  const bounds = (await page.getByRole('complementary', { name: '剪贴板' }).boundingBox())!;
-  expect(bounds.width).toBeLessThanOrEqual(400);
+  await expect(page.locator('.rd-clipboard-notice')).toHaveCount(0);
+  await expect(page.locator('.rd-key-capture')).toBeFocused();
+  expect(await page.evaluate(() => window.desktopTest.clipboard.requests
+    .filter(message => message.request.action === 'read').length)).toBe(1);
 });
 
 test('keeps an older host connected and explains the required update before using new controls', async ({ page }) => {
@@ -166,8 +171,9 @@ test('keeps an older host connected and explains the required update before usin
   await page.getByRole('button', { name: '远程桌面', exact: true }).click();
   await expect.poll(() => page.locator('video').evaluate(video => video.videoWidth)).toBeGreaterThan(0);
   await focusDesktop(page); await page.keyboard.press('a'); await page.keyboard.press('Control+c');
-  await expect(page.getByRole('complementary', { name: '剪贴板' }))
+  await expect(page.locator('.rd-clipboard-notice'))
     .toContainText('请更新远程电脑上的应用，启用实体键盘和剪贴板。');
+  await expect(page.getByRole('complementary', { name: '剪贴板' })).toHaveCount(0);
   expect(await page.evaluate(() => window.desktopTest.inputs.some(input => input.kind === 'keyboard'))).toBe(false);
   expect(await page.evaluate(() => window.desktopTest.clipboard.requests)).toEqual([]);
   await expect(page.getByText('桌面连接已断开，请重新连接。')).not.toBeVisible();

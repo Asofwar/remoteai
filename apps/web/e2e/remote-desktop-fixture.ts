@@ -49,7 +49,7 @@ export const desktopTest = { inputs: [] as DesktopInput[], settings: [] as Deskt
   reconnect: () => host.register('fixture', window.desktopRelayFixture?.iceServers ?? []),
   clipboard: clipboardFixture,
   localClipboard: { content: { format: 'text', text: 'Local clipboard' } as ClipboardContent,
-    calls: [] as string[], delay: 0 },
+    calls: [] as string[], delay: 0, writeFailures: 0 },
   selectedDisplays: [] as string[], inputDisplays: [] as string[],
   displays,
   peers: [] as RTCPeerConnection[],
@@ -97,6 +97,10 @@ Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {
     if (command === 'remote_desktop_write_local_clipboard') {
       desktopTest.localClipboard.calls.push('write');
       await new Promise(resolve => setTimeout(resolve, desktopTest.localClipboard.delay));
+      if (desktopTest.localClipboard.writeFailures > 0) {
+        desktopTest.localClipboard.writeFailures -= 1;
+        throw '无法访问剪贴板，请重新复制后再试。';
+      }
       desktopTest.localClipboard.content = structuredClone(args.content!); return;
     }
     if (command === 'remote_desktop_clipboard') return desktopClipboard(args.message!);

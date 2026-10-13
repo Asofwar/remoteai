@@ -24,6 +24,7 @@ import { useDesktopPlayback } from './useDesktopPlayback';
 import { useHardwarePointer } from './useDesktopMouse';
 import { useDesktopClipboard } from './useDesktopClipboard';
 import { DesktopClipboardPanel } from './DesktopClipboardPanel';
+import { DesktopClipboardNotice } from './DesktopClipboardNotice';
 import { DesktopInputSurface } from './DesktopInputSurface';
 import { DesktopKeyboard } from './DesktopKeyboard';
 import { useDesktopOrientation } from './useDesktopOrientation';
@@ -132,8 +133,7 @@ function DesktopViewer({ client, active, connected = true, close, localClipboard
         stats={{ visible: statsVisible, toggle: () => setStatsVisible(!statsVisible) }}
         close={() => setDisplay(false)} />}
       {clipboard.open && <DesktopClipboardPanel clipboard={clipboard} />}
-      {!clipboard.open && clipboard.status && <div className="rd-clipboard-notice" role="status">
-        {t(clipboard.status)}{clipboard.progress !== undefined && ` ${clipboard.progress}%`}</div>}
+      <DesktopClipboardNotice clipboard={clipboard} />
       {viewOnly && session.stream && <div className="rd-clipboard-notice" role="status">{t('仅观看')}</div>}
       {!viewOnly && hardware && session.stream && !session.capabilities.keyboard && !clipboard.status
         && <div className="rd-clipboard-notice" role="status">

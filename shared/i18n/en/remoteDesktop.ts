@@ -119,6 +119,8 @@ export const remoteDesktopMessages: Record<string, string> = {
     'Up to 64 MB and 32 files at a time. Remote files download to this device. Zip folders before copying.',
   '正在传输剪贴板…': 'Transferring clipboard…', '已粘贴到远程电脑。': 'Pasted to the remote computer.',
   '已复制到本机。': 'Copied to this device.', '文件已收到，可在下方下载。': 'Files received. Download them below.',
+  '文件已收到，点击“下载文件”保存。': 'Files received. Select “Download files” to save them.',
+  '下载文件': 'Download files',
   '内容已收到，请点击“复制到本机”。': 'Content received. Click “Copy to this device”.',
   '剪贴板传输失败，请重试。': 'Clipboard transfer failed. Please try again.',
   '请等待桌面连接后重试。': 'Wait for the desktop to connect, then try again.',

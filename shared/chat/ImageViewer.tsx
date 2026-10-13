@@ -1,5 +1,5 @@
 import { useRef, useState, type MouseEvent, type PointerEvent } from 'react';
-import { Image as ImageIcon } from 'lucide-react';
+import { Download, Image as ImageIcon, LoaderCircle } from 'lucide-react';
 import { useImageViewer } from './useImageViewer';
 import type { PreviewImageLoader } from '../remote-chat/previewProgress';
 import { PreviewTransferProgress } from './PreviewTransferProgress';
@@ -49,13 +49,16 @@ export function ImageViewer({ thumbnail, description, load, close, download, con
     </div>
     <button type="button" className="cs-image-close" aria-label={translate('关闭图片')} onClick={close}>×</button>
     {download && <button type="button" className="cs-image-download" disabled={saving || image.loading}
+      aria-label={translate(saving ? '正在保存…' : '下载图片')} aria-busy={saving}
       onClick={async () => {
         setSaving(true);
         setDownloadError('');
         try { await download(await image.loadOriginal()); }
         catch (error) { setDownloadError(error instanceof Error ? error.message : translate('下载失败，请重试。')); }
         finally { setSaving(false); }
-      }}>{translate(saving ? '正在保存…' : '下载图片')}</button>}
+      }}>{saving ? <LoaderCircle size={24} className="cs-image-download-spinner" aria-hidden="true" />
+        : <Download size={24} aria-hidden="true" />}
+      <span>{translate(saving ? '正在保存…' : '下载图片')}</span></button>}
     <div className="cs-image-toolbar">
       <button type="button" aria-label={translate('缩小图片')} onClick={() => setTransform((v) => ({ ...v,
         scale: clampZoom(v.scale / 1.5) }))}>−</button>

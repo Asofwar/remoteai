@@ -1,10 +1,11 @@
 .cs-image-ai { position: absolute; bottom: max(16px, env(safe-area-inset-bottom)); left: 50%;
   transform: translateX(-50%); max-width: calc(100% - 24px); color: #ddd; }
 .cs-image-ai-tools { display: flex; align-items: center; gap: 4px; padding: 6px 10px;
-  border-radius: 18px; background: #2c2c2c; width: max-content; max-width: 100%; overflow-x: auto; }
+  border-radius: 18px; background: #2c2c2c; width: max-content; max-width: 100%; box-sizing: border-box;
+  overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; touch-action: pan-x; }
 .cs-image-ai-tools > svg { flex-shrink: 0; }
 .cs-image-ai-tools button { display: flex; align-items: center; gap: 8px; padding: 10px;
-  white-space: nowrap; min-height: 44px; border-radius: 12px; font-size: 15px; }
+  white-space: nowrap; flex-shrink: 0; min-height: 44px; border-radius: 12px; font-size: 15px; }
 .cs-image-ai-tools button:hover, .cs-image-ai-tools button[aria-pressed=true] { background: #424242; }
 .cs-image-ai button:disabled { opacity: .45; cursor: default; }
 .cs-image-ai-form { box-sizing: border-box; width: 400px; max-width: 100%; margin: 0 auto 12px;
@@ -26,6 +27,6 @@
 @media (max-width: 640px) {
   .cs-image-ai { width: calc(100% - 24px); }
   .cs-image-ai-tools { box-sizing: border-box; width: 100%; }
-  .cs-image-ai-tools button { flex-direction: column; gap: 4px; font-size: 12px; padding: 8px 6px; }
+  .cs-image-ai-tools button { flex-direction: column; gap: 4px; font-size: 12px; padding: 8px 10px; }
   .cs-image-ai-tools > svg { display: none; }
 }

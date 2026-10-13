@@ -5,9 +5,13 @@ import { useImageAiEdit } from '../../../../shared/chat/useImageAiEdit';
 import { t } from '../i18n';
 
 const icons = ['draw', 'comment-plus-outline', 'image-filter-center-focus', 'eraser', 'resize'] as const;
-export function ImageAiToolbar({ load, close }: { load: () => Promise<string>; close: () => void }) {
+interface Props {
+  load: () => Promise<string>; close: () => void;
+  originalAction?: { label: string; onPress: () => void };
+}
+export function ImageAiToolbar({ load, close, originalAction }: Props) {
   const editor = useImageAiEdit({ load, close });
-  if (!editor.available) return null;
+  if (!editor.available && !originalAction) return null;
   const selected = IMAGE_AI_TOOLS.find(item => item.id === editor.tool);
   return <View>
     {selected && <ScrollView style={styles.form} keyboardShouldPersistTaps="handled">
@@ -34,14 +38,20 @@ export function ImageAiToolbar({ load, close }: { load: () => Promise<string>; c
       </View>
     </ScrollView>}
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.toolbar}
-      contentContainerStyle={styles.tools} keyboardShouldPersistTaps="handled">
-      {IMAGE_AI_TOOLS.map((item, index) => <Pressable key={item.id} accessibilityRole="button"
+      contentContainerStyle={styles.tools} keyboardShouldPersistTaps="handled" directionalLockEnabled
+      alwaysBounceHorizontal={false}>
+      {originalAction && <Pressable accessibilityRole="button" accessibilityLabel={originalAction.label}
+        onPress={originalAction.onPress} style={styles.tool}>
+        <MaterialCommunityIcons name="image-outline" size={20} color="#ddd" />
+        <Text style={styles.label} numberOfLines={1}>{originalAction.label}</Text>
+      </Pressable>}
+      {editor.available && IMAGE_AI_TOOLS.map((item, index) => <Pressable key={item.id} accessibilityRole="button"
         accessibilityLabel={t(item.label)} accessibilityState={{ selected: item.id === editor.tool,
           disabled: editor.busy || !editor.enabled }} disabled={editor.busy || !editor.enabled}
         onPress={() => editor.select(item.id)} style={[styles.tool, item.id === editor.tool && styles.selected,
           (editor.busy || !editor.enabled) && styles.disabled]}>
         <MaterialCommunityIcons name={icons[index]} size={20} color="#ddd" />
-        <Text style={styles.label}>{t(item.label)}</Text>
+        <Text style={styles.label} numberOfLines={1}>{t(item.label)}</Text>
       </Pressable>)}
     </ScrollView>
   </View>;
@@ -50,7 +60,7 @@ const styles = StyleSheet.create({
   toolbar: { borderRadius: 18, backgroundColor: '#2c2c2c', flexGrow: 0 },
   tools: { flexGrow: 1, justifyContent: 'space-around', padding: 4 },
   tool: { alignItems: 'center', justifyContent: 'center', minHeight: 56, paddingHorizontal: 10, gap: 4,
-    borderRadius: 12 },
+    borderRadius: 12, flexShrink: 0 },
   selected: { backgroundColor: '#454545' }, disabled: { opacity: 0.45 },
   label: { fontSize: 12, color: '#ddd' }, text: { color: '#ddd', fontSize: 14 },
   title: { color: '#fff', fontSize: 17, fontWeight: '600', marginBottom: 12 },

@@ -88,6 +88,23 @@ test("reapplies saved settings on native resume and restores the original transp
   await assert.rejects(runtime.adapter.save("one", 272000));
 });
 
+test("capacity changes and native resumes replace stale auto-compaction thresholds", async () => {
+  const runtime = createRuntime();
+  for (const [capacity, limit] of [[1000000, 900000], [400000, 360000], [1001, 900]]) {
+    await runtime.adapter.save("one", capacity);
+    const reload = runtime.calls.filter(call => call.method === "thread/resume" && call.params.config).at(-1);
+    assert.equal(reload.params.config.model_auto_compact_token_limit, limit);
+    await runtime.manager.requestClient.sendRequest("thread/resume", { threadId: "one",
+      config: { model_auto_compact_token_limit: 250000, other: true } });
+    assert.equal(runtime.calls.at(-1).params.config.model_auto_compact_token_limit, limit);
+    assert.equal(runtime.calls.at(-1).params.config.other, true);
+  }
+  await runtime.adapter.save("one", null);
+  const reset = runtime.calls.filter(call => call.method === "thread/resume" && call.params.config).at(-1);
+  assert.equal(reset.params.config.model_context_window, undefined);
+  assert.equal(reset.params.config.model_auto_compact_token_limit, undefined);
+});
+
 test("leaves ordinary native interrupts untouched and honors user-stop after the reply has become idle", async () => {
   let release;
   let reached;

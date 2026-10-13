@@ -167,6 +167,7 @@ fn model_catalog_context_override_updates_limits_and_etag() {
             "slug": GPT_5_6_SOL_MODEL,
             "context_window": 272_000,
             "max_context_window": 872_000,
+            "auto_compact_token_limit": 250_000,
             "effective_context_window_percent": 95
         }]
     });
@@ -187,6 +188,7 @@ fn model_catalog_context_override_updates_limits_and_etag() {
 
     assert_eq!(updated["models"][0]["context_window"], 1_000_000);
     assert_eq!(updated["models"][0]["max_context_window"], 1_000_000);
+    assert!(updated["models"][0]["auto_compact_token_limit"].is_null());
     assert_eq!(updated["models"][0]["effective_context_window_percent"], 95);
     assert!(payload.response_headers[0].1.starts_with("\"codex-switch-"));
 }
@@ -203,6 +205,31 @@ fn model_catalog_refresh_removes_conditional_request_headers() {
         unconditional_model_catalog_headers(&headers),
         vec![("User-Agent".to_string(), "Codex".to_string())]
     );
+}
+
+#[test]
+fn catalog_compaction_defaults_follow_capacity_overrides_only() {
+    let original = json!({"models": [
+        {"slug": "configured", "context_window": 272_000, "auto_compact_token_limit": 250_000},
+        {"slug": "untouched", "context_window": 272_000, "auto_compact_token_limit": 250_000}
+    ]});
+    for capacity in [1_000_000, 128_000] {
+        let mut catalog = original.clone();
+        let overrides = std::collections::BTreeMap::from([("configured".to_string(), capacity)]);
+        assert!(apply_official_context_windows(&mut catalog, 0, &overrides));
+        assert_eq!(catalog["models"][0]["context_window"], capacity);
+        assert_eq!(catalog["models"][0]["max_context_window"], capacity);
+        assert!(catalog["models"][0]["auto_compact_token_limit"].is_null());
+        assert_eq!(catalog["models"][1], original["models"][1]);
+    }
+    let mut catalog = original.clone();
+    assert!(!apply_official_context_windows(&mut catalog, 0, &Default::default()));
+    assert_eq!(catalog, original);
+    assert!(apply_official_context_windows(&mut catalog, 1_000_000, &Default::default()));
+    for model in catalog["models"].as_array().unwrap() {
+        assert_eq!(model["context_window"], 1_000_000);
+        assert!(model["auto_compact_token_limit"].is_null());
+    }
 }
 
 #[test]

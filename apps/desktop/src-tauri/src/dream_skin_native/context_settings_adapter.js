@@ -60,8 +60,7 @@ class NativeContextAdapter {
   async resumePending(params, options, pending) {
     const preserved = contextResumeParams(params.threadId, pending.snapshot);
     delete preserved.excludeTurns;
-    const config = { ...params.config, ...preserved.config };
-    if (pending.capacity !== null) config.model_context_window = pending.capacity;
+    const config = contextCapacityConfig({ ...params.config, ...preserved.config }, pending.capacity);
     const result = await this.original.call(this.client, "thread/resume", { ...params, ...preserved, config }, options);
     pending.resumed = true;
     return result;
@@ -88,7 +87,7 @@ class NativeContextAdapter {
     const capacity = readContextCapacity(id);
     if (method === "thread/resume") {
       const result = await this.original.call(this.client, method, capacity === null ? params
-        : { ...params, config: { ...params.config, model_context_window: capacity } }, options);
+        : { ...params, config: contextCapacityConfig(params.config, capacity) }, options);
       // An already loaded thread may ignore config. Confirm by reloading before its next turn.
       if (capacity === null) current.applied = capacity;
       return result;

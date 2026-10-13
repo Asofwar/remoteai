@@ -614,6 +614,7 @@ export function AccountTable({
           </Tooltip>
         </span>
       ), key: "account", dataIndex: "email", width: 280, fixed: "left",
+      showSorterTooltip: { target: "sorter-icon", styles: { root: { maxWidth: 400 } } },
       sortOrder: columnSort?.column === "account" ? columnSort.order : null,
       sorter: (left, right, sortOrder) => compareKeepingAttentionLast(
         left,

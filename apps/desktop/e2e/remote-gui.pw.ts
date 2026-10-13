@@ -9,6 +9,7 @@ import type { desktopTest } from '../../web/e2e/remote-desktop-fixture';
 import './chat-harness-types';
 import { checkGitDiffReview } from './git-diff-checks';
 import { checkRemoteFileDrop } from './file-drop-checks';
+import { checkThreadSidebarResize } from './thread-sidebar-resize';
 
 declare global { interface Window { desktopTest: typeof desktopTest } }
 
@@ -54,6 +55,33 @@ async function chooseHost(page: Page, name: string) {
   await page.getByRole('menu', { name: '主机列表' }).getByRole('menuitemradio', { name: new RegExp(name) }).click();
   await expect(page.getByRole('menu', { name: '主机列表' })).toBeHidden();
 }
+
+test('remote chat sidebar resizes and restores its width after hiding and mobile layout',
+  async ({ context, page }) => {
+    const host = await context.newPage();
+    await host.goto(`/e2e/chat-harness.html?role=desktop&demo&device=computer-one&blocked=false`
+      + `&socket=${encodeURIComponent(endpoint)}`);
+    await expect(host.locator('#status')).toHaveText('registered');
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`/e2e/remote-gui-harness.html?socket=${encodeURIComponent(endpoint)}`);
+    await chooseHost(page, 'Office PC');
+    await expect(page.locator('.gui-remote-workspace:visible .chat-connection-status'))
+      .toContainText('P2P', { timeout: 20_000 });
+    await checkThreadSidebarResize(page);
+    const handle = page.getByRole('separator', { name: '调整聊天列表宽度' });
+    await page.getByRole('button', { name: '收起聊天列表', exact: true }).click();
+    await expect(handle).toHaveCount(0);
+    await page.getByRole('button', { name: '打开聊天列表', exact: true }).click();
+    await expect(handle).toHaveAttribute('aria-valuenow', '520');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('button', { name: '打开聊天列表', exact: true }).click();
+    await expect(page.locator('.chat-drawer:visible .gui-remote-sidebar')).toBeVisible();
+    await expect(handle).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect(handle).toHaveAttribute('aria-valuenow', '520');
+    await page.screenshot({ path: '../../.codex-tmp/remote-chat-sidebar-resize.png' });
+  });
 
 async function accountSummaryRows(page: Page) {
   return page.getByRole('button', { name: /^切换 GUI 账户：/ }).evaluate(button => {

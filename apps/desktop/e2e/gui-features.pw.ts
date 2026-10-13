@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { checkThreadSidebarResize } from "./thread-sidebar-resize";
 
 const thread = { id: "conversation", cwd: "", name: "保留的对话", preview: "对话内容", updatedAt: 1, turns: [] };
 const task = { id: "release", title: "跟踪 Remote AI 发布", prompt: "检查新版本发布。", cwd: "",
@@ -75,6 +76,26 @@ async function openGui(page: Page, suffix = "") {
   const expand = page.getByRole("button", { name: "展开对话列表" });
   if (await expand.isVisible()) await expand.click();
 }
+
+test("local chat sidebar resizes, remembers its width and adapts to the available space", async ({ page }) => {
+  await mockCommands(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await openGui(page);
+  await checkThreadSidebarResize(page);
+  const handle = page.getByRole("separator", { name: "调整聊天列表宽度" });
+  await page.getByRole("button", { name: "收起对话列表" }).click();
+  await expect(handle).toHaveCount(0);
+  await page.getByRole("button", { name: "展开对话列表" }).click();
+  await expect(handle).toHaveAttribute("aria-valuenow", "520");
+  await page.reload();
+  await expect(handle).toHaveAttribute("aria-valuenow", "520");
+  await page.setViewportSize({ width: 700, height: 900 });
+  await expect(handle).toHaveAttribute("aria-valuenow", "380");
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(700);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(handle).toHaveAttribute("aria-valuenow", "520");
+  await page.screenshot({ path: "../../.codex-tmp/local-chat-sidebar-resize.png" });
+});
 
 test("feature navigation preserves drafts, filters tasks and scopes compact plugin cards to the GUI", async ({ page }) => {
   const calls = await mockCommands(page);

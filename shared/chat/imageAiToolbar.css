@@ -20,15 +20,12 @@
 .cs-image-ai-actions button { padding: 10px; min-height: 44px; border-radius: 8px; background: #454545; }
 .cs-image-viewer:has(.cs-image-ai) .cs-image-toolbar { bottom: 88px; }
 .cs-image-viewer:has(.cs-image-ai) .cs-image-stage { bottom: 156px; }
-.cs-image-viewer:has(.cs-image-ai) .cs-image-original,
 .cs-image-viewer:has(.cs-image-ai) .cs-image-status { bottom: 148px; }
-.cs-image-viewer:has(.cs-image-ai) .cs-image-original ~ .cs-image-status { bottom: 200px; }
 .cs-image-viewer:has(.cs-image-ai-form) .cs-image-toolbar,
-.cs-image-viewer:has(.cs-image-ai-form) .cs-image-original,
 .cs-image-viewer:has(.cs-image-ai-form) .cs-image-status { visibility: hidden; }
 @media (max-width: 640px) {
   .cs-image-ai { width: calc(100% - 24px); }
   .cs-image-ai-tools { box-sizing: border-box; width: 100%; }
-  .cs-image-ai-tools button { flex-direction: column; gap: 4px; font-size: 12px; padding: 8px; }
+  .cs-image-ai-tools button { flex-direction: column; gap: 4px; font-size: 12px; padding: 8px 6px; }
   .cs-image-ai-tools > svg { display: none; }
 }

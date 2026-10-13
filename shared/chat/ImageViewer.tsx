@@ -1,4 +1,5 @@
 import { useRef, useState, type MouseEvent, type PointerEvent } from 'react';
+import { Image as ImageIcon } from 'lucide-react';
 import { useImageViewer } from './useImageViewer';
 import type { PreviewImageLoader } from '../remote-chat/previewProgress';
 import { PreviewTransferProgress } from './PreviewTransferProgress';
@@ -55,8 +56,6 @@ export function ImageViewer({ thumbnail, description, load, close, download, con
         catch (error) { setDownloadError(error instanceof Error ? error.message : translate('下载失败，请重试。')); }
         finally { setSaving(false); }
       }}>{translate(saving ? '正在保存…' : '下载图片')}</button>}
-    {!image.url && !image.loading && <button type="button" className="cs-image-original" onClick={image.request}>
-        {translate(image.error ? '重新加载原图' : '查看原图')}</button>}
     <div className="cs-image-toolbar">
       <button type="button" aria-label={translate('缩小图片')} onClick={() => setTransform((v) => ({ ...v,
         scale: clampZoom(v.scale / 1.5) }))}>−</button>
@@ -67,7 +66,10 @@ export function ImageViewer({ thumbnail, description, load, close, download, con
       <button type="button" aria-label={translate('旋转图片')} onClick={() => setTransform((v) => ({ ...v,
         rotation: (v.rotation + 90) % 360 }))}>↻</button>
     </div>
-    <ImageAiToolbar load={image.loadOriginal} close={close} translate={translate} />
+    <ImageAiToolbar load={image.loadOriginal} close={close} translate={translate}
+      originalAction={!image.url && !image.loading && <button type="button" className="cs-image-original"
+        onClick={image.request}><ImageIcon size={20} aria-hidden="true" />
+        <span>{translate(image.error ? '重新加载原图' : '查看原图')}</span></button>} />
     {image.loading && <div className="cs-image-status cs-image-transfer">
       <PreviewTransferProgress progress={image.progress} label={translate('正在加载原图…')} /></div>}
     {downloadError && <div className="cs-image-status" role="status">{downloadError}</div>}

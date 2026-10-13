@@ -1,14 +1,16 @@
+import type { ReactNode } from 'react';
 import { GripVertical, Pencil, MessageSquarePlus, Scan, Eraser, RectangleHorizontal } from 'lucide-react';
 import { IMAGE_AI_TOOLS } from './imageAiEdit';
 import { useImageAiEdit } from './useImageAiEdit';
 import './imageAiToolbar.css';
 
 const icons = [Pencil, MessageSquarePlus, Scan, Eraser, RectangleHorizontal];
-export function ImageAiToolbar({ load, close, translate: t }: {
+export function ImageAiToolbar({ load, close, translate: t, originalAction }: {
   load: () => Promise<string>; close: () => void; translate: (text: string) => string;
+  originalAction?: ReactNode;
 }) {
   const editor = useImageAiEdit({ load, close });
-  if (!editor.available) return null;
+  if (!editor.available) return originalAction ?? null;
   const selected = IMAGE_AI_TOOLS.find(item => item.id === editor.tool);
   return <div className="cs-image-ai">
     {selected && <form className="cs-image-ai-form" onSubmit={event => {
@@ -33,6 +35,7 @@ export function ImageAiToolbar({ load, close, translate: t }: {
     </form>}
     <div className="cs-image-ai-tools" role="toolbar" aria-label={t('图片编辑')}>
       <GripVertical size={18} aria-hidden="true" />
+      {originalAction}
       {IMAGE_AI_TOOLS.map((item, index) => {
         const Icon = icons[index];
         return <button type="button" key={item.id} disabled={editor.busy || !editor.enabled}

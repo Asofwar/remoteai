@@ -1,6 +1,6 @@
 import type { GuiEvent, Thread } from '../pages/codexGui/types';
 import { updateThread } from '../../../../shared/remote-chat/client/events';
-import { mergeHistory } from '../../../../shared/remote-chat/client/history';
+import { discardStaleRunningTurns, mergeHistory } from '../../../../shared/remote-chat/client/history';
 
 const MAX_LIVE_THREADS = 16;
 
@@ -33,8 +33,14 @@ export class LiveHistory {
     if (this.threads.size > MAX_LIVE_THREADS) this.threads.delete(this.threads.keys().next().value!);
   }
 
-  merge(snapshot: Thread) {
+  async read(threadId: string, read: () => Promise<{ thread: Thread }>): Promise<Thread> {
+    const before = this.threads.get(threadId);
+    const { thread: snapshot } = await read();
     const live = this.threads.get(snapshot.id);
-    return live ? mergeHistory(snapshot, live, { ...snapshot, turns: [], tokenUsage: undefined }) : snapshot;
+    if (!live) return snapshot;
+    const empty = { ...snapshot, turns: [], tokenUsage: undefined };
+    const current = discardStaleRunningTurns(snapshot, live, before ?? empty);
+    this.threads.set(snapshot.id, current);
+    return mergeHistory(snapshot, current, empty);
   }
 }

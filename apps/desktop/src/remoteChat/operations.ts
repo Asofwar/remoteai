@@ -209,8 +209,10 @@ export class ChatOperations {
       if (typeof body.threadId !== 'string') throw new Error('请选择聊天后重试。');
       const known = parseHistoryVersion(body.known);
       const window = parseHistoryWindow(body.window);
-      const { thread } = await guiApi.request<{ thread: Thread }>({ operation: 'read', threadId: body.threadId });
-      const current = effectiveProjectThread(this.liveHistory.merge(thread));
+      const threadId = body.threadId;
+      const thread = await this.liveHistory.read(threadId,
+        () => guiApi.request<{ thread: Thread }>({ operation: 'read', threadId }));
+      const current = effectiveProjectThread(thread);
       const sliced = sliceHistory(acknowledgedMessages.merge(current), window);
       return { ...historyDelta(this.images.prepare(sliced.thread, thread.id), known), page: sliced.page };
     }

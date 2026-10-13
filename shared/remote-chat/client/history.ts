@@ -31,9 +31,21 @@ function mergeTurn(snapshot: Turn, live: Turn, before?: Turn, authoritative = fa
   return { ...snapshot, ...live, status: terminal, items: order.map(id => items.get(id)!) };
 }
 
+/** A settled PC snapshot retires missing running turns, except events received during the read. */
+export function discardStaleRunningTurns(snapshot: Thread, live: Thread, before: Thread): Thread {
+  if (!snapshot.turns || !['idle', 'notLoaded'].includes(snapshot.status?.type ?? '')
+    || snapshot.turns.some(turn => turn.status === 'inProgress')) return live;
+  const retained = new Set(snapshot.turns.map(turn => turn.id));
+  const original = new Map(before.turns?.map(turn => [turn.id, turn]));
+  const turns = live.turns?.filter(turn => turn.status !== 'inProgress'
+    || retained.has(turn.id) || turn !== original.get(turn.id));
+  return { ...live, turns };
+}
+
 /** Preserve notifications received while a history snapshot was in flight. */
 export function mergeHistory(snapshot: Thread, live: Thread, before: Thread, authoritative = false): Thread {
   if (snapshot.id !== live.id) return snapshot;
+  live = discardStaleRunningTurns(snapshot, live, before);
   const original = new Map(before.turns?.map((turn) => [turn.id, turn]));
   const turns = new Map(snapshot.turns?.map((turn) => [turn.id, turn]));
   for (const turn of live.turns ?? []) {

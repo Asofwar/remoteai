@@ -4,6 +4,17 @@
 
 迁移前应结束所选会话中的任务，并使用目标 Home 启动一次 Codex，初始化会话数据库。
 
+## 迁移时选择模型提供方
+
+迁移弹窗支持 `openai`、`codex-switch-local` 和 `codex-switch-gui`。迁入内置 Codex GUI 时默认选择
+`codex-switch-gui`，其他目标默认选择 `openai`；可在确认前切换。请选择目标中已配置的提供方。
+
+迁移会同步修改所有迁入会话（包括关联会话）的 rollout 元数据和状态数据库中的 `model_provider`，
+避免把来源专用的提供方带到目标后出现“Model provider not found”。普通和压缩的历史文件均支持，
+聊天内容、项目路径保持不变，目标已有的会话仍然跳过。目标配置和认证信息不随迁移修改。
+
+原始备份保留来源提供方，失败时按原样还原。旧调用未传 `modelProvider` 时继续保留原值。
+
 ## 日志冲突修复
 
 两个 Home 的 SQLite 日志 ID 分别自增，相同数字不代表同一条日志。直接恢复原 ID 会触发 `INSERT OR REPLACE`，覆盖目标其他会话的日志。

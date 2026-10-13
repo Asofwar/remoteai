@@ -1,4 +1,5 @@
 use super::super::home_migration::{migrate_between_homes, HomeMigrationError};
+use super::super::home_migration_provider::MigrationDestination;
 use super::*;
 
 pub(super) fn source_fixture() -> Fixture {
@@ -14,7 +15,10 @@ pub(super) fn migrate(
 ) -> Result<MigrationReport, HomeMigrationError> {
     migrate_between_homes(
         &source.home,
-        &target.home,
+        MigrationDestination {
+            path: &target.home,
+            model_provider: None,
+        },
         &source.bin,
         ids.iter().map(|id| id.to_string()).collect(),
     )
@@ -84,7 +88,15 @@ fn same_home_alias_and_empty_selection_are_rejected_without_writes() {
     let before = source.dump(THREAD);
     let alias = source.home.join(".");
     assert!(matches!(
-        migrate_between_homes(&source.home, &alias, &source.bin, vec![THREAD.into()]),
+        migrate_between_homes(
+            &source.home,
+            MigrationDestination {
+                path: &alias,
+                model_provider: None
+            },
+            &source.bin,
+            vec![THREAD.into()]
+        ),
         Err(HomeMigrationError::SameHome)
     ));
     let target = source_fixture();
@@ -113,9 +125,16 @@ fn uninitialized_target_keeps_original_conversation() {
     let target = source.root.join("new-home");
     fs::create_dir_all(&target).unwrap();
     let before = source.dump(THREAD);
-    assert!(
-        migrate_between_homes(&source.home, &target, &source.bin, vec![THREAD.into()]).is_err()
-    );
+    assert!(migrate_between_homes(
+        &source.home,
+        MigrationDestination {
+            path: &target,
+            model_provider: None
+        },
+        &source.bin,
+        vec![THREAD.into()]
+    )
+    .is_err());
     assert_eq!(source.dump(THREAD), before);
     assert!(source.snapshot().path.exists());
 }

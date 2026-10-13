@@ -101,40 +101,47 @@ fn rewrite_rollout_provider(path: &Path, target_provider: &str) -> Result<bool, 
         .map_err(|error| error.to_string())?;
     let mut meta: Value =
         serde_json::from_str(first.trim_end()).map_err(|error| error.to_string())?;
-    let Some(provider) = meta.pointer_mut("/payload/model_provider") else {
-        return Ok(false);
-    };
-    if provider.as_str() == Some(target_provider) {
+    let payload = meta
+        .get_mut("payload")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| "会话信息不完整，请恢复后重试".to_string())?;
+    if payload.get("model_provider").and_then(Value::as_str) == Some(target_provider) {
         return Ok(false);
     }
-    *provider = Value::String(target_provider.to_string());
-    let temporary = path.with_extension(format!("visibility-{}.tmp", Uuid::new_v4()));
+    payload.insert(
+        "model_provider".to_string(),
+        Value::String(target_provider.to_string()),
+    );
+    let parent = path.parent().ok_or_else(|| "会话目录无效".to_string())?;
+    let mut temporary = tempfile::NamedTempFile::new_in(parent).map_err(|error| error.to_string())?;
     if path.extension().and_then(|value| value.to_str()) == Some("zst") {
-        let output = File::create(&temporary).map_err(|error| error.to_string())?;
-        let mut encoder =
-            zstd::stream::write::Encoder::new(output, 3).map_err(|error| error.to_string())?;
-        serde_json::to_writer(&mut encoder, &meta).map_err(|error| error.to_string())?;
-        encoder
-            .write_all(b"\n")
+        let mut encoder = zstd::stream::write::Encoder::new(temporary.as_file_mut(), 3)
             .map_err(|error| error.to_string())?;
-        std::io::copy(&mut reader, &mut encoder).map_err(|error| error.to_string())?;
-        encoder
-            .finish()
-            .map_err(|error| error.to_string())?
-            .sync_all()
-            .map_err(|error| error.to_string())?;
+        write_rollout_metadata(&mut encoder, &meta, &mut reader)?;
+        encoder.finish().map_err(|error| error.to_string())?;
     } else {
-        let mut output = File::create(&temporary).map_err(|error| error.to_string())?;
-        serde_json::to_writer(&mut output, &meta).map_err(|error| error.to_string())?;
-        output.write_all(b"\n").map_err(|error| error.to_string())?;
-        std::io::copy(&mut reader, &mut output).map_err(|error| error.to_string())?;
-        output.sync_all().map_err(|error| error.to_string())?;
+        write_rollout_metadata(temporary.as_file_mut(), &meta, &mut reader)?;
     }
+    temporary
+        .as_file()
+        .sync_all()
+        .map_err(|error| error.to_string())?;
     // Windows does not allow replacing the rollout while its decoder still owns
     // an open handle to the original file.
     drop(reader);
-    replace_file(&temporary, path).map_err(|error| error.to_string())?;
+    temporary.persist(path).map_err(|error| error.to_string())?;
     Ok(true)
+}
+
+fn write_rollout_metadata(
+    mut output: impl Write,
+    meta: &Value,
+    reader: &mut impl Read,
+) -> Result<(), String> {
+    serde_json::to_writer(&mut output, meta).map_err(|error| error.to_string())?;
+    output.write_all(b"\n").map_err(|error| error.to_string())?;
+    std::io::copy(reader, &mut output).map_err(|error| error.to_string())?;
+    Ok(())
 }
 
 fn rebuild_index_from_snapshots(
@@ -331,13 +338,12 @@ pub(crate) fn reconcile_codex_thread_visibility_blocking<R: Runtime>(
                 first_rollout_value(&item.path)
                     .ok()
                     .flatten()
-                    .and_then(|value| {
+                    .is_some_and(|value| {
                         value
                             .pointer("/payload/model_provider")
                             .and_then(Value::as_str)
-                            .map(str::to_string)
+                            != Some(provider.as_str())
                     })
-                    .is_some_and(|value| value != provider)
             })
             .count();
     }

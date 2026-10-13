@@ -32,6 +32,7 @@ async function mockCommands(page: Page) {
     }
     if (command === "measure_codex_thread_tokens") result = [];
     if (command === "migrate_codex_threads_to_home") {
+      await new Promise((resolve) => setTimeout(resolve, 800));
       migrated = true;
       result = { requestedCount: 1, migratedCount: 1, skippedCount: 0, message: "已迁移 1 条会话" };
     }
@@ -167,7 +168,15 @@ test("migration reuses session management in the chat pane and excludes the GUI 
   await pane.getByRole("checkbox", { name: "全选全部会话" }).check();
   await pane.getByRole("button", { name: "对话迁移", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "确认迁移对话？", exact: true });
-  await expect(dialog.getByRole("combobox")).toHaveCount(0);
+  const provider = dialog.getByRole("combobox", { name: "模型提供方（model provider）" });
+  await expect(dialog.getByRole("combobox")).toHaveCount(1);
+  await expect(dialog.getByText("codex-switch-gui", { exact: true })).toBeVisible();
+  await provider.press("ArrowDown");
+  await expect(page.locator(".ant-select-dropdown:visible .ant-select-item-option")).toHaveText([
+    "openai", "codex-switch-local", "codex-switch-gui",
+  ]);
+  await page.locator(".ant-select-dropdown:visible .ant-select-item-option")
+    .filter({ hasText: "codex-switch-local" }).click();
   await expect(dialog.getByText("默认目录 · C:/Users/test/.codex", { exact: true })).toBeVisible();
   await expect(dialog.getByText("内置 Codex GUI", { exact: true })).toBeVisible();
   await expect(dialog.getByText("所选对话", { exact: true })).toBeVisible();
@@ -180,11 +189,20 @@ test("migration reuses session management in the chat pane and excludes the GUI 
   expect(calls.filter((call) => call.command === "migrate_codex_threads_to_home")).toEqual([]);
   await pane.getByRole("button", { name: "对话迁移", exact: true }).click();
   await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("codex-switch-gui", { exact: true })).toBeVisible();
+  await provider.press("ArrowDown");
+  await page.locator(".ant-select-dropdown:visible .ant-select-item-option")
+    .filter({ hasText: /^openai$/ }).click();
   await expect(pane.getByRole("combobox", { name: "选择管理的 Codex Home" })).toBeDisabled();
   await dialog.getByRole("button", { name: "开始迁移", exact: true }).click();
+  await expect(provider).toBeDisabled();
+  const migrationBeat = Number(await page.getByLabel("刷新次数").textContent());
+  await expect.poll(async () => Number(await page.getByLabel("刷新次数").textContent()))
+    .toBeGreaterThan(migrationBeat + 3);
   await expect(dialog).toBeHidden();
   expect(calls.find((call) => call.command === "migrate_codex_threads_to_home")?.args).toEqual({
-    request: { homeId: "default", targetHomeId: "codex-gui", sessionIds: [sourceThread.sessionId] },
+    request: { homeId: "default", targetHomeId: "codex-gui", sessionIds: [sourceThread.sessionId],
+      modelProvider: "openai" },
   });
   expect(calls.filter((call) => call.command === "browse_codex_threads")
     .every((call) => call.args.homeId !== "codex-gui")).toBe(true);
@@ -208,4 +226,11 @@ test("migration list fits a narrow dark chat pane", async ({ page }) => {
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   expect(await pane.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   await page.screenshot({ path: "../../.codex-tmp/gui-migration-dark-narrow.png", animations: "disabled" });
+  await pane.getByRole("checkbox", { name: "全选全部会话" }).check();
+  await pane.getByRole("button", { name: "对话迁移", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "确认迁移对话？", exact: true });
+  await expect(dialog.getByRole("combobox", { name: "模型提供方（model provider）" })).toBeVisible();
+  expect((await dialog.boundingBox())!.width).toBeLessThanOrEqual(390);
+  expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: "../../.codex-tmp/gui-migration-provider-dark-narrow.png", animations: "disabled" });
 });

@@ -1,5 +1,6 @@
 import { copyText } from "../utils/clipboard";
 import type { ProxyServiceTier } from "../types";
+import type { MigrationModelProvider } from "../types/conversationMigration";
 import { cacheDisplayCurrencyRates } from "../utils/currencyDisplay";
 import { invoke as invokeTauri } from "@tauri-apps/api/core";
 import { hasDirectChatInput } from "../../../../shared/remote-chat/uploadMode";
@@ -1824,6 +1825,7 @@ export function migrateCodexThreadsToHome(request: {
   homeId: string;
   targetHomeId: string;
   sessionIds: string[];
+  modelProvider?: MigrationModelProvider;
 }): Promise<CodexThreadMigrationReport> {
   return invoke<CodexThreadMigrationReport>("migrate_codex_threads_to_home", { request });
 }

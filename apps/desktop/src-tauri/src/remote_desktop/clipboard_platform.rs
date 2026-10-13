@@ -118,7 +118,10 @@ pub(super) fn write_local(content: Content) -> ClipboardResult<()> {
 }
 
 #[cfg(windows)]
-fn copy_selection(session: &mut super::Session, shortcut: Shortcut) -> ClipboardResult<()> {
+pub(super) fn copy_selection(
+    session: &mut super::Session,
+    shortcut: Shortcut,
+) -> ClipboardResult<()> {
     use windows_sys::Win32::{
         System::DataExchange::GetClipboardSequenceNumber,
         UI::Input::KeyboardAndMouse::{VK_C, VK_X},
@@ -146,7 +149,7 @@ fn copy_selection(session: &mut super::Session, shortcut: Shortcut) -> Clipboard
 }
 
 #[cfg(windows)]
-fn paste_selection(session: &mut super::Session) -> ClipboardResult<()> {
+pub(super) fn paste_selection(session: &mut super::Session) -> ClipboardResult<()> {
     session
         .input
         .release()
@@ -155,7 +158,10 @@ fn paste_selection(session: &mut super::Session) -> ClipboardResult<()> {
         .map_err(|_| ClipboardError::Access)
 }
 #[cfg(target_os = "macos")]
-fn copy_selection(session: &mut super::Session, shortcut: Shortcut) -> ClipboardResult<()> {
+pub(super) fn copy_selection(
+    session: &mut super::Session,
+    shortcut: Shortcut,
+) -> ClipboardResult<()> {
     let before = super::macos::pasteboard::change_count()?;
     let key = match shortcut {
         Shortcut::Copy => 8,
@@ -176,7 +182,7 @@ fn copy_selection(session: &mut super::Session, shortcut: Shortcut) -> Clipboard
 }
 
 #[cfg(target_os = "macos")]
-fn paste_selection(session: &mut super::Session) -> ClipboardResult<()> {
+pub(super) fn paste_selection(session: &mut super::Session) -> ClipboardResult<()> {
     session
         .input
         .chord(&[55, 9])
@@ -184,11 +190,11 @@ fn paste_selection(session: &mut super::Session) -> ClipboardResult<()> {
 }
 
 #[cfg(not(any(windows, target_os = "macos")))]
-fn copy_selection(_: &mut super::Session, _: Shortcut) -> ClipboardResult<()> {
+pub(super) fn copy_selection(_: &mut super::Session, _: Shortcut) -> ClipboardResult<()> {
     Err(ClipboardError::Access)
 }
 #[cfg(not(any(windows, target_os = "macos")))]
-fn paste_selection(_: &mut super::Session) -> ClipboardResult<()> {
+pub(super) fn paste_selection(_: &mut super::Session) -> ClipboardResult<()> {
     Err(ClipboardError::Access)
 }
 

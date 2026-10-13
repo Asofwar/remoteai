@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, RwLock,
     },
     time::Duration,
 };
@@ -21,6 +21,7 @@ const DOCUMENT_POLICY: &str = "sandbox allow-scripts; default-src 'self' data: b
 pub(super) struct PreviewServer {
     pub url: String,
     active: Arc<AtomicBool>,
+    forwarded_host: Arc<RwLock<Option<String>>>,
 }
 
 impl Drop for PreviewServer {
@@ -34,6 +35,7 @@ pub(super) struct Scope {
     root: PathBuf,
     token: String,
     host: String,
+    forwarded_host: Arc<RwLock<Option<String>>>,
 }
 
 impl Scope {
@@ -43,11 +45,24 @@ impl Scope {
             root: path.parent().ok_or(PreviewError::Read)?.to_owned(),
             token,
             host,
+            forwarded_host: Arc::new(RwLock::new(None)),
         })
     }
 }
 
 impl PreviewServer {
+    pub fn forward_host(&self, host: String) -> Result<()> {
+        let address: std::net::SocketAddr = host.parse().map_err(|_| PreviewError::Open)?;
+        if address.ip() != std::net::Ipv4Addr::LOCALHOST || address.port() == 0 {
+            return Err(PreviewError::Open);
+        }
+        *self
+            .forwarded_host
+            .write()
+            .map_err(|_| PreviewError::Open)? = Some(host);
+        Ok(())
+    }
+
     pub fn start(path: &Path) -> Result<Self> {
         let server = Arc::new(Server::http("127.0.0.1:0").map_err(|_| PreviewError::Open)?);
         let host = server.server_addr().to_string();
@@ -66,6 +81,7 @@ impl PreviewServer {
         let preview = Self {
             url: url.into(),
             active: Arc::new(AtomicBool::new(true)),
+            forwarded_host: Arc::clone(&scope.forwarded_host),
         };
         for _ in 0..WORKERS {
             let (server, scope, active) = (
@@ -198,7 +214,16 @@ fn respond(request: Request, scope: &Scope) {
 }
 
 fn prepare(request: &Request, scope: &Scope) -> Result<tiny_http::ResponseBox> {
-    if request_header(request, "Host") != Some(&scope.host) {
+    let host = request_header(request, "Host");
+    let forwarded = scope
+        .forwarded_host
+        .read()
+        .map_err(|_| PreviewError::Open)?;
+    if host != Some(&scope.host)
+        && forwarded
+            .as_deref()
+            .is_none_or(|allowed| host != Some(allowed))
+    {
         return Ok(Response::empty(StatusCode(403)).boxed());
     }
     prepare_asset(request, scope)

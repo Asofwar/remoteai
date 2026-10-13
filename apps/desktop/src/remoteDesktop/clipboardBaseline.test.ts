@@ -1,0 +1,21 @@
+// @vitest-environment jsdom
+import { afterEach, expect, it, vi } from 'vitest';
+import { readBrowserClipboardBaseline } from '../../../web/src/chat/desktop/clipboardContent';
+
+afterEach(() => vi.unstubAllGlobals());
+
+it.each(['prompt', 'denied'])('does not read or prompt for clipboard access when permission is %s', async state => {
+  const readText = vi.fn();
+  vi.stubGlobal('navigator', { permissions: { query: vi.fn().mockResolvedValue({ state }) },
+    clipboard: { readText } });
+  await expect(readBrowserClipboardBaseline()).resolves.toBeUndefined();
+  expect(readText).not.toHaveBeenCalled();
+});
+
+it('records a baseline only with an existing grant and tolerates unsupported permissions', async () => {
+  vi.stubGlobal('navigator', { permissions: { query: vi.fn().mockResolvedValue({ state: 'granted' }) },
+    clipboard: { readText: vi.fn().mockResolvedValue('old local') } });
+  await expect(readBrowserClipboardBaseline()).resolves.toEqual({ format: 'text', text: 'old local' });
+  vi.stubGlobal('navigator', {});
+  await expect(readBrowserClipboardBaseline()).resolves.toBeUndefined();
+});

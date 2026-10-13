@@ -12,13 +12,16 @@ export interface LocalDesktopClipboard {
   write: (content: ClipboardContent) => Promise<void>;
 }
 export type ClipboardRequest = { action: 'read'; shortcut?: 'copy' | 'cut' }
+  | { action: 'copy'; shortcut: 'copy' | 'cut' } | { action: 'paste'; preferLocal: boolean }
   | { action: 'begin'; length: number } | { action: 'append'; offset: number; data: string }
-  | { action: 'commit'; paste: boolean } | { action: 'chunk'; offset: number } | { action: 'clear' };
+  | { action: 'commit'; paste: boolean; expectedRevision?: string }
+  | { action: 'chunk'; offset: number } | { action: 'clear' };
 export interface ClipboardMessage {
   kind: 'clipboard'; requestId: number; transferId: string; request: ClipboardRequest;
 }
 export interface ClipboardReply {
-  kind: 'clipboard'; requestId: number; result?: { length?: number; data?: string }; error?: string;
+  kind: 'clipboard'; requestId: number;
+  result?: { length?: number; data?: string; pasted?: boolean; revision?: string }; error?: string;
 }
 export type ClipboardProgress = (completed: number, total: number) => void;
 

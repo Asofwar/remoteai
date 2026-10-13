@@ -36,11 +36,31 @@ pub(crate) struct ClipboardMessage {
 #[derive(Deserialize)]
 #[serde(tag = "action", rename_all = "camelCase")]
 enum Request {
-    Read { shortcut: Option<Shortcut> },
-    Begin { length: usize },
-    Append { offset: usize, data: String },
-    Commit { paste: bool },
-    Chunk { offset: usize },
+    Read {
+        shortcut: Option<Shortcut>,
+    },
+    Copy {
+        shortcut: Shortcut,
+    },
+    Paste {
+        #[serde(rename = "preferLocal")]
+        prefer_local: bool,
+    },
+    Begin {
+        length: usize,
+    },
+    Append {
+        offset: usize,
+        data: String,
+    },
+    Commit {
+        paste: bool,
+        #[serde(rename = "expectedRevision")]
+        expected_revision: Option<String>,
+    },
+    Chunk {
+        offset: usize,
+    },
     Clear,
 }
 #[derive(Clone, Copy, Deserialize)]
@@ -56,6 +76,10 @@ pub(crate) struct ReplyData {
     length: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     data: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pasted: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    revision: Option<String>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -140,17 +164,17 @@ fn apply(session: &mut super::Session, message: ClipboardMessage) -> ClipboardRe
     }
     let id = message.transfer_id;
     match message.request {
-        Request::Read { shortcut } => {
-            let content = super::clipboard_platform::read(session, shortcut)?;
-            allow_content(&session.permissions, &content)?;
-            let bytes = serde_json::to_vec(&content).map_err(|_| ClipboardError::Invalid)?;
-            let length = bytes.len();
-            session.clipboard = Some(Transfer::new(id, bytes, None)?);
-            Ok(ReplyData {
-                length: Some(length),
-                data: None,
-            })
+        Request::Copy { shortcut } => {
+            super::clipboard_platform::copy_selection(session, shortcut)?;
+            session.clipboard_revision = super::clipboard_revision::current().ok();
+            // Sharing is optional: folders, large files and private formats still copy natively.
+            if !session.permissions.clipboard_read {
+                return Ok(ReplyData::default());
+            }
+            Ok(read_content(session, id, None).unwrap_or_default())
         }
+        Request::Paste { prefer_local } => prepare_paste(session, prefer_local),
+        Request::Read { shortcut } => read_content(session, id, shortcut),
         Request::Begin { length } => {
             if length == 0 {
                 return Err(ClipboardError::Invalid);
@@ -172,6 +196,57 @@ fn apply(session: &mut super::Session, message: ClipboardMessage) -> ClipboardRe
     }
 }
 
+fn read_content(
+    session: &mut super::Session,
+    id: String,
+    shortcut: Option<Shortcut>,
+) -> ClipboardResult<ReplyData> {
+    let content = super::clipboard_platform::read(session, shortcut)?;
+    allow_content(&session.permissions, &content)?;
+    let bytes = serde_json::to_vec(&content).map_err(|_| ClipboardError::Invalid)?;
+    let length = bytes.len();
+    session.clipboard = Some(Transfer::new(id, bytes, None)?);
+    Ok(ReplyData {
+        length: Some(length),
+        ..Default::default()
+    })
+}
+
+fn can_import(
+    prefer_local: bool,
+    allowed: bool,
+    previous: Option<&str>,
+    current: Option<&str>,
+) -> bool {
+    prefer_local && allowed && current.is_some() && previous == current
+}
+
+fn paste_original(session: &mut super::Session) -> ClipboardResult<ReplyData> {
+    super::clipboard_platform::paste_selection(session)?;
+    session.clipboard_revision = super::clipboard_revision::current().ok();
+    Ok(ReplyData {
+        pasted: Some(true),
+        ..Default::default()
+    })
+}
+
+fn prepare_paste(session: &mut super::Session, prefer_local: bool) -> ClipboardResult<ReplyData> {
+    let revision = super::clipboard_revision::current().ok();
+    if can_import(
+        prefer_local,
+        session.permissions.clipboard_write,
+        session.clipboard_revision.as_deref(),
+        revision.as_deref(),
+    ) {
+        return Ok(ReplyData {
+            pasted: Some(false),
+            revision,
+            ..Default::default()
+        });
+    }
+    paste_original(session)
+}
+
 fn allow_content(
     permissions: &super::permissions::Permissions,
     content: &Content,
@@ -187,12 +262,15 @@ fn authorize(
     request: &Request,
 ) -> ClipboardResult<()> {
     let allowed = match request {
+        Request::Copy { .. } | Request::Paste { .. } => permissions.control,
         Request::Read { shortcut } => {
             permissions.clipboard_read && (shortcut.is_none() || permissions.control)
         }
         Request::Chunk { .. } => permissions.clipboard_read,
         Request::Begin { .. } | Request::Append { .. } => permissions.clipboard_write,
-        Request::Commit { paste } => permissions.clipboard_write && (!paste || permissions.control),
+        Request::Commit { paste, .. } => {
+            permissions.clipboard_write && (!paste || permissions.control)
+        }
         Request::Clear => true,
     };
     if allowed {
@@ -225,22 +303,44 @@ fn continue_transfer(
             let end = (offset + CHUNK_BYTES).min(transfer.bytes.len());
             Ok(ReplyData {
                 data: Some(STANDARD.encode(&transfer.bytes[offset..end])),
-                length: None,
+                ..Default::default()
             })
         }
-        Request::Commit { paste } => {
+        Request::Commit {
+            paste,
+            expected_revision,
+        } => {
             if transfer.expected != Some(transfer.bytes.len()) {
                 return Err(ClipboardError::Invalid);
             }
             let content =
                 serde_json::from_slice(&transfer.bytes).map_err(|_| ClipboardError::Invalid)?;
             session.clipboard = None;
-            allow_content(&session.permissions, &content)?;
-            super::clipboard_platform::write(session, content, paste)?;
-            Ok(ReplyData::default())
+            commit_content(session, content, paste, expected_revision)
         }
         _ => Err(ClipboardError::Invalid),
     }
+}
+
+fn commit_content(
+    session: &mut super::Session,
+    content: Content,
+    paste: bool,
+    expected_revision: Option<String>,
+) -> ClipboardResult<ReplyData> {
+    if expected_revision.is_some() && expected_revision != super::clipboard_revision::current().ok()
+    {
+        // A remote copy during upload wins. Do not overwrite it with an older local snapshot.
+        return if paste {
+            paste_original(session)
+        } else {
+            Err(ClipboardError::Invalid)
+        };
+    }
+    allow_content(&session.permissions, &content)?;
+    super::clipboard_platform::write(session, content, paste)?;
+    session.clipboard_revision = super::clipboard_revision::current().ok();
+    Ok(ReplyData::default())
 }
 
 #[tauri::command]
@@ -279,7 +379,14 @@ mod tests {
         )
         .is_err());
         assert!(authorize(&policy, &Request::Begin { length: 5 }).is_err());
-        assert!(authorize(&policy, &Request::Commit { paste: true }).is_err());
+        assert!(authorize(
+            &policy,
+            &Request::Commit {
+                paste: true,
+                expected_revision: None
+            }
+        )
+        .is_err());
         assert!(allow_content(&policy, &Content::Files { files: Vec::new() }).is_err());
         assert!(allow_content(
             &policy,
@@ -288,6 +395,69 @@ mod tests {
             }
         )
         .is_ok());
+    }
+    #[test]
+    fn native_gestures_need_control_but_not_clipboard_sharing() {
+        let policy = super::super::permissions::Permissions {
+            clipboard_read: false,
+            clipboard_write: false,
+            files: false,
+            ..Default::default()
+        };
+        assert!(authorize(
+            &policy,
+            &Request::Copy {
+                shortcut: Shortcut::Cut
+            }
+        )
+        .is_ok());
+        assert!(authorize(
+            &policy,
+            &Request::Paste {
+                prefer_local: false
+            }
+        )
+        .is_ok());
+        assert!(authorize(&policy, &Request::Read { shortcut: None }).is_err());
+        assert!(authorize(&policy, &Request::Begin { length: 5 }).is_err());
+        let view_only = super::super::permissions::Permissions {
+            control: false,
+            ..policy
+        };
+        assert!(authorize(
+            &view_only,
+            &Request::Copy {
+                shortcut: Shortcut::Copy
+            }
+        )
+        .is_err());
+        assert!(authorize(
+            &view_only,
+            &Request::Paste {
+                prefer_local: false
+            }
+        )
+        .is_err());
+    }
+    #[test]
+    fn remote_changes_and_unreadable_revisions_always_preserve_the_original() {
+        assert!(can_import(true, true, Some("1"), Some("1")));
+        assert!(!can_import(false, true, Some("1"), Some("1")));
+        assert!(!can_import(true, false, Some("1"), Some("1")));
+        assert!(!can_import(true, true, Some("1"), Some("2")));
+        assert!(!can_import(true, true, None, None));
+    }
+    #[test]
+    fn native_gesture_wire_fields_preserve_revision_guards() {
+        let paste: Request =
+            serde_json::from_str(r#"{"action":"paste","preferLocal":true}"#).unwrap();
+        assert!(matches!(paste, Request::Paste { prefer_local: true }));
+        let commit: Request =
+            serde_json::from_str(r#"{"action":"commit","paste":true,"expectedRevision":"42"}"#)
+                .unwrap();
+        assert!(
+            matches!(commit, Request::Commit { expected_revision: Some(value), .. } if value == "42")
+        );
     }
     #[test]
     fn rejects_oversize_reordered_and_excess_chunks() {

@@ -9,13 +9,21 @@ import { guiFontStyle, useGuiFontSize } from "./guiAppearance";
 import { useDetailsPanel } from "./useDetailsPanel";
 import { FilePreviewPanel } from "./filePreview/FilePreviewPanel";
 import { WebsitePreview } from "./filePreview/WebsitePreview";
+import type { FilePreviewTarget } from "./filePreview/usePreviewHistory";
+import type { PreviewNavigationState } from "./filePreview/PreviewNavigation";
 import styles from "./DetailsWorkspace.module.less";
 
 const MIN_CHAT_WIDTH = 520;
 
-export function DetailsWorkspace({ selected, active, children, enabled = true, className = '', contentClassName = '' }: {
+export interface RemoteFilePreviewProps {
+  target: FilePreviewTarget; active: boolean; navigation: PreviewNavigationState;
+}
+
+export function DetailsWorkspace({ selected, active, children, enabled = true, className = '', contentClassName = '',
+  renderRemoteFile }: {
   selected: string | null; active: boolean; children: ReactNode;
   enabled?: boolean; className?: string; contentClassName?: string;
+  renderRemoteFile?: (props: RemoteFilePreviewProps) => ReactNode;
 }) {
   const t = useDiffText();
   const fontSize = useGuiFontSize();
@@ -25,7 +33,7 @@ export function DetailsWorkspace({ selected, active, children, enabled = true, c
   const workspace = useMemo(() => ({ host: drawerHost, active, reserve }), [drawerHost, active]);
   const closeButton = useRef<HTMLButtonElement>(null);
   const panelId = useId();
-  const panel = useDetailsPanel({ selected, active, enabled });
+  const panel = useDetailsPanel({ selected, active, enabled, remoteFiles: Boolean(renderRemoteFile) });
   const { entry, preview, viewId, expanded, visible, showingChanges } = panel;
   const resize = useDrawerResize(host);
   const docked = visible && !expanded && resize.available - resize.width >= MIN_CHAT_WIDTH;
@@ -73,10 +81,12 @@ export function DetailsWorkspace({ selected, active, children, enabled = true, c
             initialOpen continuous />
         </div>}
         {preview && <div hidden={showingChanges} className={styles.preview}>
-          {preview.kind === "file" ? <FilePreviewPanel key={preview.data.sessionId} data={preview.data}
-            active={visible && !showingChanges} navigation={panel.navigation} />
-            : <WebsitePreview key={preview.url} url={preview.url} active={visible && !showingChanges}
-              resizing={resize.dragging} navigation={panel.navigation} />}
+          {preview.kind === "file" && <FilePreviewPanel key={preview.data.sessionId} data={preview.data}
+            active={visible && !showingChanges} navigation={panel.navigation} />}
+          {preview.kind === "remoteFile" && renderRemoteFile?.({ target: preview.file,
+            active: visible && !showingChanges, navigation: panel.navigation })}
+          {preview.kind === "website" && <WebsitePreview key={preview.url} url={preview.url}
+            active={visible && !showingChanges} resizing={resize.dragging} navigation={panel.navigation} />}
         </div>}
       </aside>}
       {(entry || preview) && panel.minimized && active && enabled &&

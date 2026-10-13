@@ -15,7 +15,7 @@ export class TerminalLinkTunnels {
   private readonly listeners = new Map<string, Promise<{ id: string; port: number }>>();
   private readonly bridges = new Set<() => void>();
 
-  constructor(private readonly client: GuiToolsClient['terminal'], private readonly native = nativeRequest) {}
+  constructor(private readonly client: Pick<GuiToolsClient['terminal'], 'link'>, private readonly native = nativeRequest) {}
 
   resolve = async (terminal: string, value: string): Promise<string> => {
     const url = websiteUrl(value);

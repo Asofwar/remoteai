@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 pub(crate) mod clipboard;
 mod clipboard_files;
 mod clipboard_platform;
+mod clipboard_revision;
 pub(crate) mod displays;
 #[cfg(windows)]
 pub(crate) mod input_desktop;
@@ -115,6 +116,7 @@ struct Session {
     touched: Instant,
     deadline: Instant,
     clipboard: Option<clipboard::Transfer>,
+    clipboard_revision: Option<String>,
     #[cfg(any(windows, target_os = "macos"))]
     display: monitors::Monitor,
     #[cfg(any(windows, target_os = "macos"))]
@@ -323,6 +325,7 @@ fn begin_session(
         touched: Instant::now(),
         deadline,
         clipboard: None,
+        clipboard_revision: clipboard_revision::current().ok(),
         display,
         input: platform_input::InputState::default(),
     });

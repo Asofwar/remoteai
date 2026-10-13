@@ -42,14 +42,13 @@ test('multiple browser files offer a compact download action without interruptin
   await expect(page.getByRole('button', { name: '下载 two.txt' })).toBeVisible();
 });
 
-test('empty paste shows a compact error and leaves the desktop available', async ({ page }) => {
+test('empty local clipboard still permits native remote paste without a popup', async ({ page }) => {
   await page.locator('.rd-key-capture').evaluate(element => element.dispatchEvent(new ClipboardEvent('paste', {
     clipboardData: new DataTransfer(), bubbles: true, cancelable: true,
   })));
-  const notice = page.locator('.rd-clipboard-notice');
-  await expect(notice).toContainText('剪贴板中没有可发送的内容');
-  expect((await notice.boundingBox())!.width).toBeLessThanOrEqual(400);
+  await expect.poll(() => page.evaluate(() => window.desktopTest.clipboard.nativePastes)).toBe(1);
+  await expect(page.locator('.rd-clipboard-notice')).toHaveCount(0);
   await expect(page.getByRole('complementary', { name: '剪贴板' })).toHaveCount(0);
   await expect(page.locator('.rd-key-capture')).toBeFocused();
-  expect(await page.evaluate(() => window.desktopTest.clipboard.pastes)).toBe(0);
+  expect(await page.evaluate(() => window.desktopTest.clipboard.writes)).toBe(0);
 });

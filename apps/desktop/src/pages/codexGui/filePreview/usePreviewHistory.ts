@@ -1,22 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { message } from "antd";
 import { guiText } from "../../../i18n/guiText";
 import { filePreviewApi, type FilePreviewData } from "./api";
+import { FileEnvironmentContext } from '../fileEnvironment';
 
-type FileTarget = Parameters<typeof filePreviewApi.open>[0];
-type Target = { kind: "file"; file: FileTarget } | { kind: "website"; url: string };
-type Preview = { kind: "file"; data: FilePreviewData } | { kind: "website"; url: string };
+export type FilePreviewTarget = Parameters<typeof filePreviewApi.open>[0];
+type RemoteFile = { kind: "remoteFile"; file: FilePreviewTarget };
+type Target = { kind: "file"; file: FilePreviewTarget } | RemoteFile | { kind: "website"; url: string };
+type Preview = { kind: "file"; data: FilePreviewData; release: () => void }
+  | RemoteFile | { kind: "website"; url: string };
 interface History { entries: Target[]; index: number }
 const EMPTY_HISTORY: History = { entries: [], index: -1 };
 const MAX_HISTORY_ENTRIES = 100;
 
-function release(data: FilePreviewData) {
-  void filePreviewApi.close(data.sessionId).catch(error => console.error("Failed to release file preview", error));
-}
-
 function sameTarget(current: Target | undefined, next: Target) {
   if (current?.kind === "website" && next.kind === "website") return current.url === next.url;
-  if (current?.kind !== "file" || next.kind !== "file") return false;
+  if (!current || current.kind === "website" || next.kind === "website" || current.kind !== next.kind) return false;
   return current.file.path === next.file.path && current.file.threadId === next.file.threadId
     && current.file.line === next.file.line && current.file.column === next.file.column;
 }
@@ -28,6 +27,8 @@ function append(history: History, target: Target): History {
 }
 
 export function usePreviewHistory({ onOpen, onNavigate }: { onOpen: () => void; onNavigate: () => void }) {
+  const environment = useContext(FileEnvironmentContext);
+  const api = environment?.previews ?? filePreviewApi;
   // Retain targets only: old file URLs belong to released sessions and must be reopened when revisited.
   const history = useRef(EMPTY_HISTORY);
   const request = useRef(0);
@@ -47,10 +48,15 @@ export function usePreviewHistory({ onOpen, onNavigate }: { onOpen: () => void; 
     try {
       let next: Preview;
       if (target.kind === "file") {
-        const data = await filePreviewApi.open(target.file);
-        if (id !== request.current) { if (data) release(data); return true; }
+        const data = await api.open(target.file);
+        const release = () => { if (data) void api.close(data.sessionId)
+          .catch(error => console.error("Failed to release file preview", error)); };
+        if (id !== request.current) { release(); return true; }
         if (!data) return false;
-        next = { kind: "file", data };
+        next = { kind: "file", data, release };
+      } else if (target.kind === 'website' && environment) {
+        next = { kind: 'website', url: await environment.resolveWebsite(target.url) };
+        if (id !== request.current) return true;
       } else next = target;
       history.current = index === undefined ? append(history.current, target) : { ...history.current, index };
       setPreview(next); onNavigate();
@@ -61,9 +67,14 @@ export function usePreviewHistory({ onOpen, onNavigate }: { onOpen: () => void; 
     } finally {
       if (id === request.current) { pending.current = false; setLoading(false); }
     }
-  }, [onOpen, onNavigate]);
-  const openFile = useCallback((file: FileTarget) => visit({ kind: "file", file }), [visit]);
-  const openWebsite = useCallback((url: string) => { void visit({ kind: "website", url }); }, [visit]);
+  }, [onOpen, onNavigate, api, environment]);
+  const openFile = useCallback((file: FilePreviewTarget) => visit({ kind: "file", file }), [visit]);
+  const openRemoteFile = useCallback((file: FilePreviewTarget) => visit({ kind: "remoteFile", file }), [visit]);
+  const openWebsite = useCallback((url: string) => {
+    void visit({ kind: "website", url }).catch(() => { void message.error({
+      content: guiText("链接暂时无法打开，请稍后重试。"), style: { maxWidth: 400, marginInline: "auto" },
+    }); });
+  }, [visit]);
   const navigate = useCallback(async (direction: -1 | 1) => {
     if (pending.current) return;
     const index = history.current.index + direction;
@@ -75,11 +86,11 @@ export function usePreviewHistory({ onOpen, onNavigate }: { onOpen: () => void; 
     if (!opened) void message.error({ content: guiText("预览未能打开，请稍后重试。"),
       style: { maxWidth: 400, marginInline: "auto" } });
   }, [visit]);
-  useEffect(() => () => { request.current += 1; }, []);
+  useEffect(() => { cancel(); reset(); return cancel; }, [api, cancel, reset]);
   useEffect(() => {
-    if (preview?.kind === "file") return () => release(preview.data);
+    if (preview?.kind === "file") return preview.release;
   }, [preview]);
-  return { preview, openFile, openWebsite, cancel, reset, navigation: {
+  return { preview, openFile, openRemoteFile, openWebsite, cancel, reset, navigation: {
     loading, canGoBack: !loading && history.current.index > 0,
     canGoForward: !loading && history.current.index < history.current.entries.length - 1,
     back: () => { void navigate(-1); }, forward: () => { void navigate(1); },

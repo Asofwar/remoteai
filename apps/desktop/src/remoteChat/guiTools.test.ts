@@ -20,6 +20,25 @@ vi.mock('../pages/codexGui/terminal/api', () => ({
 
 const request = (id: string, body: object) => ({ kind: 'request' as const, method: 'request' as const, id, body });
 const flush = async () => { for (let index = 0; index < 10; index++) await Promise.resolve(); };
+
+it('keeps remote preview stream retries idempotent across long transfers and isolates reconnects', async () => {
+  const operations = new ChatOperations();
+  vi.mocked(invoke).mockResolvedValueOnce('resource');
+  await operations.execute(request('resource', { operation: 'guiResourceOpen', url: 'http://localhost:1234' }),
+    'relay', 'owner', 'same-account');
+  vi.mocked(invoke).mockResolvedValue({ type: 'data', data: 'YQ==', eof: false });
+  const stream = (id: string) => request(id, { operation: 'guiResourceLink', id: 'resource',
+    request: { type: 'read', id: 'socket' } });
+  for (let index = 0; index < 650; index++) {
+    expect((await operations.execute(stream(`chunk-${index}`), 'relay', 'owner')).error).toBeUndefined();
+    await operations.execute(stream(`chunk-${index}`), 'direct', 'owner');
+  }
+  expect(invoke).toHaveBeenCalledTimes(651);
+  expect((await operations.execute(stream('other-owner'), 'relay', 'other', 'same-account')).error)
+    .toContain('连接已断开');
+  operations.release('owner');
+  expect(invoke).toHaveBeenLastCalledWith('codex_gui_resource_link', { request: { type: 'stop', scope: 'resource' } });
+});
 beforeEach(() => {
   vi.clearAllMocks(); state.conversations = {};
   vi.mocked(invoke).mockImplementation(async () => ({ version: '0.155.0' }));

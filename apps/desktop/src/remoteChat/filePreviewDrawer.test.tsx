@@ -1,0 +1,97 @@
+// @vitest-environment jsdom
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { ChatDetailsWorkspace } from '../../../web/src/chat/ChatDetailsWorkspace';
+import { ChatFileContext } from '../../../web/src/chat/ChatFileLink';
+import type { FilePreviewContext } from '../../../web/src/chat/ChatFilePreview';
+import { ChatMarkdown } from '../../../web/src/chat/ChatMarkdown';
+import { filePreviewApi } from '../pages/codexGui/filePreview/api';
+
+let root: Root;
+let host: HTMLDivElement;
+let context: FilePreviewContext;
+const panel = () => host.querySelector<HTMLElement>('aside[data-details-panel]');
+const content = () => host.querySelector('[aria-label="文件预览"]');
+const click = (name: string) => act(async () => {
+  const button = [...host.querySelectorAll('button')]
+    .find(element => (element.getAttribute('aria-label') ?? element.textContent) === name);
+  expect(button).toBeDefined(); button!.click();
+});
+function Fixture({ selected = 'remote-thread', active = true }: { selected?: string; active?: boolean }) {
+  return <ChatFileContext.Provider value={{ ...context, threadId: selected }}>
+    <ChatDetailsWorkspace selected={selected} active={active} enabled>
+      <ChatMarkdown text={'[交接文档](F:/remote/docs/handoff.md)\n\n[另一份](F:/remote/other.md)'} />
+    </ChatDetailsWorkspace>
+  </ChatFileContext.Provider>;
+}
+
+beforeEach(async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1440, 900));
+  vi.spyOn(filePreviewApi, 'open').mockRejectedValue(new Error('Must not read a local file'));
+  vi.spyOn(filePreviewApi, 'close').mockResolvedValue();
+  context = { ready: true, threadId: 'remote-thread', client: {
+    open: vi.fn(), read: vi.fn(), close: vi.fn(),
+  }, load: vi.fn(async (_threadId, path) => ({ path,
+    text: path.endsWith('handoff.md') ? '# 远程交接文档\n\n[后续文档](next.md#L3)' : '# 后续内容' })) };
+  host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+  await act(async () => root.render(<Fixture />));
+});
+afterEach(async () => {
+  await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals();
+});
+
+it('opens remote Markdown in the shared drawer and navigates nested links on the same computer', async () => {
+  await click('交接文档');
+  expect(panel()?.hidden).toBe(false);
+  expect(content()?.textContent).toContain('远程交接文档');
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(context.load).toHaveBeenLastCalledWith('remote-thread', 'F:/remote/docs/handoff.md', expect.any(Object));
+  await click('后续文档');
+  expect(host.querySelectorAll('aside')).toHaveLength(1);
+  expect(context.load).toHaveBeenLastCalledWith('remote-thread', 'F:/remote/docs/next.md', expect.any(Object));
+  expect(content()?.textContent).toContain('引用位置：第 3 行');
+  await click('返回上一页');
+  expect(content()?.textContent).toContain('远程交接文档');
+  await click('前往下一页');
+  expect(content()?.textContent).toContain('后续内容');
+  expect(filePreviewApi.open).not.toHaveBeenCalled();
+  expect(filePreviewApi.close).not.toHaveBeenCalled();
+});
+
+it('retains source mode across drawer controls and clears the preview on conversation changes', async () => {
+  await click('交接文档'); await click('原文');
+  await click('文件更改'); await click('预览');
+  expect(content()?.querySelector('pre')?.textContent).toContain('# 远程交接文档');
+  await click('最小化详情抽屉'); expect(panel()?.hidden).toBe(true);
+  await click('恢复预览'); expect(panel()?.hidden).toBe(false);
+  await act(async () => root.render(<Fixture active={false} />));
+  expect(panel()?.hidden).toBe(true);
+  await act(async () => root.render(<Fixture selected="another-thread" />));
+  expect(panel()).toBeNull();
+  await click('交接文档');
+  expect(context.load).toHaveBeenLastCalledWith('another-thread', 'F:/remote/docs/handoff.md', expect.any(Object));
+  await click('关闭详情抽屉'); expect(panel()).toBeNull();
+});
+
+it('cancels a remote read when closed and ignores its late response', async () => {
+  let resolve!: (value: { path: string; text: string }) => void;
+  vi.mocked(context.load!).mockReturnValueOnce(new Promise(done => { resolve = done; }));
+  await click('交接文档');
+  expect(content()?.textContent).toContain('正在读取文件');
+  const options = vi.mocked(context.load!).mock.calls[0][2];
+  await click('关闭详情抽屉');
+  expect(options?.signal?.aborted).toBe(true);
+  await act(async () => resolve({ path: 'F:/remote/docs/handoff.md', text: '# Late' }));
+  expect(panel()).toBeNull();
+});
+
+it('shows remote load failures in the drawer and keeps download available', async () => {
+  vi.mocked(context.load!).mockRejectedValueOnce(new Error('private remote path'));
+  await click('交接文档');
+  expect(content()?.textContent).toContain('暂时无法预览此文件');
+  expect(content()?.textContent).not.toContain('private remote path');
+  expect([...content()!.querySelectorAll('button')].find(button => button.textContent === '下载')?.disabled).toBe(false);
+});

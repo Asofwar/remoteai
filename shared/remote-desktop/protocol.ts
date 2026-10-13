@@ -26,6 +26,7 @@ export interface DesktopDisplays {
 }
 export interface DesktopResolution { width: number; height: number }
 export interface DesktopCapabilities {
+  clipboardNative?: boolean;
   resolution?: boolean;
   privacyScreen?: boolean;
   platform?: DesktopPlatform;

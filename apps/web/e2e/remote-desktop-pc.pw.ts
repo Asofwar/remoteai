@@ -92,8 +92,8 @@ test('copies remote text with Ctrl+C and Ctrl+X, and pastes local text through t
   await expect.poll(() => page.evaluate(() => window.browserClipboard.text)).toBe('Remote clipboard 测试');
   await page.keyboard.press('Control+x');
   await expect.poll(() => page.evaluate(() => window.desktopTest.clipboard.requests
-    .filter(message => message.request.action === 'read').map(message => message.request)))
-    .toEqual([{ action: 'read', shortcut: 'copy' }, { action: 'read', shortcut: 'cut' }]);
+    .filter(message => message.request.action === 'copy').map(message => message.request)))
+    .toEqual([{ action: 'copy', shortcut: 'copy' }, { action: 'copy', shortcut: 'cut' }]);
   await expect(page.locator('.rd-clipboard-notice')).toHaveCount(0);
   await page.locator('.rd-key-capture').evaluate(element => {
     const data = new DataTransfer(); data.setData('text/plain', '本机 → 远程\nclipboard');
@@ -162,7 +162,7 @@ test('retains received content when clipboard permission is denied and permits a
   await expect(page.locator('.rd-clipboard-notice')).toHaveCount(0);
   await expect(page.locator('.rd-key-capture')).toBeFocused();
   expect(await page.evaluate(() => window.desktopTest.clipboard.requests
-    .filter(message => message.request.action === 'read').length)).toBe(1);
+    .filter(message => message.request.action === 'copy').length)).toBe(1);
 });
 
 test('keeps an older host connected and explains the required update before using new controls', async ({ page }) => {
@@ -177,4 +177,20 @@ test('keeps an older host connected and explains the required update before usin
   expect(await page.evaluate(() => window.desktopTest.inputs.some(input => input.kind === 'keyboard'))).toBe(false);
   expect(await page.evaluate(() => window.desktopTest.clipboard.requests)).toEqual([]);
   await expect(page.getByText('桌面连接已断开，请重新连接。')).not.toBeVisible();
+});
+
+test('browser paste preserves remote contents after clipboard synchronization was denied', async ({ page }) => {
+  await focusDesktop(page);
+  await page.evaluate(() => { window.browserClipboard.denied = true; window.browserClipboard.text = 'old local'; });
+  await page.keyboard.press('Control+c');
+  await expect(page.getByRole('button', { name: '复制到本机' })).toBeVisible();
+  await page.locator('.rd-key-capture').evaluate(element => {
+    const data = new DataTransfer(); data.setData('text/plain', 'old local');
+    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect.poll(() => page.evaluate(() => window.desktopTest.clipboard.nativePastes)).toBe(1);
+  expect(await page.evaluate(() => window.desktopTest.clipboard.writes)).toBe(0);
+  expect(await page.evaluate(() => window.desktopTest.clipboard.content))
+    .toEqual({ format: 'text', text: 'Remote clipboard 测试' });
+  await expect(page.locator('.rd-clipboard-notice')).toHaveCount(0);
 });

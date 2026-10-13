@@ -58,3 +58,30 @@ it('keeps four chunks in flight and waits for every acknowledgement before commi
   await vi.waitFor(() => expect(requests.at(-1)?.request.action).toBe('clear'));
   acknowledge(requests.at(-1)!); await sending;
 });
+
+it('accepts native copy without transferable data and never retries a cut', async () => {
+  const requests: ClipboardMessage[] = [];
+  const clipboard = new DesktopClipboard(message => {
+    requests.push(message);
+    queueMicrotask(() => clipboard.receive({ kind: 'clipboard', requestId: message.requestId, result: {} }));
+    return true;
+  });
+  await expect(clipboard.copy('cut')).resolves.toBeUndefined();
+  expect(requests.map(message => message.request)).toEqual([{ action: 'copy', shortcut: 'cut' }, { action: 'clear' }]);
+});
+
+it('preserves host clipboard revisions across the upload and recognizes completed native pastes', async () => {
+  const requests: ClipboardMessage[] = [];
+  const clipboard = new DesktopClipboard(message => {
+    requests.push(message);
+    const result = message.request.action === 'paste'
+      ? (message.request.preferLocal ? { pasted: false, revision: '42' } : { pasted: true }) : {};
+    queueMicrotask(() => clipboard.receive({ kind: 'clipboard', requestId: message.requestId, result }));
+    return true;
+  });
+  const revision = await clipboard.paste(true);
+  await clipboard.write({ format: 'text', text: 'local' }, true, undefined, revision);
+  expect(requests.find(message => message.request.action === 'commit')?.request)
+    .toEqual({ action: 'commit', paste: true, expectedRevision: '42' });
+  await expect(clipboard.paste(false)).resolves.toBeUndefined();
+});

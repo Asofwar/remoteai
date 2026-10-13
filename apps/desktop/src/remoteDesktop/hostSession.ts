@@ -41,6 +41,7 @@ export class HostSession {
       resolution: this.session instanceof NativeDesktopSession && policy?.control !== false
         && !!offer.resolutions?.length,
       keyboard: policy?.control ?? true, control: policy?.control ?? true,
+      clipboardNative: true,
       clipboard: !policy || policy.clipboardRead || policy.clipboardWrite, horizontalScroll: policy?.control ?? true } };
   }
   signal(signal: DesktopSignal) { return this.session.signal(signal); }

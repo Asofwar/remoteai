@@ -10,6 +10,66 @@ async function clipboard(page: Page) {
   return page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, '\n'));
 }
 
+test('PC remote files share tables, code, source location, menus and relative HTML assets', async ({ page }, info) => {
+  await page.goto('e2e/file-preview-harness.html?pc');
+  await page.getByRole('button', { name: '预览文件：F:/remote/docs/guide.md', exact: true }).click();
+  const drawer = page.locator('aside[data-details-panel]');
+  await expect(drawer.getByRole('heading', { name: '远程文档' })).toBeVisible();
+  await expect(drawer.getByRole('button', { name: '展开表格' })).toBeVisible();
+  await expect(drawer.getByRole('button', { name: '自动换行' })).toBeVisible();
+  await expect.poll(() => drawer.getByRole('img', { name: '相邻图片' })
+    .evaluate((node: HTMLImageElement) => node.naturalWidth)).toBe(160);
+  await drawer.getByRole('button', { name: '预览文件：F:/remote/docs/next.md', exact: true }).click();
+  await expect(drawer.getByRole('button', { name: '源码', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(drawer.getByLabel('文件内容', { exact: true })).toContainText('这是远程电脑的第三行。');
+  await drawer.getByRole('button', { name: '返回上一页' }).click();
+  await drawer.getByRole('button', { name: '文件操作：F:/remote/docs/guide.md', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: '下载到本机…' })).toBeVisible();
+  await page.getByRole('menuitem', { name: '在远程电脑上打开', exact: true }).click();
+  await expect(page.getByLabel('文件操作结果')).toContainText('"computer":"remote-PC"');
+  await expect(page.getByLabel('文件操作结果')).toContainText('F:/remote/docs/guide.md');
+  await screenshot(page, info, 'pc-shared-file-preview');
+  await drawer.getByRole('button', { name: '预览文件：F:/remote/docs/index.html', exact: true }).click();
+  const frame = page.frameLocator('iframe[title="HTML 预览"]');
+  await expect(frame.getByRole('heading', { name: '远程 HTML' })).toBeVisible();
+  await expect(frame.locator('body')).toHaveCSS('color', 'rgb(24, 80, 120)');
+  await expect.poll(() => frame.getByRole('img').evaluate((node: HTMLImageElement) => node.naturalWidth)).toBe(160);
+  await expect(page.locator('iframe')).toHaveAttribute('sandbox', 'allow-scripts');
+});
+
+test('PC remote Markdown links use the shared right drawer with navigation and source controls', async ({ page }, info) => {
+  await page.goto('e2e/file-preview-harness.html?workspace');
+  await page.getByRole('button', { name: '交接文档', exact: true }).click();
+  const drawer = page.locator('aside[data-details-panel]');
+  const preview = drawer.getByRole('region', { name: '文件预览', exact: true });
+  await expect(preview.getByRole('heading', { name: '文件预览', exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect.poll(async () => {
+    const bounds = await drawer.boundingBox();
+    return Math.abs(bounds!.x + bounds!.width - page.viewportSize()!.width);
+  }).toBeLessThanOrEqual(1);
+  await preview.getByRole('button', { name: '原文', exact: true }).click();
+  await expect(preview.locator('pre')).toContainText('# 文件预览');
+  await drawer.getByRole('tab', { name: '文件更改', exact: true }).click();
+  await drawer.getByRole('tab', { name: '预览', exact: true }).click();
+  await expect(preview.locator('pre')).toContainText('# 文件预览');
+  await preview.getByRole('button', { name: '预览', exact: true }).click();
+  await preview.getByRole('button', { name: '后续文档', exact: true }).click();
+  await expect(preview.getByRole('heading', { name: '后续文档' })).toBeVisible();
+  await expect(preview).toContainText('F:/remote/docs/next.md');
+  await expect(page.locator('aside[data-details-panel]')).toHaveCount(1);
+  await preview.getByRole('button', { name: '返回上一页' }).click();
+  await expect(preview.getByRole('heading', { name: '文件预览', exact: true })).toBeVisible();
+  await drawer.getByRole('button', { name: '最小化详情抽屉' }).click();
+  await expect(drawer).toBeHidden();
+  await page.getByRole('button', { name: '恢复预览' }).click();
+  await expect(preview).toBeVisible();
+  await expect(preview.getByRole('button', { name: '下载', exact: true })).toBeEnabled();
+  await screenshot(page, info, 'remote-markdown-drawer');
+  await drawer.getByRole('button', { name: '关闭详情抽屉' }).click();
+  await expect(drawer).toHaveCount(0);
+});
+
 test('previews HTML scripts in an isolated frame and retains source and download actions', async ({ page }) => {
   await open(page, 'page.HTML');
   const frame = page.frameLocator('iframe[title="HTML 预览"]');

@@ -1,14 +1,8 @@
 import { invoke, isHostedWebApp } from "../../../api/backend";
 import type { FileReference } from "../fileReference";
+import type { FilePreviewData } from '../../../../../../shared/remote-chat/files';
+export type { FilePreviewData, PreviewKind } from '../../../../../../shared/remote-chat/files';
 
-export type PreviewKind = "html" | "markdown" | "text" | "image" | "pdf" | "video" | "audio";
-export interface FilePreviewData extends FileReference {
-  sessionId: string;
-  name: string;
-  kind: PreviewKind;
-  text: string | null;
-  url: string;
-}
 export const filePreviewApi = {
   open: async (target: FileReference & { threadId: string | null }) => {
     const data = await invoke<FilePreviewData | null>("codex_gui_open_file_preview", { target });

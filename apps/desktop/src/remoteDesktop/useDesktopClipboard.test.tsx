@@ -6,7 +6,7 @@ import { useDesktopClipboard } from '../../../web/src/chat/desktop/useDesktopCli
 import type { ClipboardContent } from '../../../../shared/remote-desktop/clipboard';
 
 const text = (value: string): ClipboardContent => ({ format: 'text', text: value });
-const clipboard = { read: vi.fn(), write: vi.fn() };
+const clipboard = { read: vi.fn(), write: vi.fn(), copy: vi.fn(), paste: vi.fn() };
 const localClipboard = { files: true, read: vi.fn(), write: vi.fn() };
 let state: ReturnType<typeof useDesktopClipboard>;
 let root: Root;
@@ -21,8 +21,10 @@ function deferred<T>() {
 }
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.clearAllMocks();
-  clipboard.read.mockResolvedValue(text('remote')); clipboard.write.mockResolvedValue(undefined);
+  vi.resetAllMocks();
+  clipboard.read.mockResolvedValue(text('remote')); clipboard.copy.mockResolvedValue(text('remote'));
+  clipboard.write.mockResolvedValue(undefined);
+  clipboard.paste.mockImplementation(async preferLocal => preferLocal ? 'revision-1' : undefined);
   localClipboard.read.mockResolvedValue(text('local')); localClipboard.write.mockResolvedValue(undefined);
   root = createRoot(document.createElement('div'));
   act(() => root.render(<Harness />));
@@ -38,11 +40,11 @@ it('queues consecutive paste gestures without overlapping or losing transfers', 
 });
 
 it('discards queued work and late copy results after the viewer becomes inactive', async () => {
-  const reading = deferred<ClipboardContent>(); clipboard.read.mockReturnValueOnce(reading.promise);
+  const reading = deferred<ClipboardContent>(); clipboard.copy.mockReturnValueOnce(reading.promise);
   await act(async () => { state.copy('copy'); state.pasteLocal(); });
   act(() => root.render(<Harness active={false} />));
   await act(async () => reading.resolve(text('old session')));
-  expect(localClipboard.write).not.toHaveBeenCalled(); expect(localClipboard.read).not.toHaveBeenCalled();
+  expect(localClipboard.write).not.toHaveBeenCalled(); expect(localClipboard.read).toHaveBeenCalledTimes(1);
   expect(clipboard.write).not.toHaveBeenCalled(); expect(state.status).toBe(''); expect(state.busy).toBe(false);
   act(() => root.render(<Harness />));
   await act(async () => state.pasteLocal());
@@ -51,21 +53,21 @@ it('discards queued work and late copy results after the viewer becomes inactive
 
 it('keeps native file copies available for retry after a system clipboard write fails', async () => {
   const files: ClipboardContent = { format: 'files', files: [{ name: 'report.txt', data: 'YQ==' }] };
-  clipboard.read.mockResolvedValueOnce(files); localClipboard.write.mockRejectedValueOnce('clipboard locked');
+  clipboard.copy.mockResolvedValueOnce(files); localClipboard.write.mockRejectedValueOnce('clipboard locked');
   await act(async () => state.copy('copy'));
   expect(state.received).toEqual(files); expect(state.open).toBe(false); expect(state.needsSave).toBe(true);
   await act(async () => state.save());
   expect(localClipboard.write).toHaveBeenLastCalledWith(files);
   expect(state.status).toBe(''); expect(state.needsSave).toBe(false);
-  expect(clipboard.read).toHaveBeenCalledTimes(1);
+  expect(clipboard.copy).toHaveBeenCalledTimes(1);
 });
 
 it('uses the in-flight remote copy for an immediate browser paste, not stale event text', async () => {
   act(() => root.render(<Harness native={false} />));
-  const reading = deferred<ClipboardContent>(); clipboard.read.mockReturnValueOnce(reading.promise);
+  const reading = deferred<ClipboardContent>(); clipboard.copy.mockReturnValueOnce(reading.promise);
   await act(async () => { state.copy('copy'); state.paste({} as DataTransfer); });
   await act(async () => reading.resolve(text('fresh remote')));
-  expect(clipboard.write).toHaveBeenCalledWith(text('fresh remote'), true, expect.any(Function));
+  expect(clipboard.paste).toHaveBeenCalledWith(false); expect(clipboard.write).not.toHaveBeenCalled();
 });
 
 it('shows native errors and allows the next paste to proceed', async () => {
@@ -88,7 +90,7 @@ it('completes regular copy and paste silently without opening the clipboard pane
 
 it('only shows progress for slow transfers and clears it on completion', async () => {
   vi.useFakeTimers();
-  const reading = deferred<ClipboardContent>(); clipboard.read.mockReturnValueOnce(reading.promise);
+  const reading = deferred<ClipboardContent>(); clipboard.copy.mockReturnValueOnce(reading.promise);
   await act(async () => state.copy('copy'));
   await act(async () => vi.advanceTimersByTimeAsync(799));
   expect(state.status).toBe('');
@@ -99,26 +101,75 @@ it('only shows progress for slow transfers and clears it on completion', async (
 });
 
 it('uses the fresh remote copy for native paste even when the local clipboard is locked', async () => {
-  const reading = deferred<ClipboardContent>(); clipboard.read.mockReturnValueOnce(reading.promise);
+  const reading = deferred<ClipboardContent>(); clipboard.copy.mockReturnValueOnce(reading.promise);
   localClipboard.write.mockRejectedValueOnce('clipboard locked');
-  await act(async () => { state.copy('cut'); state.pasteLocal(); });
+  await act(async () => { state.copy('cut'); state.pasteShortcut!(); });
   await act(async () => reading.resolve(text('fresh remote')));
-  expect(clipboard.write).toHaveBeenCalledWith(text('fresh remote'), true, expect.any(Function));
-  expect(localClipboard.read).not.toHaveBeenCalled(); expect(state.open).toBe(false);
+  expect(clipboard.paste).toHaveBeenCalledWith(false); expect(clipboard.write).not.toHaveBeenCalled();
+  expect(state.open).toBe(false);
 });
 
 it('does not paste stale native data if the preceding remote copy fails', async () => {
-  clipboard.read.mockRejectedValueOnce(new Error('copy failed'));
-  await act(async () => { state.copy('copy'); state.pasteLocal(); });
-  expect(clipboard.write).not.toHaveBeenCalled(); expect(localClipboard.read).not.toHaveBeenCalled();
-  expect(state.status).toContain('未能复制'); expect(state.open).toBe(false);
+  clipboard.copy.mockRejectedValueOnce(new Error('copy failed'));
+  await act(async () => { state.copy('copy'); state.pasteShortcut!(); });
+  expect(clipboard.write).not.toHaveBeenCalled(); expect(clipboard.paste).toHaveBeenCalledWith(false);
+  expect(state.open).toBe(false);
 });
 
 it('keeps multiple browser files available without opening the download panel', async () => {
   act(() => root.render(<Harness native={false} />));
-  clipboard.read.mockResolvedValueOnce({ format: 'files', files: [
+  clipboard.copy.mockResolvedValueOnce({ format: 'files', files: [
     { name: 'one.txt', data: 'YQ==' }, { name: 'two.txt', data: 'Yg==' },
   ] });
   await act(async () => state.copy('copy'));
   expect(state.open).toBe(false); expect(state.status).toContain('下载文件');
+});
+
+it('preserves remote paste after a completed copy fails to synchronize locally', async () => {
+  localClipboard.write.mockRejectedValueOnce(new Error('denied'));
+  await act(async () => state.copy('cut'));
+  expect(state.busy).toBe(false);
+  await act(async () => state.pasteShortcut!());
+  expect(clipboard.paste).toHaveBeenCalledWith(false); expect(clipboard.write).not.toHaveBeenCalled();
+});
+
+it('preserves rich text and cut files on repeated remote-to-remote paste', async () => {
+  const files: ClipboardContent = { format: 'files', files: [{ name: 'original.docx', data: 'YQ==' }] };
+  clipboard.copy.mockResolvedValueOnce(files);
+  localClipboard.write.mockImplementationOnce(async content => { localClipboard.read.mockResolvedValue(content); });
+  await act(async () => state.copy('cut'));
+  await act(async () => { state.pasteShortcut!(); state.pasteShortcut!(); });
+  expect(clipboard.paste.mock.calls).toEqual([[false], [false]]);
+  expect(clipboard.write).not.toHaveBeenCalled();
+});
+
+it('imports newly copied local content with the host revision guard', async () => {
+  await act(async () => state.copy('copy'));
+  localClipboard.read.mockResolvedValueOnce(text('new local'));
+  await act(async () => state.pasteShortcut!());
+  expect(clipboard.paste).toHaveBeenCalledWith(true);
+  expect(clipboard.write).toHaveBeenCalledWith(text('new local'), true, expect.any(Function), 'revision-1');
+});
+
+it('does not upload stale local content when the host detects a remote context-menu copy', async () => {
+  clipboard.paste.mockResolvedValueOnce(undefined);
+  await act(async () => state.pasteShortcut!());
+  expect(clipboard.paste).toHaveBeenCalledWith(true); expect(clipboard.write).not.toHaveBeenCalled();
+  await act(async () => state.pasteShortcut!());
+  expect(clipboard.paste).toHaveBeenLastCalledWith(false); expect(clipboard.write).not.toHaveBeenCalled();
+});
+
+it('allows native copy/paste for folders or hosts that disable clipboard sharing', async () => {
+  clipboard.copy.mockResolvedValueOnce(undefined);
+  await act(async () => state.copy('copy'));
+  await act(async () => state.pasteShortcut!());
+  expect(clipboard.paste).toHaveBeenCalledWith(false);
+  expect(clipboard.write).not.toHaveBeenCalled(); expect(localClipboard.write).not.toHaveBeenCalled();
+  expect(state.status).toBe('');
+});
+
+it('preserves native paste when reading the local clipboard is unavailable', async () => {
+  localClipboard.read.mockRejectedValueOnce(new Error('denied'));
+  await act(async () => state.pasteShortcut!());
+  expect(clipboard.paste).toHaveBeenCalledWith(false); expect(clipboard.write).not.toHaveBeenCalled();
 });

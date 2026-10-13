@@ -16,6 +16,8 @@ export function remoteDevelopmentUrl(value: string): boolean {
   const url = websiteUrl(value);
   if (!url) return false;
   const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  // Include IPv4-mapped loopback/LAN addresses; they must never reach the viewer's own network.
+  if (host.includes(':')) return true;
   if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || !host.includes('.')) return true;
   const parts = host.split('.').map(Number);
   return parts.length === 4 && parts.every(part => Number.isInteger(part) && part >= 0 && part <= 255)

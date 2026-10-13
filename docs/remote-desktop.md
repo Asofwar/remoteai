@@ -236,9 +236,18 @@ Ctrl+C/Ctrl+X in the remote desktop copies the selection into the local system c
 be pasted directly into Explorer without downloading or opening the Clipboard panel. File entries survive
 closing the viewer. Clipboard I/O runs on blocking workers, and gestures queue in order so an immediate
 paste waits for an earlier copy to finish. Queued work is discarded when the viewer disconnects or closes.
-An immediate paste uses that copy's content even if writing the local clipboard failed; a failed remote
-copy never falls back to stale local content. Local clipboard access retries brief OS locks up to three times
-without repeating the remote copy/cut operation.
+Remote-to-remote paste uses the host's original clipboard, including rich text, original file paths and cut/move
+metadata. This also works after local synchronization fails or when clipboard sharing is disabled. Native
+copy/cut and paste require control permission; sharing contents separately requires the corresponding clipboard
+and file permissions. Unsupported shared content (folders, large files or application-specific formats) remains
+available for native remote paste. Local clipboard access retries brief OS locks without repeating a remote cut.
+
+The viewer remembers the local content observed during copy/paste gestures. Unchanged local content is never
+uploaded over the remote original. A host OS revision detects context-menu copies without background polling;
+the revision is checked again at upload commit so a remote copy during transfer wins over older local content.
+When the source cannot be established safely, native remote paste takes priority. The explicit **Paste to remote**
+tool remains available for intentionally importing local contents. Browser baseline reads only run when read
+permission is already granted, avoiding an extra permission prompt during remote copy.
 
 The Web clipboard supports bidirectional text and PNG images, plus copying files into the remote Windows
 clipboard and downloading remote clipboard files. Ctrl+C/Ctrl+X copy the remote selection; Ctrl+V consumes
@@ -258,8 +267,10 @@ Clipboard transfers use the authenticated desktop's ordered, encrypted control c
 service, session checks, validation and input ordering. Files use validated basenames inside a fresh
 application-owned temporary directory; source paths never cross the connection. Temporary files remain
 available for pasting after disconnect and expire after 24 hours, cleaned on a subsequent file transfer.
-Both the Web frontend and Windows host app must be updated. Capability negotiation keeps older hosts
-connected and explains which update is needed instead of sending unsupported keyboard/clipboard messages.
+Both the viewer and host must be updated for automatic clipboard routing using the `clipboardNative` capability.
+Older hosts receive ordinary native copy/cut/paste shortcuts, with explicit clipboard imports still available.
+Clipboard sharing being disabled never disables native editing. App-specific shortcuts such as Ctrl+Shift+V
+and Ctrl+Alt+V are forwarded intact.
 
 The touch viewer draws its own pointer immediately; all Windows capture paths exclude the host cursor.
 The compact floating mouse follows that pointer and can extend into letterbox space around the video.

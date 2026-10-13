@@ -8,6 +8,7 @@ interface DetailsContextValue {
   update: (entry: DiffPanelEntry) => void;
   setConversationChanges: (entry: DiffPanelEntry) => void;
   openFile: (target: FileReference & { threadId: string | null }) => Promise<boolean>;
+  openRemoteFile?: (target: FileReference & { threadId: string | null }) => Promise<boolean>;
   openWebsite: (url: string) => void;
   showingChanges: boolean;
   visible: boolean;

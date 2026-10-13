@@ -19,6 +19,7 @@ import { GuiRemoteDesktop } from '../GuiRemoteDesktop';
 import styles from '../styles.module.less';
 import './remoteGui.less';
 import { useDesktopDownloads } from '../../../downloads/useDesktopDownloads';
+import { RemoteFileEnvironment } from './RemoteFileEnvironment';
 
 const TerminalPanel = lazy(() => import('../terminal/TerminalPanel'));
 const nativeFileDrop = { subscribe: subscribeFileDrop, readFiles: readDroppedFiles };
@@ -43,6 +44,7 @@ export default function RemoteGuiWorkspace(props: {
   return <section ref={workspace} className={`${styles.page} chat-page gui-remote-workspace`}
     data-dream-skin={skinStyle ? 'true' : undefined} style={skinStyle} aria-label={`Codex GUI：${device.name}`}>
     <ConfigProvider getPopupContainer={popupContainer}>
+    <RemoteFileEnvironment controller={chat.controller} ready={chat.state.ready} threadId={chat.state.selected?.id ?? null}>
     <ConnectedChat chat={chat} active={active} device={device} devices={computers.devices} email="" desktopDiffs
       scope={JSON.stringify([identity.baseUrl, identity.userId, device.deviceId])}
       chooseLocal={() => computers.choose(null)}
@@ -63,6 +65,7 @@ export default function RemoteGuiWorkspace(props: {
         active={active} />}
       renderSidebar={actions => <RemoteGuiSidebar state={chat.state} controller={chat.controller}
         actions={actions} accountPicker={accountPicker} focusMode={props.focusMode} />} />
+    </RemoteFileEnvironment>
     </ConfigProvider>
   </section>;
 }

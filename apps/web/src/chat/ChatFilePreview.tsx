@@ -15,9 +15,11 @@ import { localImageSource } from '../../../../shared/chat/imageSources';
 import type { PreviewLoadOptions, PreviewProgress } from '../../../../shared/remote-chat/previewProgress';
 import { PreviewTransferProgress } from '../../../../shared/chat/PreviewTransferProgress';
 import { ChatDownloadFile, isDownloadOnlyFile } from './ChatDownloadFile';
+import { ChatFileContext } from './ChatFileLink';
 
 export interface FilePreviewContext {
   client: FileClient; threadId: string | null; ready: boolean;
+  basePath?: string;
   load?: (threadId: string, path: string, options?: PreviewLoadOptions) => Promise<TextPreview>;
 }
 function TextFile({ path, context, line }: { path: string; context: FilePreviewContext; line?: number }) {
@@ -69,18 +71,27 @@ function VideoFile({ path, context }: { path: string; context: FilePreviewContex
   return <video controls playsInline src={url} style={{ width: '100%', maxHeight: '60dvh' }}
     onError={() => setError(t("浏览器暂不支持此视频格式，可以下载后播放。"))} />;
 }
-export function ChatFilePreview({ path, line, context, onClose }: {
-  path: string; line?: number; context: FilePreviewContext; onClose: () => void;
+export function ChatFilePreviewContent({ path, line, context }: {
+  path: string; line?: number; context: FilePreviewContext;
 }) {
   useLanguage();
-  if (isDownloadOnlyFile(path)) return <ChatDownloadFile path={path} context={context} onClose={onClose} />;
   const image = /\.(png|jpe?g|gif|webp|bmp|avif)$/i.test(path);
-  return <AdaptiveSheet open truncateTitle title={path.split(/[\\/]/).at(-1) || t("文件预览")}
-    width={800} onClose={onClose}>
+  return <ChatFileContext.Provider value={{ ...context, basePath: path }}>
     <div className="chat-detail-stack">
       {localImageSource(path) ? <ImageFileDownload path={path} /> : <FileDownloadButton path={path} context={context} />}
       {image ? <ChatImage source={path} description={t("文件预览")} />
       : isVideoPath(path) ? <VideoFile path={path} context={context} />
         : <TextFile key={path} path={path} context={context} line={line} />}</div>
+  </ChatFileContext.Provider>;
+}
+
+export function ChatFilePreview({ path, line, context, onClose }: {
+  path: string; line?: number; context: FilePreviewContext; onClose: () => void;
+}) {
+  useLanguage();
+  if (isDownloadOnlyFile(path)) return <ChatDownloadFile path={path} context={context} onClose={onClose} />;
+  return <AdaptiveSheet open truncateTitle title={path.split(/[\\/]/).at(-1) || t("文件预览")}
+    width={800} onClose={onClose}>
+    <ChatFilePreviewContent path={path} line={line} context={context} />
   </AdaptiveSheet>;
 }

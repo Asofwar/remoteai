@@ -29,6 +29,77 @@ fn client() -> reqwest::blocking::Client {
 }
 
 #[test]
+fn remote_preview_allows_only_the_registered_loopback_host_and_keeps_asset_and_range_scope() {
+    let fixture = Fixture::new();
+    let path = fixture.file("index.html", b"<img src=\"photo.png\">");
+    fixture.file("photo.png", b"0123456789");
+    let server = PreviewServer::start(&path).unwrap();
+    let client = client();
+    let forwarded = "127.0.0.1:54321";
+    assert_eq!(
+        client
+            .get(&server.url)
+            .header("Host", forwarded)
+            .send()
+            .unwrap()
+            .status(),
+        403
+    );
+    for invalid in [
+        "example.com:80",
+        "192.168.1.2:80",
+        "127.0.0.1:0",
+        "127.0.0.1:80/secret",
+    ] {
+        assert!(server.forward_host(invalid.into()).is_err());
+    }
+    server.forward_host(forwarded.into()).unwrap();
+    assert_eq!(
+        client
+            .get(&server.url)
+            .header("Host", forwarded)
+            .send()
+            .unwrap()
+            .status(),
+        200
+    );
+    let asset = url::Url::parse(&server.url)
+        .unwrap()
+        .join("photo.png")
+        .unwrap();
+    let response = client
+        .get(asset)
+        .header("Host", forwarded)
+        .header("Range", "bytes=2-4")
+        .send()
+        .unwrap();
+    assert_eq!(response.status(), 206);
+    assert_eq!(response.text().unwrap(), "234");
+    let escaped = url::Url::parse(&server.url)
+        .unwrap()
+        .join("../photo.png")
+        .unwrap();
+    assert_eq!(
+        client
+            .get(escaped)
+            .header("Host", forwarded)
+            .send()
+            .unwrap()
+            .status(),
+        404
+    );
+    assert_eq!(
+        client
+            .get(&server.url)
+            .header("Host", "127.0.0.1:54322")
+            .send()
+            .unwrap()
+            .status(),
+        403
+    );
+}
+
+#[test]
 fn media_streams_support_full_reads_head_and_seek_without_loading_the_whole_file() {
     let fixture = Fixture::new();
     let path = fixture.file("视频 #1+.mp4", b"0123456789");
@@ -124,6 +195,7 @@ fn only_the_selected_file_and_contained_web_assets_are_served() {
         root: fixture.0.clone(),
         token: "test".into(),
         host: String::new(),
+        forwarded_host: Arc::new(RwLock::new(None)),
     };
     for path in [
         "/test/%2e%2e/secret.css",

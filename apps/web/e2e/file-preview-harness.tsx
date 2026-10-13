@@ -1,5 +1,9 @@
 import { createRoot } from 'react-dom/client';
 import { ChatFilePreview, type FilePreviewContext } from '../src/chat/ChatFilePreview';
+import { ChatFileContext } from '../src/chat/ChatFileLink';
+import { ChatDetailsWorkspace } from '../src/chat/ChatDetailsWorkspace';
+import { ChatMarkdown } from '../src/chat/ChatMarkdown';
+import { PcFilePreviewFixture } from './pc-file-preview-fixture';
 import { externalCodePath, longMarkdown, markdown, sourceCode } from './file-preview-fixture';
 import '../src/styles.css';
 import '../src/chat/chat.css';
@@ -10,6 +14,8 @@ const DOWNLOAD_BYTES = 8 * 1024 * 1024;
 Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true });
 
 const files: Record<string, string> = {
+  'F:/remote/docs/handoff.md': markdown + '\n\n[后续文档](next.md#L3)',
+  'F:/remote/docs/next.md': '# 后续文档\n\n这是同一台远程电脑上的文件。',
   'verification.md': markdown, 'README.MARKDOWN': markdown, 'long.md': longMarkdown,
   'empty.md': ' \n', 'source.ts': sourceCode, [externalCodePath]: sourceCode,
   'page.HTML': '<h1>页面预览</h1><script>document.body.dataset.ready = "yes";'
@@ -38,5 +44,11 @@ const context: FilePreviewContext = {
 };
 const path = params.get('path') ?? 'verification.md';
 createRoot(document.getElementById('root')!).render(
-  <ChatFilePreview path={path} line={3} context={context} onClose={() => {}} />,
+  params.has('pc') ? <PcFilePreviewFixture /> : params.has('workspace') ? <div className="chat-page" style={{ height: '100dvh' }}>
+    <ChatFileContext.Provider value={context}>
+      <ChatDetailsWorkspace selected={context.threadId} active enabled>
+        <ChatMarkdown text="[交接文档](F:/remote/docs/handoff.md)" />
+      </ChatDetailsWorkspace>
+    </ChatFileContext.Provider>
+  </div> : <ChatFilePreview path={path} line={3} context={context} onClose={() => {}} />,
 );

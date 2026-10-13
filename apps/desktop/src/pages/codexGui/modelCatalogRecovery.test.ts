@@ -178,6 +178,7 @@ it("rejects endless pagination even when each page responds immediately", async 
   const catalog = new GuiModelCatalog({ ready: () => true, accept });
   await expect(catalog.invalidate()).rejects.toThrow("模型列表");
   expect(accept).not.toHaveBeenCalled();
+  catalog.suspend();
   expect(vi.getTimerCount()).toBe(0);
 });
 

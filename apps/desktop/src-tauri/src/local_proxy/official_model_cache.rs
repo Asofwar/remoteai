@@ -29,7 +29,7 @@ pub(super) fn with_fallback<R: Runtime>(
     app: &AppHandle<R>,
     official: impl FnOnce() -> Result<UpstreamPayload, String>,
 ) -> Result<UpstreamPayload, String> {
-    prefer_official(official(), || fetch(app))
+    prefer_official(official, || fetch(app))
 }
 
 /// Fetch Admin suggestions and defaults independently of official model discovery.
@@ -42,12 +42,16 @@ pub(crate) fn admin_model_catalog<R: Runtime>(app: &AppHandle<R>) -> Result<Valu
 }
 
 fn prefer_official(
-    official: Result<UpstreamPayload, String>,
+    official: impl FnOnce() -> Result<UpstreamPayload, String>,
     admin: impl FnOnce() -> Result<UpstreamPayload, CatalogError>,
 ) -> Result<UpstreamPayload, String> {
-    match official
-        .and_then(|payload| validate_official_payload(payload).map_err(|error| error.to_string()))
-    {
+    let official = {
+        let _deadline = super::model_catalog_deadline::Scope::enter();
+        official().and_then(|payload| {
+            validate_official_payload(payload).map_err(|error| error.to_string())
+        })
+    };
+    match official {
         Ok(payload) => Ok(payload),
         Err(error) => {
             eprintln!("Official model catalog failed: {error}; fetching models from Admin");

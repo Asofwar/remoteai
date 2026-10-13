@@ -100,13 +100,14 @@ it('does not acknowledge a switch before both routing and the new CLI catalog ar
   expect((await bridge.read(null)).settings.model).toBe('model-b');
 });
 
-it('keeps sending blocked after a failed refresh and recovers on the next refresh', async () => {
+it('keeps sending blocked when the new Provider cannot be read and recovers on the next refresh', async () => {
   selection = { kind: 'provider', id: 'b' };
-  vi.mocked(guiApi.request).mockRejectedValueOnce(new Error('offline'));
+  pc.modelCatalog.setProviderSource(async () => { throw new Error('offline'); });
   await expect(pc.modelCatalog.invalidate()).rejects.toThrow('offline');
   expect(pc.getSnapshot().modelCatalogLoading).toBe(true);
   expect(await pc.send('must wait', [])).toBe(false);
-  await expect(bridge.validateSend({ model: 'model-a' })).rejects.toThrow('模型正在同步');
+  await expect(bridge.validateSend({ model: 'model-a' })).rejects.toThrow('offline');
+  pc.modelCatalog.setProviderSource(readGuiProviderModels);
   await pc.modelCatalog.refresh();
   expect((await bridge.read(null)).settings.model).toBe('model-b');
 });

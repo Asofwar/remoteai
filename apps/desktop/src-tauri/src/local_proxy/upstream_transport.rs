@@ -112,6 +112,7 @@ pub(super) struct Request {
     headers: header::HeaderMap,
     body: Bytes,
     timeouts: Timeouts,
+    deadline: Option<Instant>,
 }
 
 impl Request {
@@ -127,12 +128,34 @@ impl Request {
             headers: request.headers().clone(),
             body,
             timeouts: Timeouts::default(),
+            deadline: super::model_catalog_deadline::current(),
         })
     }
 
     pub(super) fn send(&self) -> Result<Response, Error> {
         // This entry point is called from the proxy's request worker, never the UI thread.
-        tauri::async_runtime::block_on(self.send_async())
+        tauri::async_runtime::block_on(async {
+            let Some(deadline) = self.deadline else {
+                return self.send_async().await;
+            };
+            if Instant::now() >= deadline {
+                return Err(Error::Timeout {
+                    phase: Phase::ResponseHeaders,
+                    sent_bytes: 0,
+                });
+            }
+            tokio::time::timeout_at(deadline, self.send_async())
+                .await
+                .map_err(|_| Error::Timeout {
+                    phase: Phase::ResponseHeaders,
+                    sent_bytes: 0,
+                })?
+        })
+    }
+
+    pub(super) fn can_retry(&self, error: &Error) -> bool {
+        // Catalog failures go straight to Admin; chat keeps its existing pre-upload retries.
+        self.deadline.is_none() && error.can_retry()
     }
 
     async fn send_async(&self) -> Result<Response, Error> {
@@ -157,7 +180,7 @@ impl Request {
                 } else {
                     Some(self.timeouts.response_idle)
                 };
-                return Ok(Response::new(response, idle));
+                return Ok(Response::new(response, idle).with_deadline(self.deadline));
             }
         }
     }
@@ -268,6 +291,8 @@ fn phase_deadline(
     )
 }
 
+#[cfg(test)]
+mod model_deadline_tests;
 #[cfg(test)]
 mod proxy_tests;
 #[cfg(test)]

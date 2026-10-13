@@ -16,6 +16,9 @@ const MAX_ENTRIES: usize = 500;
 const MAX_SCANNED_ENTRIES: usize = 10_000;
 const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "webp", "gif"];
 
+#[path = "project_file_search.rs"]
+mod search;
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectFilesRequest {
@@ -25,6 +28,7 @@ pub(crate) struct ProjectFilesRequest {
     directory: String,
     #[serde(default)]
     images_only: bool,
+    query: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -52,8 +56,9 @@ pub(super) async fn list(client: &Client, options: ProjectFilesRequest) -> Resul
                 .ok_or(GuiError::ProjectFiles)?,
         )
     };
-    let data = tauri::async_runtime::spawn_blocking(move || {
-        browse(&root, &options.directory, options.images_only)
+    let data = tauri::async_runtime::spawn_blocking(move || match options.query {
+        Some(query) => search::search(&root, &query),
+        None => browse(&root, &options.directory, options.images_only),
     })
     .await
     .map_err(|_| GuiError::ProjectFiles)??;

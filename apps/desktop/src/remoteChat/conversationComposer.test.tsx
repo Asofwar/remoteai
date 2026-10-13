@@ -6,6 +6,7 @@ import { ChatComposer } from '../../../web/src/chat/ChatComposer';
 import type { ComposerProps } from '../../../web/src/chat/composerProps';
 import { guiApi } from '../pages/codexGui/api';
 import type { ListResponse, Thread } from '../../../../shared/remote-chat/client/types';
+import type { ProjectFilesResponse } from '../../../../shared/remote-chat/projectFiles';
 
 vi.mock('../pages/codexGui/api', () => ({ guiApi: { request: vi.fn() } }));
 const threads: Thread[] = [
@@ -142,4 +143,49 @@ it('does not submit an empty or failed search and stops polling when hidden or d
   expect(props.loadConversations).toHaveBeenCalledTimes(2);
   await render({ active: false });
   expect(host.querySelector('.chat-composer-popover')).toBeNull();
+});
+
+it.each([false, true])('searches the connected computer and sends folder/file references (desktop=%s)', async desktop => {
+  vi.mocked(matchMedia).mockReturnValue({ matches: desktop, addEventListener: vi.fn(),
+    removeEventListener: vi.fn() } as unknown as MediaQueryList);
+  await render({ threadId: desktop ? 'desktop' : 'current' });
+  vi.mocked(props.loadFiles).mockResolvedValue({ directory: '/remote/project', parent: null, truncated: false,
+    entries: [
+      { name: 'robot', path: '/remote/project/src/robot', directory: true, relativePath: 'src/robot' },
+      { name: 'robot.ts', path: '/remote/project/src/robot.ts', directory: false, relativePath: 'src/robot.ts' },
+    ] });
+  await type('完成120%');
+  expect(props.loadFiles).not.toHaveBeenCalled();
+  await type('%robot');
+  expect(props.loadFiles).toHaveBeenCalledExactlyOnceWith({ cwd: '/remote/project',
+    threadId: props.threadId, query: 'robot' });
+  expect(guiApi.request).not.toHaveBeenCalled();
+  expect(props.catalog.refresh).not.toHaveBeenCalled();
+  expect(host.querySelectorAll('.chat-file-menu [role="menuitem"]')).toHaveLength(2);
+  await key('Enter');
+  expect(props.send).not.toHaveBeenCalled();
+  expect(input().value).toBe('');
+  await type('检查 %robot');
+  await key('ArrowDown'); await key('Tab');
+  expect(input().value).toBe('检查 ');
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="发送消息"]')!.click());
+  expect(props.send).toHaveBeenCalledWith(expect.objectContaining({ text: '检查 ', attachments: [
+    { kind: 'folder', name: 'robot', path: '/remote/project/src/robot' },
+    { kind: 'file', name: 'robot.ts', path: '/remote/project/src/robot.ts' },
+  ] }));
+});
+
+it('discards a file result after switching projects and does not send failed searches with Enter', async () => {
+  let finish!: (value: ProjectFilesResponse) => void;
+  vi.mocked(props.loadFiles).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  await type('%old');
+  await render({ cwd: '/remote/other' });
+  await act(async () => finish({ directory: '/remote/project', parent: null, truncated: false,
+    entries: [{ name: 'old', path: '/remote/project/old', directory: false }] }));
+  expect(host.querySelector('.chat-file-menu')).toBeNull();
+  vi.mocked(props.loadFiles).mockRejectedValue(new Error('private path must not be exposed'));
+  await type('%new');
+  expect(host.textContent).toContain('文件搜索失败');
+  expect(host.textContent).not.toContain('private path');
+  await key('Enter'); expect(props.send).not.toHaveBeenCalled();
 });

@@ -25,9 +25,10 @@ export function useComposerMenu({ draft, scope, active, refresh, compact }: Opti
   const triggerKey = trigger ? JSON.stringify(trigger) : '';
   const open = active && (expanded || (!!trigger && triggerKey !== dismissed));
   const conversations = Boolean(trigger?.conversations) && !pickingPlugins;
+  const files = Boolean(trigger?.files) && !pickingPlugins;
   useEffect(() => { setExpanded(false); setPickingPlugins(false); setDismissed(triggerKey); }, [scope, active]);
   useEffect(() => { if (!triggerKey) setDismissed(''); }, [triggerKey]);
-  useEffect(() => { if (open && !conversations) refresh(); }, [open, conversations, refresh]);
+  useEffect(() => { if (open && !conversations && !files) refresh(); }, [open, conversations, files, refresh]);
   useEffect(() => () => {
     if (focusFrame.current !== null) cancelAnimationFrame(focusFrame.current);
   }, [scope, active]);
@@ -40,6 +41,12 @@ export function useComposerMenu({ draft, scope, active, refresh, compact }: Opti
   const close = () => { setExpanded(false); setPickingPlugins(false); setDismissed(triggerKey); };
   const restoreCaret = (caret: number) => {
     setSelection({ start: caret, end: caret }); focusAt(caret);
+  };
+  const updateSelection = (next: TextSelection) => {
+    // User input takes precedence over a caret restoration queued by the previous selection.
+    if (focusFrame.current !== null) cancelAnimationFrame(focusFrame.current);
+    focusFrame.current = null;
+    setSelection(next);
   };
   const openPlugins = () => {
     setPickingPlugins(true); setExpanded(true); input.current?.focus();
@@ -69,8 +76,8 @@ export function useComposerMenu({ draft, scope, active, refresh, compact }: Opti
     if (trigger) draft.removeText(trigger, text);
     close();
   };
-  return { input, selection, setSelection, open, query: pickingPlugins ? '' : trigger?.query ?? '',
-    skillsOnly: trigger?.skillsOnly ?? false, conversations, plugins: pickingPlugins,
+  return { input, selection, setSelection: updateSelection, open, query: pickingPlugins ? '' : trigger?.query ?? '',
+    skillsOnly: trigger?.skillsOnly ?? false, conversations, files, plugins: pickingPlugins,
     openPlugins, consumeTrigger,
     choose, close, runCompact, restoreCaret, toggle: () => { if (open) close(); else setExpanded(true); } };
 }

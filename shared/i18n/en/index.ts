@@ -1,4 +1,5 @@
 import { imageAiEnglish } from '../imageAi';
+import { fileReferencesEnglish } from '../fileReferences';
 import { messages } from './messages';
 import { terminalMessages } from './terminal';
 import { gitMessages } from './git';
@@ -22,4 +23,5 @@ export const english: Readonly<Record<string, string>> = {
   ...guiSettingsEnglish,
   ...cozeEnglish,
   ...imageAiEnglish,
+  ...fileReferencesEnglish,
 };

@@ -27,6 +27,7 @@ import { ComposerQuotes } from './ComposerQuotes';
 import { useChatQuotes } from './ChatQuotes';
 import { replyWithQuotes } from './replyQuotes';
 import { ComposerProjectFiles } from './ComposerProjectFiles';
+import { ComposerFileMenu } from './ComposerFileMenu';
 import { useComposerAttachments } from './useComposerAttachments';
 import type { RemoteComposerCatalog } from '../../../../shared/remote-chat/composerCatalog';
 import type { ProjectFilesRequest, ProjectFilesResponse } from '../../../../shared/remote-chat/projectFiles';
@@ -177,6 +178,9 @@ export function ChatComposer({ suggestions, models, selection, settingsBusy, set
   };
   const menuContent = () => {
     if (adding) return <ComposerAddMenu busy={attachmentBusy} choose={chooseAdd} />;
+    if (menu.files) return <ComposerFileMenu key={`${threadId}:${cwd}`} query={menu.query}
+      threadId={threadId} cwd={cwd} ready={ready && !attachmentBusy} load={loadFiles} close={menu.close}
+      choose={reference => { if (attachments.add(reference)) menu.consumeTrigger(); }} />;
     if (menu.conversations) return <ComposerConversationMenu key={threadId} query={menu.query}
       threadId={threadId} ready={ready && !attachmentBusy} load={loadConversations} close={menu.close}
       choose={reference => { if (attachments.add(reference)) menu.consumeTrigger(); }} />;
@@ -219,7 +223,8 @@ export function ChatComposer({ suggestions, models, selection, settingsBusy, set
           if (text) suggestion.dismiss(); else suggestion.restore();
           draft.setText(text);
         }}
-        placeholder={ready ? (goalMode.enabled ? t("描述想完成的目标…") : t("发消息，@ 引用对话…")) : t("连接后发消息")} />
+        placeholder={ready ? (goalMode.enabled ? t("描述想完成的目标…")
+          : t("发消息，% 引用文件，@ 引用对话…")) : t("连接后发消息")} />
       </ScrollView>
       <View pointerEvents="box-none" style={[styles.composerActions, compactField && styles.composerActionsCompact]}>
         <Pressable accessibilityRole="button" accessibilityLabel={t("添加内容")} style={styles.composerAdd}

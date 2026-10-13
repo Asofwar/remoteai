@@ -10,6 +10,7 @@ import { composerOptions, type CompactCommand, type ComposerOption, type GoalCom
 import type { SkillTrigger } from "./skillEditorDom";
 import { useComposerSkills } from "./useComposerSkills";
 import { useComposerCoze } from "./useComposerCoze";
+import { useComposerFileOptions } from './useComposerFileOptions';
 import { SkillMenu } from "./SkillMenu";
 import { useSuggestionInput } from './useSuggestionInput';
 import styles from "./SkillInput.module.less";
@@ -37,11 +38,12 @@ export const SkillInput = forwardRef<SkillInputHandle, {
   conversations?: Pick<GuiState, "selected" | "threads" | "conversations">;
   onConversation?: (reference: AttachmentReference) => void;
   onCoze?: (reference: AttachmentReference) => void;
+  onFile?: (reference: AttachmentReference) => void;
   editing?: { onCancel: () => void; className: string };
   onPaste: (event: ClipboardEvent<HTMLElement>) => void; onSend: () => void;
   onPasteKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
 }>(function SkillInput({ value, draftKey, cwd, active, connected, disabled, placeholder,
-  compact, goal, conversations, onConversation, onCoze, editing, onChange, onPaste, onPasteKeyDown, onSend,
+  compact, goal, conversations, onConversation, onCoze, onFile, editing, onChange, onPaste, onPasteKeyDown, onSend,
   suggestion, onUserInput, onInputEnd }, ref) {
   const editor = useRef<HTMLDivElement>(null);
   const savedCaret = useRef<Range | null>(null);
@@ -51,13 +53,15 @@ export const SkillInput = forwardRef<SkillInputHandle, {
   const listId = useId();
   const isConversation = trigger?.kind === "conversation";
   const isCoze = trigger?.kind === "coze";
+  const isFile = trigger?.kind === 'file';
   const open = Boolean(trigger) && active && !disabled && (!isConversation || Boolean(onConversation))
-    && (!isCoze || Boolean(onCoze));
+    && (!isCoze || Boolean(onCoze)) && (!isFile || Boolean(onFile));
   const ghost = useSuggestionInput({ editor, value, text: suggestion,
     enabled: active && connected && !disabled && !open && !editing, onChange, onUserInput, onInputEnd });
-  const catalog = useComposerSkills({ cwd, active: open && !isConversation && !isCoze, connected });
+  const catalog = useComposerSkills({ cwd, active: open && !isConversation && !isCoze && !isFile, connected });
   const coze = useComposerCoze(open && isCoze && connected);
   const query = trigger?.query.toLocaleLowerCase() ?? "";
+  const files = useComposerFileOptions({ cwd, active: open && isFile, connected, query, choose: onFile });
   const candidates = useConversationCandidates({ active: open && isConversation, connected, query });
   const cozeOptions: ComposerOption[] = coze.items
     .filter((item) => `${item.name} ${item.description}`.toLocaleLowerCase().includes(query))
@@ -73,9 +77,11 @@ export const SkillInput = forwardRef<SkillInputHandle, {
       command: { enabled: true, run: () => onConversation?.(conversationReference(thread)) },
     }));
   if (isCoze) options = cozeOptions;
+  if (isFile) options = files.options;
   let menuState: { loading: boolean; error: string } = catalog;
   if (isConversation) menuState = candidates;
   if (isCoze) menuState = coze;
+  if (isFile) menuState = files;
   const selectedIndex = Math.min(selected, Math.max(0, options.length - 1));
 
   useLayoutEffect(() => {
@@ -160,7 +166,7 @@ export const SkillInput = forwardRef<SkillInputHandle, {
   return <div className={styles.inputWrap} data-suggesting={Boolean(ghost.text)}>
     {open && <SkillMenu id={listId} options={options} selected={selectedIndex}
       loading={menuState.loading} error={menuState.error}
-      conversations={isConversation} coze={isCoze}
+      conversations={isConversation} coze={isCoze} files={isFile} truncated={isFile && files.truncated}
       onChoose={choose} below={Boolean(editing)}
       skillsOnly={!compact && !goal} />}
     {ghost.text && <div className={styles.suggestion} data-testid="next-prompt-suggestion">

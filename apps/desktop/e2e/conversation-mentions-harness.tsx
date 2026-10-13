@@ -21,6 +21,13 @@ controller.send = async (text, images, skills, attachments) => {
 let pending = 0;
 let maxPending = 0;
 guiApi.request = async <T,>(request: Request): Promise<T> => {
+  if (request.operation === 'projectFiles') return { directory: 'F:/project', parent: null, truncated: false,
+    entries: [
+      { name: 'robot', path: 'F:/project/service_business/log/src/main/java/com/robot', directory: true,
+        relativePath: 'service_business/log/src/main/java/com/robot' },
+      { name: 'RobotService.java', path: 'F:/project/src/RobotService.java', directory: false,
+        relativePath: 'src/RobotService.java' },
+    ] } as T;
   if (request.operation !== "list") throw new Error("Unexpected request");
   maxPending = Math.max(maxPending, ++pending);
   document.body.dataset.maxPending = String(maxPending);
@@ -46,6 +53,7 @@ function Harness() {
       <SkillInput value={draft.draft} draftKey={draftKey} cwd="F:/project" active connected disabled={false}
         conversations={{ selected: draftKey, threads: [], conversations: {} }}
         onConversation={(reference) => draft.addAttachments([reference])} placeholder="描述任务，@ 引用对话…"
+        onFile={reference => draft.addAttachments([reference])}
         onChange={draft.editContent} onPaste={draft.paste} onSend={() => void draft.send()} />
       <button onClick={() => void draft.send()}>发送</button>
     </section>

@@ -3,6 +3,23 @@ import { composerMenuTrigger } from './composerTrigger';
 import { remoteAttachments } from '../../../../shared/remote-chat/composerAttachments';
 import { fileUploadByteLimit } from '../../../../shared/remote-chat/policy';
 import { remotePlugins } from '../../../../shared/remote-chat/composerCatalog';
+import { projectFileReference } from '../../../../shared/chat/useProjectFileCandidates';
+
+it('matches % file paths at the caret without treating ordinary percentages as references', () => {
+  for (const query of ['', 'robot', 'src/robot', 'src\\robot', '中文', '.env', 'my-file.ts']) {
+    const prefix = `参考 %${query}`;
+    expect(composerMenuTrigger(`${prefix} 后续文字`, { start: prefix.length, end: prefix.length }))
+      .toMatchObject({ start: 3, end: prefix.length, query, files: true, conversations: false });
+  }
+  for (const text of ['120%', 'url%20file', '%file ', '中文%file']) {
+    expect(composerMenuTrigger(text, { start: text.length, end: text.length })).toBeNull();
+  }
+  expect(composerMenuTrigger('%file', { start: 1, end: 5 })).toBeNull();
+  const folder = projectFileReference({ name: 'src', path: 'C:/project/src', directory: true });
+  expect(remoteAttachments([folder])).toEqual([{ kind: 'folder', name: 'src', path: 'C:/project/src' }]);
+  for (const invalid of [{ ...folder, data: 'aGVsbG8=' }, { ...folder, path: 'relative/src' },
+    { ...folder, path: '/path\0/private' }]) expect(() => remoteAttachments([invalid])).toThrow();
+});
 
 it('opens conversation search at the caret and leaves emails, selections and commands intact', () => {
   expect(composerMenuTrigger('请用 @设计 后面', { start: 6, end: 6 }))

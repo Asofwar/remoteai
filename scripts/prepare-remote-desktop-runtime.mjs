@@ -39,7 +39,8 @@ export async function prepareDesktopVideoRuntime() {
   if (createHash('sha256').update(await readFile(archive)).digest('hex') !== hash) {
     throw new Error('Desktop video runtime checksum mismatch');
   }
-  const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command',
+  const powershell = join(process.env.SystemRoot || 'C:\\Windows', 'System32/WindowsPowerShell/v1.0/powershell.exe');
+  const result = spawnSync(powershell, ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command',
     'Expand-Archive -LiteralPath $env:CSW_RUNTIME_ARCHIVE -DestinationPath $env:CSW_RUNTIME_EXTRACT -Force'], {
     env: { ...process.env, CSW_RUNTIME_ARCHIVE: archive, CSW_RUNTIME_EXTRACT: extracted }, windowsHide: true,
     stdio: 'inherit',

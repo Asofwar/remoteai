@@ -4,6 +4,7 @@ import { cp, mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promise
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveCmakeTool } from './resolve-cmake-tool.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const source = join(root, 'apps/desktop/src-tauri/desktop-privacy');
@@ -54,14 +55,15 @@ async function driver() {
 
 export async function prepareDesktopPrivacy() {
   if (process.platform !== 'win32' && process.platform !== 'darwin') return;
+  const cmake = resolveCmakeTool('cmake');
   await mkdir(cache, { recursive: true });
   await mkdir(destination, { recursive: true });
   const build = join(cache, 'build');
   const platform = process.platform === 'win32'
     ? ['-G', 'Visual Studio 17 2022', '-A', 'x64']
     : ['-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64', '-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0', '-DCMAKE_BUILD_TYPE=Release'];
-  run('cmake', ['-S', source, '-B', build, ...platform, `-DPRIVACY_OUTPUT=${destination}`]);
-  run('cmake', ['--build', build, '--config', 'Release', '--parallel']);
+  run(cmake, ['-S', source, '-B', build, ...platform, `-DPRIVACY_OUTPUT=${destination}`]);
+  run(cmake, ['--build', build, '--config', 'Release', '--parallel']);
   run(process.execPath, [join(root, 'scripts/test-desktop-privacy.mjs'),
     join(build, process.platform === 'win32' ? 'Release/privacy-protocol-test.exe' : 'privacy-protocol-test')]);
   if (process.platform === 'win32') await driver();

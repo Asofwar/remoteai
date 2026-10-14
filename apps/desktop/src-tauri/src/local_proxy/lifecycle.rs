@@ -33,6 +33,9 @@ pub(crate) fn restore_local_proxy_if_enabled<R: Runtime>(
         let _ = set_local_proxy_enabled(&paths, false);
         return Err(error);
     }
+    if write_codex {
+        official_context_startup::restore(app.clone());
+    }
     Ok(true)
 }
 

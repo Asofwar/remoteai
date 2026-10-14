@@ -75,7 +75,10 @@ pub(super) fn append_configured_models(
         {
             continue;
         }
-        models.push(entry.clone());
+        let mut metadata = entry.clone();
+        // Supplemental metadata is not evidence that the current account can select this model.
+        metadata["visibility"] = "hide".into();
+        models.push(metadata);
         changed = true;
     }
     changed

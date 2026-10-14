@@ -15,6 +15,7 @@ fn old_catalog() -> Value {
 fn supplemental_catalog() -> Value {
     json!({"models": [{
         "slug": MODEL,
+        "visibility": "list",
         "context_window": 373_000,
         "max_context_window": 872_000,
         "auto_compact_token_limit": 250_000,
@@ -43,7 +44,9 @@ fn missing_configured_model_is_completed_without_replacing_existing_metadata() {
     ));
     assert_eq!(catalog["models"].as_array().unwrap().len(), 2);
     assert_eq!(catalog["models"][0], original);
-    assert_eq!(catalog["models"][1], source["models"][0]);
+    let mut hidden = source["models"][0].clone();
+    hidden["visibility"] = "hide".into();
+    assert_eq!(catalog["models"][1], hidden);
     assert!(!append_configured_models(
         &mut catalog,
         &overrides(),
@@ -89,7 +92,7 @@ fn exact_names_and_id_entries_are_supported_without_creating_unknown_models() {
     assert!(append_configured_models(&mut catalog, &overrides, &source));
     assert_eq!(
         catalog,
-        json!({"models": [null, {"id": "existing"}, {"id": MODEL}]})
+        json!({"models": [null, {"id": "existing"}, {"id": MODEL, "visibility": "hide"}]})
     );
 }
 
@@ -117,6 +120,7 @@ fn proxy_payload_applies_missing_model_capacity_and_updates_cache_identity() {
     expected["context_window"] = json!(500_000);
     expected["max_context_window"] = json!(500_000);
     expected["auto_compact_token_limit"] = Value::Null;
+    expected["visibility"] = "hide".into();
     assert_eq!(catalog["models"][1], expected);
     assert_eq!(catalog["models"][0]["context_window"], 272_000);
     assert_eq!(
@@ -124,6 +128,25 @@ fn proxy_payload_applies_missing_model_capacity_and_updates_cache_identity() {
         475_000
     );
     assert_ne!(payload.response_headers[0].1, "old-catalog");
+}
+
+#[test]
+fn supplementation_preserves_each_accounts_visible_models() {
+    let source = supplemental_catalog();
+    for visible in [vec!["gpt-6-sol"], vec!["gpt-6-sol", MODEL]] {
+        let mut catalog = json!({"models": visible.iter().map(|name| {
+            json!({"slug": name, "visibility": "list"})
+        }).collect::<Vec<_>>()});
+        append_configured_models(&mut catalog, &overrides(), &source);
+        let listed: Vec<_> = catalog["models"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|model| model["visibility"] == "list")
+            .map(|model| model["slug"].as_str().unwrap())
+            .collect();
+        assert_eq!(listed, visible);
+    }
 }
 
 #[test]

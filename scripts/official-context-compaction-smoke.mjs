@@ -84,6 +84,12 @@ try {
     const client = connectAppServer({ executable, home: await configure(name), cwd: root });
     try {
       await client.initialize();
+      const listed = await client.rpc("model/list", { includeHidden: false });
+      assert.ok(!listed.data.some((model) => model.model === MODEL), "Supplement must not add a selectable model");
+      if (name === "updated") {
+        const all = await client.rpc("model/list", { includeHidden: true });
+        assert.equal(all.data.find((model) => model.model === MODEL)?.hidden, true);
+      }
       const { thread } = await client.rpc("thread/start", { cwd: root, sandbox: "read-only" });
       await check(client, thread.id, { used: 285_000,
         capacity: name === "original" ? 258_400 : 475_000, compact: name === "original" });

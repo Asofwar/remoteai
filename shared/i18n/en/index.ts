@@ -12,6 +12,7 @@ import { desktop } from './desktop';
 import { assistanceEnglish } from '../remoteAssistance';
 import { guiSettingsEnglish } from '../guiSettings';
 import { cozeEnglish } from '../coze';
+import { portForwardingEnglish } from '../portForwarding';
 
 export const english: Readonly<Record<string, string>> = {
   ...messages, ...terminalMessages, ...gitMessages, ...remoteDesktopMessages, ...mobile,
@@ -24,4 +25,5 @@ export const english: Readonly<Record<string, string>> = {
   ...cozeEnglish,
   ...imageAiEnglish,
   ...fileReferencesEnglish,
+  ...portForwardingEnglish,
 };

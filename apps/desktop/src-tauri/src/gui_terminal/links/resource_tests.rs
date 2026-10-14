@@ -11,7 +11,9 @@ async fn resource_streams_reject_other_destinations_scopes_and_listener_commands
     assert!(open_resource(&state, "file:///C:/secret".into())
         .await
         .is_err());
-    assert!(resource_request(&state, LinkRequest::Listen).await.is_err());
+    assert!(resource_request(&state, LinkRequest::Listen { port: None })
+        .await
+        .is_err());
     assert!(resource_request(
         &state,
         LinkRequest::Connect {

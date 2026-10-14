@@ -16,6 +16,7 @@ import { cliImportRussian } from '../cliImport';
 import { assistanceRussian } from '../remoteAssistance';
 import { guiSettingsRussian } from '../guiSettings';
 import { cozeRussian } from '../coze';
+import { portForwardingRussian } from '../portForwarding';
 
 export const russian = {
   '分辨率': 'Разрешение',
@@ -32,6 +33,7 @@ export const russian = {
   ...cozeRussian,
   ...imageAiRussian,
   ...fileReferencesRussian,
+  ...portForwardingRussian,
   ...downloads,
   ...cliImportRussian,
   ...reliabilityRussian,

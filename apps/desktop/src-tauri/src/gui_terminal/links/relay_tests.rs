@@ -111,7 +111,11 @@ async fn websocket_round_trip() {
             .unwrap();
     });
     let local = Arc::new(LinkState::default());
-    let LinkReply::Listener { id, port } = local.perform(LinkRequest::Listen).await.unwrap() else {
+    let LinkReply::Listener { id, port } = local
+        .perform(LinkRequest::Listen { port: None })
+        .await
+        .unwrap()
+    else {
         panic!("local listener expected")
     };
     let forwarding = tokio::spawn(bridge(local, id, remote_url));

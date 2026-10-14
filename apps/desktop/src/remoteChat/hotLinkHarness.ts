@@ -12,6 +12,7 @@ interface Packet { side: Side; path: Path; payload: string; frame: Record<string
 export function hotLinkHarness(options: {
   relayDelay?: number; endpoints?: Partial<Record<Side, ConnectionEndpoints>>;
   wrapDirectChannel?: (channel: Channel) => Channel;
+  onMessage?: (side: Side, message: RpcMessage) => void;
 } = {}) {
   const keys = { phone: keyPair((size) => crypto.getRandomValues(new Uint8Array(size))),
     pc: keyPair((size) => crypto.getRandomValues(new Uint8Array(size))) };
@@ -60,7 +61,8 @@ export function hotLinkHarness(options: {
         if (frame.type === 'relay') send(side, 'relay', frame.payload);
       },
       relayBuffered: () => 0, reconnectRelay: () => reconnect(side),
-      message: (message) => messages[side].push(message), mode: (mode) => modes[side].push(mode), error,
+      message: (message) => { messages[side].push(message); options.onMessage?.(side, message); },
+      mode: (mode) => modes[side].push(mode), error,
     });
     channels[side] = { readyState: 'open', bufferedAmount: 0, close() {},
       get connectionEndpoints() { return endpoints[side]; },

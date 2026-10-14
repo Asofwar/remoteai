@@ -22,13 +22,20 @@ pub(super) enum LinkError {
     Closed,
     #[error("无法连接网页，请确认服务已启动。")]
     Network,
+    #[error("本地端口已被占用，请换一个端口。")]
+    PortInUse,
+    #[error("无法监听本地端口，请换一个端口重试。")]
+    Listen,
 }
 type Result<T> = std::result::Result<T, LinkError>;
 
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) enum LinkRequest {
-    Listen,
+    Listen {
+        #[serde(default)]
+        port: Option<u16>,
+    },
     Accept {
         scope: String,
     },

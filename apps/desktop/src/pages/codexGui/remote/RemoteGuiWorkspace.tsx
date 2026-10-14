@@ -20,6 +20,7 @@ import styles from '../styles.module.less';
 import './remoteGui.less';
 import { useDesktopDownloads } from '../../../downloads/useDesktopDownloads';
 import { RemoteFileEnvironment } from './RemoteFileEnvironment';
+import { PortForwarding } from '../portForwarding/PortForwarding';
 
 const TerminalPanel = lazy(() => import('../terminal/TerminalPanel'));
 const nativeFileDrop = { subscribe: subscribeFileDrop, readFiles: readDroppedFiles };
@@ -30,6 +31,7 @@ export default function RemoteGuiWorkspace(props: {
 }) {
   const { active, identity, device, computers } = props;
   const chat = useRemoteGui(identity, device.deviceId, active);
+  const scope = JSON.stringify([identity.baseUrl, identity.userId, device.deviceId]);
   useDesktopDownloads({ identity, device, controller: chat.controller });
   const terminal = useRemoteTerminalPanel({ client: chat.controller.guiTools.terminal, connected: chat.state.ready,
     cwd: chat.state.selected?.cwd ?? chat.state.draftProject?.cwd ?? '' });
@@ -46,12 +48,15 @@ export default function RemoteGuiWorkspace(props: {
     <ConfigProvider getPopupContainer={popupContainer}>
     <RemoteFileEnvironment controller={chat.controller} ready={chat.state.ready} threadId={chat.state.selected?.id ?? null}>
     <ConnectedChat chat={chat} active={active} device={device} devices={computers.devices} email="" desktopDiffs
-      scope={JSON.stringify([identity.baseUrl, identity.userId, device.deviceId])}
+      scope={scope}
       chooseLocal={() => computers.choose(null)}
       chooseDevice={(id) => { const device = computers.devices.find((entry) => entry.deviceId === id);
         if (device) computers.choose(device); }}
-      headerConnectionActions={<GuiRemoteDesktop client={chat.controller.guiTools.desktop} active={active}
-        connected={chat.state.mode === 'direct' || chat.state.mode === 'relay'} />}
+      headerConnectionActions={<>
+        {isDesktopApp && <PortForwarding client={chat.controller.guiTools.files} scope={scope}
+          active={active} connected={chat.state.ready} />}
+        <GuiRemoteDesktop client={chat.controller.guiTools.desktop} active={active}
+          connected={chat.state.mode === 'direct' || chat.state.mode === 'relay'} /></>}
       headerActions={<><RemoteGuiTools controller={chat.controller} state={chat.state} active={active}
         terminal={terminal} />
         <span className="gui-remote-focus"><FocusModeButton {...props.focusMode} /></span></>}

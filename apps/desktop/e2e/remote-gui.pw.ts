@@ -67,6 +67,19 @@ test('remote chat sidebar resizes and restores its width after hiding and mobile
     await chooseHost(page, 'Office PC');
     await expect(page.locator('.gui-remote-workspace:visible .chat-connection-status'))
       .toContainText('P2P', { timeout: 20_000 });
+    const ports = page.getByRole('button', { name: '端口转发', exact: true });
+    const portsBounds = await ports.boundingBox();
+    const desktopBounds = await page.getByRole('button', { name: '打开远程桌面' }).boundingBox();
+    expect(portsBounds!.x + portsBounds!.width).toBeLessThan(desktopBounds!.x);
+    await ports.click();
+    const forwardingPanel = page.getByRole('region', { name: '端口转发设置' });
+    await expect(forwardingPanel).toBeInViewport();
+    const remotePort = forwardingPanel.getByRole('spinbutton', { name: '远程端口' });
+    await expect(remotePort).toBeEnabled();
+    await remotePort.click();
+    await expect(remotePort).toBeFocused();
+    await page.screenshot({ path: '../../.codex-tmp/port-forwarding-workspace.png', animations: 'disabled' });
+    await ports.click();
     await checkThreadSidebarResize(page);
     const handle = page.getByRole('separator', { name: '调整聊天列表宽度' });
     await page.getByRole('button', { name: '收起聊天列表', exact: true }).click();

@@ -3,11 +3,13 @@ import type { GuiToolsClient } from '../../../../../../shared/remote-chat/guiToo
 import { websiteUrl, type TerminalLinkReply, type TerminalLinkRequest } from '../../../../../../shared/terminal/links';
 
 type LocalRequest = (TerminalLinkRequest & { scope: string })
-  | { type: 'listen' } | { type: 'accept' | 'stop'; scope: string };
+  | { type: 'listen'; port?: number } | { type: 'accept' | 'stop'; scope: string };
 type NativeRequest = (request: LocalRequest) => Promise<TerminalLinkReply>;
 const nativeRequest: NativeRequest = request => invoke('codex_gui_terminal_link', { request });
 type Endpoint = { request: (request: TerminalLinkRequest) => Promise<TerminalLinkReply>; id: string };
 const MAX_BRIDGES = 8;
+export interface TunnelBridgeBudget { active: number; limit: number }
+interface TunnelOptions { localPort?: number; onClosed?: () => void; bridgeBudget?: TunnelBridgeBudget }
 
 /** One loopback listener per remote origin keeps HTTP, assets and WebSockets on the same remote computer. */
 export class TerminalLinkTunnels {
@@ -15,7 +17,8 @@ export class TerminalLinkTunnels {
   private readonly listeners = new Map<string, Promise<{ id: string; port: number }>>();
   private readonly bridges = new Set<() => void>();
 
-  constructor(private readonly client: Pick<GuiToolsClient['terminal'], 'link'>, private readonly native = nativeRequest) {}
+  constructor(private readonly client: Pick<GuiToolsClient['terminal'], 'link'>,
+    private readonly native = nativeRequest, private readonly options: TunnelOptions = {}) {}
 
   resolve = async (terminal: string, value: string): Promise<string> => {
     const url = websiteUrl(value);
@@ -31,12 +34,12 @@ export class TerminalLinkTunnels {
     return url.href;
   };
 
-  close() {
+  async close() {
     this.closed = true;
     for (const close of this.bridges) close();
-    for (const listener of this.listeners.values()) {
-      void listener.then(value => this.native({ type: 'stop', scope: value.id })).catch(() => undefined);
-    }
+    // Await listener release so a stopped mapping can immediately reuse its fixed local port.
+    await Promise.all([...this.listeners.values()].map(listener =>
+      listener.then(value => this.native({ type: 'stop', scope: value.id })).catch(() => undefined)));
     this.listeners.clear();
   }
 
@@ -46,7 +49,7 @@ export class TerminalLinkTunnels {
       const probe = await this.client.link(terminal, { type: 'connect', url });
       if (probe.type !== 'socket') throw new Error('无法连接网页，请确认服务已启动。');
       await this.client.link(terminal, { type: 'close', id: probe.id });
-      const reply = await this.native({ type: 'listen' });
+      const reply = await this.native({ type: 'listen', ...this.options.localPort && { port: this.options.localPort } });
       if (reply.type !== 'listener') throw new Error('无法连接网页，请稍后重试。');
       if (this.closed) {
         await this.native({ type: 'stop', scope: reply.id });
@@ -64,14 +67,19 @@ export class TerminalLinkTunnels {
         if (reply.type === 'socket') void this.bridge(target, reply.id);
       }
     } catch { /* A disconnected view releases its listener; reopening creates a fresh one. */ }
-    finally { await this.native({ type: 'stop', scope: target.scope }).catch(() => undefined); }
+    finally {
+      await this.native({ type: 'stop', scope: target.scope }).catch(() => undefined);
+      if (!this.closed) this.options.onClosed?.();
+    }
   }
 
   private async bridge(target: { terminal: string; url: string; scope: string }, id: string) {
     const local: Endpoint = { id, request: request => this.native({ ...request, scope: target.scope }) };
-    if (this.closed || this.bridges.size >= MAX_BRIDGES) {
+    const budget = this.options.bridgeBudget;
+    if (this.closed || this.bridges.size >= MAX_BRIDGES || (budget && budget.active >= budget.limit)) {
       await local.request({ type: 'close', id }).catch(() => undefined); return;
     }
+    if (budget) budget.active++;
     let remote: Endpoint | undefined;
     let stopped = false;
     const close = () => {
@@ -87,7 +95,7 @@ export class TerminalLinkTunnels {
       if (this.closed || stopped) return;
       await Promise.race([pump(local, remote), pump(remote, local)]);
     } catch { /* Closing both sockets makes network errors visible in the browser's normal retry UI. */ }
-    finally { close(); this.bridges.delete(close); }
+    finally { close(); this.bridges.delete(close); if (budget) budget.active--; }
   }
 }
 

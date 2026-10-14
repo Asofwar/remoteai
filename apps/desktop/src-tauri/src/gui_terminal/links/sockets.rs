@@ -19,7 +19,7 @@ use tokio::{
 };
 
 const MAX_SOCKETS: usize = 64;
-const MAX_LISTENERS: usize = 8;
+const MAX_LISTENERS: usize = 16;
 const CHUNK_BYTES: usize = 48 * 1024;
 const READ_WAIT: Duration = Duration::from_secs(10);
 const IDLE_TIMEOUT: Duration = Duration::from_secs(90);
@@ -58,7 +58,7 @@ struct Socket {
     life: Lifetime,
 }
 struct Listener {
-    socket: TcpListener,
+    socket: Mutex<Option<TcpListener>>,
     life: Lifetime,
 }
 
@@ -76,7 +76,7 @@ impl LinkState {
         request: LinkRequest,
     ) -> Result<LinkReply> {
         match request {
-            LinkRequest::Listen => self.listen().await,
+            LinkRequest::Listen { port } => self.listen(port).await,
             LinkRequest::Accept { scope } => self.accept(&scope).await,
             LinkRequest::Connect { scope, url } => {
                 let destination = destination(&url)?;
@@ -142,10 +142,16 @@ impl LinkState {
         Ok(LinkReply::Socket { id })
     }
 
-    async fn listen(self: &Arc<Self>) -> Result<LinkReply> {
-        let socket = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+    async fn listen(self: &Arc<Self>, port: Option<u16>) -> Result<LinkReply> {
+        if port == Some(0) {
+            return Err(LinkError::Invalid);
+        }
+        let socket = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port.unwrap_or(0)))
             .await
-            .map_err(|_| LinkError::Network)?;
+            .map_err(|error| match error.kind() {
+                std::io::ErrorKind::AddrInUse => LinkError::PortInUse,
+                _ => LinkError::Listen,
+            })?;
         let port = socket.local_addr().map_err(|_| LinkError::Network)?.port();
         let mut listeners = self.listeners.lock().await;
         if listeners.len() >= MAX_LISTENERS {
@@ -155,7 +161,7 @@ impl LinkState {
         listeners.insert(
             id.clone(),
             Arc::new(Listener {
-                socket,
+                socket: Mutex::new(Some(socket)),
                 life: Lifetime::new(),
             }),
         );
@@ -176,9 +182,14 @@ impl LinkState {
         }
         listener.life.touch();
         let mut canceled = listener.life.cancel.subscribe();
+        let socket = listener.socket.lock().await;
+        let socket = socket.as_ref().ok_or(LinkError::Closed)?;
+        if *canceled.borrow() {
+            return Err(LinkError::Closed);
+        }
         let accepted = tokio::select! {
             _ = canceled.changed() => return Err(LinkError::Closed),
-            accepted = timeout(READ_WAIT, listener.socket.accept()) => accepted,
+            accepted = timeout(READ_WAIT, socket.accept()) => accepted,
         };
         let Ok(accepted) = accepted else {
             return Ok(LinkReply::Done);
@@ -191,8 +202,11 @@ impl LinkState {
     }
 
     async fn stop(&self, scope: &str) {
-        if let Some(listener) = self.listeners.lock().await.remove(scope) {
+        let listener = self.listeners.lock().await.remove(scope);
+        if let Some(listener) = listener {
             listener.life.cancel.send_replace(true);
+            // Release the bound port before replying, including when an accept is still in flight.
+            listener.socket.lock().await.take();
         }
         self.sockets.lock().await.retain(|_, socket| {
             if socket.scope != scope {

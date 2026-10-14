@@ -50,3 +50,35 @@ it('closes both sides after forwarding HTTP/WebSocket bytes and releases listene
   expect(remote.link).toHaveBeenCalledWith('terminal', { type: 'close', id: 'remote-socket' });
   tunnels.close();
 });
+
+it('shares the stream budget between mappings and returns capacity when a connection ends', async () => {
+  const remote = client();
+  const accepts = new Map<string, (reply: TerminalLinkReply) => void>();
+  const reads = new Map<string, (reply: TerminalLinkReply) => void>();
+  remote.link.mockImplementation(async (_terminal?: string, request?: { type: string }) => {
+    if (request?.type === 'connect') return { type: 'socket', id: 'remote' };
+    if (request?.type === 'read') return new Promise(() => undefined);
+    return { type: 'done' };
+  });
+  const native = vi.fn(async (request: { type: string; port?: number; scope?: string; id?: string }) => {
+    if (request.type === 'listen') return { type: 'listener' as const, id: String(request.port), port: request.port! };
+    if (request.type === 'accept') return new Promise<TerminalLinkReply>(resolve => accepts.set(request.scope!, resolve));
+    if (request.type === 'read') return new Promise<TerminalLinkReply>(resolve => reads.set(request.id!, resolve));
+    return { type: 'done' as const };
+  });
+  const bridgeBudget = { active: 0, limit: 1 };
+  const first = new TerminalLinkTunnels(remote, native, { localPort: 13000, bridgeBudget });
+  const second = new TerminalLinkTunnels(remote, native, { localPort: 15432, bridgeBudget });
+  await first.resolve('first', 'http://localhost:3000');
+  await second.resolve('second', 'http://localhost:5432');
+  accepts.get('13000')!({ type: 'socket', id: 'one' }); await flush();
+  accepts.get('15432')!({ type: 'socket', id: 'two' }); await flush();
+  expect(bridgeBudget.active).toBe(1);
+  expect(native).toHaveBeenCalledWith({ type: 'close', id: 'two', scope: '15432' });
+  reads.get('one')!({ type: 'data', data: '', eof: true }); await flush();
+  expect(bridgeBudget.active).toBe(0);
+  accepts.get('15432')!({ type: 'socket', id: 'three' }); await flush();
+  expect(bridgeBudget.active).toBe(1);
+  reads.get('three')!({ type: 'data', data: '', eof: true }); await flush();
+  await first.close(); await second.close();
+});

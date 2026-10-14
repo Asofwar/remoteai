@@ -30,10 +30,94 @@ fn targets_keep_the_remote_host_and_reject_non_web_links() {
 }
 
 async fn listener(state: &Arc<LinkState>) -> (String, u16) {
-    let LinkReply::Listener { id, port } = state.perform(LinkRequest::Listen).await.unwrap() else {
+    let LinkReply::Listener { id, port } = state
+        .perform(LinkRequest::Listen { port: None })
+        .await
+        .unwrap()
+    else {
         panic!("listener reply expected");
     };
     (id, port)
+}
+
+#[test]
+fn listener_ports_validate_at_the_ipc_boundary_and_keep_automatic_ports_compatible() {
+    let automatic = serde_json::from_str::<LinkRequest>(r#"{"type":"listen"}"#).unwrap();
+    assert!(matches!(automatic, LinkRequest::Listen { port: None }));
+    for port in ["-1", "65536", "1.5", "\"3000\""] {
+        let request = format!(r#"{{"type":"listen","port":{port}}}"#);
+        assert!(serde_json::from_str::<LinkRequest>(&request).is_err());
+    }
+}
+
+#[tokio::test]
+async fn fixed_ports_reject_conflicts_and_can_be_reused_after_stop() {
+    let state = Arc::new(LinkState::default());
+    let reserved = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = reserved.local_addr().unwrap().port();
+    assert!(matches!(
+        state
+            .perform(LinkRequest::Listen { port: Some(port) })
+            .await,
+        Err(LinkError::PortInUse)
+    ));
+    assert!(matches!(
+        state.perform(LinkRequest::Listen { port: Some(0) }).await,
+        Err(LinkError::Invalid)
+    ));
+    drop(reserved);
+    for _ in 0..2 {
+        let LinkReply::Listener { id, port: actual } = state
+            .perform(LinkRequest::Listen { port: Some(port) })
+            .await
+            .unwrap()
+        else {
+            panic!("listener expected")
+        };
+        assert_eq!(actual, port);
+        state
+            .perform(LinkRequest::Stop { scope: id })
+            .await
+            .unwrap();
+    }
+}
+
+#[tokio::test]
+async fn stopping_one_mapping_keeps_other_local_ports_listening() {
+    let state = Arc::new(LinkState::default());
+    let (first, first_port) = listener(&state).await;
+    let (second, second_port) = listener(&state).await;
+    assert_ne!(first_port, second_port);
+    state
+        .perform(LinkRequest::Stop { scope: first })
+        .await
+        .unwrap();
+    assert!(TcpStream::connect(("127.0.0.1", first_port)).await.is_err());
+    assert!(TcpStream::connect(("127.0.0.1", second_port)).await.is_ok());
+    state
+        .perform(LinkRequest::Stop { scope: second })
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn stopped_port_is_reusable_while_a_previous_accept_is_in_flight() {
+    let state = Arc::new(LinkState::default());
+    let (scope, port) = listener(&state).await;
+    let accepting_state = state.clone();
+    let accepting_scope = scope.clone();
+    let accepting = tokio::spawn(async move {
+        accepting_state
+            .perform(LinkRequest::Accept {
+                scope: accepting_scope,
+            })
+            .await
+    });
+    tokio::task::yield_now().await;
+    state.perform(LinkRequest::Stop { scope }).await.unwrap();
+    let rebound = TcpListener::bind(("127.0.0.1", port)).await.unwrap();
+    assert_eq!(rebound.local_addr().unwrap().port(), port);
+    assert!(accepting.await.unwrap().is_err());
 }
 
 #[tokio::test]

@@ -26,7 +26,8 @@ export function ChatConnectionInfo({ state, controller, device, active, chooseDe
   useEffect(() => { if (!canChoose) setPicking(false); }, [canChoose]);
   return <>
     <div className={`chat-connection-info${canReconnect ? ' is-reconnecting' : ''}`}>
-      <button className="chat-connection chat-muted chat-ellipsis" type="button" aria-label={t("选择电脑")}
+      <button className={`chat-connection chat-muted chat-ellipsis${device ? ' chat-connection-device' : ''}`}
+        type="button" aria-label={t("选择电脑")}
         onClick={chooseDevice}>
         {device ? device.name : t("选择电脑，开始聊天")}
       </button>
@@ -35,7 +36,7 @@ export function ChatConnectionInfo({ state, controller, device, active, chooseDe
         <button type="button" className="chat-connection chat-connection-status chat-muted"
           aria-label={`${status} · ${t('连接体检')}`} aria-expanded={healthOpen}
           onClick={() => setHealthOpen(true)}>
-          <span role="status">{status}</span>
+          <span role="status" className="chat-ellipsis">{status}</span>
         </button>
       </>}
       {canReconnect && <>

@@ -14,5 +14,5 @@
 .chat-connection-info.is-reconnecting > .chat-ellipsis { max-width: 40%; }
 .chat-connection-info .chat-reconnect {
   flex: 1; margin: 4px 0 0 6px; color: var(--app-accent, #238578); font-size: 11px; line-height: 1.6;
-  white-space: normal; overflow-wrap: anywhere;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }

@@ -21,17 +21,14 @@ export function ChatReconnectButton({ retryAt, onPress }: { retryAt: number | nu
   const seconds = retryAt === null ? null : Math.max(0, Math.ceil((retryAt - tick.now) / MILLISECONDS_PER_SECOND));
   return <Pressable accessibilityRole="button" accessibilityLabel={t("立即连接")} onPress={onPress}
     style={reconnectStyles.button} hitSlop={6}>
-    <Text style={[styles.headerMeta, reconnectStyles.text, reconnectStyles.label]}>
-      {t("立即连接")}{seconds === null ? '' : t("（{value1}秒）", { value1: seconds })}</Text>
-    <Text numberOfLines={1} style={[styles.headerMeta, reconnectStyles.text, reconnectStyles.dots]}>
-      {DOTS[tick.dots]}</Text>
+    <Text numberOfLines={1} ellipsizeMode="tail"
+      style={[styles.headerMeta, reconnectStyles.text]}>
+      {t("立即连接")}{seconds === null ? '' : t("（{value1}秒）", { value1: seconds })}{DOTS[tick.dots]}</Text>
   </Pressable>;
 }
 
 const useReconnectStyles = createThemedStyles((color) => ({
   // Use the available row width; Android's fallback font can exceed the intrinsic text measurement.
-  button: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start' },
+  button: { flex: 1, minWidth: 0 },
   text: { color: color(palette.green, 'accent') },
-  label: { flexShrink: 1 },
-  dots: { minWidth: 16, flexShrink: 0 },
 }));

@@ -32,14 +32,15 @@ export function ChatConnectionInfo({ state, controller, device, active }: {
   return <>
     <View style={connectionStyles.row}>
       <Text numberOfLines={1} style={[styles.headerMeta, connectionStyles.device,
-        canReconnect && connectionStyles.reconnectingDevice]}>
+        device && connectionStyles.deviceName]}>
         {device ? device.name : t("选择电脑，开始聊天")}</Text>
       {device && <>
         <Text style={styles.headerMeta}> · </Text>
         <Pressable accessibilityRole="button" accessibilityLabel={`${status} · ${t('连接体检')}`}
+          style={connectionStyles.status}
           accessibilityState={{ expanded: healthOpen }} hitSlop={{ top: 6, bottom: 6 }}
           onPress={() => setHealthOpen(true)}>
-          <Text style={styles.headerMeta}>{status}</Text>
+          <Text numberOfLines={1} ellipsizeMode="tail" style={styles.headerMeta}>{status}</Text>
         </Pressable>
       </>}
       {canReconnect && <>
@@ -69,6 +70,8 @@ export function ChatConnectionInfo({ state, controller, device, active }: {
 const useConnectionStyles = createThemedStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
   device: { flexShrink: 1 },
-  reconnectingDevice: { maxWidth: '40%' },
-  project: { flexShrink: 1, minWidth: 0, maxWidth: '60%' },
+  deviceName: { maxWidth: '40%' },
+  // Give Android's fallback font the remaining width instead of its underestimated intrinsic width.
+  status: { flex: 1, minWidth: 0 },
+  project: { flex: 1, minWidth: 0, maxWidth: '40%' },
 }));

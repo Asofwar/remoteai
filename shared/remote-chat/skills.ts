@@ -1,8 +1,11 @@
 import type { Skill, SkillsResponse } from './client/types';
+import { getInterfaceLanguage } from '../i18n/interfaceLanguage';
+import { builtInSkillDescription } from '../i18n/skillDescriptions';
 
 export const skillLabel = (skill: Skill) => skill.interface?.displayName || skill.name;
-export const skillDescription = (skill: Skill) =>
-  skill.interface?.shortDescription || skill.shortDescription || skill.description;
+export const skillDescription = (skill: Skill, language = getInterfaceLanguage()) =>
+  builtInSkillDescription(skill.name, language)
+  ?? (skill.interface?.shortDescription || skill.shortDescription || skill.description);
 
 function isSkill(value: unknown): value is Skill {
   if (!value || typeof value !== 'object') return false;

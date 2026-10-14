@@ -1,9 +1,8 @@
 import type { ComposerText, Skill } from "./types";
 import styles from "./SkillInput.module.less";
+import { skillLabel } from "../../../../../shared/remote-chat/skills";
 
-export const skillLabel = (skill: Skill) => skill.interface?.displayName || skill.name;
-export const skillDescription = (skill: Skill) =>
-  skill.interface?.shortDescription || skill.shortDescription || skill.description;
+export { skillLabel, skillDescription } from "../../../../../shared/remote-chat/skills";
 
 export function readEditor(root: Node): ComposerText {
   const value: ComposerText = { text: "", mentions: [] };

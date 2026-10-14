@@ -1,4 +1,5 @@
 import { guiText } from "../../i18n/guiText";
+import { useGuiLanguage } from "../../i18n/useGuiLanguage";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { Popover } from "antd";
 import { Paperclip, Plus, Target } from "lucide-react";
@@ -16,6 +17,7 @@ export function ComposerAddMenu({ cwd, disabled, active, anchor, onFiles, onGoal
   onPlugin: (plugin: AttachmentReference) => void;
   onSkill: (skill: Skill) => void;
 }) {
+  useGuiLanguage();
   const [open, setOpen] = useState(false);
   const [offset, setOffset] = useState(8);
   const trigger = useRef<HTMLButtonElement>(null);

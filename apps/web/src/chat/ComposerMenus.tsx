@@ -29,10 +29,10 @@ interface CommandProps {
 }
 export function ChatCommandMenu({ catalog, query, skillsOnly, compactReason, choose, compact, goal,
   close, input }: CommandProps) {
-  useLanguage();
+  const language = useLanguage();
   const search = query.toLocaleLowerCase();
   const skills = catalog.skills.filter(skill =>
-    `${skill.name} ${skillLabel(skill)} ${skillDescription(skill)}`.toLocaleLowerCase().includes(search));
+    `${skill.name} ${skillLabel(skill)} ${skillDescription(skill, language)}`.toLocaleLowerCase().includes(search));
   const showCompact = !skillsOnly && t("compact 压缩 上下文").includes(search);
   const showGoal = !skillsOnly && t("goal 目标 持续推进").includes(search);
   const options: ComposerMenuOption[] = [
@@ -54,7 +54,8 @@ export function ChatCommandMenu({ catalog, query, skillsOnly, compactReason, cho
         <strong>{t("目标")} <small>/goal</small></strong><small>{t("持续推进，直到完成目标")}</small></button>}
       {skills.map(skill => <button key={skill.path} type="button" role="menuitem" {...keyboard.optionProps(skill.path)}
         aria-label={t("使用技能 {value1}", { value1: skillLabel(skill) })} disabled={!skill.enabled} onClick={() => choose(skill)}>
-        <strong>{skillLabel(skill)}{!skill.enabled && t("（已停用）")}</strong><small>{skillDescription(skill)}</small></button>)}
+        <strong>{skillLabel(skill)}{!skill.enabled && t("（已停用）")}</strong>
+        <small>{skillDescription(skill, language)}</small></button>)}
       {catalog.loading && !catalog.loaded && <p role="status">{t("正在加载技能…")}</p>}
       {catalog.error && <p role="status">{t(catalog.error)}</p>}
       {catalog.loaded && !skills.length && !showCompact && !showGoal && <p>{t("没有找到匹配的命令或技能")}</p>}

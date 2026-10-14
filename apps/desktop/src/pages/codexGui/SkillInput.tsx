@@ -1,4 +1,5 @@
 import { guiText } from "../../i18n/guiText";
+import { useGuiLanguage } from "../../i18n/useGuiLanguage";
 import { forwardRef, useId, useImperativeHandle, useLayoutEffect, useRef, useState,
   type ClipboardEvent, type KeyboardEvent } from "react";
 import type { ComposerText, GuiState, Skill } from "./types";
@@ -45,6 +46,7 @@ export const SkillInput = forwardRef<SkillInputHandle, {
 }>(function SkillInput({ value, draftKey, cwd, active, connected, disabled, placeholder,
   compact, goal, conversations, onConversation, onCoze, onFile, editing, onChange, onPaste, onPasteKeyDown, onSend,
   suggestion, onUserInput, onInputEnd }, ref) {
+  useGuiLanguage();
   const editor = useRef<HTMLDivElement>(null);
   const savedCaret = useRef<Range | null>(null);
   const composing = useRef(false);

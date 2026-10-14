@@ -19,10 +19,10 @@ interface Props {
 export function ChatCommandMenu({ catalog, query, skillsOnly, compactReason, choose, compact, goal, close }: Props) {
   const menuStyles = useMenuStyles();
   const styles = useStyles();
-  useLanguage();
+  const language = useLanguage();
   const search = query.toLocaleLowerCase();
   const skills = catalog.skills.filter((skill) =>
-    `${skill.name} ${skillLabel(skill)} ${skillDescription(skill)}`.toLocaleLowerCase().includes(search));
+    `${skill.name} ${skillLabel(skill)} ${skillDescription(skill, language)}`.toLocaleLowerCase().includes(search));
   const showCompact = !skillsOnly && `compact 压缩 上下文 ${t('压缩此对话的上下文')}`.toLocaleLowerCase().includes(search);
   const showGoal = !!goal && !skillsOnly && `goal 目标 持续推进 ${t('持续推进，直到完成目标')}`.toLocaleLowerCase().includes(search);
   return <View style={menuStyles.panel} accessibilityLabel={t("命令和技能")}>
@@ -50,7 +50,7 @@ export function ChatCommandMenu({ catalog, query, skillsOnly, compactReason, cho
         accessibilityState={{ disabled: !skill.enabled }} onPress={() => choose(skill)}
         style={[menuStyles.option, !skill.enabled && styles.disabled]}>
         <Text style={styles.buttonText}>{skillLabel(skill)}{!skill.enabled && t("（已停用）")}</Text>
-        <Text numberOfLines={2} style={styles.subtitle}>{skillDescription(skill)}</Text>
+        <Text numberOfLines={2} style={styles.subtitle}>{skillDescription(skill, language)}</Text>
       </Pressable>}
       ListFooterComponent={<>
         {!catalog.loaded && catalog.loading && <Text style={menuStyles.message}>{t("正在加载技能…")}</Text>}

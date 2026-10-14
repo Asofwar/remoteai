@@ -49,6 +49,7 @@ beforeEach(async () => {
     alarms: { create: () => {}, onAlarm: event() },
     action: { setBadgeText: async () => {}, setBadgeBackgroundColor: async () => {} },
     tabs: { get: async id => ({ id, url: 'https://fixture.example/' }), onUpdated: event(), onRemoved: event() },
+    tabGroups: { query: async () => [] },
     windows: { onRemoved: event() },
     scripting: { executeScript: async () => {} },
     debugger: { onEvent: event(), onDetach: event(),

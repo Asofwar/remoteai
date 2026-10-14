@@ -20,7 +20,7 @@ The plugin is available in the desktop application's community marketplace for t
 Controlled webpages display a green cursor favicon. Pausing control, revoking access or navigating
 restores the website's icon. Focusing a minimized Chrome window also restores the window.
 Unless the user explicitly requests an already-open page, the browser instructions require opening
-a new background tab in the dedicated Codex group and continuing in task-created tabs. New tabs
+a new background tab in the dedicated Remote AI group and continuing in task-created tabs. New tabs
 automatically join a group belonging to the requesting home in their window; existing user tabs and
 same-named user groups are left in place. Opening returns the tab, window and group IDs. A grouping
 failure closes only the newly created tab and reports an error. Bringing a page forward requires
@@ -32,8 +32,14 @@ viewport; only that session receives temporary viewport dimensions. The window r
 Input-driven rendering is allowed to settle before restoring page overrides, with a one-second limit
 so background animation callbacks do not leave the tool waiting indefinitely. All overrides end with
 each operation. Debugger connections are reused between operations, keeping Chrome's debugging banner
-visible during continued browser work. A connection is released after five minutes without an operation
-on its target; active operations never expire. Pause, access revocation, native-host disconnect and
+visible throughout browser work, including long gaps and recoverable action failures. Connections have
+no idle expiry; `browser_finish` ends debugging and closes the specified task-created temporary tabs.
+`keepTabIds` preserves pages requested by the user while releasing debugging. Existing user tabs and
+other tasks' tabs remain open, including user pages moved into a work group. Ownership is recorded per
+tab in session storage, rather than inferred from group names. Chrome removes groups when their last
+tab closes. The skill requires completion before replying, including after failures, and reports failed
+cleanup IDs for retry. Completion is explicit: inactivity cannot distinguish a finished task from reasoning.
+Pause, access revocation, native-host disconnect and
 Chrome's Cancel button release connections immediately. Cancel also pauses control until the user resumes
 it in the extension popup. Closing a target removes only that connection. Frame/Worker subscriptions
 and log domains are reset after each operation so repeated reads still replay retained logs. Unpacked
@@ -87,8 +93,8 @@ reinstalling or selecting the extension directory again is unnecessary. Later up
 
 ## Supported operations
 
-The MCP server exposes 23 tools for connected profiles, existing tabs, opening/navigating/focusing/
-closing tabs, history, reload, accessible page snapshots, frames, click/double-click, fill, typing,
+The MCP server exposes 24 tools for connected profiles, existing tabs, opening/navigating/focusing/
+closing/finishing tabs, history, reload, accessible page snapshots, frames, click/double-click, fill, typing,
 keyboard shortcuts, scrolling, selection, checkboxes, drag/drop, screenshots, console logs, workers and waiting for text.
 Snapshots provide element references that expire when the document changes. Same-origin, cross-site
 and nested frames are supported, including out-of-process Chrome child sessions.
@@ -201,6 +207,22 @@ webpage content as untrusted, preserve user tabs and respect permission decision
 are masked in accessible snapshots; screenshots can still contain visible page content.
 
 ## Verification
+
+### 2026-10-14 task completion and Remote AI naming
+
+Extension 1.6.0 names its task groups Remote AI and migrates recorded groups still using the old
+default title without renaming user-created or customized groups. Connections no longer expire
+during long reasoning gaps. Recoverable action failures retain the transport after permission checks
+and protocol cleanup. `browser_finish` is serialized with operations on each target, closes only
+recorded temporary tabs selected by the caller, and preserves existing pages and requested keep tabs.
+Ownership survives extension worker restart. Legacy groups without per-tab ownership records are
+renamed but their existing tabs are not claimed or automatically closed.
+
+The isolated Chromium background fixture verifies one attach across successful actions and a stale
+reference failure followed by retry. It also verifies completion with temporary and user-owned tabs
+in the same group, explicit keep tabs, debugger detachment and automatic removal of empty groups.
+Unit tests cover long gaps, per-home connection sharing, exact tab ownership, keep/retry behavior,
+cleanup failures, worker-only completion, concurrent work and legacy-name migration.
 
 ### 2026-09-30 continuous browser control indication
 
@@ -348,7 +370,7 @@ cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
 cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --test codex_switch_lib_tests
 node --test scripts/chrome-plugin.test.mjs scripts/chrome-plugin-snapshot.test.mjs scripts/chrome-plugin-frames.test.mjs
-node scripts/chrome-plugin-tab-groups.test.mjs
+node --test scripts/chrome-plugin-tab-groups.test.mjs scripts/chrome-plugin-finish.test.mjs
 node scripts/chrome-plugin-tab-indicator.test.mjs
 node --test scripts/chrome-plugin-update.test.mjs
 node --test scripts/chrome-plugin-driver.test.mjs

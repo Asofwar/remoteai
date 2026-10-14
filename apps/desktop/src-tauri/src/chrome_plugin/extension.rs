@@ -27,6 +27,8 @@ const ASSETS: &[(&str, &[u8])] = assets![
     "rendering.js",
     "tab-indicator.js",
     "tab-groups.js",
+    "target-queue.js",
+    "finish-task.js",
     "frame-sessions.js",
     "snapshot.js",
     "console-logs.js",

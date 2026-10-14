@@ -2,8 +2,9 @@ const TAB_OPERATIONS = new Set([
   'navigate', 'back', 'forward', 'reload', 'close', 'focus', 'snapshot', 'frames', 'click',
   'fill', 'type', 'key', 'scroll', 'select', 'check', 'drag', 'screenshot', 'wait',
 ]);
-const OPERATIONS = new Set(['status', 'tabs', 'open', 'workers', 'console_logs', ...TAB_OPERATIONS]);
+const OPERATIONS = new Set(['status', 'tabs', 'open', 'workers', 'console_logs', 'finish', ...TAB_OPERATIONS]);
 const MAX_TEXT_LENGTH = 20000;
+const MAX_FINISH_TARGETS = 100;
 const MAX_CONSOLE_ENTRIES = 200;
 const MAX_CONSOLE_FILTER_LENGTH = 500;
 
@@ -46,6 +47,7 @@ export function validate(request) {
   if (operation === 'click') validateClick(args);
   if (operation === 'scroll') validateScroll(args);
   if (operation === 'console_logs') validateConsoleLogs(args);
+  if (operation === 'finish') validateFinish(args);
   if (operation === 'key' && !text(args.key, 60, false)) throw new Error('按键无效。');
   if (operation === 'wait' && (!text(args.text, 500, false)
     || (args.timeoutMs !== undefined && !finite(args.timeoutMs, 100, 20000)))) {
@@ -55,6 +57,17 @@ export function validate(request) {
     throw new Error('请先读取页面，再选择拖动位置。');
   }
   return { operation, args };
+}
+
+function validateFinish(args) {
+  const tabId = value => Number.isSafeInteger(value) && value >= 0;
+  const identifiers = (values, valid) => Array.isArray(values) && values.length <= MAX_FINISH_TARGETS
+    && values.every(valid) && new Set(values).size === values.length;
+  if (!identifiers(args.tabIds, tabId)
+    || !identifiers(args.keepTabIds ?? [], value => tabId(value) && args.tabIds.includes(value))
+    || !identifiers(args.workerIds ?? [], value => text(value, 100, false))) {
+    throw new Error('请选择本次任务使用的标签页或 Worker。');
+  }
 }
 
 function validateConsoleLogs(args) {

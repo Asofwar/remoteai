@@ -44,7 +44,7 @@ Node.js is needed for Inspector, but is not required by the extension or its des
    open the local URL it prints, and connect to `codex_switch_chrome`.
 4. List the tools and call `browser_list` with `{}`. Use the returned `browserId` for your test profile.
 5. Call `browser_open` with that ID, `url` set to `https://example.com`, and `background` set to `true`.
-   Expect a new background tab in a green **Codex** group. Use its returned `tabId` in later calls.
+   Expect a new background tab in a green **Remote AI** group. Use its returned `tabId` in later calls.
 6. Call `browser_snapshot` and `browser_screenshot` with `browserId` and `tabId`.
    Expect the Example Domain page text and an image. A green cursor favicon marks the controlled tab.
 7. To test clicking, take a fresh snapshot, then call `browser_click` with the link's returned `ref`.
@@ -53,10 +53,12 @@ Node.js is needed for Inspector, but is not required by the extension or its des
 8. Pause control in the extension popup. A subsequent page operation should be rejected.
    Resume it, switch to per-site confirmation, and try a new website. Grant access in the popup
    to continue; declining or leaving the request unanswered must not grant access.
-9. Close only the test-created tabs with `browser_close`.
+9. Call `browser_finish` with `browserId` and the test tabs' `tabIds`. Temporary tabs and empty groups
+   should close, and debugging should end. Existing user tabs stay open. To retain a test page,
+   also include it in `keepTabIds`.
 
 Normal AI use runs the same tools from a new Codex conversation after enabling the plugin.
-The assistant instructions require new background tabs in a Codex group unless the user explicitly
+The assistant instructions require new background tabs in a Remote AI group unless the user explicitly
 requests an already-open page. An explicitly selected existing page stays in its original group.
 
 The extension sends results to the local companion application. In the Inspector flow above,

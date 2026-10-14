@@ -4,6 +4,7 @@ import { invalidate } from './snapshot.js';
 import { stopDebugging } from './driver.js';
 import { debuggerDetached, hasDebuggerConnections } from './debugger-connections.js';
 import { clearControlledTabs } from './tab-indicator.js';
+import { forgetWorkTab, renameWorkGroups } from './tab-groups.js';
 import { createBundleUpdater, UPDATE_ALARM } from './auto-update.js';
 
 const HOST = 'dev.codex_switch.chrome';
@@ -107,7 +108,12 @@ chrome.tabs.onUpdated.addListener((tabId, change) => {
   invalidate(tabId);
   void clearControlledTabs(tabId);
 });
-chrome.tabs.onRemoved.addListener((tabId) => { invalidate(tabId); void clearControlledTabs(tabId); });
+chrome.tabs.onRemoved.addListener((tabId) => {
+  invalidate(tabId);
+  void debuggerDetached({ tabId });
+  void clearControlledTabs(tabId);
+  void forgetWorkTab(tabId).catch(() => console.warn('未能清理已关闭标签页的记录。'));
+});
 chrome.debugger.onDetach.addListener((target, reason) => {
   void debuggerDetached(target);
   if (reason !== 'canceled_by_user') return;
@@ -129,4 +135,5 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === UPDATE_ALARM) void updater.check();
 });
 updater.start();
+void renameWorkGroups().catch(() => console.warn('未能更新标签组名称。'));
 void connect();

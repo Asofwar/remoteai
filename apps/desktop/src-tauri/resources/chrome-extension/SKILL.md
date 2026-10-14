@@ -21,7 +21,7 @@ claim that Computer Use provides these Chrome MCP tools.
    **Start a closed browser** below. Keep a paused profile paused unless the user asks to resume it.
    Never substitute another profile or bypass connection, pause or website permission checks.
 2. Unless the user explicitly asks to use an already-open page, call `browser_open` to create a new
-   background tab in the dedicated Codex group. Continue the task in the tabs you create. Only use
+   background tab in the dedicated Remote AI group. Continue the task in the tabs you create. Only use
    `browser_tabs` to select an existing user page when the user has requested that page; a matching
    URL or the currently active tab alone is not a request to use it. Leave that page in its original group.
    Keep `background` enabled and avoid `browser_focus` unless the user asks to bring the page forward.
@@ -56,6 +56,15 @@ claim that Computer Use provides these Chrome MCP tools.
 5. Chrome grants website access during extension installation. The user can allow all websites
    or choose per-site confirmation in the browser assistant. If a permission request appears, wait
    for the user; a denial, timeout, or pause does not authorize another tool or profile to reach the site.
+6. Track the tab and standalone Worker IDs used in this task. Before the final reply, call `browser_finish`
+   with those exact `tabIds` and optional `workerIds`, including when the task failed. It closes recorded
+   task-created tabs, removes empty groups, and releases debugging connections; existing user tabs stay open.
+   Put task-created pages the user asked to keep in `keepTabIds` (also include them in `tabIds`).
+   Finish temporary pages as soon as their work is complete and they are no longer needed. Never sweep
+   every tab in a group or home: other tasks may still use them. Check the returned failed ID lists,
+   retry failed cleanup once if control is still available, and report any leftovers. If paused or
+   disconnected, preserve that state and report that cleanup could not finish. Do not end debugging
+   between steps just because another tool or reasoning takes time.
 
 ## Start a closed browser
 
@@ -85,6 +94,6 @@ action, destination, and data. Password changes and security challenges must be 
 the user. Never weaken browser security, install extensions through policy workarounds, or
 silently enable a paused integration.
 
-Keep tabs the user needs and close only task-created temporary tabs when finished. Do not close
+Keep tabs the user asks to retain and close only task-created temporary tabs when finished. Do not close
 existing user tabs unless requested. Distinguish this Remote AI integration from OpenAI's
 Chrome plugin; no OpenAI desktop component is used.

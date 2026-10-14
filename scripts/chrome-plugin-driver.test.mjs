@@ -111,6 +111,16 @@ test('failed cleanup releases the connection instead of retaining focus emulatio
   assert.equal(calls.at(-1), 'detach');
 });
 
+test('recoverable action errors keep the banner visible and allow the next action to reuse the connection', async () => {
+  await assert.rejects(withTab({ clientId: 'test' }, { tabId: 4 }, async () => {
+    throw new Error('stale reference');
+  }), /stale reference/);
+  assert.ok(!calls.includes('detach'));
+  assert.equal(listeners.size, 0);
+  assert.equal(await withTab({ clientId: 'test' }, { tabId: 4 }, async () => 'retry'), 'retry');
+  assert.equal(calls.filter(method => method === 'attach').length, 1);
+});
+
 test('queued operations share a connection but keep their own permission checks', async () => {
   const order = [];
   const first = withTab({ clientId: 'first' }, { tabId: 4 }, async () => { order.push('first'); return 1; });

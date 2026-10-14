@@ -4,22 +4,17 @@ import { markControlledTab, clearControlledTabs } from './tab-indicator.js';
 import { prepareBackgroundPage, restoreBackgroundPage, settleRendering } from './rendering.js';
 import { acquireConnection, assertConnected, closeConnection, releaseConnection,
   stopConnections } from './debugger-connections.js';
+import { queueTarget } from './target-queue.js';
 
-const queues = new Map();
-
-export async function withTab(context, args, operation, options = {}) {
-  const previous = queues.get(args.tabId) ?? Promise.resolve();
-  const current = previous.catch(() => {}).then(() => run(context, args, operation, options));
-  queues.set(args.tabId, current);
-  try { return await current; }
-  finally { if (queues.get(args.tabId) === current) queues.delete(args.tabId); }
+export function withTab(context, args, operation, options = {}) {
+  return queueTarget({ tabId: args.tabId }, () => run(context, args, operation, options));
 }
 
 async function run(context, args, operation, { prepareInput = true }) {
   const tab = await chrome.tabs.get(args.tabId);
   await authorize(tab.url, context.clientId, context.signal);
   const target = { tabId: tab.id };
-  const connection = await acquireConnection(target, context.signal).catch(() => {
+  const connection = await acquireConnection(target, context.signal, context.clientId).catch(() => {
     assertRunning(context.signal);
     throw new Error('无法连接这个标签页。请关闭其开发者工具或其他浏览器控制工具后重试。');
   });
@@ -27,15 +22,14 @@ async function run(context, args, operation, { prepareInput = true }) {
   const abort = () => { void closeConnection(connection); };
   context.signal?.addEventListener('abort', abort, { once: true });
   if (context.signal?.aborted) abort();
-  const guard = async () => {
+  const guard = async (options) => {
     assertRunning(context.signal);
     assertConnected(connection);
     const current = await chrome.tabs.get(tab.id);
-    await authorize(current.url, context.clientId, context.signal);
+    await authorize(current.url, context.clientId, context.signal, options);
   };
   const sessions = createFrameSessions(target, guard);
   let viewportOverridden = false;
-  let completed = false;
   try {
     await guard();
     // Log reads need no focus emulation, viewport changes or page JavaScript execution.
@@ -47,12 +41,14 @@ async function run(context, args, operation, { prepareInput = true }) {
     const result = await operation(driver);
     if (prepareInput) await settleRendering(driver);
     await guard();
-    completed = true;
     return result;
   } finally {
     const cleaned = await sessions.dispose();
     const restored = !prepareInput || await restoreBackgroundPage(target, viewportOverridden);
-    await releaseConnection(connection, completed && cleaned && restored && !context.signal?.aborted);
+    // A stale reference or a wait timeout does not end the debugging task. Recheck access
+    // before retaining the transport, even when the requested page action failed.
+    const authorized = await guard({ prompt: false }).then(() => true, () => false);
+    await releaseConnection(connection, authorized && cleaned && restored);
     context.signal?.removeEventListener('abort', abort);
   }
 }

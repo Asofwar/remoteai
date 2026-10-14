@@ -125,7 +125,7 @@ test('the compiled application exposes MCP over redirected standard streams',asy
     assert.equal((await call('initialize')).result.serverInfo.name,'codex-switch-chrome');
     const names=(await call('tools/list')).result.tools.map(tool=>tool.name);
     for(const name of ['browser_list','browser_tabs','browser_snapshot','browser_click',
-      'browser_fill','browser_screenshot','browser_console_logs','browser_workers']) {
+      'browser_fill','browser_screenshot','browser_console_logs','browser_workers','browser_finish']) {
       assert.ok(names.includes(name));
     }
   } finally {
@@ -146,6 +146,7 @@ test('compiled Native Messaging and MCP helpers authenticate, relay, revoke, and
       incoming.push(message);
       if (message.type === 'cancel' || message.request.operation === 'open') return;
       const replies = {status:{paused:false},tabs:{tabs:[{tabId:42,title:'fixture'}]},
+        finish:{closedTabIds:[42],keptTabIds:[],failedTabIds:[],releasedWorkerIds:['worker-1'],failedWorkerIds:[]},
         workers:{workers:[{workerId:'worker-1',url:'https://example.com/sw.js'}],scope:'profile'},
         console_logs:{tabId:42,frameId:'main',entries:[{level:'error',text:'fixture error'}],truncated:false}};
       const result = replies[message.request.operation];
@@ -180,6 +181,11 @@ test('compiled Native Messaging and MCP helpers authenticate, relay, revoke, and
     assert.equal(workerLogs.result.isError,false);
     assert.deepEqual(incoming.at(-1).request,
       {operation:'console_logs',args:{workerId:'worker-1',source:'worker'}});
+    const finishArgs = {tabIds:[42],workerIds:['worker-1']};
+    const finished = await call('tools/call',{name:'browser_finish',arguments:{browserId:live.id,...finishArgs}});
+    assert.equal(finished.result.isError,false);
+    assert.deepEqual(JSON.parse(finished.result.content[0].text).closedTabIds,[42]);
+    assert.deepEqual(incoming.at(-1).request,{operation:'finish',args:finishArgs});
     const before = incoming.length;
     const forged = await bridge(live.port,{clientId:first.clientId,token:second.record.token,
       request:{operation:'tabs',args:{}}});

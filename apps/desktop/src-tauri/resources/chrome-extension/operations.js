@@ -5,6 +5,8 @@ import { groupNewTab } from './tab-groups.js';
 import { snapshot, frames, invalidate } from './snapshot.js';
 import { consoleLogs, standaloneWorkerLogs } from './console-logs.js';
 import { listWorkers, withWorker } from './worker-driver.js';
+import { finishTask } from './finish-task.js';
+import { queueTarget } from './target-queue.js';
 import * as actions from './actions.js';
 
 const MAX_SCREENSHOT_CHARACTERS = 12 * 1024 * 1024;
@@ -13,13 +15,16 @@ export async function execute(context, request) {
   const { operation, args } = validate(request);
   if (operation === 'status') return status();
   assertRunning(context.signal);
+  if (operation === 'finish') return finishTask(context, args);
   if (operation === 'tabs') return listTabs();
   if (operation === 'workers') return listWorkers();
   if (operation === 'console_logs' && args.workerId) {
     return withWorker(context, args, connection => standaloneWorkerLogs(connection, args));
   }
   if (operation === 'open') return open(context, args);
-  if (['navigate', 'close', 'focus'].includes(operation)) return tabAction(context, operation, args);
+  if (['navigate', 'close', 'focus'].includes(operation)) {
+    return queueTarget({ tabId: args.tabId }, () => tabAction(context, operation, args));
+  }
   return withTab(context, args, (driver) => pageAction(driver, operation, args),
     { prepareInput: operation !== 'console_logs' });
 }

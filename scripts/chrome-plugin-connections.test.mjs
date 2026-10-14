@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 import { acquireConnection, assertConnected, closeConnection, releaseConnection, debuggerDetached,
-  hasDebuggerConnections, stopConnections, DEBUGGER_IDLE_MS }
+  hasDebuggerConnections, stopConnections, finishConnection }
   from '../apps/desktop/src-tauri/resources/chrome-extension/debugger-connections.js';
 import { initializePermissions } from '../apps/desktop/src-tauri/resources/chrome-extension/permissions.js';
 
@@ -19,20 +19,19 @@ beforeEach(async () => {
 });
 afterEach(() => stopConnections());
 
-test('idle connections survive gaps, renew their deadline and eventually detach', async t => {
+test('connections survive long reasoning gaps until explicit task completion', async t => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
-  const first = await acquireConnection({ tabId: 1 });
+  const first = await acquireConnection({ tabId: 1 }, undefined, 'first');
   await releaseConnection(first, true);
-  t.mock.timers.tick(DEBUGGER_IDLE_MS - 1);
+  t.mock.timers.tick(60 * 60 * 1000);
   assert.equal(calls.length, 1);
-  const second = await acquireConnection({ tabId: 1 });
+  const second = await acquireConnection({ tabId: 1 }, undefined, 'first');
   assert.equal(first, second);
   await releaseConnection(second, true);
-  t.mock.timers.tick(1);
+  t.mock.timers.tick(60 * 60 * 1000);
   await flush();
   assert.equal(calls.length, 1);
-  t.mock.timers.tick(DEBUGGER_IDLE_MS - 1);
-  await flush();
+  await finishConnection({ tabId: 1 }, 'first');
   assert.deepEqual(calls, [['attach', { tabId: 1 }], ['detach', { tabId: 1 }]]);
   assert.equal(hasDebuggerConnections(), false);
 });
@@ -41,12 +40,22 @@ test('an active operation cannot be detached by its previous idle deadline', asy
   t.mock.timers.enable({ apis: ['setTimeout'] });
   await releaseConnection(await acquireConnection({ tabId: 1 }), true);
   const active = await acquireConnection({ tabId: 1 });
-  t.mock.timers.tick(DEBUGGER_IDLE_MS * 2);
+  t.mock.timers.tick(60 * 60 * 1000);
   await flush();
   assertConnected(active);
   assert.equal(calls.length, 1);
   await releaseConnection(active, false);
   assert.equal(calls.at(-1)[0], 'detach');
+});
+
+test('finishing one home retains a connection still used by another home', async () => {
+  const first = await acquireConnection({ tabId: 1 }, undefined, 'first');
+  await releaseConnection(first, true);
+  await releaseConnection(await acquireConnection({ tabId: 1 }, undefined, 'second'), true);
+  assert.equal(await finishConnection({ tabId: 1 }, 'first'), false);
+  assertConnected(first);
+  assert.equal(await finishConnection({ tabId: 1 }, 'second'), true);
+  assert.equal(hasDebuggerConnections(), false);
 });
 
 test('stop releases both retained and active connections, including workers', async () => {

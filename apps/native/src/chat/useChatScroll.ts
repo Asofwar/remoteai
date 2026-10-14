@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FlatList, LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent, ViewToken } from 'react-native';
 import type { ChatMessagesProps } from '../../../../shared/remote-chat/client/messageProps';
+import { shouldShowScrollToBottom } from '../../../../shared/chat/scrollPosition';
 import type { Item } from './types';
 import { useNativeChatScroll } from './useNativeChatScroll';
 
@@ -42,8 +43,9 @@ export function useChatScroll<Entry extends { id: string } = Item>(
   const [preservePosition, setPreservePosition] = useState(false);
   const [historyBottomSpace, setHistoryBottomSpace] = useState(0);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const updateScrollButton = () => setShowScrollToBottom(!following.current
-    && contentHeight.current - viewportHeight.current - nativePosition.current >= SCROLL_EDGE_DISTANCE);
+  const updateScrollButton = () => setShowScrollToBottom(shouldShowScrollToBottom({
+    contentHeight: contentHeight.current, viewportHeight: viewportHeight.current, offset: nativePosition.current,
+  }));
   const presentLatest = useCallback(() => {
     if (presented.current || presentFrame.current !== undefined) return;
     // Reveal after native cells and the bottom position agree, never at an estimated virtualization spacer.
@@ -124,6 +126,8 @@ export function useChatScroll<Entry extends { id: string } = Item>(
   const finishScroll = (event: ScrollEvent) => {
     updateFollowing(event);
     scrolling.current = false;
+    // The last onScroll event can be throttled; drag/momentum completion carries the actual final position.
+    updatePosition(event);
     // Android can deliver the final scroll position after the drag event has ended.
     const top = event.nativeEvent.contentOffset.y;
     if (hasMore && top > 0 && top < SCROLL_EDGE_DISTANCE) void more();
@@ -135,8 +139,12 @@ export function useChatScroll<Entry extends { id: string } = Item>(
       updateFollowing(event);
       if (hasMore && top > 0 && top < position.current && top < SCROLL_EDGE_DISTANCE) void more();
     }
-    position.current = top;
-    nativePosition.current = top;
+    updatePosition(event);
+  };
+  const updatePosition = ({ nativeEvent }: ScrollEvent) => {
+    position.current = nativePosition.current = nativeEvent.contentOffset.y;
+    contentHeight.current = nativeEvent.contentSize.height;
+    viewportHeight.current = nativeEvent.layoutMeasurement.height;
     updateScrollButton();
     presentLatest();
   };
@@ -144,7 +152,8 @@ export function useChatScroll<Entry extends { id: string } = Item>(
     nativeScroll.attach();
     if (viewportHeight.current === layout.height) return;
     viewportHeight.current = layout.height;
-    updateScrollButton();
+    if (following.current) setShowScrollToBottom(false);
+    else updateScrollButton();
     followLatest();
     presentLatest();
   };
@@ -152,7 +161,9 @@ export function useChatScroll<Entry extends { id: string } = Item>(
     nativeScroll.attach();
     if (contentHeight.current === height) return;
     contentHeight.current = height;
-    updateScrollButton();
+    // Following will adjust the native offset; avoid comparing the new height with the previous position.
+    if (following.current) setShowScrollToBottom(false);
+    else updateScrollButton();
     followLatest();
     presentLatest();
   };

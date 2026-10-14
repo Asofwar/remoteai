@@ -1,5 +1,6 @@
-import { useLayoutEffect, useRef, useState, type WheelEvent } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState, type WheelEvent } from 'react';
 import type { ChatMessagesProps } from '../../../../shared/remote-chat/client/messageProps';
+import { shouldShowScrollToBottom } from '../../../../shared/chat/scrollPosition';
 
 const EDGE_DISTANCE = 100;
 
@@ -20,6 +21,12 @@ export function useHistoryScroll({ thread, loadingMore, hasMore, loadOlder }: Ch
   const fetching = useRef(false);
   const position = useRef(0);
   const anchor = useRef<{ element: Element; top: number }>();
+  const updateScrollButton = useCallback(() => {
+    const node = list.current;
+    if (node) setShowBottom(shouldShowScrollToBottom({
+      contentHeight: node.scrollHeight, viewportHeight: node.clientHeight, offset: node.scrollTop,
+    }));
+  }, []);
   const more = () => {
     if (!hasMore || loadingMore || fetching.current || !loadOlder || !list.current) return;
     following.current = false;
@@ -37,28 +44,30 @@ export function useHistoryScroll({ thread, loadingMore, hasMore, loadOlder }: Ch
       node.scrollTop += anchor.current.element.getBoundingClientRect().top - anchor.current.top;
     } else if (following.current) node.scrollTop = node.scrollHeight;
     position.current = node.scrollTop;
+    updateScrollButton();
     if (!loadingMore) anchor.current = undefined;
-  }, [thread, loadingMore]);
+  }, [thread, loadingMore, updateScrollButton]);
   useLayoutEffect(() => {
     const follow = () => {
       if (following.current && list.current) {
         list.current.scrollTop = list.current.scrollHeight;
         position.current = list.current.scrollTop;
       }
+      updateScrollButton();
     };
     const observer = new ResizeObserver(follow);
-    if (content.current) observer.observe(content.current);
+    if (content.current) observer.observe(content.current, { box: 'border-box' });
     if (list.current) observer.observe(list.current);
     follow();
     return () => observer.disconnect();
-  }, []);
+  }, [updateScrollButton]);
   const onScroll = () => {
     const node = list.current;
     if (!node) return;
     const upward = node.scrollTop < position.current;
     position.current = node.scrollTop;
     following.current = node.scrollHeight - node.clientHeight - node.scrollTop < EDGE_DISTANCE;
-    setShowBottom(!following.current);
+    updateScrollButton();
     if (upward && node.scrollTop < EDGE_DISTANCE) more();
   };
   const onWheel = (event: WheelEvent<HTMLDivElement>) => {

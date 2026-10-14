@@ -135,5 +135,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === UPDATE_ALARM) void updater.check();
 });
 updater.start();
+void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+  .catch(() => console.warn('未能启用侧边栏，请重新加载浏览器助手。'));
 void renameWorkGroups().catch(() => console.warn('未能更新标签组名称。'));
 void connect();

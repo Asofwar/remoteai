@@ -48,6 +48,7 @@ beforeEach(async () => {
       connectNative: () => port, onMessage: event(), onInstalled: event(), onStartup: event() },
     alarms: { create: () => {}, onAlarm: event() },
     action: { setBadgeText: async () => {}, setBadgeBackgroundColor: async () => {} },
+    sidePanel: { setPanelBehavior: async options => { globalThis.panelBehavior = options; } },
     tabs: { get: async id => ({ id, url: 'https://fixture.example/' }), onUpdated: event(), onRemoved: event() },
     tabGroups: { query: async () => [] },
     windows: { onRemoved: event() },
@@ -62,6 +63,24 @@ beforeEach(async () => {
   await flush();
 });
 afterEach(() => stopDebugging());
+
+test('the toolbar icon opens a native side panel', () => {
+  assert.deepEqual(globalThis.panelBehavior, { openPanelOnActionClick: true });
+});
+
+test('remote chat frames and page scripts cannot change browser permissions', async () => {
+  for (const sender of [
+    { id: 'fixture', url: 'https://codex.onepiper.cloud/web/' },
+    { id: 'fixture', url: 'https://example.com/popup.html' },
+    { id: 'other', url: 'chrome-extension://fixture/popup.html' },
+  ]) {
+    let responded = false;
+    chrome.runtime.onMessage.emit({ operation: 'pause', paused: true }, sender, () => { responded = true; });
+    await flush();
+    assert.equal(local.paused, false);
+    assert.equal(responded, false);
+  }
+});
 
 test('successive native requests keep the banner connection until the popup pauses control', async () => {
   assert.equal((await request()).error, null);

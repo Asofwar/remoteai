@@ -12,10 +12,25 @@ The plugin is available in the desktop application's community marketplace for t
 3. Confirm that the card reports a connected browser, then send a message using that home.
    Existing GUI conversations reload changed MCP configuration before their next turn.
 4. Accept Chrome's website permissions when installing the extension. All HTTP(S) websites are allowed
-   by default. Turn off "Allow all websites" in the popup to use per-site session or remembered grants.
-5. Use the extension popup to pause control, revoke a site's permission, rename the browser profile,
+   by default. Turn off "Allow all websites" in the side panel's browser settings to use per-site grants.
+5. Click the extension icon to open the native Chrome side panel, then use its browser settings to
+   pause control, revoke a site's permission, rename the browser profile,
    or reconnect. The card shows installation/connection settings and disable/enable controls together on one row.
    Explicitly disabled installations remain disabled when the card is reopened or the app is upgraded.
+
+The side panel displays the existing responsive Web app at `https://codex.onepiper.cloud/web/`,
+reusing the mobile chat, device selection, conversation list and account flow. Chat requires a Remote AI
+account and an online device; local browser settings remain available without signing in or network access.
+Chrome owns the panel layout: the webpage keeps its own viewport and scrollbar, and the panel follows
+Chrome's left/right side preference. No page styles or scroll containers are changed.
+Switching to settings keeps the chat frame alive, preserving drafts and active responses.
+Unpacked extension updates wait while any side panel is open, then retry after it closes.
+
+The hosted chat is a sandboxed cross-origin frame with no bridge to extension APIs, page content or
+browser grants. Account storage stays on the Web app's origin. The extension CSP permits only the
+official chat host and local settings frames; privileged scripts are bundled locally. The toolbar
+provides reload and open-in-tab actions for connectivity problems. This follows Chrome's
+[sandboxed iframe guidance](https://developer.chrome.com/docs/extensions/develop/migrate/improve-security).
 
 Controlled webpages display a green cursor favicon. Pausing control, revoking access or navigating
 restores the website's icon. Focusing a minimized Chrome window also restores the window.
@@ -41,7 +56,7 @@ tab closes. The skill requires completion before replying, including after failu
 cleanup IDs for retry. Completion is explicit: inactivity cannot distinguish a finished task from reasoning.
 Pause, access revocation, native-host disconnect and
 Chrome's Cancel button release connections immediately. Cancel also pauses control until the user resumes
-it in the extension popup. Closing a target removes only that connection. Frame/Worker subscriptions
+it in the side panel's browser settings. Closing a target removes only that connection. Frame/Worker subscriptions
 and log domains are reset after each operation so repeated reads still replay retained logs. Unpacked
 extension updates wait until retained connections have been released.
 This fixes the case where input commands acknowledged a click but the background page received no
@@ -344,10 +359,9 @@ without a per-site permission prompt. The resulting form contained the entered C
 After the operations, all-site access remained enabled, the per-site grant list stayed empty and no
 permission requests were pending. The task-created page was closed after verification.
 
-The toolbar popup uses a fixed 360 x 460 CSS-pixel document with an internally scrolling site list.
-Its root dimensions do not depend on the viewport, avoiding a feedback loop with Chrome's automatic
-popup sizing. The name field and save button share one row. Browser previews of empty/long lists,
-connection errors and narrow/wide viewports retained the same outer dimensions without horizontal overflow.
+Before version 1.7.0, the toolbar popup used a fixed 360 x 460 CSS-pixel document to avoid Chrome's
+automatic popup-sizing feedback loop. Version 1.7.0 replaces it with the native side panel and responsive
+settings described above. The browser name field and save button still share one row.
 
 The tested Windows release replaced the user's installed application and restarted successfully.
 Its SHA-256 is `FD7E3A3A6F9D80E0A0DEE1382696A342884C43FA02A73D564844D1E941B9D34F`.
@@ -380,6 +394,7 @@ node --test scripts/chrome-plugin-console-format.test.mjs
 node scripts/chrome-plugin-console.e2e.mjs
 node --test scripts/chrome-plugin-workers.test.mjs
 node scripts/chrome-plugin-diagnostics.e2e.mjs
+node scripts/chrome-plugin-sidepanel.e2e.mjs
 cargo build --manifest-path apps/desktop/src-tauri/Cargo.toml --bin csw
 node --test scripts/chrome-plugin-protocol.test.mjs
 ```
@@ -389,6 +404,13 @@ library harness and fail before running tests. For a release STDIO check, set `C
 to the release executable and run `node scripts/chrome-plugin-protocol.test.mjs --initialize-only`.
 Release builds intentionally ignore the debug-only `CSW_CHROME_TEST_ROOT` override. The full debug
 protocol fixture uses temporary credentials and a simulated extension without changing Chrome registration.
+
+The side-panel E2E uses another isolated profile and stubs only the native host connection. It verifies
+native panel opening/closing, independent scrolling, frame isolation, draft preservation, settings and
+320/600-pixel layouts. Set `CSW_CHROME_LIVE_CHAT=1` for a read-only smoke test of the hosted login page.
+For full local chat integration, start `apps/desktop/e2e/mobile-fixture.mjs` and the Web Vite server
+with `VITE_DEV_API_URL` pointing at that fixture, then set `CSW_CHROME_CHAT_TEST_URL` to its `/web/` URL.
+This mode logs in with fixture credentials, sends a test message and verifies draft preservation.
 
 `node scripts/chrome-plugin-background.e2e.mjs` tests real extension input in an isolated Chrome profile.
 Install a Playwright Chromium build or set `CSW_CHROME_TEST_BROWSER` to a Chrome for Testing executable.

@@ -16,8 +16,17 @@
 .row {
   display: flex; align-items: center; gap: 6px;
   & + & { margin-top: 6px; }
-  strong, code { flex: 1; min-width: 0; }
-  code { font-size: 12px; color: var(--muted); }
+  strong, .address { flex: 1; min-width: 0; }
+}
+.address {
+  display: flex; align-items: center; gap: 4px; padding: 0; border: 0;
+  background: transparent; color: var(--green); cursor: pointer; text-align: left;
+  code { font-size: 12px; overflow-wrap: anywhere; }
+  svg { flex-shrink: 0; }
+  &:hover code { text-decoration: underline; }
+  &:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; border-radius: 2px; }
+  &:disabled { color: var(--muted); cursor: default; }
+  &:disabled code { text-decoration: none; }
 }
 .status { color: var(--muted); font-size: 12px; }
 .status[data-running='true'] { color: var(--green); }

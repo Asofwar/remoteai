@@ -4,6 +4,7 @@ import { ArrowRight, Cable, Copy, Play, Plus, Square, Trash2 } from 'lucide-reac
 import { guiText as t } from '../../../i18n/guiText';
 import { copyText } from '../../../utils/clipboard';
 import { usePortForwarding } from './usePortForwarding';
+import { ForwardedAddress } from './ForwardedAddress';
 import { MAX_PORT, MAX_PORT_MAPPINGS } from './settings';
 import type { ForwardingClient, ForwardingEntry, PortForwardingService } from './service';
 import launcherStyles from '../GuiRemoteDesktop.module.less';
@@ -27,7 +28,7 @@ export function PortForwarding(props: {
       {!props.connected && <Alert type="info" message={t('连接已断开，重新连接后可再次启动。')} />}
       <div className={styles.list}>
         {entries.map(entry => <MappingRow key={entry.id} entry={entry} service={service}
-          connected={props.connected} />)}
+          connected={props.connected} onOpen={() => setOpen(false)} />)}
       </div>
       {!entries.length && <div className={styles.empty}>{t('还没有端口映射')}</div>}
       <MappingForm service={service} disabled={!props.connected || entries.length >= MAX_PORT_MAPPINGS} />
@@ -67,8 +68,8 @@ function MappingForm({ service, disabled }: { service: PortForwardingService; di
   </form>;
 }
 
-function MappingRow({ entry, service, connected }: {
-  entry: ForwardingEntry; service: PortForwardingService; connected: boolean;
+function MappingRow({ entry, service, connected, onOpen }: {
+  entry: ForwardingEntry; service: PortForwardingService; connected: boolean; onOpen: () => void;
 }) {
   const busy = entry.status === 'starting' || entry.status === 'stopping';
   const running = entry.status === 'running';
@@ -89,7 +90,7 @@ function MappingRow({ entry, service, connected }: {
       </Tooltip>
     </div>
     <div className={styles.row}>
-      <code>127.0.0.1:{entry.localPort}</code>
+      <ForwardedAddress port={entry.localPort} running={running} onOpen={onOpen} />
       <Tooltip title={t('复制本地地址')} styles={{ root: { maxWidth: 400 } }}>
         <Button type="text" size="small" disabled={!running} aria-label={`${t('复制本地地址')} ${label}`}
           icon={<Copy size={14} />} onClick={() => { void copy(); }} />

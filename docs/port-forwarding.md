@@ -5,6 +5,11 @@ In a remote computer's desktop chat workspace, **端口转发** appears immediat
 uses the remote port number. For example, remote port `3000` and local port `13000` make the remote
 service available at `127.0.0.1:13000` on the viewing computer.
 
+Click a running mapping's local address to choose **在 Remote AI 中预览** or **在浏览器中打开**.
+Both actions open `http://127.0.0.1:<local port>` through the existing mapping. The preview uses the
+shared details drawer and retains the local address in its navigation history. Stopped mappings
+cannot be opened. These actions are intended for HTTP services; copying remains available for other TCP clients.
+
 Each computer supports up to eight saved mappings. Mappings can be started, stopped, deleted and
 copied independently. Settings are stored locally and separated by server, account and remote device.
 Switching chat threads or computers keeps active mappings running. Disconnecting or signing out
@@ -38,5 +43,5 @@ connections are closed. A failed listener or disconnected session requires resta
   late replies, cleanup, retries and disconnects. Settings tests cover device isolation and corrupt data.
 - `portForwarding/transport.test.ts` carries two byte streams through the existing encrypted transport
   while switching from P2P to Relay without restarting either mapping.
-- `e2e/port-forwarding.pw.ts` covers form actions, copying, errors, reconnects, device switching,
+- `e2e/port-forwarding.pw.ts` covers form actions, preview/browser opening, copying, errors, reconnects, device switching,
   persistence and compact light/dark layouts; `e2e/remote-gui.pw.ts` verifies the real workspace entry.

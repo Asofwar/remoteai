@@ -5,8 +5,11 @@ import { filePreviewApi, type FilePreviewData } from "./api";
 import { FileEnvironmentContext } from '../fileEnvironment';
 
 export type FilePreviewTarget = Parameters<typeof filePreviewApi.open>[0];
+/** Already resolved URLs belong to the viewing computer, including when revisiting history. */
+export interface WebsitePreviewOptions { resolved?: boolean }
 type RemoteFile = { kind: "remoteFile"; file: FilePreviewTarget };
-type Target = { kind: "file"; file: FilePreviewTarget } | RemoteFile | { kind: "website"; url: string };
+type Target = { kind: "file"; file: FilePreviewTarget } | RemoteFile
+  | ({ kind: "website"; url: string } & WebsitePreviewOptions);
 type Preview = { kind: "file"; data: FilePreviewData; release: () => void }
   | RemoteFile | { kind: "website"; url: string };
 interface History { entries: Target[]; index: number }
@@ -14,7 +17,9 @@ const EMPTY_HISTORY: History = { entries: [], index: -1 };
 const MAX_HISTORY_ENTRIES = 100;
 
 function sameTarget(current: Target | undefined, next: Target) {
-  if (current?.kind === "website" && next.kind === "website") return current.url === next.url;
+  if (current?.kind === "website" && next.kind === "website") {
+    return current.url === next.url && Boolean(current.resolved) === Boolean(next.resolved);
+  }
   if (!current || current.kind === "website" || next.kind === "website" || current.kind !== next.kind) return false;
   return current.file.path === next.file.path && current.file.threadId === next.file.threadId
     && current.file.line === next.file.line && current.file.column === next.file.column;
@@ -54,7 +59,7 @@ export function usePreviewHistory({ onOpen, onNavigate }: { onOpen: () => void; 
         if (id !== request.current) { release(); return true; }
         if (!data) return false;
         next = { kind: "file", data, release };
-      } else if (target.kind === 'website' && environment) {
+      } else if (target.kind === 'website' && environment && !target.resolved) {
         next = { kind: 'website', url: await environment.resolveWebsite(target.url) };
         if (id !== request.current) return true;
       } else next = target;
@@ -70,8 +75,8 @@ export function usePreviewHistory({ onOpen, onNavigate }: { onOpen: () => void; 
   }, [onOpen, onNavigate, api, environment]);
   const openFile = useCallback((file: FilePreviewTarget) => visit({ kind: "file", file }), [visit]);
   const openRemoteFile = useCallback((file: FilePreviewTarget) => visit({ kind: "remoteFile", file }), [visit]);
-  const openWebsite = useCallback((url: string) => {
-    void visit({ kind: "website", url }).catch(() => { void message.error({
+  const openWebsite = useCallback((url: string, options: WebsitePreviewOptions = {}) => {
+    void visit({ kind: "website", url, resolved: options.resolved }).catch(() => { void message.error({
       content: guiText("链接暂时无法打开，请稍后重试。"), style: { maxWidth: 400, marginInline: "auto" },
     }); });
   }, [visit]);

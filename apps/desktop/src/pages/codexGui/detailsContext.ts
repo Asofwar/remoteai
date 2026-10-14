@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect } from "react";
 import type { DiffFile } from "./diff";
 import type { FileReference } from "./fileReference";
+import type { WebsitePreviewOptions } from "./filePreview/usePreviewHistory";
 
 export interface DiffPanelEntry { id: string; title: string; files: DiffFile[]; status?: string; filePath?: string }
 interface DetailsContextValue {
@@ -9,7 +10,7 @@ interface DetailsContextValue {
   setConversationChanges: (entry: DiffPanelEntry) => void;
   openFile: (target: FileReference & { threadId: string | null }) => Promise<boolean>;
   openRemoteFile?: (target: FileReference & { threadId: string | null }) => Promise<boolean>;
-  openWebsite: (url: string) => void;
+  openWebsite: (url: string, options?: WebsitePreviewOptions) => void;
   showingChanges: boolean;
   visible: boolean;
   close: () => void;

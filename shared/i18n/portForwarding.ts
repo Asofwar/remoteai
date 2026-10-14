@@ -1,5 +1,6 @@
 export const portForwardingEnglish: Readonly<Record<string, string>> = {
   '端口转发': 'Port forwarding',
+  '在 Remote AI 中预览': 'Preview in Remote AI',
   '端口转发设置': 'Port forwarding settings',
   '将远程电脑的端口映射到本机，方便在本机访问。': 'Map remote ports to this computer for local access.',
   '连接已断开，重新连接后可再次启动。': 'Disconnected. Reconnect to start forwarding again.',
@@ -31,6 +32,7 @@ export const portForwardingEnglish: Readonly<Record<string, string>> = {
 
 export const portForwardingRussian: Readonly<Record<string, string>> = {
   '端口转发': 'Проброс портов',
+  '在 Remote AI 中预览': 'Предпросмотр в Remote AI',
   '端口转发设置': 'Настройки проброса портов',
   '将远程电脑的端口映射到本机，方便在本机访问。': 'Подключите удалённые порты для доступа с этого компьютера.',
   '连接已断开，重新连接后可再次启动。': 'Соединение разорвано. Подключитесь снова, чтобы запустить проброс.',

@@ -2,6 +2,13 @@ import { expect, test, type Page } from '@playwright/test';
 
 const panel = (page: Page) => page.getByRole('region', { name: '端口转发设置' });
 const entry = (page: Page, label: string) => panel(page).getByRole('article', { name: label });
+declare global {
+  interface Window {
+    portForwardingFixture: {
+      clipboard: string[]; browserUrls: string[]; previewUrls: string[]; resolvedUrls: string[]; failBrowser: boolean;
+    };
+  }
+}
 async function add(page: Page, remotePort: number, localPort: number) {
   await panel(page).getByRole('spinbutton', { name: '远程端口' }).fill(String(remotePort));
   await panel(page).getByRole('spinbutton', { name: '本地端口' }).fill(String(localPort));
@@ -17,10 +24,10 @@ test('multiple mappings, port conflicts, stop, copy and reconnect stay independe
   await expect(entry(page, '3000 → 13000').getByRole('status')).toHaveText('转发中');
   await expect(entry(page, '5432 → 15432').getByRole('status')).toHaveText('转发中');
   await entry(page, '3000 → 13000').getByRole('button', { name: '复制本地地址 3000 → 13000' }).click();
-  expect(await page.evaluate(() => (window as unknown as { portForwardingFixture: { clipboard: string[] } })
-    .portForwardingFixture.clipboard)).toEqual(['127.0.0.1:13000']);
+  expect(await page.evaluate(() => window.portForwardingFixture.clipboard)).toEqual(['127.0.0.1:13000']);
   await entry(page, '3000 → 13000').getByRole('button', { name: '停止转发 3000 → 13000' }).click();
   await expect(entry(page, '3000 → 13000').getByRole('status')).toHaveText('已停止');
+  await expect(entry(page, '3000 → 13000').getByRole('button', { name: '127.0.0.1:13000' })).toBeDisabled();
   await expect(entry(page, '5432 → 15432').getByRole('status')).toHaveText('转发中');
   await add(page, 8080, 9999);
   await expect(entry(page, '8080 → 9999').getByRole('alert')).toHaveText('本地端口已被占用，请换一个端口。');
@@ -32,11 +39,47 @@ test('multiple mappings, port conflicts, stop, copy and reconnect stay independe
   await page.getByRole('button', { name: '端口转发', exact: true }).click();
   await expect(entry(page, '5432 → 15432').getByRole('status')).toHaveText('已停止');
   await expect(panel(page).getByRole('button', { name: '启动转发 5432 → 15432' })).toBeDisabled();
+  await expect(entry(page, '5432 → 15432').getByRole('button', { name: '127.0.0.1:15432' })).toBeDisabled();
   await page.getByRole('button', { name: '端口转发', exact: true }).click();
   await page.getByRole('button', { name: '重新连接', exact: true }).click();
   await page.getByRole('button', { name: '端口转发', exact: true }).click();
   await panel(page).getByRole('button', { name: '启动转发 5432 → 15432' }).click();
   await expect(entry(page, '5432 → 15432').getByRole('status')).toHaveText('转发中');
+});
+
+test('opens the mapped local address in the preview drawer and system browser', async ({ page }) => {
+  await add(page, 3000, 13000);
+  await entry(page, '3000 → 13000').getByRole('button', { name: '127.0.0.1:13000' }).click();
+  const menu = page.getByRole('menu');
+  await expect(menu.getByRole('menuitem', { name: '在 Remote AI 中预览' })).toBeVisible();
+  expect((await menu.boundingBox())!.width).toBeLessThanOrEqual(400);
+  await page.screenshot({ path: '../../.codex-tmp/port-forwarding-link-menu.png', animations: 'disabled' });
+  await menu.getByRole('menuitem', { name: '在 Remote AI 中预览' }).click();
+  await expect(page.getByRole('region', { name: '网页预览' })).toContainText('http://127.0.0.1:13000');
+  await expect.poll(() => page.evaluate(() => window.portForwardingFixture.previewUrls))
+    .toContain('http://127.0.0.1:13000');
+  await expect(panel(page)).toBeHidden();
+  await page.getByRole('button', { name: '在浏览器中打开', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.portForwardingFixture.browserUrls))
+    .toEqual(['http://127.0.0.1:13000']);
+  await page.getByRole('button', { name: '关闭详情抽屉' }).click();
+  await page.getByRole('button', { name: '端口转发', exact: true }).click();
+  const address = entry(page, '3000 → 13000').getByRole('button', { name: '127.0.0.1:13000' });
+  await address.focus(); await page.keyboard.press('Enter');
+  await menu.getByRole('menuitem', { name: '在浏览器中打开' }).click();
+  await expect.poll(() => page.evaluate(() => window.portForwardingFixture.browserUrls))
+    .toEqual(['http://127.0.0.1:13000', 'http://127.0.0.1:13000']);
+  expect(await page.evaluate(() => window.portForwardingFixture.resolvedUrls)).toEqual([]);
+  await expect(panel(page)).toBeHidden();
+});
+
+test('reports browser failures without exposing internal details', async ({ page }) => {
+  await add(page, 3000, 13000);
+  await page.evaluate(() => { window.portForwardingFixture.failBrowser = true; });
+  await entry(page, '3000 → 13000').getByRole('button', { name: '127.0.0.1:13000' }).click();
+  await page.getByRole('menuitem', { name: '在浏览器中打开' }).click();
+  await expect(page.getByText('链接暂时无法打开，请稍后重试。')).toBeVisible();
+  await expect(page.getByText('Private browser failure')).toHaveCount(0);
 });
 
 test('keeps mappings by computer, restores settings, and fits compact light and dark views', async ({ page }) => {
@@ -61,5 +104,12 @@ test('keeps mappings by computer, restores settings, and fits compact light and 
   }
   await launcher.click(); await page.getByRole('button', { name: '切换深色' }).click(); await launcher.click();
   await expect(entry(page, '3000 → 13000')).toBeVisible();
+  await entry(page, '3000 → 13000').getByRole('button', { name: '启动转发 3000 → 13000' }).click();
+  await entry(page, '3000 → 13000').getByRole('button', { name: '127.0.0.1:13000' }).click();
+  await expect(page.getByRole('menuitem', { name: '在 Remote AI 中预览' })).toBeVisible();
+  const menuBounds = await page.getByRole('menu').boundingBox();
+  expect(menuBounds!.width).toBeLessThanOrEqual(400);
+  expect(menuBounds!.x).toBeGreaterThanOrEqual(0);
+  expect(menuBounds!.x + menuBounds!.width).toBeLessThanOrEqual(560);
   await page.screenshot({ path: '../../.codex-tmp/port-forwarding-dark.png', animations: 'disabled' });
 });

@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, useContext } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { message } from 'antd';
 import { ChatMarkdown } from '../../../web/src/chat/ChatMarkdown';
 import { DetailsWorkspace } from '../pages/codexGui/DetailsWorkspace';
+import { DetailsContext } from '../pages/codexGui/detailsContext';
 import { FileEnvironmentContext, type FileEnvironment } from '../pages/codexGui/fileEnvironment';
 import { FileThreadContext, fileApi } from '../pages/codexGui/fileApi';
 import { filePreviewApi } from '../pages/codexGui/filePreview/api';
@@ -78,6 +79,32 @@ it('routes localhost websites through the remote resolver before opening the sha
   await act(async () => host.querySelector('a')!.click());
   expect(environment.resolveWebsite).toHaveBeenCalledWith('http://localhost:3000/remote');
   expect(host.querySelector('iframe')?.src).toBe('http://127.0.0.1:54322/remote');
+});
+
+function ForwardedWebsiteLinks() {
+  const panel = useContext(DetailsContext)!;
+  const url = 'http://127.0.0.1:13000';
+  return <>
+    <button onClick={() => panel.openWebsite(url)}>Remote website</button>
+    <button onClick={() => panel.openWebsite(url, { resolved: true })}>Forwarded website</button>
+  </>;
+}
+
+it('keeps forwarded local addresses distinct from remote URLs throughout preview history', async () => {
+  await act(async () => root.render(<FileEnvironmentContext.Provider value={environment}>
+    <DetailsWorkspace selected="remote-thread" active><ForwardedWebsiteLinks /></DetailsWorkspace>
+  </FileEnvironmentContext.Provider>));
+  await click('Remote website');
+  expect(host.querySelector('iframe')?.src).toBe('http://127.0.0.1:54322/remote');
+  await click('Forwarded website');
+  expect(host.querySelector('iframe')?.src).toBe('http://127.0.0.1:13000/');
+  expect(environment.resolveWebsite).toHaveBeenCalledTimes(1);
+  await click('返回上一页');
+  expect(host.querySelector('iframe')?.src).toBe('http://127.0.0.1:54322/remote');
+  expect(environment.resolveWebsite).toHaveBeenCalledTimes(2);
+  await click('前往下一页');
+  expect(host.querySelector('iframe')?.src).toBe('http://127.0.0.1:13000/');
+  expect(environment.resolveWebsite).toHaveBeenCalledTimes(2);
 });
 
 it.each(['pdf', 'audio', 'video'] as const)('uses the same %s preview content', async kind => {

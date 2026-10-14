@@ -8,6 +8,7 @@ import { ChatDetailsWorkspace } from '../src/chat/ChatDetailsWorkspace';
 import { ConversationChangesButton } from '../../desktop/src/pages/codexGui/ConversationChangesButton';
 import { useDesktopLayout } from '../src/useDesktopLayout';
 import type { Thread } from '../src/chat/types';
+import { mergeHistory } from '../../../shared/remote-chat/client/history';
 import '../src/styles.css';
 import '../src/chat/chat.css';
 
@@ -33,8 +34,14 @@ function Harness() {
   }, []);
   useEffect(() => {
     const update = (event: Event) => setThread((event as CustomEvent<Thread>).detail);
+    const sync = (event: Event) => setThread(current => current
+      ? mergeHistory((event as CustomEvent<Thread>).detail, current, current) : current);
     window.addEventListener('display-fixture', update);
-    return () => window.removeEventListener('display-fixture', update);
+    window.addEventListener('display-history-snapshot', sync);
+    return () => {
+      window.removeEventListener('display-fixture', update);
+      window.removeEventListener('display-history-snapshot', sync);
+    };
   }, []);
   return <ChatQuotesProvider scope={thread?.id ?? null} enabled sending={false}>
     <main className="chat-page" style={{ height: '100vh' }}>

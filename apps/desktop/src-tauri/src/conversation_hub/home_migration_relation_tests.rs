@@ -1,3 +1,4 @@
+use super::super::home_migration_provider::MigrationDestination;
 use super::home_migration::{migrate, source_fixture};
 use super::*;
 
@@ -212,7 +213,10 @@ fn destination_created_after_planning_is_not_overwritten() {
     fs::remove_file(target.snapshot().path).unwrap();
     let result = super::super::home_migration_batch::migrate_home_batch(
         &source.home,
-        &target.home,
+        MigrationDestination {
+            path: &target.home,
+            model_provider: None,
+        },
         &source.bin.join("late-duplicate"),
         vec![snapshot],
     );

@@ -121,8 +121,10 @@ fn should_skip_header(name: &str, skip_auth: bool) -> bool {
 }
 
 fn http_client() -> Result<Client, String> {
+    let timeout = model_catalog_deadline::credential_timeout(UPSTREAM_RESPONSE_IDLE_TIMEOUT)
+        .map_err(|error| error.to_string())?;
     crate::system_proxy::apply(Client::builder())
-        .timeout(UPSTREAM_RESPONSE_IDLE_TIMEOUT)
+        .timeout(timeout)
         .connect_timeout(UPSTREAM_CONNECT_TIMEOUT)
         .build()
         .map_err(|error| format!("Failed to create proxy HTTP client: {error}"))
@@ -144,7 +146,7 @@ fn send_with_timeout_retries(
             diagnostic_http_result(&result, attempt);
             if result
                 .as_ref()
-                .is_err_and(upstream_transport::Error::can_retry)
+                .is_err_and(|error| request.can_retry(error))
                 && attempt < UPSTREAM_TIMEOUT_ATTEMPT_LIMIT
             {
                 diagnostic_retry("transport_timeout", Duration::ZERO);
@@ -155,7 +157,7 @@ fn send_with_timeout_retries(
             }
             result
         },
-        upstream_transport::Error::can_retry,
+        |error| request.can_retry(error),
     );
     match result {
         Ok(response) => Ok(response),

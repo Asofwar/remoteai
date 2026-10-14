@@ -3,6 +3,8 @@ import { ALL_WEBSITES } from './site-access.js';
 const error = document.querySelector('#error');
 const allowAll = document.querySelector('#allow-all');
 let paused = false;
+let refreshing = false;
+const REFRESH_INTERVAL_MS = 2000;
 
 async function send(message) {
   const reply = await chrome.runtime.sendMessage(message);
@@ -23,7 +25,13 @@ function rows(container, items, label, action, handler) {
 }
 
 async function refresh() {
-  const state = await send({ operation: 'status' });
+  if (refreshing) return;
+  refreshing = true;
+  try { renderStatus(await send({ operation: 'status' })); }
+  finally { refreshing = false; }
+}
+
+function renderStatus(state) {
   paused = state.paused;
   document.querySelector('#status').textContent = state.connected
     ? paused ? '已连接 · 控制已暂停' : '已连接 · 等待你的任务' : '尚未连接 Remote AI';
@@ -40,7 +48,12 @@ async function refresh() {
 
 async function perform(action) {
   try { await action(); await refresh(); }
-  catch (caught) { error.hidden = false; error.textContent = caught.message; }
+  catch (caught) { showError(caught); }
+}
+
+function showError(caught) { error.hidden = false; error.textContent = caught.message; }
+function refreshVisible() {
+  if (document.visibilityState === 'visible' && !window.frameElement?.hidden) void refresh().catch(showError);
 }
 
 document.querySelector('#connect').addEventListener('click', () => perform(() => send({ operation: 'connect' })));
@@ -57,4 +70,7 @@ document.querySelector('#save-name').addEventListener('click', () => perform(() 
   send({ operation: 'profileName', name: document.querySelector('#name').value })));
 const { profileName = 'Chrome' } = await chrome.storage.local.get('profileName');
 document.querySelector('#name').value = profileName;
-await perform(refresh);
+await refresh().catch(showError);
+window.addEventListener('focus', refreshVisible);
+const refreshTimer = setInterval(refreshVisible, REFRESH_INTERVAL_MS);
+window.addEventListener('pagehide', () => clearInterval(refreshTimer));

@@ -27,11 +27,22 @@
 .cs-image-status { position: absolute; bottom: 88px; left: 50%; transform: translateX(-50%); max-width: 400px;
   font-size: 13px; text-align: center; }
 .cs-image-status button { padding: 8px; text-decoration: underline; }
-.cs-image-download { position: absolute; top: 16px; right: 80px; min-height: 44px; padding: 0 16px;
+.cs-image-viewer .cs-image-download { position: absolute; top: max(12px, env(safe-area-inset-top));
+  right: max(68px, calc(env(safe-area-inset-right) + 56px)); min-height: 44px; padding: 0 16px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
   border-radius: 22px; background: #282b2a; color: #eee; }
 .cs-image-download:disabled { opacity: .5; }
-.cs-image-original { position: absolute; bottom: 88px; left: 50%; transform: translateX(-50%);
-  min-height: 44px; padding: 0 18px; border-radius: 22px; background: #282b2a !important; }
+.cs-image-download-spinner { animation: cs-image-download-spin 1s linear infinite; }
+@keyframes cs-image-download-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .cs-image-download-spinner { animation: none; } }
+@media (max-width: 640px), (hover: none) and (pointer: coarse) {
+  .cs-image-viewer .cs-image-close { left: max(12px, env(safe-area-inset-left)); right: auto; }
+  .cs-image-viewer .cs-image-download { right: max(12px, env(safe-area-inset-right)); width: 44px; padding: 0; }
+  .cs-image-download span { display: none; }
+}
+.cs-image-viewer > .cs-image-original { position: absolute; bottom: 88px; left: 50%;
+  transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
+  min-height: 44px; padding: 0 18px; border-radius: 22px; background: #282b2a; }
 .cs-image-original ~ .cs-image-status { bottom: 140px; }
 .cs-image-transfer { width: 288px; max-width: calc(100vw - 32px); }
 .cs-image-transfer .cs-preview-progress { background: #252827; }

@@ -25,7 +25,25 @@ async function update(page: Page, value: Thread) {
 test.beforeEach(({}, info) => test.skip(info.project.name !== 'desktop'
   && !info.title.startsWith('preserves reading and typing')
   && !info.title.startsWith('shows conversation references')
+  && !info.title.startsWith('clears obsolete running status')
   && !info.title.startsWith('hides automatic retry'), 'PC message presentation'));
+
+test('clears obsolete running status after the PC confirms a finished reply', async ({ page }, info) => {
+  const finished = fixture([{ ...reply, text: '测试成功' }]);
+  finished.status = { type: 'notLoaded' };
+  const live: Thread = { ...finished, turns: [...finished.turns!, {
+    id: 'obsolete', status: 'inProgress', startedAt: Date.now() / 1000,
+    items: [{ id: 'wait', type: 'sleep', status: 'inProgress', durationMs: 20_000 }],
+  }] };
+  await open(page, live);
+  await expect(page.getByText('测试成功', { exact: true })).toBeVisible();
+  await expect(page.locator('.chat-processing-status')).toBeVisible();
+  await page.evaluate(detail => window.dispatchEvent(new CustomEvent('display-history-snapshot', { detail })), finished);
+  await expect(page.locator('.chat-processing-status')).toHaveCount(0);
+  await expect(page.getByText('测试成功', { exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '消息', exact: true })).toBeEnabled();
+  await screenshot(page, info, 'history-completion-recovered');
+});
 
 test('shows conversation references during send, after reload and without message text', async ({ page }, info) => {
   const name = '代理日志排查与历史记录恢复'.repeat(8);

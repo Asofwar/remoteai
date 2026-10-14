@@ -1,3 +1,4 @@
+use super::home_migration_provider::MigrationDestination;
 use super::*;
 
 struct PreparedSession {
@@ -14,13 +15,13 @@ struct PreparedSession {
 /// Original manifests remain durable until every related thread has committed.
 pub(super) fn migrate_home_batch(
     source: &Path,
-    target: &Path,
+    target: MigrationDestination<'_>,
     batch: &Path,
     snapshots: Vec<RolloutSnapshot>,
 ) -> Result<(), String> {
     let mut prepared = Vec::new();
     for snapshot in snapshots {
-        match prepare_session(source, target, batch, snapshot) {
+        match prepare_session(source, target.path, batch, snapshot) {
             Ok(item) => prepared.push(item),
             Err(error) => return Err(cleanup_batch_error(batch, error)),
         }
@@ -28,7 +29,7 @@ pub(super) fn migrate_home_batch(
     let result = restore_batch_target(target, &mut prepared)
         .and_then(|()| remove_batch_source(source, &mut prepared));
     if let Err(error) = result {
-        let rollback = rollback_batch(source, target, &prepared);
+        let rollback = rollback_batch(source, target.path, &prepared);
         return Err(match rollback {
             Ok(()) => cleanup_batch_error(batch, error),
             Err(rollback) => format!("{error}；还原未完成，迁移备份已保留：{rollback}"),
@@ -112,7 +113,11 @@ fn copy_verified_file(source: &Path, target: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn restore_batch_target(target: &Path, prepared: &mut [PreparedSession]) -> Result<(), String> {
+fn restore_batch_target(
+    destination: MigrationDestination<'_>,
+    prepared: &mut [PreparedSession],
+) -> Result<(), String> {
+    let target = destination.path;
     let mut available = super::home_migration_plan::target_session_ids(target)?;
     available.extend(
         prepared
@@ -120,15 +125,22 @@ fn restore_batch_target(target: &Path, prepared: &mut [PreparedSession]) -> Resu
             .map(|item| item.backup.manifest.session_id.clone()),
     );
     for item in prepared.iter_mut() {
-        for (source, destination) in bin_restore_targets(target, &item.backup)? {
-            copy_verified_file(&source, &destination)?;
-            item.created_files.push(destination);
+        for (source, path) in bin_restore_targets(target, &item.backup)? {
+            copy_verified_file(&source, &path)?;
+            // Register the copy before rewriting so a failed rewrite is rolled back too.
+            item.created_files.push(path.clone());
+            if let Some(provider) = destination.model_provider {
+                rewrite_rollout_provider(&path, provider.as_str())?;
+            }
         }
     }
     // Every history file must exist before a thread becomes visible in the
     // destination database, including bases stored in another rollout.
     for item in prepared {
         let mut manifest = relocated_bin_manifest(target, &item.backup.manifest)?;
+        if let Some(provider) = destination.model_provider {
+            provider.apply_to_manifest(&mut manifest);
+        }
         if snapshot_thread_row(latest_state_db(target).as_deref(), &manifest.session_id)?.is_some()
         {
             return Err("目标会话列表发生变化，请刷新后重试".to_string());

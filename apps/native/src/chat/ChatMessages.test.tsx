@@ -84,6 +84,21 @@ it('passes the initial positioning event frequency through to the native list', 
   expect(element<ListProps>(tree, 'FlatList').props.scrollEventThrottle).toBe(16);
 });
 
+it('removes obsolete running activities when completed PC history replaces a waiting turn', () => {
+  const live = { id: 'thread', cwd: '', preview: '', updatedAt: 1, turns: [
+    { id: 'waiting', status: 'inProgress', items: [command('stale', 'inProgress')] },
+  ] };
+  const snapshot = { ...live, status: { type: 'notLoaded' }, turns: [
+    { id: 'continued', status: 'completed', items: [
+      { id: 'reply', type: 'agentMessage', phase: 'final_answer' as const, text: '测试成功' },
+    ] },
+  ] };
+  const tree = ChatMessages({ thread: mergeHistory(snapshot, live, live) });
+  const entries = element<ListProps>(tree, 'FlatList').props.data;
+  expect(entries.some(entry => entry.turn.status === 'inProgress')).toBe(false);
+  expect(entries.flatMap(entry => entry.kind === 'message' ? [entry.item.text] : [])).toEqual(['测试成功']);
+});
+
 it('renders an interrupted answer before the supplement and newer progress after a history refresh', () => {
   const turn: Turn = { id: 'turn', status: 'inProgress', items: [
     { id: 'user', type: 'userMessage', text: 'Check downloads' },

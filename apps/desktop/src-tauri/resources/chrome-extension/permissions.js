@@ -46,7 +46,7 @@ export function setSiteAccessMode(allowAll) {
   });
 }
 
-export async function authorize(value, clientId, signal) {
+export async function authorize(value, clientId, signal, { prompt = true } = {}) {
   assertRunning(signal);
   const origin = website(value).origin;
   await assertWebsitePermission(origin);
@@ -55,6 +55,7 @@ export async function authorize(value, clientId, signal) {
   const { siteGrants = [] } = await chrome.storage.local.get('siteGrants');
   const { sessionGrants = [] } = await chrome.storage.session.get('sessionGrants');
   if (![...siteGrants, ...sessionGrants].some((grant) => grant.clientId === clientId && grant.origin === origin)) {
+    if (!prompt) throw new Error('未获得网站访问许可。');
     await requestAccess({ origin, clientId, signal });
   }
   assertRunning(signal);

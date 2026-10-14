@@ -1,10 +1,10 @@
 import { useComposerSuggestion } from '../../../../shared/chat/useComposerSuggestion';
 import { ComposerSuggestion } from './ComposerSuggestion';
 import type { PromptSuggestionSource } from '../../../../shared/chat/nextPromptSuggestion';
-import { useThemeColor } from '../theme/store';
+import { ComposerInput } from './ComposerInput';
 import { t, useLanguage } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, ScrollView, Text, View } from 'react-native';
 import { ChatSettings } from './ChatSettings';
 import type { ChatConnectionProps } from './ChatProfileMenu';
 import { ComposerGoal } from './ComposerGoal';
@@ -27,6 +27,7 @@ import { ComposerQuotes } from './ComposerQuotes';
 import { useChatQuotes } from './ChatQuotes';
 import { replyWithQuotes } from './replyQuotes';
 import { ComposerProjectFiles } from './ComposerProjectFiles';
+import { ComposerFileMenu } from './ComposerFileMenu';
 import { useComposerAttachments } from './useComposerAttachments';
 import type { RemoteComposerCatalog } from '../../../../shared/remote-chat/composerCatalog';
 import type { ProjectFilesRequest, ProjectFilesResponse } from '../../../../shared/remote-chat/projectFiles';
@@ -87,7 +88,6 @@ export function ChatComposer({ suggestions, models, selection, settingsBusy, set
   threadId, active, ready, sending, running, upload, reconnecting = false, interrupted = false, send, interrupt,
   catalog, cwd, compactReason, compacting, compact, loadCatalog, loadFiles, loadConversations }: Props) {
   const styles = useStyles();
-  const color = useThemeColor();
   useLanguage();
   const [settings, setSettings] = useState(false);
   const goalMode = useGoalMode(threadId, sending);
@@ -177,6 +177,9 @@ export function ChatComposer({ suggestions, models, selection, settingsBusy, set
   };
   const menuContent = () => {
     if (adding) return <ComposerAddMenu busy={attachmentBusy} choose={chooseAdd} />;
+    if (menu.files) return <ComposerFileMenu key={`${threadId}:${cwd}`} query={menu.query}
+      threadId={threadId} cwd={cwd} ready={ready && !attachmentBusy} load={loadFiles} close={menu.close}
+      choose={reference => { if (attachments.add(reference)) menu.consumeTrigger(); }} />;
     if (menu.conversations) return <ComposerConversationMenu key={threadId} query={menu.query}
       threadId={threadId} ready={ready && !attachmentBusy} load={loadConversations} close={menu.close}
       choose={reference => { if (attachments.add(reference)) menu.consumeTrigger(); }} />;
@@ -210,16 +213,15 @@ export function ChatComposer({ suggestions, models, selection, settingsBusy, set
         upload={sending ? upload : undefined} reconnecting={reconnecting} />
       <ComposerQuotes disabled={sending} active={active} />
       <ComposerSuggestion text={suggestion.text} accept={suggestion.accept} />
-      <TextInput ref={menu.input} accessibilityLabel={t("聊天消息")}
-        style={[styles.input, compactField && styles.inputCompact]}
+      <ComposerInput ref={menu.input} accessibilityLabel={t("聊天消息")} compact={compactField}
         multiline value={draft.text} maxLength={100_000} selection={menu.selection} editable={!queueEditor.loading}
-        placeholderTextColor={color("#999999", 'muted')} underlineColorAndroid="transparent"
         onSelectionChange={(event) => menu.setSelection(event.nativeEvent.selection)}
         onChangeText={text => {
           if (text) suggestion.dismiss(); else suggestion.restore();
           draft.setText(text);
         }}
-        placeholder={ready ? (goalMode.enabled ? t("描述想完成的目标…") : t("发消息，@ 引用对话…")) : t("连接后发消息")} />
+        placeholder={ready ? (goalMode.enabled ? t("描述想完成的目标…")
+          : t("% 引用文件，@ 引用对话…")) : t("连接后发消息")} />
       </ScrollView>
       <View pointerEvents="box-none" style={[styles.composerActions, compactField && styles.composerActionsCompact]}>
         <Pressable accessibilityRole="button" accessibilityLabel={t("添加内容")} style={styles.composerAdd}

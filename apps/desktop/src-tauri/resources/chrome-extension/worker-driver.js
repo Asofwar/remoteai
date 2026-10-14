@@ -1,8 +1,8 @@
 import { authorize, assertRunning } from './permissions.js';
 import { website } from './validation.js';
 import { acquireConnection, assertConnected, closeConnection, releaseConnection } from './debugger-connections.js';
+import { queueTarget } from './target-queue.js';
 
-const queues = new Map();
 const MAX_LIST_WORKERS = 100;
 const MAX_WORKER_URL = 2000;
 const MAX_WORKER_TITLE = 200;
@@ -31,12 +31,8 @@ export async function listWorkers() {
     truncated: targets.length > MAX_LIST_WORKERS || workers.some(item => item.truncated) };
 }
 
-export async function withWorker(context, args, operation) {
-  const previous = queues.get(args.workerId) ?? Promise.resolve();
-  const current = previous.catch(() => {}).then(() => run(context, args.workerId, operation));
-  queues.set(args.workerId, current);
-  try { return await current; }
-  finally { if (queues.get(args.workerId) === current) queues.delete(args.workerId); }
+export function withWorker(context, args, operation) {
+  return queueTarget({ targetId: args.workerId }, () => run(context, args.workerId, operation));
 }
 
 async function findWorker(context, workerId) {
@@ -51,7 +47,7 @@ async function run(context, workerId, operation) {
   const worker = await findWorker(context, workerId);
   const workerUrl = worker.url;
   const target = { targetId: workerId };
-  const connection = await acquireConnection(target, context.signal).catch(() => {
+  const connection = await acquireConnection(target, context.signal, context.clientId).catch(() => {
     assertRunning(context.signal);
     throw new Error('无法连接这个 Worker，请关闭其开发者工具后重试。');
   });

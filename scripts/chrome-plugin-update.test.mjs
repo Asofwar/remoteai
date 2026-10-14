@@ -20,7 +20,7 @@ beforeEach(() => {
   marker = { revision: 'a'.repeat(64) };
   globalThis.chrome = {
     runtime: { id: 'hgdkdomojacbaehnmlahndjmhglbjjim', getURL: name => `chrome-extension://test/${name}`,
-      reload: () => { assert.equal(cleaned, 1); reloaded++; } },
+      getContexts: async () => [], reload: () => { assert.equal(cleaned, 1); reloaded++; } },
     alarms: { create: (...args) => alarms.push(args) },
   };
   globalThis.fetch = async (_url, options) => {
@@ -38,6 +38,18 @@ test('a changed completed bundle reloads once after cleanup', async () => {
   assert.equal(requests, 1);
   assert.equal(reloaded, 1);
   assert.equal(updater.isReloading(), true);
+});
+
+test('an open side panel preserves chat drafts until the panel is closed', async () => {
+  chrome.runtime.getContexts = async filter => {
+    assert.deepEqual(filter, { contextTypes: ['SIDE_PANEL'] });
+    return [{ contextType: 'SIDE_PANEL' }];
+  };
+  await updater.check();
+  assert.equal(reloaded, 0);
+  chrome.runtime.getContexts = async () => [];
+  await updater.check();
+  assert.equal(reloaded, 1);
 });
 
 test('busy browser operations postpone reload, including operations begun during the check', async () => {

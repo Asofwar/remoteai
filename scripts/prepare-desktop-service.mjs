@@ -31,7 +31,8 @@ export async function prepareDesktopService() {
   verify(await readFile(archive));
   const source = resolve(extracted, `node-${version}-win-x64`);
   if (!existsSync(resolve(source, 'node.exe'))) {
-    const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    const powershell = resolve(process.env.SystemRoot || 'C:\\Windows', 'System32/WindowsPowerShell/v1.0/powershell.exe');
+    const result = spawnSync(powershell, ['-NoProfile', '-NonInteractive', '-Command',
       'Expand-Archive -LiteralPath $env:CSW_SERVICE_ARCHIVE -DestinationPath $env:CSW_SERVICE_EXTRACT -Force'],
     { windowsHide: true, stdio: 'inherit', env: { ...process.env,
       CSW_SERVICE_ARCHIVE: archive, CSW_SERVICE_EXTRACT: extracted } });

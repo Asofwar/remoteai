@@ -8,6 +8,9 @@ export const threadCopy = {
     moveToHome: "Перенести чаты", homeMigrationTarget: "Выберите папку назначения Codex Home",
     confirmHomeMigration: "Перенести чаты?", homeMigrationSource: "Откуда", homeMigrationDestination: "Куда",
     homeMigrationSelection: "Выбранные чаты", homeMigrationCount: "{count}",
+    homeMigrationModelProvider: "Провайдер модели",
+    homeMigrationModelProviderHint: "Перенесённые чаты будут использовать выбранного провайдера. "
+      + "Он должен быть настроен в папке назначения.",
     homeMigrationConfirmHint: "История чатов и пути проектов сохранятся. Связанные чаты переносятся вместе, уже существующие пропускаются. Перенесённые чаты удаляются из исходной папки, но история, нужная другим чатам, сохраняется. Сначала завершите связанные задачи.",
     migrationHomeUnavailable: "Папка назначения недоступна. Повторите попытку позже.",
     homeMigrationHint: "Перенести выбранные чаты ({count}) в другую папку Codex Home с сохранением истории и путей проектов. Связанные чаты переносятся вместе, существующие пропускаются. История, нужная исходной папке, сохраняется. Сначала завершите связанные задачи.",
@@ -67,6 +70,8 @@ export const threadCopy = {
     homeMigrationDestination: "目标",
     homeMigrationSelection: "所选对话",
     homeMigrationCount: "{count} 条",
+    homeMigrationModelProvider: "模型提供方（model provider）",
+    homeMigrationModelProviderHint: "迁移后的对话将使用所选提供方，请选择目标中已配置的提供方。",
     homeMigrationConfirmHint: "迁移后可在 Codex GUI 中继续对话，对话记录和项目路径会保留。"
       + "关联对话会一并迁移，已有对话会跳过。迁移成功的对话会从来源移除，"
       + "仍被其他对话使用的历史记录会保留。请先结束相关任务。",
@@ -162,6 +167,9 @@ export const threadCopy = {
     homeMigrationDestination: "Destination",
     homeMigrationSelection: "Selected conversations",
     homeMigrationCount: "{count}",
+    homeMigrationModelProvider: "Model provider",
+    homeMigrationModelProviderHint: "Migrated conversations will use this provider. "
+      + "Choose one configured in the destination.",
     homeMigrationConfirmHint: "Continue these conversations in Codex GUI with their history and project paths preserved. "
       + "Related conversations are included; existing ones are skipped. Migrated conversations are removed from "
       + "the source, but history still needed by other conversations is kept. Finish related tasks first.",

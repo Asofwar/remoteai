@@ -1,7 +1,7 @@
 import { guiText } from "../../i18n/guiText";
 import type { ReactNode } from "react";
 import { Dropdown, type MenuProps } from "antd";
-import { ChevronRight, Copy, File, FileDiff, FolderOpen, Save } from "lucide-react";
+import { ChevronRight, Copy, File, FileDiff, FileSearch, FolderOpen, Save } from "lucide-react";
 import type { FileReference } from "./fileReference";
 import { useFileMenu } from "./useFileMenu";
 import { FileApplicationIcon } from "./FileApplicationIcon";
@@ -27,6 +27,8 @@ export function FileMenu({ path, line, column, children, className, onReview, pr
     onClick: () => openApplication(app.id),
   }));
   const items: MenuProps["items"] = [
+    ...(previewsFile ? [{ key: "preview", label: guiText("预览文件"), icon: <FileSearch size={16} />,
+      onClick: () => { void menu.preview(); } }] : []),
     { key: "open", label: guiText(menu.remote ? "在远程电脑上打开" : "打开文件"), icon: <File size={16} />,
       disabled: !menu.desktop,
       onClick: () => openApplication("default") },

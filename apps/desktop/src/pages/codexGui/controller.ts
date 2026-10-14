@@ -40,9 +40,14 @@ export class GuiController {
   private unlisten?: () => void;
   private disposed = false;
   private connecting?: Promise<void>;
+  private reportedModelError?: string;
   readonly modelCatalog = new GuiModelCatalog({ ready: () => this.state.connection === "ready",
     accept: (models) => this.setModels(models),
     failed: (modelCatalogError) => this.patch({ modelCatalogError }),
+    recovered: () => {
+      if (this.state.error === this.reportedModelError) this.clearError();
+      this.reportedModelError = undefined;
+    },
     syncing: (modelCatalogLoading) => {
       this.patch({ modelCatalogLoading });
       if (!modelCatalogLoading) Object.keys(this.state.queued).forEach(id => void this.queue.flush(id));
@@ -161,7 +166,12 @@ export class GuiController {
 
   refreshModels = () => {
     if (this.state.modelCatalogError) this.clearError();
-    return this.state.connection === "ready" ? this.modelCatalog.refresh() : this.connect();
+    if (this.state.connection !== "ready") return this.connect();
+    return this.modelCatalog.refresh().catch(error => {
+      const message: unknown = error instanceof Error ? error.message : error;
+      this.reportedModelError = typeof message === "string" ? message : "操作未完成，请重试。";
+      throw error;
+    });
   };
 
   private async initialize(options?: { reuseExisting: boolean }) {
@@ -178,7 +188,9 @@ export class GuiController {
       this.patch({ connection: "ready", approvals, error: "" });
       this.modelCatalog.activate();
       const results = await Promise.allSettled([
-        this.refresh(), this.modelCatalog.invalidate(), this.modelSettings.refresh(),
+        this.refresh(), this.modelCatalog.invalidate().catch(() => {
+          // The picker owns this error and clears it when automatic recovery succeeds.
+        }), this.modelSettings.refresh(),
       ]);
       results.forEach((result) => { if (result.status === "rejected") this.report(result.reason); });
       if (this.state.selected) await this.select(this.state.selected);

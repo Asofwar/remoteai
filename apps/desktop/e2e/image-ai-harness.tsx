@@ -20,6 +20,7 @@ function Harness() {
       setResult(JSON.stringify({ text, original: image === source })); return true;
     } }}>
       {open && <ImageViewer thumbnail={source} description="测试图片" load={async () => source}
+        download={async url => { setResult(JSON.stringify({ downloaded: url === source })); }}
         close={() => setOpen(false)} />}
     </ImageAiContext.Provider>
   </main>;

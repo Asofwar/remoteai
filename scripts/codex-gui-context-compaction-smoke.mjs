@@ -1,4 +1,4 @@
-// Invoked by the Rust smoke test with overrides produced by the real GUI capacity code.
+// Receives overrides produced by the real GUI Rust code or native window adapter.
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { once } from "node:events";
@@ -9,7 +9,7 @@ import { connectAppServer } from "./fixtures/codex-app-server-client.mjs";
 import { guiContextCatalog } from "./fixtures/gui-context-catalog.mjs";
 import { contextUsage } from "../shared/context-usage/values.js";
 
-assert.ok(process.argv[2] && process.argv[3], "Run the real_cli_context_compaction_follows_gui_capacity Rust test");
+assert.ok(process.argv[2] && process.argv[3], "Pass the Codex binary and generated context configurations");
 const executable = resolve(process.argv[2]);
 const configurations = JSON.parse(process.argv[3]);
 const REPORTED_USAGE = 285_000;

@@ -1,9 +1,12 @@
 import { guiText } from "../../i18n/guiText";
 
-export const MODEL_CATALOG_TIMEOUT_MS = 20_000;
+// Outlast the 130-second model/list RPC, including official and Admin discovery.
+export const MODEL_CATALOG_TIMEOUT_MS = 140_000;
 
 /** Bound waits before the backend timeout starts; callers must still ignore late IPC replies. */
-export async function withModelCatalogTimeout<T>(pending: Promise<T>, signal: AbortSignal): Promise<T> {
+export async function withModelCatalogTimeout<T>(
+  pending: Promise<T>, signal: AbortSignal, timeoutMs = MODEL_CATALOG_TIMEOUT_MS,
+): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let abort: (() => void) | undefined;
   try {
@@ -11,7 +14,7 @@ export async function withModelCatalogTimeout<T>(pending: Promise<T>, signal: Ab
       abort = () => reject(new Error(guiText("模型正在同步，请稍后重试。")));
       if (signal.aborted) { abort(); return; }
       signal.addEventListener("abort", abort, { once: true });
-      timer = setTimeout(() => reject(new Error(guiText("模型加载超时，请重试。"))), MODEL_CATALOG_TIMEOUT_MS);
+      timer = setTimeout(() => reject(new Error(guiText("模型加载超时，请重试。"))), timeoutMs);
     })]);
   } finally {
     clearTimeout(timer);

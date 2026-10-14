@@ -8,6 +8,7 @@ import { ChatReconnectButton } from './ChatReconnectButton';
 import { HOST_IDENTITY_CHANGED } from '../../../../shared/remote-chat/trustedHost';
 import { HostIdentityVerification } from './HostIdentityVerification';
 import { ChatConnectionHealth } from './ChatConnectionHealth';
+import { ChatConnectionAction } from './ChatConnectionAction';
 
 const modeLabels = { get connecting() { return t("正在连接…"); }, direct: 'P2P', relay: 'Relay', get offline() { return t("等待重新连接"); } };
 
@@ -25,30 +26,32 @@ export function ChatConnectionInfo({ state, controller, device, active, chooseDe
   if (!state.ready && state.error) status = t("连接未完成");
   useEffect(() => { if (!canChoose) setPicking(false); }, [canChoose]);
   return <>
-    <div className={`chat-connection-info${canReconnect ? ' is-reconnecting' : ''}`}>
-      <button className="chat-connection chat-muted chat-ellipsis" type="button" aria-label={t("选择电脑")}
-        onClick={chooseDevice}>
+    <div className="chat-connection-info chat-muted">
+      <ChatConnectionAction label={t("选择电脑")} onClick={chooseDevice}>
         {device ? device.name : t("选择电脑，开始聊天")}
-      </button>
+      </ChatConnectionAction>
       {device && <>
-        <span className="chat-muted"> · </span>
-        <button type="button" className="chat-connection chat-connection-status chat-muted"
-          aria-label={`${status} · ${t('连接体检')}`} aria-expanded={healthOpen}
+        {' · '}
+        <ChatConnectionAction className="chat-connection-status"
+          label={`${status} · ${t('连接体检')}`} expanded={healthOpen}
           onClick={() => setHealthOpen(true)}>
           <span role="status">{status}</span>
-        </button>
+        </ChatConnectionAction>
       </>}
       {canReconnect && <>
-        <span className="chat-muted"> · </span>
+        {' · '}
         <ChatReconnectButton retryAt={state.retryAt} onClick={controller.connectNow} />
       </>}
-      {state.error === HOST_IDENTITY_CHANGED && <button className="chat-button" onClick={() => setVerifying(true)}>
-        {t('核对电脑身份')}</button>}
+      {state.error === HOST_IDENTITY_CHANGED && <>
+        {' · '}
+        <ChatConnectionAction label={t('核对电脑身份')} onClick={() => setVerifying(true)}>
+          {t('核对电脑身份')}</ChatConnectionAction>
+      </>}
       {!state.selected && !canReconnect && <>
-        <span className="chat-muted"> · </span>
-        <button type="button" className="chat-connection chat-project-name chat-muted chat-ellipsis"
-          aria-label={t("选择项目")} disabled={!canChoose} onClick={() => setPicking(true)}>
-          {state.draftProject?.label || t("未选择项目")}</button>
+        {' · '}
+        <ChatConnectionAction className="chat-project-name" label={t("选择项目")}
+          disabled={!canChoose} onClick={() => setPicking(true)}>
+          {state.draftProject?.label || t("未选择项目")}</ChatConnectionAction>
       </>}
     </div>
     {healthOpen && <ChatConnectionHealth state={state} device={device}

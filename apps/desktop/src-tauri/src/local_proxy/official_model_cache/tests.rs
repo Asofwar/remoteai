@@ -1,6 +1,9 @@
 use super::*;
 use std::{cell::Cell, io::Cursor, thread};
 
+#[path = "deadline_tests.rs"]
+mod deadline_tests;
+
 const CATALOG: &[u8] = br#"{"models":[{"slug":"gpt-test","context_window":123456,
     "input_modalities":["text","image"],"supported_reasoning_levels":[{"effort":"high"}]}],"extra":true}"#;
 
@@ -26,6 +29,14 @@ fn assert_catalog(payload: UpstreamPayload, etag: &str) {
 }
 
 fn server(status: u16, body: Vec<u8>) -> (Url, thread::JoinHandle<()>) {
+    server_after_delay(status, body, Duration::ZERO)
+}
+
+fn server_after_delay(
+    status: u16,
+    body: Vec<u8>,
+    delay: Duration,
+) -> (Url, thread::JoinHandle<()>) {
     let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
     let url = catalog_url(&format!("http://{}", server.server_addr())).unwrap();
     let task = thread::spawn(move || {
@@ -41,6 +52,7 @@ fn server(status: u16, body: Vec<u8>) -> (Url, thread::JoinHandle<()>) {
         let response = tiny_http::Response::from_data(body)
             .with_status_code(status)
             .with_header(tiny_http::Header::from_bytes("ETag", "catalog-v3").unwrap());
+        thread::sleep(delay);
         request.respond(response).unwrap();
     });
     (url, task)
@@ -52,9 +64,10 @@ fn official_success_preserves_catalog_and_never_calls_admin() {
         UpstreamBody::Buffered(CATALOG.to_vec()),
         UpstreamBody::Streaming(Box::new(Cursor::new(CATALOG))),
     ] {
-        let payload = prefer_official(Ok(official_payload(200, body)), || {
-            panic!("Admin must not be called after official success")
-        })
+        let payload = prefer_official(
+            || Ok(official_payload(200, body)),
+            || panic!("Admin must not be called after official success"),
+        )
         .unwrap();
         assert_catalog(payload, "official-v1");
     }
@@ -64,9 +77,23 @@ fn official_success_preserves_catalog_and_never_calls_admin() {
 fn official_transport_failure_falls_back_to_admin_and_preserves_capabilities() {
     let (url, task) = server(200, CATALOG.to_vec());
     let client = Client::builder().no_proxy().build().unwrap();
-    let payload = prefer_official(Err("official request timed out".into()), || {
-        request_catalog(&client, url)
-    })
+    let payload = prefer_official(
+        || Err("official request timed out".into()),
+        || request_catalog(&client, url),
+    )
+    .unwrap();
+    assert_catalog(payload, "catalog-v3");
+    task.join().unwrap();
+}
+
+#[test]
+fn admin_fallback_can_exceed_its_previous_three_second_timeout() {
+    let (url, task) = server_after_delay(200, CATALOG.to_vec(), Duration::from_millis(3100));
+    let client = Client::builder().no_proxy().build().unwrap();
+    let payload = prefer_official(
+        || Err("official request timed out".into()),
+        || request_catalog(&client, url),
+    )
     .unwrap();
     assert_catalog(payload, "catalog-v3");
     task.join().unwrap();
@@ -89,13 +116,16 @@ fn unsuccessful_empty_and_invalid_official_catalogs_fall_back_to_admin_once() {
     ] {
         let calls = Cell::new(0);
         let payload = official_payload(status, UpstreamBody::Buffered(body.as_bytes().to_vec()));
-        let result = prefer_official(Ok(payload), || {
-            calls.set(calls.get() + 1);
-            Ok(official_payload(
-                200,
-                UpstreamBody::Buffered(CATALOG.to_vec()),
-            ))
-        });
+        let result = prefer_official(
+            || Ok(payload),
+            || {
+                calls.set(calls.get() + 1);
+                Ok(official_payload(
+                    200,
+                    UpstreamBody::Buffered(CATALOG.to_vec()),
+                ))
+            },
+        );
         assert_eq!(calls.get(), 1);
         assert_catalog(result.unwrap(), "official-v1");
     }
@@ -120,12 +150,15 @@ fn unreadable_and_oversized_official_bodies_fall_back_to_admin() {
         UpstreamBody::Streaming(Box::new(std::io::repeat(b' '))),
         UpstreamBody::Buffered(vec![b' '; MAX_CATALOG_BYTES as usize + 1]),
     ] {
-        let result = prefer_official(Ok(official_payload(200, body)), || {
-            Ok(official_payload(
-                200,
-                UpstreamBody::Buffered(CATALOG.to_vec()),
-            ))
-        });
+        let result = prefer_official(
+            || Ok(official_payload(200, body)),
+            || {
+                Ok(official_payload(
+                    200,
+                    UpstreamBody::Buffered(CATALOG.to_vec()),
+                ))
+            },
+        );
         assert_catalog(result.unwrap(), "official-v1");
     }
 }
@@ -142,9 +175,10 @@ fn failed_or_invalid_admin_fallback_preserves_official_failure() {
     ] {
         let (url, task) = server(status, body.as_bytes().to_vec());
         let client = Client::builder().no_proxy().build().unwrap();
-        let result = prefer_official(Err("official unavailable".into()), || {
-            request_catalog(&client, url)
-        });
+        let result = prefer_official(
+            || Err("official unavailable".into()),
+            || request_catalog(&client, url),
+        );
         assert_eq!(result.err().as_deref(), Some("official unavailable"));
         task.join().unwrap();
     }
@@ -173,8 +207,9 @@ fn admin_transport_failure_preserves_official_failure() {
     let url = catalog_url(&format!("http://{}", listener.local_addr().unwrap())).unwrap();
     drop(listener);
     let client = Client::builder().no_proxy().build().unwrap();
-    let result = prefer_official(Err("official unavailable".into()), || {
-        request_catalog(&client, url)
-    });
+    let result = prefer_official(
+        || Err("official unavailable".into()),
+        || request_catalog(&client, url),
+    );
     assert_eq!(result.err().as_deref(), Some("official unavailable"));
 }

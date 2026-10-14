@@ -62,7 +62,8 @@ fn forward_official_upstream<R: Runtime>(
     if invalid_agent_identity_task_response(&credentials.authentication, &payload) {
         diagnostic_retry("agent_identity_task_refresh", Duration::ZERO);
         record_retried_proxy_response(&payload);
-        refresh_agent_identity_task(&mut credentials.authentication, app, &client)?;
+        // Recalculate discovery's remaining credential budget before another network operation.
+        refresh_agent_identity_task(&mut credentials.authentication, app, &http_client()?)?;
         payload = send_official_request(
             &client,
             method,

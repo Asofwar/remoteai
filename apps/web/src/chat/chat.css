@@ -82,11 +82,11 @@ html:has(.app-shell.chat-active), body:has(.app-shell.chat-active) { overscroll-
 .chat-device-switch, .chat-connection { border: 0; background: transparent; text-align: left; cursor: pointer; }
 .chat-device-switch { padding: 18px; border-top: 1px solid var(--chat-border); }
 .chat-connection { max-width: 100%; padding: 0; font: inherit; font-size: 12px; }
-.chat-connection-info { display: flex; align-items: center; min-width: 0; }
-.chat-connection-info > span { white-space: pre; flex-shrink: 0; }
-.chat-connection-info .chat-connection { min-width: 0; }
-.chat-connection-status { flex-shrink: 0; white-space: nowrap; }
-.chat-project-name { max-width: 60%; }
+.chat-connection-info { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-connection-info .chat-connection { display: inline; max-width: none; font: inherit; color: inherit; }
+.chat-connection-info .chat-connection:focus-visible { outline: 1px solid currentColor; outline-offset: -1px; }
+.chat-connection-info .chat-connection[aria-disabled="true"] { cursor: default; }
+.chat-connection-info .chat-reconnect { color: var(--app-accent, #238578); }
 .chat-project-picker { max-width: 400px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
 .chat-project-path { overflow-wrap: anywhere; }
 .chat-project-folders { max-height: 340px; }

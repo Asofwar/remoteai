@@ -41,6 +41,7 @@ it("moves captured selection from the current home to the chosen destination", a
   await act(async () => migration.commit());
   expect(migrateCodexThreadsToHome).toHaveBeenCalledWith({
     homeId: "source", targetHomeId: "third", sessionIds: ["one", "two"],
+    modelProvider: "openai",
   });
   expect(clearSelection).toHaveBeenCalledOnce();
   expect(refresh).toHaveBeenCalledOnce();
@@ -87,6 +88,7 @@ it("uses the fixed GUI destination regardless of home order or destination selec
   await act(async () => migration.commit());
   expect(migrateCodexThreadsToHome).toHaveBeenCalledExactlyOnceWith({
     homeId: "source", targetHomeId: "codex-gui", sessionIds: ["one", "two"],
+    modelProvider: "codex-switch-gui",
   });
   expect(onMigrated).toHaveBeenCalledExactlyOnceWith("codex-gui");
 });
@@ -98,4 +100,27 @@ it.each(["unavailable", "source"])("does not substitute another home for invalid
   expect(migrateCodexThreadsToHome).not.toHaveBeenCalled();
   expect(migration.targetHome).toBeUndefined();
   expect(migration.open).toBe(true);
+});
+
+it.each(["openai", "codex-switch-local", "codex-switch-gui"] as const)(
+  "migrates using the explicitly selected provider %s", async (modelProvider) => {
+    await act(async () => root.render(<Harness fixedTargetHomeId="codex-gui" />));
+    await act(async () => migration.show());
+    await act(async () => migration.setModelProvider(modelProvider));
+    await act(async () => migration.commit());
+    expect(migrateCodexThreadsToHome).toHaveBeenCalledExactlyOnceWith({
+      homeId: "source", targetHomeId: "codex-gui", sessionIds: ["one", "two"], modelProvider,
+    });
+  },
+);
+
+it("resets the provider for a new destination and when reopening the dialog", async () => {
+  await act(async () => migration.show());
+  await act(async () => migration.setTargetHomeId("codex-gui"));
+  expect(migration.modelProvider).toBe("codex-switch-gui");
+  await act(async () => migration.setTargetHomeId("third"));
+  expect(migration.modelProvider).toBe("openai");
+  await act(async () => migration.setModelProvider("codex-switch-local"));
+  await act(async () => migration.show());
+  expect(migration.modelProvider).toBe("openai");
 });

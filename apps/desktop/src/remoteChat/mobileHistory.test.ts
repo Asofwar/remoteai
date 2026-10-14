@@ -80,6 +80,49 @@ async function connected(remote: Thread) {
   return { controller, stream, emit: (event: GuiEvent) => stream.receive(operations.prepareEvent(event)) };
 }
 
+it('clears stale waiting on both host and client after an interrupted turn is replaced', async () => {
+  const remote = conversation(2);
+  const { controller, stream, emit } = await connected(remote);
+  try {
+    await controller.select({ ...remote, turns: [] });
+    emit({ method: 'turn/started', params: { threadId: remote.id,
+      turn: { id: 'old', status: 'inProgress', items: [] } } });
+    emit({ method: 'item/started', params: { threadId: remote.id, turnId: 'old',
+      item: { id: 'wait', type: 'sleep', status: 'inProgress', durationMs: 20_000 } } });
+    expect(controller.snapshot().processing?.phase).toBe('wait');
+    remote.status = { type: 'notLoaded' };
+    remote.turns!.push({ id: 'continued', status: 'completed', items: [
+      { id: 'answer', type: 'agentMessage', text: '测试成功' },
+    ] });
+    for (let refresh = 0; refresh < 2; refresh++) {
+      await controller.refreshSelected();
+      expect(controller.snapshot().selected?.turns?.some(turn => turn.status === 'inProgress')).toBe(false);
+      expect(controller.snapshot().processing).toBeUndefined();
+      expect(controller.snapshot().selected?.turns?.at(-1)?.items[0].text).toBe('测试成功');
+    }
+  } finally { controller.stop(); stream.close(); }
+});
+
+it('keeps a new live turn when it starts during an idle PC history read', async () => {
+  const remote = { ...conversation(2), status: { type: 'idle' } };
+  const { controller, stream, emit } = await connected(remote);
+  try {
+    await controller.select({ ...remote, turns: [] });
+    let finish!: (value: { thread: Thread }) => void;
+    vi.mocked(guiApi.request).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const refresh = controller.refreshSelected();
+    emit({ method: 'turn/started', params: { threadId: remote.id,
+      turn: { id: 'new', status: 'inProgress', items: [] } } });
+    emit({ method: 'item/completed', params: { threadId: remote.id, turnId: 'new',
+      item: { id: 'answer', type: 'agentMessage', text: 'Still working' } } });
+    finish({ thread: remote });
+    await refresh;
+    expect(controller.snapshot().selected?.turns?.at(-1)).toMatchObject({ id: 'new', status: 'inProgress',
+      items: [{ text: 'Still working' }] });
+    expect(controller.snapshot().processing?.turnId).toBe('new');
+  } finally { controller.stop(); stream.close(); }
+});
+
 it('streams before completion even when disk history stays stale, without replaying text on refresh', async () => {
   const remote = conversation(2);
   const { controller, stream, emit } = await connected(remote);

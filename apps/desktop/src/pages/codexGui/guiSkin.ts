@@ -10,7 +10,7 @@ export type GuiSkin = {
   imageRevision: number;
 };
 const DEFAULT_GUI_SKIN: GuiSkin = {
-  mode: "inherit", themeId: null, overlayOpacity: DEFAULT_GUI_SKIN_OPACITY, imageRevision: 0,
+  mode: "custom", themeId: null, overlayOpacity: DEFAULT_GUI_SKIN_OPACITY, imageRevision: 0,
 };
 
 function readSnapshot(): string | null {
@@ -24,7 +24,7 @@ function parseSkin(saved: string | null): GuiSkin {
     if (!value || typeof value !== "object") return DEFAULT_GUI_SKIN;
     const { mode, themeId, overlayOpacity, imageRevision } = value as Record<string, unknown>;
     return {
-      mode: mode === "custom" || mode === "none" ? mode : "inherit",
+      mode: mode === "inherit" || mode === "none" ? mode : "custom",
       themeId: typeof themeId === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,119}$/.test(themeId) ? themeId : null,
       overlayOpacity: typeof overlayOpacity === "number" && Number.isFinite(overlayOpacity)
         ? Math.min(1, Math.max(0, overlayOpacity)) : DEFAULT_GUI_SKIN_OPACITY,

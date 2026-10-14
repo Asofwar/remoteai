@@ -11,6 +11,7 @@ pub(in crate::local_proxy) struct Response {
     pending: Bytes,
     idle_timeout: Option<Duration>,
     finished: bool,
+    deadline: Option<tokio::time::Instant>,
 }
 
 impl Response {
@@ -20,7 +21,13 @@ impl Response {
             pending: Bytes::new(),
             idle_timeout,
             finished: false,
+            deadline: None,
         }
+    }
+
+    pub(super) fn with_deadline(mut self, deadline: Option<tokio::time::Instant>) -> Self {
+        self.deadline = deadline;
+        self
     }
 
     pub(in crate::local_proxy) fn status(&self) -> reqwest::StatusCode {
@@ -39,9 +46,22 @@ impl Response {
 
     fn next_chunk(&mut self) -> io::Result<Option<Bytes>> {
         tauri::async_runtime::block_on(async {
-            let Some(timeout) = self.idle_timeout else {
+            let remaining = self
+                .deadline
+                .map(|deadline| deadline.saturating_duration_since(tokio::time::Instant::now()));
+            let timeout = match (self.idle_timeout, remaining) {
+                (Some(idle), Some(remaining)) => Some(idle.min(remaining)),
+                (idle, remaining) => idle.or(remaining),
+            };
+            let Some(timeout) = timeout else {
                 return self.response.chunk().await.map_err(io::Error::other);
             };
+            if timeout.is_zero() {
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "model catalog deadline exceeded",
+                ));
+            }
             tokio::time::timeout(timeout, self.response.chunk())
                 .await
                 .map_err(|_| {

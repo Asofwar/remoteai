@@ -1,8 +1,9 @@
 import { useComposerSuggestion } from '../../../../shared/chat/useComposerSuggestion';
 import { ComposerSuggestion } from './ComposerSuggestion';
+import { ComposerInput } from './ComposerInput';
 import { t, useLanguage } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowUp, ChevronDown, File, MessageSquare, Pause, Play, Plus,
+import { ArrowUp, ChevronDown, File, Folder, MessageSquare, Pause, Play, Plus,
   SlidersHorizontal, Square, Target, X } from 'lucide-react';
 import { COMPOSER_ACTION_LABELS } from '../../../../shared/remote-chat/composerAction';
 import { composerLabel } from '../../../../shared/remote-chat/composer';
@@ -24,6 +25,7 @@ import { ComposerQuotes } from './ChatQuotes';
 import { ComposerAddMenu, ComposerPluginMenu, ChatCommandMenu, type ComposerAddAction } from './ComposerMenus';
 import { ComposerProjectFiles } from './ComposerProjectFiles';
 import { ComposerConversationMenu } from './ComposerConversationMenu';
+import { ComposerFileMenu } from './ComposerFileMenu';
 import { useComposerState } from './useComposerState';
 import type { ComposerProps } from './composerProps';
 import './composer.css';
@@ -89,7 +91,8 @@ export function ChatComposer(props: ComposerProps) {
   const label = composerLabel(models, selection, t);
   const closeMenus = () => { menu.close(); setAdding(false); };
   const showSettings = () => { closeMenus(); setSettings(true); };
-  const placeholder = desktop ? t('描述任务，@ 引用对话，/ 选择命令和技能…') : t('发消息，@ 引用对话…');
+  const placeholder = desktop ? t('描述任务，% 引用文件，@ 引用对话，/ 选择命令和技能…')
+    : t('% 引用文件，@ 引用对话…');
   return <div className="chat-composer-dock" ref={dock} onKeyDown={event => {
     if (event.defaultPrevented || event.nativeEvent.isComposing || event.keyCode === 229) return;
     if (event.key === 'Escape') { setAdding(false); menu.close(); }
@@ -124,7 +127,10 @@ export function ChatComposer(props: ComposerProps) {
           input={menu.input} close={menu.close}
           chooseSkill={menu.choose}
           choosePlugin={plugin => { attachments.addPlugin(plugin); menu.consumeTrigger(); }} />}
-        {!adding && !menu.plugins && !menu.conversations && <ChatCommandMenu
+        {!adding && menu.files && <ComposerFileMenu key={`${threadId}:${cwd}`} input={menu.input}
+          query={menu.query} threadId={threadId} cwd={cwd} ready={ready && !busy} load={loadFiles} close={menu.close}
+          choose={reference => { if (attachments.add(reference)) menu.consumeTrigger(); }} />}
+        {!adding && !menu.plugins && !menu.conversations && !menu.files && <ChatCommandMenu
             catalog={catalog} query={menu.query} skillsOnly={menu.skillsOnly} input={menu.input}
             compactReason={props.compactReason} choose={menu.choose} compact={() => { void menu.runCompact(); }}
             goal={() => { menu.consumeTrigger(); goalMode.enter(); }} close={menu.close} />}</div>}
@@ -136,7 +142,9 @@ export function ChatComposer(props: ComposerProps) {
             add={() => setAdding(true)} edit={id => { menu.input.current?.blur(); setEditingId(id); }} />
           <div className="chat-composer-capsules">{attachments.items.map((item, index) =>
             <span className="chat-capsule" key={`${item.path}:${index}`}>
-              {item.kind === 'conversation' ? <MessageSquare size={14} /> : <File size={14} />}
+              {item.kind === 'conversation' && <MessageSquare size={14} />}
+              {item.kind === 'folder' && <Folder size={14} />}
+              {item.kind !== 'conversation' && item.kind !== 'folder' && <File size={14} />}
               <span title={item.name}>{item.kind === 'conversation' ? `@${item.name}` : item.name}</span>
               {item.data && <ChatUploadProgress inline reconnecting={!ready}
                 progress={itemUploadProgress(sending ? uploadProgress : undefined, 'attachment', index)} />}
@@ -144,7 +152,7 @@ export function ChatComposer(props: ComposerProps) {
                 disabled={busy} onClick={() => attachments.remove(item)}><X size={14} /></button></span>)}</div>
           <ComposerQuotes disabled={busy} />
           <ComposerSuggestion text={suggestion.text} accept={suggestion.accept} />
-          <textarea ref={menu.input} aria-label={t("聊天消息")} value={draft.text} maxLength={100_000} rows={1}
+          <ComposerInput ref={menu.input} aria-label={t("聊天消息")} value={draft.text} maxLength={100_000} rows={1}
             readOnly={state.queueEditor.loading}
             onBeforeInput={suggestion.dismiss} onCompositionStart={suggestion.dismiss}
             onCompositionEnd={suggestion.restore}

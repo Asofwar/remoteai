@@ -3,10 +3,11 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { loadDreamSkinStatus, loadDreamSkinThemePreview } from "../../api/backend";
+import { useThemeMode } from "../../hooks/useThemeMode";
 import type { DreamSkinStatus } from "../../types";
 import { publishDreamSkinStatus } from "../dreamSkin/statusEvents";
 import { dreamSkinStyle, useDreamSkin } from "./useDreamSkin";
-import { saveGuiTheme } from "./guiTheme";
+import { saveGuiTheme, useGuiTheme } from "./guiTheme";
 import { saveGuiSkin } from "./guiSkin";
 
 vi.mock("../../api/backend", () => ({ loadDreamSkinStatus: vi.fn(), loadDreamSkinThemePreview: vi.fn() }));
@@ -15,10 +16,17 @@ const status: DreamSkinStatus = { supported: true, platform: "windows", installe
   activeThemeOverlayOpacity: 0.8, savedThemes: [] };
 let root: Root;
 let current: ReturnType<typeof useDreamSkin>;
-function Fixture({ active = true }: { active?: boolean }) { current = useDreamSkin(active); return null; }
+let appTheme: ReturnType<typeof useThemeMode>;
+function Fixture({ active = true }: { active?: boolean }) {
+  const theme = useGuiTheme();
+  appTheme = useThemeMode(theme.mode === "inherit" ? undefined : theme.mode);
+  current = useDreamSkin(active);
+  return null;
+}
 
 beforeEach(() => {
   localStorage.clear();
+  saveGuiSkin({ mode: "inherit" });
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.mocked(loadDreamSkinStatus).mockResolvedValue(status);
   vi.mocked(loadDreamSkinThemePreview).mockImplementation(async (id) => `data:image/png;base64,${id}`);
@@ -26,13 +34,44 @@ beforeEach(() => {
 });
 afterEach(async () => {
   await act(async () => root.unmount()); localStorage.clear(); vi.resetAllMocks(); vi.unstubAllGlobals();
+  document.documentElement.removeAttribute("data-theme");
+  document.documentElement.removeAttribute("style");
+});
+
+it("defaults to an independent background without loading or following the shared skin", async () => {
+  localStorage.clear();
+  await act(async () => root.render(<Fixture />));
+  expect(current).toBeUndefined();
+  expect(loadDreamSkinStatus).not.toHaveBeenCalled();
+  expect(loadDreamSkinThemePreview).not.toHaveBeenCalled();
+  await act(async () => publishDreamSkinStatus(status));
+  expect(current).toBeUndefined();
+  await act(async () => { saveGuiSkin({ themeId: "preset-rose-reverie" }); });
+  expect(current?.["--gui-skin-image"]).toContain("preset-rose-reverie");
+});
+
+it.each(["inherit", "custom"] as const)("follows app appearance with a %s background", async (mode) => {
+  saveGuiSkin({ mode, themeId: "preset-rose-reverie" });
+  await act(async () => root.render(<Fixture />));
+  const background = current?.["--gui-skin-image"];
+  expect(background).toBeTruthy();
+  for (const appearance of ["dark", "light", "dark"] as const) {
+    await act(async () => appTheme.setMode(appearance));
+    expect(document.documentElement.dataset.theme).toBe(appearance);
+    expect(current?.["--gui-skin-image"]).toBe(background);
+    expect(current?.colorScheme).toBeUndefined();
+    expect(current?.["--panel"]).toBeUndefined();
+    expect(current?.["--ink"]).toBeUndefined();
+    expect(current?.["--green-soft"]).toBeUndefined();
+  }
+  expect(loadDreamSkinThemePreview).toHaveBeenCalledTimes(1);
 });
 
 it("preserves the background while giving explicit GUI appearance and color precedence", async () => {
   await act(async () => root.render(<Fixture />));
   await act(async () => { saveGuiTheme({ color: "#123456" }); });
   expect(current?.["--green-soft"]).toBeUndefined();
-  expect(current?.colorScheme).toBe("dark");
+  expect(current?.colorScheme).toBeUndefined();
   await act(async () => { saveGuiTheme({ mode: "light" }); });
   expect(current?.["--gui-skin-image"]).toContain("first");
   expect(current?.["--panel"]).toBeUndefined();
@@ -43,7 +82,7 @@ it("loads the applied theme on entry and synchronizes opacity, pause, and restor
   await act(async () => root.render(<Fixture />));
   expect(current?.["--gui-skin-image"]).toContain("first");
   expect(current?.["--gui-skin-overlay"]).toBe("80%");
-  expect(current?.colorScheme).toBe("dark");
+  expect(current?.colorScheme).toBeUndefined();
   await act(async () => publishDreamSkinStatus({ ...status, activeThemeOverlayOpacity: 0.35 }));
   expect(current?.["--gui-skin-overlay"]).toBe("35%");
   await act(async () => publishDreamSkinStatus({ ...status, session: "paused" }));
@@ -72,9 +111,9 @@ it("uses the ordinary theme on image failure and reloads when returning to the p
   expect(current?.["--gui-skin-image"]).toContain("first");
 });
 
-it("clamps the shared opacity and lets automatic appearance inherit the app theme", () => {
+it("clamps the shared opacity", () => {
   const style = (opacity: number) => dreamSkinStyle({ image: "data:image/png;base64,test",
-    status: { ...status, activeThemeAppearance: "auto", activeThemeOverlayOpacity: opacity } });
+    status: { ...status, activeThemeOverlayOpacity: opacity } });
   expect(style(-1)?.["--gui-skin-overlay"]).toBe("0%");
   expect(style(2)?.["--gui-skin-overlay"]).toBe("100%");
   expect(style(NaN)?.["--gui-skin-overlay"]).toBe("80%");
@@ -138,5 +177,5 @@ it("accepts skin changes from another window and rejects invalid saved theme ids
   expect(current).toBeUndefined();
   expect(loadDreamSkinThemePreview).not.toHaveBeenCalledWith("../invalid");
   await changeStorage("invalid-json");
-  expect(current?.["--gui-skin-image"]).toContain("first");
+  expect(current).toBeUndefined();
 });

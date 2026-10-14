@@ -25,6 +25,25 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
+it("accepts a catalog after official discovery and Admin use their full network budgets", async () => {
+  const response = deferred<ReturnType<typeof page>>();
+  vi.mocked(guiApi.request).mockReturnValue(response.promise);
+  const accept = vi.fn();
+  const failed = vi.fn();
+  const catalog = new GuiModelCatalog({ ready: () => true, accept, failed });
+  const pending = catalog.invalidate();
+  await vi.advanceTimersByTimeAsync(120_000);
+  expect(guiApi.request).toHaveBeenCalledOnce();
+  expect(accept).not.toHaveBeenCalled();
+  expect(failed).toHaveBeenLastCalledWith("");
+  response.resolve(page([current]));
+  await pending;
+  expect(accept).toHaveBeenCalledExactlyOnceWith([current]);
+  await expect(catalog.ready()).resolves.toBeUndefined();
+  catalog.suspend();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
 it("reports an empty initial catalog as a failed load and recovers on retry", async () => {
   vi.mocked(guiApi.request).mockResolvedValue(page([]));
   const controller = new GuiController();
@@ -178,6 +197,7 @@ it("rejects endless pagination even when each page responds immediately", async 
   const catalog = new GuiModelCatalog({ ready: () => true, accept });
   await expect(catalog.invalidate()).rejects.toThrow("模型列表");
   expect(accept).not.toHaveBeenCalled();
+  catalog.suspend();
   expect(vi.getTimerCount()).toBe(0);
 });
 

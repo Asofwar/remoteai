@@ -113,7 +113,7 @@ export class ComposerBridge {
 
   async read(threadId?: string | null): Promise<ComposerSnapshot> {
     if (threadId !== undefined && !this.binding) throw new Error(guiText("电脑尚未就绪，请稍后重试。"));
-    await this.binding?.modelCatalog.ready();
+    await this.binding?.modelCatalog.recover();
     await Promise.all([this.readSelection(), this.speed?.read().then((speed) => this.publishSpeed(speed))
       .catch(() => { /* Model selection stays usable if the host cannot report its speed yet. */ }),
       threadId !== undefined ? this.binding!.modelSettings.ready(threadId) : undefined]);

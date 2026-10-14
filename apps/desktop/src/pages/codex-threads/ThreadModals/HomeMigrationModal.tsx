@@ -1,5 +1,6 @@
 import { Alert, Descriptions, Modal, Select } from "antd";
 import { homeLabel } from "../../../components/CodexHomeScope";
+import { MIGRATION_MODEL_PROVIDERS } from "../../../types/conversationMigration";
 import type { ThreadCopy } from "../copy";
 import type { useHomeMigration } from "../useHomeMigration";
 
@@ -31,6 +32,14 @@ export function HomeMigrationModal({ migration, busy, text }: {
           style={{ width: "100%" }} value={migration.targetHomeId} onChange={migration.setTargetHomeId}
           disabled={busy} options={migration.homes.map((home) => ({ value: home.id, label: homeLabel(home) }))} />
       </>}
+      <div style={{ marginTop: 16 }}>
+        <label htmlFor="migration-model-provider">{text.homeMigrationModelProvider}</label>
+        <Select id="migration-model-provider" aria-label={text.homeMigrationModelProvider}
+          style={{ width: "100%", marginTop: 8 }} value={migration.modelProvider}
+          onChange={migration.setModelProvider} disabled={busy}
+          options={MIGRATION_MODEL_PROVIDERS.map((value) => ({ value, label: value }))} />
+        <p style={{ marginTop: 8 }}>{text.homeMigrationModelProviderHint}</p>
+      </div>
       {migration.error && <Alert type="error" message={migration.error} style={{ marginTop: 12 }} />}
       {migration.fixedTarget && !migration.targetHome && <Alert type="warning" message={text.migrationHomeUnavailable} />}
       {!migration.fixedTarget && !migration.homes.length && <p>{text.noMigrationHome}</p>}

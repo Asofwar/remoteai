@@ -42,7 +42,7 @@ export function ImageViewer({ thumbnail, description, load, close, save }: Props
         </GestureDetector>
         <KeyboardAvoidingView pointerEvents="box-none" style={styles.controls}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <SafeAreaView pointerEvents="box-none">
+        <SafeAreaView pointerEvents="box-none" edges={['bottom', 'left', 'right']}>
           <View pointerEvents="box-none" style={styles.footer}>
             <View pointerEvents="box-none" style={styles.notices}>
               {!!message && <Text pointerEvents="none" accessibilityLiveRegion="polite"
@@ -52,27 +52,28 @@ export function ImageViewer({ thumbnail, description, load, close, save }: Props
                 <Text style={styles.status}>{t("原图加载失败")}</Text>
               </View>}
             </View>
-            <View pointerEvents="box-none" style={styles.actions}>
-              {!image.url && !image.loading && <Pressable accessibilityRole="button" onPress={image.request}
-                accessibilityLabel={t(image.error ? "重新加载原图" : "查看原图")}
-                style={styles.original}><Text style={styles.status}>
-                  {t(image.error ? "重新加载原图" : "查看原图")}</Text></Pressable>}
-              {orientation.suggested && <Pressable accessibilityRole="button" accessibilityLabel={t("转到手机当前方向")}
-                disabled={orientation.rotating} onPress={orientation.rotate} style={styles.rotate}>
-                <MaterialCommunityIcons name="screen-rotation" size={28} color="#fff" />
-              </Pressable>}
-              <Pressable accessibilityRole="button" accessibilityLabel={t("下载图片到相册")}
-                accessibilityState={{ disabled: image.loading || saving.saving, busy: saving.saving }}
-                disabled={image.loading || saving.saving} onPress={saving.save}
-                style={[styles.save, (image.loading || saving.saving) && styles.disabled]}>
-                {saving.saving ? <ActivityIndicator color="#fff" />
-                  : <MaterialCommunityIcons name="download" size={30} color="#fff" />}
-              </Pressable>
-            </View>
-            <ImageAiToolbar load={image.loadOriginal} close={close} />
+            {orientation.suggested && <Pressable accessibilityRole="button" accessibilityLabel={t("转到手机当前方向")}
+              disabled={orientation.rotating} onPress={orientation.rotate} style={styles.rotate}>
+              <MaterialCommunityIcons name="screen-rotation" size={28} color="#fff" />
+            </Pressable>}
+            <ImageAiToolbar load={image.loadOriginal} close={close}
+              originalAction={!image.url && !image.loading ? {
+                label: t(image.error ? "重新加载原图" : "查看原图"), onPress: image.request,
+              } : undefined} />
           </View>
         </SafeAreaView>
         </KeyboardAvoidingView>
+        <SafeAreaView pointerEvents="box-none" edges={['top', 'left', 'right']} style={styles.header}>
+          <View pointerEvents="box-none" style={styles.headerActions}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t("下载图片到相册")}
+              accessibilityState={{ disabled: image.loading || saving.saving, busy: saving.saving }}
+              disabled={image.loading || saving.saving} onPress={saving.save}
+              style={[styles.save, (image.loading || saving.saving) && styles.disabled]}>
+              {saving.saving ? <ActivityIndicator color="#fff" />
+                : <MaterialCommunityIcons name="download" size={26} color="#fff" />}
+            </Pressable>
+          </View>
+        </SafeAreaView>
       </GestureHandlerRootView>
     </SafeAreaProvider>
   </Modal>;
@@ -83,12 +84,11 @@ const useStyles = createThemedStyles((color) => ({
   stage: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
   image: { width: '100%', height: '100%' },
   controls: { flex: 1, justifyContent: 'flex-end' },
+  header: { position: 'absolute', top: 0, left: 0, right: 0 },
+  headerActions: { alignItems: 'flex-end', paddingHorizontal: 12, paddingTop: 12 },
   footer: { paddingHorizontal: 12, paddingBottom: 12, paddingTop: 12 },
-  actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 56 },
   rotate: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
-  original: { minHeight: 44, paddingHorizontal: 16, borderRadius: 22, backgroundColor: '#484848',
-    justifyContent: 'center' },
-  save: { marginLeft: 'auto', width: 56, height: 56, borderRadius: 28, backgroundColor: '#484848',
+  save: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#484848',
     alignItems: 'center', justifyContent: 'center' },
   disabled: { opacity: 0.4 },
   notices: { alignItems: 'center', gap: 8 },

@@ -10,6 +10,7 @@ import { threadPresentation } from '../../../../../../shared/remote-chat/sidebar
 import { FocusModeButton, type GuiFocusMode } from '../FocusModeButton';
 import { ThreadStatus } from '../ThreadStatus';
 import { ThreadPagination } from '../ThreadPagination';
+import { ResizableThreadSidebar } from '../ResizableThreadSidebar';
 import { useThreadScrollPagination } from '../useThreadPagination';
 import { RemoteThreadDialogs, RemoteThreadMenu } from './RemoteThreadMenu';
 import styles from '../styles.module.less';
@@ -27,7 +28,7 @@ export function RemoteGuiSidebar({ state, controller, actions, accountPicker, fo
     loading: state.loading,
     loadMore: () => controller.list({ more: true }),
   });
-  return <div className={`${styles.sidebar} gui-remote-sidebar`}>
+  return <ResizableThreadSidebar className="gui-remote-sidebar" layoutSelector=".chat-diff-layout">
     <div className={styles.sidebarHeading} data-tauri-drag-region>
       <h2 className={styles.sidebarTitle} data-tauri-drag-region>Codex GUI</h2>
       <div className={styles.sidebarActions}>
@@ -89,5 +90,5 @@ export function RemoteGuiSidebar({ state, controller, actions, accountPicker, fo
     </div>
     {accountPicker}
     <RemoteThreadDialogs actions={threadActions} />
-  </div>;
+  </ResizableThreadSidebar>;
 }

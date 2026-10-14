@@ -6,8 +6,9 @@
     box-shadow: 0 5px 25px #173c2810; font-size: 14px; }
   .chat-conversation .chat-composer, .chat-composer-dock .chat-queue { background: var(--app-surface, #fbfcfa); }
   .chat-composer:focus-within { border-color: var(--chat-green); }
-  .chat-composer textarea { min-height: 83px; padding: 5px 8px 12px; font-size: 14px; line-height: 1.7; }
-  .chat-composer textarea::placeholder { color: var(--chat-muted); }
+  .chat-composer textarea, .chat-composer-placeholder { font-size: 14px; line-height: 1.7; }
+  .chat-composer textarea { min-height: 83px; padding: 5px 8px 12px; }
+  .chat-composer-placeholder { top: 5px; left: 8px; right: 8px; color: var(--chat-muted); }
   .chat-composer-content { max-height: min(35dvh, 240px); }
   .chat-composer-actions { justify-content: flex-start; gap: 2px; flex-wrap: wrap; }
   .chat-composer-trailing { flex: 1 1 510px; flex-wrap: wrap; gap: 8px; }

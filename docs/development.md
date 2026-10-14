@@ -11,6 +11,15 @@ Install Node.js, npm, the Go toolchain declared in `apps/admin-go/go.mod`, the l
 npm install
 ```
 
+Windows desktop builds require Visual Studio 2022 C++ build tools, Windows SDK 10.0.26100.0,
+and CMake 3.20 or newer. In Visual Studio Installer, include **C++ CMake tools for Windows**.
+The desktop build scripts use CMake and CTest from PATH when available, then look for Visual Studio's
+bundled tools (including custom installation locations) and the standard `C:\Program Files\CMake\bin`
+installation. A separate CMake installation in another location must have its `bin` directory on PATH;
+reopen the terminal after changing PATH.
+Windows release builds also need [7-Zip](https://www.7-zip.org/download.html) on PATH to unpack native
+dependencies. After installing it, add `C:\Program Files\7-Zip` to PATH and reopen the terminal.
+
 Ubuntu needs the Linux WebKitGTK/AppIndicator toolchain before `npm run dev:app`, `npm run check`, or `npm run build:app`:
 
 ```bash

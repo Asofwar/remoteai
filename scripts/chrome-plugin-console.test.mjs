@@ -150,15 +150,17 @@ test('bounds text, stack, entry count and encoded response size', async () => {
   assert.ok(Buffer.byteLength(JSON.stringify(result)) < 1024 * 1024);
 });
 
-test('rejects navigation and always removes event listeners after failures', async () => {
+test('rejects navigation and removes listeners while retaining a usable debugger after read failures', async () => {
   changeDocument = true;
   await assert.rejects(read(), /页面已变化/);
   assert.equal(listeners.size, 0);
   changeDocument = false;
-  replay = async () => { throw new Error('session detached'); };
-  await assert.rejects(read(), /session detached/);
+  replay = async () => { throw new Error('read failed'); };
+  await assert.rejects(read(), /read failed/);
   assert.equal(listeners.size, 0);
-  assert.equal(calls.at(-1).method, 'detach');
+  assert.equal(calls.at(-1).method, 'Log.disable');
+  assert.equal(calls.filter(call => call.method === 'attach').length, 1);
+  assert.ok(!calls.some(call => call.method === 'detach'));
 });
 
 test('rejects context replacement even when the frame loader is unchanged', async () => {

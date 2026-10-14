@@ -31,6 +31,7 @@ export const chat = {
   '收起文件更改': 'Hide file changes',
   '暂无文件更改': 'No file changes yet',
   '调整详情抽屉宽度': 'Resize details panel',
+  '调整聊天列表宽度': 'Resize chat list',
   '还原抽屉宽度': 'Restore panel width',
   '展开详情抽屉': 'Expand details panel',
   '最小化详情抽屉': 'Minimize details panel',

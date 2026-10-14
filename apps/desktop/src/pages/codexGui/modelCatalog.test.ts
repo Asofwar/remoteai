@@ -126,13 +126,14 @@ it("keeps ordinary polling quiet when the catalog has not changed", async () => 
   expect(current()).toBe(false);
 });
 
-it("keeps a failed settings reconciliation blocked without repeatedly retrying it", async () => {
+it("keeps a failed settings reconciliation blocked during passive readiness checks", async () => {
   const accept = vi.fn().mockRejectedValue(new Error("save failed"));
   const catalog = new GuiModelCatalog({ ready: () => true, accept });
   vi.mocked(guiApi.request).mockResolvedValue({ data: [existing], nextCursor: null });
   await expect(catalog.invalidate()).rejects.toThrow("save failed");
   expect(accept).toHaveBeenCalledOnce();
   await expect(catalog.ready()).rejects.toThrow("模型正在同步");
+  catalog.suspend();
 });
 
 it("keeps models and conversation choices when the CLI returns an empty catalog during polling", async () => {

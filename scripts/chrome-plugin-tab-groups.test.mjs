@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 import { execute } from '../apps/desktop/src-tauri/resources/chrome-extension/operations.js';
+import { renameWorkGroups } from '../apps/desktop/src-tauri/resources/chrome-extension/tab-groups.js';
 
 let state;
 const USER_TAB_ID = 1;
@@ -42,7 +43,7 @@ beforeEach(() => {
   state = { session: {}, windowId: 2, nextTab: 20, nextGroup: 100, updates: [],
     tabs: new Map([[USER_TAB_ID, { id: USER_TAB_ID, windowId: 2, groupId: USER_GROUP_ID,
       active: true, url: PAGE_URL }]]),
-    groups: new Map([[USER_GROUP_ID, { id: USER_GROUP_ID, windowId: 2, title: 'Codex', color: 'blue' }]]) };
+    groups: new Map([[USER_GROUP_ID, { id: USER_GROUP_ID, windowId: 2, title: 'Remote AI', color: 'blue' }]]) };
   globalThis.chrome = {
     storage: {
       local: { get: async () => ({ siteAccessMode: 'all' }) },
@@ -66,7 +67,7 @@ test('default opens use a new background group and preserve the active page and 
   assert.equal(state.tabs.get(result.tabId).active, false);
   assert.equal(state.tabs.get(result.tabId).groupId, result.groupId);
   assert.deepEqual(state.groups.get(result.groupId),
-    { id: result.groupId, windowId: 2, title: 'Codex', color: 'green' });
+    { id: result.groupId, windowId: 2, title: 'Remote AI', color: 'green' });
   assert.deepEqual(state.tabs.get(USER_TAB_ID), originalTab);
   assert.deepEqual(state.groups.get(USER_GROUP_ID), originalGroup);
   assert.deepEqual(state.updates, []);
@@ -79,6 +80,19 @@ test('concurrent opens from one home reuse their group without creating duplicat
   assert.equal(new Set(results.map((result) => result.groupId)).size, 1);
   assert.equal(state.groups.size, 2);
   assert.equal(state.session.browserWorkGroups.length, 1);
+});
+
+test('upgrade renames only recorded legacy groups and preserves user names and pages', async () => {
+  const first = await open();
+  const customized = await open('second');
+  state.groups.get(first.groupId).title = 'Codex';
+  state.groups.get(customized.groupId).title = 'My task';
+  state.groups.get(USER_GROUP_ID).title = 'Codex';
+  await renameWorkGroups();
+  assert.equal(state.groups.get(first.groupId).title, 'Remote AI');
+  assert.equal(state.groups.get(customized.groupId).title, 'My task');
+  assert.equal(state.groups.get(USER_GROUP_ID).title, 'Codex');
+  assert.equal(state.tabs.size, 3);
 });
 
 test('different homes and windows receive separate groups', async () => {
@@ -117,7 +131,7 @@ test('moving a group to another window does not move new tabs out of their windo
 
 test('explicit foreground opens activate the new tab only after it is grouped', async () => {
   chrome.tabs.update = async (id, options) => {
-    assert.equal(state.groups.get(state.tabs.get(id).groupId).title, 'Codex');
+    assert.equal(state.groups.get(state.tabs.get(id).groupId).title, 'Remote AI');
     state.updates.push({ id, ...options });
   };
   const result = await open('first', { background: false });
@@ -131,7 +145,7 @@ test('grouping failures remove only the new tab, report an error and allow retry
   assert.deepEqual([...state.tabs.keys()], [USER_TAB_ID]);
   assert.deepEqual(state.updates, []);
   chrome.tabs.group = group;
-  assert.equal(state.groups.get((await open()).groupId).title, 'Codex');
+  assert.equal(state.groups.get((await open()).groupId).title, 'Remote AI');
 });
 
 test('group setup and storage failures also remove the new tab', async () => {

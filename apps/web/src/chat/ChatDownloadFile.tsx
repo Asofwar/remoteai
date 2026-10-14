@@ -5,16 +5,8 @@ import { t } from '../i18n';
 import type { FilePreviewContext } from './ChatFilePreview';
 import './filePreview.css';
 
-const DOWNLOAD_ONLY_EXTENSIONS = new Set([
-  'exe', 'msi', 'msix', 'apk', 'aab', 'dmg', 'pkg', 'deb', 'rpm', 'zip', '7z', 'rar', 'gz', 'tar', 'bz2', 'xz',
-  'iso', 'bin', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'mp3', 'wav', 'flac', 'ogg',
-]);
+export { isDownloadOnlyFile } from '../../../../shared/remote-chat/filePreview';
 const INSTALLER_FILE = /\.(?:exe|msi|msix|apk|aab|dmg|pkg|deb|rpm)$/i;
-
-export function isDownloadOnlyFile(path: string) {
-  const name = path.split(/[\\/]/).at(-1) || '';
-  return name.includes('.') && DOWNLOAD_ONLY_EXTENSIONS.has(name.split('.').at(-1)!.toLowerCase());
-}
 
 export function ChatDownloadFile({ path, context, onClose }: {
   path: string; context: FilePreviewContext; onClose: () => void;

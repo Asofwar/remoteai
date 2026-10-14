@@ -117,6 +117,24 @@ it("keeps table selection, details, group editing and action buttons independent
   expect(props.onSwitch).toHaveBeenCalledExactlyOnceWith(account.id);
 });
 
+it("keeps numeric setting wrappers and suffixes independent from table switching", async () => {
+  await render({
+    displayMode: "table", accounts: [{ ...account, active: false }],
+    autoSwitchOnQuotaExhaustion: true,
+    customAutoSwitchPriorityEnabled: true, customAutoSwitchThresholdEnabled: true,
+  });
+  const row = container.querySelector<HTMLElement>(`tr[data-row-key="${account.id}"]`)!;
+  const priority = row.querySelector<HTMLElement>(".auto-switch-priority-input")!;
+  const suffix = row.querySelector<HTMLElement>(".ant-input-number-suffix")!;
+  expect(priority).not.toBeNull();
+  expect(suffix).not.toBeNull();
+  await act(async () => priority.click());
+  await act(async () => suffix.click());
+  expect(props.onSwitch).not.toHaveBeenCalled();
+  await act(async () => row.querySelector<HTMLElement>(".plan-tag")!.click());
+  expect(props.onSwitch).toHaveBeenCalledExactlyOnceWith(account.id);
+});
+
 it("shows credits in a separate column and reuses usage refresh without overlapping clicks", async () => {
   // Existing saved column preferences must still include the newly added column.
   localStorage.setItem("codex-switch:account-table-column-order", JSON.stringify(["fiveHours", "oneWeek"]));

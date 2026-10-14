@@ -10,6 +10,32 @@ async function clipboard(page: Page) {
   return page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, '\n'));
 }
 
+test('remote files preview on left click across peer versions; right click opens actions', async ({ page }, info) => {
+  await page.goto('e2e/file-preview-harness.html?pc&legacy');
+  const link = page.getByRole('button', { name: '预览文件：F:/remote/docs/guide.md', exact: true });
+  await link.click();
+  const drawer = page.locator('aside[data-details-panel]');
+  await expect(drawer.getByRole('heading', { name: '远程文档', exact: true })).toBeVisible();
+  await expect.poll(() => drawer.getByRole('img', { name: '相邻图片' })
+    .evaluate((node: HTMLImageElement) => node.naturalWidth)).toBeGreaterThan(0);
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(page.getByLabel('文件操作结果')).toBeEmpty();
+  await drawer.getByRole('button', { name: '预览文件：F:/remote/docs/next.md', exact: true }).click();
+  await expect(drawer.getByRole('heading', { name: '后续文档', exact: true })).toBeVisible();
+  await expect(drawer).toContainText('引用位置：第 3 行');
+  await drawer.getByRole('button', { name: '返回上一页' }).click();
+  await expect(drawer.getByRole('heading', { name: '远程文档', exact: true })).toBeVisible();
+  await screenshot(page, info, 'remote-compatible-preview');
+  await drawer.getByRole('button', { name: '关闭详情抽屉' }).click();
+  await link.click({ button: 'right' });
+  await expect(page.getByRole('menuitem', { name: '在远程电脑上打开', exact: true })).toBeVisible();
+  expect((await page.getByRole('menu').boundingBox())!.width).toBeLessThanOrEqual(400);
+  await expect(drawer).toHaveCount(0);
+  await page.getByRole('menuitem', { name: '预览文件', exact: true }).click();
+  await expect(drawer.getByRole('heading', { name: '远程文档', exact: true })).toBeVisible();
+  await expect(page.getByLabel('文件操作结果')).toBeEmpty();
+});
+
 test('PC remote files share tables, code, source location, menus and relative HTML assets', async ({ page }, info) => {
   await page.goto('e2e/file-preview-harness.html?pc');
   await page.getByRole('button', { name: '预览文件：F:/remote/docs/guide.md', exact: true }).click();

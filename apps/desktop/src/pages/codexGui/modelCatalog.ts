@@ -3,14 +3,18 @@ import { guiApi } from "./api";
 import type { ListResponse, Model } from "./types";
 import { withModelCatalogTimeout } from "./modelCatalogTimeout";
 import { MODEL_CATALOG_ERROR } from "../../../../../shared/remote-chat/composer";
+import { ProviderCatalogSync } from "./providerCatalogSync";
 
 const MAX_CATALOG_PAGES = 100;
+export const MODEL_CATALOG_RETRY_MS = 3000;
+const MAX_RETRY_DELAY_MS = 30_000;
 
 interface CatalogHost {
   ready: () => boolean;
   accept: (models: Model[]) => void | Promise<void>;
   syncing?: (value: boolean) => void;
   failed?: (message: string) => void;
+  recovered?: () => void;
 }
 
 /** Serializes paginated reads and discards responses from a previous connection or account. */
@@ -23,6 +27,9 @@ export class GuiModelCatalog {
   private switching = 0;
   private fingerprint?: string;
   private providerSource?: () => Promise<Model[] | null>;
+  private readonly providerSync = new ProviderCatalogSync();
+  private retryTimer?: ReturnType<typeof setTimeout>;
+  private retryDelay = MODEL_CATALOG_RETRY_MS;
   constructor(private readonly host: CatalogHost) {}
 
   setProviderSource(source: () => Promise<Model[] | null>) { this.providerSource = source; }
@@ -33,6 +40,12 @@ export class GuiModelCatalog {
     // A refresh of the same source must not hide an already usable catalog.
     if (this.pending && (this.invalid || !this.fingerprint)) await this.pending;
     if (this.invalid || this.switching) throw new Error(guiText("模型正在同步，请稍后重试。"));
+  }
+
+  /** Remote reads can recover a failed host without reconnecting or invalidating a usable catalog. */
+  async recover() {
+    if (this.invalid && !this.pending && !this.switching) await this.refresh();
+    await this.ready();
   }
 
   /** Block sends before changing routing, including before its change event reaches the UI. */
@@ -49,16 +62,39 @@ export class GuiModelCatalog {
   refresh = (): Promise<void> => {
     if (!this.active || !this.host.ready() || this.switching) return Promise.resolve();
     if (this.pending) return this.pending;
+    this.clearRetry();
     this.host.failed?.("");
-    return this.pending = this.load().finally(() => { this.pending = undefined; });
+    return this.pending = this.load().then(retry => {
+      if (this.active && !this.invalid) this.host.recovered?.();
+      if (retry) this.scheduleRetry();
+      else this.retryDelay = MODEL_CATALOG_RETRY_MS;
+    }, error => {
+      this.scheduleRetry();
+      throw error;
+    }).finally(() => { this.pending = undefined; });
   };
 
-  invalidate = () => { this.generation++; this.markInvalid(); return this.refresh(); };
+  invalidate = () => {
+    this.generation++; this.providerSync.invalidate(); this.retryDelay = MODEL_CATALOG_RETRY_MS;
+    this.markInvalid(); return this.refresh();
+  };
   activate = () => { this.active = true; };
   suspend = () => {
     this.active = false; this.generation++; this.attempt?.abort();
+    this.clearRetry(); this.providerSync.invalidate(); this.retryDelay = MODEL_CATALOG_RETRY_MS;
     this.markInvalid(); this.host.failed?.("");
   };
+
+  private clearRetry() { clearTimeout(this.retryTimer); this.retryTimer = undefined; }
+
+  private scheduleRetry() {
+    if (!this.active || !this.host.ready() || this.retryTimer) return;
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = undefined;
+      void this.refresh().catch(() => { /* The catalog error remains visible while recovery continues. */ });
+    }, this.retryDelay);
+    this.retryDelay = Math.min(this.retryDelay * 2, MAX_RETRY_DELAY_MS);
+  }
 
   private async load() {
     while (this.active && this.host.ready() && !this.switching) {
@@ -66,13 +102,15 @@ export class GuiModelCatalog {
       const attempt = this.attempt = new AbortController();
       const current = () => !attempt.signal.aborted && this.active && generation === this.generation;
       try {
-        const models = await withModelCatalogTimeout(this.readModels(current), attempt.signal);
+        const { models, retry } = await withModelCatalogTimeout(
+          this.readModels(current, attempt.signal), attempt.signal,
+        );
         if (!this.active) return;
         if (generation !== this.generation) continue;
         // The CLI can return an empty list after discovery times out; it is not a catalog update.
         if (!models.length) throw new Error(guiText(MODEL_CATALOG_ERROR));
         const fingerprint = JSON.stringify(models);
-        if (!this.invalid && fingerprint === this.fingerprint) return;
+        if (!this.invalid && fingerprint === this.fingerprint) return retry;
         generation = ++this.generation;
         this.markInvalid();
         await withModelCatalogTimeout(Promise.resolve(this.host.accept(models)), attempt.signal);
@@ -80,7 +118,7 @@ export class GuiModelCatalog {
         this.fingerprint = fingerprint;
         this.invalid = false;
         this.host.syncing?.(false);
-        return;
+        return retry;
       } catch (error) {
         if (!this.active) return;
         if (generation !== this.generation) continue;
@@ -90,12 +128,14 @@ export class GuiModelCatalog {
     }
   }
 
-  private async readModels(current: () => boolean) {
+  private async readModels(current: () => boolean, signal: AbortSignal) {
     const configured = this.providerSource ? await this.providerSource() : null;
-    if (!current()) return [];
-    // Refresh the CLI cache as well: running tasks also need the new models' capabilities.
-    const discovered = await this.readPages(current);
-    return configured ?? discovered;
+    if (!current()) return { models: [], retry: false };
+    if (configured !== null) {
+      const updated = configured.length ? await this.providerSync.refresh(signal) : true;
+      return { models: configured, retry: !updated };
+    }
+    return { models: await this.readPages(current), retry: false };
   }
 
   private async readPages(current: () => boolean) {

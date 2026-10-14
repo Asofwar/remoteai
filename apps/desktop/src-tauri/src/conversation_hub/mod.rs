@@ -1,6 +1,7 @@
 pub(crate) mod home_migration;
 mod home_migration_batch;
 mod home_migration_plan;
+mod home_migration_provider;
 pub(crate) use home_migration::migrate_codex_threads_to_home;
 
 mod context;

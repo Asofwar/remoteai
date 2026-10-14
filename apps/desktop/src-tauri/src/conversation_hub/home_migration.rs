@@ -1,3 +1,4 @@
+use super::home_migration_provider::{MigrationDestination, MigrationModelProvider};
 use super::*;
 
 #[derive(Deserialize)]
@@ -6,6 +7,7 @@ pub(crate) struct HomeMigrationRequest {
     home_id: String,
     target_home_id: String,
     session_ids: Vec<String>,
+    model_provider: Option<MigrationModelProvider>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -32,8 +34,17 @@ pub(crate) async fn migrate_codex_threads_to_home<R: Runtime + 'static>(
         let target = crate::codex_home::resolve_selected(&app, Some(&request.target_home_id))?;
         let _guard = bin_operation_guard()?;
         let bin = bin_root(&source)?;
-        migrate_between_homes(&source.paths.codex_home, &target, &bin, request.session_ids)
-            .map_err(|error| error.to_string())
+        let destination = MigrationDestination {
+            path: &target,
+            model_provider: request.model_provider,
+        };
+        migrate_between_homes(
+            &source.paths.codex_home,
+            destination,
+            &bin,
+            request.session_ids,
+        )
+        .map_err(|error| error.to_string())
     })
     .await
     .map_err(|_| "会话迁移未完成，请重试".to_string())?
@@ -68,16 +79,16 @@ fn migration_candidates(
 
 pub(super) fn migrate_between_homes(
     source: &Path,
-    target: &Path,
+    target: MigrationDestination<'_>,
     bin: &Path,
     session_ids: Vec<String>,
 ) -> Result<MigrationReport, HomeMigrationError> {
-    distinct_homes(source, target)?;
+    distinct_homes(source, target.path)?;
     let requested = normalized_ids(session_ids);
     if requested.is_empty() {
         return Err(HomeMigrationError::EmptySelection);
     }
-    let snapshots = migration_candidates(source, target, &requested)?;
+    let snapshots = migration_candidates(source, target.path, &requested)?;
     let completed = snapshots.len();
     let selected_count = snapshots
         .iter()

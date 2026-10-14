@@ -48,9 +48,9 @@ export function remoteAttachments(value: unknown, mode?: ConnectionMode): Attach
       && /^codex-thread:\/\/[^/\\\x00-\x1f\x7f]+$/u.test(item.path) && item.data === undefined) {
       return { kind: 'conversation', name: item.name, path: item.path };
     }
-    if (item.kind === 'file' && item.data === undefined && typeof item.path === 'string'
+    if ((item.kind === 'file' || item.kind === 'folder') && item.data === undefined && typeof item.path === 'string'
       && item.path.length <= 4096 && /^(?:[A-Za-z]:[\\/]|\/(?!\/))/.test(item.path)
-      && !/[\x00-\x1f\x7f]/u.test(item.path)) return { kind: 'file', name: item.name, path: item.path };
+      && !/[\x00-\x1f\x7f]/u.test(item.path)) return { kind: item.kind, name: item.name, path: item.path };
     if (item.kind !== 'file' || item.path !== '' || typeof item.data !== 'string' || !item.data
       || item.data.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(item.data)) {
       throw new Error('文件无法读取，请重新选择。');

@@ -12,12 +12,18 @@
 .chat-composer-field { padding: 0; border: 0; border-radius: 0; background: transparent; }
 .chat-composer-field[data-file-dragging] { outline: 2px solid var(--chat-green); outline-offset: 4px; border-radius: 12px; }
 .chat-composer-content { max-height: min(35dvh, 300px); overflow: auto; overscroll-behavior: contain; }
+.chat-composer-input { position: relative; }
 .chat-composer textarea { display: block; width: 100%; box-sizing: border-box; resize: none; border: 0; outline: none;
-  min-height: 44px; max-height: none; padding: 8px 10px; font: inherit; font-size: 16px; line-height: 1.6;
+  min-height: 44px; max-height: none; padding: 8px 10px; font: inherit;
   color: inherit; background: transparent; overflow: hidden; }
+.chat-composer textarea, .chat-composer-placeholder { font-size: 16px; line-height: 1.6; }
 /* Keep the shared focus outline from being clipped into lines inside the composer. */
 .chat-composer textarea:focus-visible { outline: none; }
-.chat-composer textarea::placeholder { color: var(--app-muted, #999); }
+.chat-composer textarea::placeholder { color: transparent; }
+.chat-composer textarea:placeholder-shown { white-space: nowrap; }
+.chat-composer-placeholder { position: absolute; top: 8px; left: 10px; right: 10px; pointer-events: none;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--app-muted, #999); }
+.chat-composer textarea:not(:placeholder-shown) + .chat-composer-placeholder { display: none; }
 .chat-composer-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; }
 .chat-composer-trailing { display: flex; flex: 1; min-width: 0; align-items: center; justify-content: flex-end; gap: 8px; }
 .chat-composer-add, .chat-composer-submit { display: grid; place-items: center; width: 40px; height: 40px;

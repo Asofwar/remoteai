@@ -40,6 +40,8 @@ use super::{
 };
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
+// Allow both sixty-second discovery attempts plus proxy and CLI processing.
+const MODEL_LIST_TIMEOUT: Duration = Duration::from_secs(130);
 const MAX_CONCURRENT_TITLE_JOBS: usize = 2;
 type Pending = HashMap<u64, oneshot::Sender<Result<Value>>>;
 
@@ -237,7 +239,12 @@ impl Client {
             self.pending.lock().await.remove(&id);
             return Err(error);
         }
-        let result = timeout(REQUEST_TIMEOUT, receiver).await;
+        let deadline = if method == "model/list" {
+            MODEL_LIST_TIMEOUT
+        } else {
+            REQUEST_TIMEOUT
+        };
+        let result = timeout(deadline, receiver).await;
         self.pending.lock().await.remove(&id);
         let result = result
             .map_err(|_| GuiError::Timeout)?

@@ -30,7 +30,10 @@ const base: Omit<ComposerProps, 'send'> = {
   goals: { load: async () => {}, clear: async () => true },
   contextSettings: { read: async () => ({ capacity: null }), write: async (_id, value) => value },
   catalog: { skills: [], loaded: true, loading: false, error: '', refresh: noop },
-  loadFiles: async () => ({ directory: '/project', parent: null, entries: [], truncated: false }),
+  loadFiles: async request => {
+    const response = await fetch('/web/test-project-files', { method: 'POST', body: JSON.stringify(request) });
+    return response.json();
+  },
   loadCatalog: async () => ({ data: [], plugins: [] }), loadConversations: async () => ({ data: [], nextCursor: null }),
   readUsage: async () => ({ totalTokens: 0, estimatedCostUsd: 0, primaryRemainingPercent: null,
     primaryRemainingAggregated: false, providerEstimatedCost: null }),
@@ -48,7 +51,10 @@ function Harness() {
   return <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '100dvh' }}>
     <output aria-label="已发送">{sent.join('\n')}</output>
     <output aria-label="刷新次数" hidden>{beats}</output>
-    <ChatComposer {...base} send={async input => { setSent(values => [...values, input.text]); return true; }} />
+    <ChatComposer {...base} send={async input => {
+      document.body.dataset.sent = JSON.stringify(input);
+      setSent(values => [...values, input.text]); return true;
+    }} />
   </div>;
 }
 createRoot(document.getElementById('root')!).render(<Harness />);

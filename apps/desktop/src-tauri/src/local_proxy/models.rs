@@ -179,6 +179,8 @@ fn apply_official_context_windows(
         }
         entry["context_window"] = json!(context_window);
         entry["max_context_window"] = json!(context_window);
+        // Let Codex derive its default threshold from the new capacity, not the upstream's old limit.
+        entry["auto_compact_token_limit"] = Value::Null;
         changed = true;
     }
     changed

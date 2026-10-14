@@ -21,7 +21,7 @@ let host: HTMLDivElement;
 function Fixture({ draftKey = "self", active = true }: { draftKey?: string; active?: boolean }) {
   const [value, onChange] = useState<ComposerText>({ text: "", mentions: [] });
   return <SkillInput value={value} draftKey={draftKey} cwd="D:/project" active={active} connected disabled={false}
-    conversations={{ selected: draftKey, threads: [], conversations: {} }} onConversation={choose}
+    conversations={{ selected: draftKey, threads: [], conversations: {} }} onConversation={choose} onFile={choose}
     placeholder="@ 引用对话" onChange={onChange} onPaste={() => {}} onSend={send} />;
 }
 const editor = () => host.querySelector<HTMLDivElement>('[role="textbox"]')!;
@@ -92,4 +92,34 @@ it("shows a load error, dismisses with Escape and never submits from an empty me
   expect(host.textContent).toContain("对话加载失败");
   await key("Enter"); expect(send).not.toHaveBeenCalled();
   await key("Escape"); expect(host.querySelector('[role="listbox"]')).toBeNull();
+});
+
+it('searches project paths with % and references a folder without changing surrounding text', async () => {
+  vi.mocked(guiApi.request).mockResolvedValue({ directory: 'D:/project', parent: null, truncated: false,
+    entries: [{ name: 'robot', path: 'D:/project/src/robot', relativePath: 'src/robot', directory: true }] });
+  await type('完成 120%');
+  expect(guiApi.request).not.toHaveBeenCalled();
+  await type('参考 %src/robot 后继续', '参考 %src/robot'.length);
+  expect(guiApi.request).toHaveBeenCalledExactlyOnceWith({ operation: 'projectFiles',
+    cwd: 'D:/project', threadId: undefined, query: 'src/robot' });
+  expect(host.querySelector('[role="option"]')?.textContent).toBe('robotsrc/robot');
+  await key('Tab');
+  expect(choose).toHaveBeenCalledWith({ kind: 'folder', name: 'robot', path: 'D:/project/src/robot' });
+  expect(readEditor(editor()).text).toBe('参考  后继续');
+  expect(send).not.toHaveBeenCalled();
+});
+
+it('keeps file searches single flight and rejects stale matches while a new query is pending', async () => {
+  let finish!: (value: unknown) => void;
+  vi.mocked(guiApi.request).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  await type('%old');
+  await type('%new');
+  expect(guiApi.request).toHaveBeenCalledOnce();
+  await key('Enter'); expect(choose).not.toHaveBeenCalled(); expect(send).not.toHaveBeenCalled();
+  vi.mocked(guiApi.request).mockResolvedValue({ entries: [], truncated: false });
+  await act(async () => finish({ entries: [{ name: 'old', path: 'D:/old', directory: false }] }));
+  expect(guiApi.request).toHaveBeenLastCalledWith(expect.objectContaining({ query: 'new' }));
+  expect(host.querySelector('[role="option"]')).toBeNull();
+  await key('Enter'); expect(send).not.toHaveBeenCalled();
+  await key('Escape'); expect(host.querySelector('[role="listbox"]')).toBeNull();
 });

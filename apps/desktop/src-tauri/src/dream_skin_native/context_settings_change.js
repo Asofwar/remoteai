@@ -1,6 +1,15 @@
 const CONTEXT_INTERRUPT_TIMEOUT = 10_000;
 const CONTEXT_STATUS_POLL = 100;
 const CONTEXT_CONTINUE_TEXT = "请继续完成刚才中断的任务。";
+const CONTEXT_AUTO_COMPACT_PERCENT = 90;
+const CONTEXT_FULL_PERCENT = 100;
+
+function contextCapacityConfig(config, capacity) {
+  if (capacity === null) return { ...config };
+  // Match GUI headroom and replace inherited thresholds whenever the capacity changes.
+  return { ...config, model_context_window: capacity,
+    model_auto_compact_token_limit: Math.floor(capacity * CONTEXT_AUTO_COMPACT_PERCENT / CONTEXT_FULL_PERCENT) };
+}
 
 function contextIdle(id, snapshot) {
   if (snapshot.thread?.id !== id) throw new Error("thread-mismatch");

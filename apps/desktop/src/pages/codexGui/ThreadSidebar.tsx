@@ -14,6 +14,7 @@ import { canForkLatestConversation } from "./forkConversation";
 import { ProjectGroupMenu } from "./ProjectGroupMenu";
 import { ThreadStatus } from "./ThreadStatus";
 import { ThreadPagination } from "./ThreadPagination";
+import { ResizableThreadSidebar } from "./ResizableThreadSidebar";
 import { useThreadPagination } from "./useThreadPagination";
 import { isDesktopApp } from "../../api/backend";
 import { FocusModeButton, type GuiFocusMode } from "./FocusModeButton";
@@ -75,7 +76,7 @@ export function ThreadSidebar({ state, controller, accountPicker, focused, onTog
       </div>
     </Dropdown>;
   };
-  return <aside className={styles.sidebar}>
+  return <ResizableThreadSidebar>
     <div className={styles.sidebarHeading} data-tauri-drag-region={isDesktopApp || undefined}>
       <h2 className={styles.sidebarTitle} data-tauri-drag-region={isDesktopApp || undefined}>Codex GUI</h2>
       <div className={styles.sidebarActions} data-tauri-drag-region={isDesktopApp || undefined}>
@@ -134,5 +135,5 @@ export function ThreadSidebar({ state, controller, accountPicker, focused, onTog
       <Input value={name} maxLength={120} autoFocus aria-label={guiText("对话名称")}
         onChange={(event) => setName(event.target.value)} />
     </Modal>
-  </aside>;
+  </ResizableThreadSidebar>;
 }

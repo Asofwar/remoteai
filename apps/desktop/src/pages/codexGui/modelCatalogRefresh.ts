@@ -20,7 +20,8 @@ export function watchModelCatalog(catalog: GuiModelCatalog, report: (error: unkn
     const pending = invalidate ? catalog.invalidate() : catalog.refresh();
     if (observed === pending) return;
     observed = pending;
-    void pending.catch(failed).finally(() => { if (observed === pending) observed = undefined; });
+    void pending.catch(() => { /* The picker displays catalog failures until automatic recovery. */ })
+      .finally(() => { if (observed === pending) observed = undefined; });
   };
   const timer = setInterval(refresh, MODEL_CATALOG_REFRESH_MS);
   // Hosted Provider polls have no change signal, so they share the six-hour automatic refresh limit.

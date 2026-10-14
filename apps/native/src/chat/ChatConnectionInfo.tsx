@@ -1,7 +1,6 @@
-import { createThemedStyles } from '../theme/styles';
 import { t, useLanguage } from '../i18n';
 import { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text } from 'react-native';
 import type { RemoteDevice } from '../types';
 import type { ChatState } from './types';
 import type { ChatController } from '../../../../shared/remote-chat/client/controller';
@@ -17,7 +16,6 @@ const modeLabels = { get connecting() { return t("正在连接…"); }, direct: 
 export function ChatConnectionInfo({ state, controller, device, active }: {
   state: ChatState; controller: ChatController; device?: RemoteDevice; active: boolean;
 }) {
-  const connectionStyles = useConnectionStyles();
   const styles = useStyles();
   useLanguage();
   const [picking, setPicking] = useState(false);
@@ -30,33 +28,29 @@ export function ChatConnectionInfo({ state, controller, device, active }: {
   if (!state.ready && state.error && !state.connecting) status = t("连接未完成");
   useEffect(() => { if (!canChoose) setPicking(false); }, [canChoose]);
   return <>
-    <View style={connectionStyles.row}>
-      <Text numberOfLines={1} style={[styles.headerMeta, connectionStyles.device,
-        canReconnect && connectionStyles.reconnectingDevice]}>
-        {device ? device.name : t("选择电脑，开始聊天")}</Text>
+    {/* Inline text shares one truncation boundary, including the pressable portions. */}
+    <Text numberOfLines={1} ellipsizeMode="tail" style={styles.headerMeta}>
+      {device ? device.name : t("选择电脑，开始聊天")}
       {device && <>
-        <Text style={styles.headerMeta}> · </Text>
-        <Pressable accessibilityRole="button" accessibilityLabel={`${status} · ${t('连接体检')}`}
-          accessibilityState={{ expanded: healthOpen }} hitSlop={{ top: 6, bottom: 6 }}
-          onPress={() => setHealthOpen(true)}>
-          <Text style={styles.headerMeta}>{status}</Text>
-        </Pressable>
+        {' · '}
+        <Text accessibilityRole="button" accessibilityLabel={`${status} · ${t('连接体检')}`}
+          accessibilityState={{ expanded: healthOpen }} onPress={() => setHealthOpen(true)}>{status}</Text>
       </>}
       {canReconnect && <>
-        <Text style={styles.headerMeta}> · </Text>
+        {' · '}
         <ChatReconnectButton retryAt={state.retryAt} onPress={controller.connectNow} />
       </>}
-      {state.error === HOST_IDENTITY_CHANGED && <Pressable onPress={() => setVerifying(true)} accessibilityRole="button">
-        <Text>{t("核对电脑身份")}</Text></Pressable>}
-      {!state.selected && !canReconnect && <>
-        <Text style={styles.headerMeta}> · </Text>
-        <Pressable accessibilityRole="button" accessibilityLabel={t("选择项目")} disabled={!canChoose}
-          style={connectionStyles.project} onPress={() => setPicking(true)}>
-          <Text numberOfLines={1} ellipsizeMode="tail" style={styles.headerMeta}>
-            {state.draftProject?.label || t("未选择项目")}</Text>
-        </Pressable>
+      {state.error === HOST_IDENTITY_CHANGED && <>
+        {' · '}
+        <Text onPress={() => setVerifying(true)} accessibilityRole="button">{t("核对电脑身份")}</Text>
       </>}
-    </View>
+      {!state.selected && !canReconnect && <>
+        {' · '}
+        <Text accessibilityRole="button" accessibilityLabel={t("选择项目")} disabled={!canChoose}
+          accessibilityState={{ disabled: !canChoose }} onPress={canChoose ? () => setPicking(true) : undefined}>
+          {state.draftProject?.label || t("未选择项目")}</Text>
+      </>}
+    </Text>
     {healthOpen && <ChatConnectionHealth state={state} device={device}
       reconnect={controller.connectNow} close={() => setHealthOpen(false)} />}
     {picking && canChoose && <ChatProjectPicker cwd={state.draftProject?.cwd}
@@ -65,10 +59,3 @@ export function ChatConnectionInfo({ state, controller, device, active }: {
     {verifying && <HostIdentityVerification confirm={controller.confirmHostIdentity} close={() => setVerifying(false)} />}
   </>;
 }
-
-const useConnectionStyles = createThemedStyles(() => ({
-  row: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
-  device: { flexShrink: 1 },
-  reconnectingDevice: { maxWidth: '40%' },
-  project: { flexShrink: 1, minWidth: 0, maxWidth: '60%' },
-}));

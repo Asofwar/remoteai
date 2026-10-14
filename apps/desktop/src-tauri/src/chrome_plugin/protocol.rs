@@ -22,6 +22,7 @@ pub(super) enum Operation {
     Forward,
     Reload,
     Close,
+    Finish,
     Focus,
     Snapshot,
     Frames,

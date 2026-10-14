@@ -49,7 +49,7 @@ export function UserMessage({ item, startedAt, onEdit, editDisabled = false }: {
     {showBubble && <div className={`${styles.userBubble} ${userStyles.bubble}`}>
       {mentions.map((part, index) =>
         part.path && isFileReference(part.path)
-          ? <FileMenu path={part.path} key={`reference-${index}`}>{part.name || part.path}</FileMenu>
+          ? <FileMenu path={part.path} key={`reference-${index}`} preview>{part.name || part.path}</FileMenu>
           : <span className={styles.imageLabel} key={`reference-${index}`}>
           {referenceLabel(part.path)}：{part.name || part.path}
         </span>)}

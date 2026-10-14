@@ -1,13 +1,12 @@
 import { assertRunning } from './permissions.js';
 import { clearControlledTabs } from './tab-indicator.js';
 
-export const DEBUGGER_IDLE_MS = 5 * 60 * 1000;
 const connections = new Map();
 const keyOf = target => target.tabId === undefined ? `worker:${target.targetId}` : `tab:${target.tabId}`;
 
 // Callers serialize operations per target. Retain only the transport between operations;
 // page overrides, protocol subscriptions and frame sessions remain request-scoped.
-export async function acquireConnection(target, signal) {
+export async function acquireConnection(target, signal, clientId) {
   const key = keyOf(target);
   let connection = connections.get(key);
   if (connection?.closed) {
@@ -16,15 +15,15 @@ export async function acquireConnection(target, signal) {
   }
   assertRunning(signal);
   if (!connection) {
-    connection = { target, key, closed: false, detached: false, timer: null, closing: null };
+    connection = { target, key, closed: false, detached: false, closing: null, clients: new Set() };
     connections.set(key, connection);
     connection.attaching = chrome.debugger.attach(target, '1.3');
   }
-  clearTimeout(connection.timer);
   try {
     await connection.attaching;
     assertRunning(signal);
     assertConnected(connection);
+    connection.clients.add(clientId);
     return connection;
   } catch (error) {
     await closeConnection(connection);
@@ -38,13 +37,22 @@ export function assertConnected(connection) {
 
 export function releaseConnection(connection, keepAlive) {
   if (!keepAlive || connection.closed) return closeConnection(connection);
-  connection.timer = setTimeout(() => { void closeConnection(connection); }, DEBUGGER_IDLE_MS);
+  // Reasoning and other tools can take arbitrarily long between browser actions.
+  // Keep Chrome's banner stable until explicit task completion or a stop decision.
+}
+
+export async function finishConnection(target, clientId) {
+  const connection = connections.get(keyOf(target));
+  if (!connection) return true;
+  connection.clients.delete(clientId);
+  if (connection.clients.size) return false;
+  await closeConnection(connection);
+  return true;
 }
 
 export function closeConnection(connection) {
   if (connection.closing) return connection.closing;
   connection.closed = true;
-  clearTimeout(connection.timer);
   connection.closing = detach(connection).finally(() => {
     if (connections.get(connection.key) === connection) connections.delete(connection.key);
   });

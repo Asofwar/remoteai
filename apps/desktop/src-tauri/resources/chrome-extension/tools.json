@@ -39,7 +39,7 @@
     },
     {
       "name": "browser_open",
-      "description": "Open a background page in the Codex group. Use unless the user requests an already-open page.",
+      "description": "Open a background page in the Remote AI group. Call browser_finish when the task is done.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -66,6 +66,48 @@
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "browser_finish",
+      "description": "Finish task tabs and debugging; close temporary tabs and empty groups. Call before replying.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "browserId": {
+            "type": "string",
+            "description": "ID returned by browser_list."
+          },
+          "tabIds": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0 },
+            "maxItems": 100,
+            "uniqueItems": true,
+            "description": "Exact tabs used by this task; existing user tabs stay open. Use [] for worker-only tasks."
+          },
+          "keepTabIds": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0 },
+            "maxItems": 100,
+            "uniqueItems": true,
+            "description": "Subset of tabIds the user asked to keep open. Debugging still ends."
+          },
+          "workerIds": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1, "maxLength": 100 },
+            "maxItems": 100,
+            "uniqueItems": true,
+            "description": "Standalone Worker IDs used by this task."
+          }
+        },
+        "required": ["browserId", "tabIds"],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
         "openWorldHint": true
       }
     },

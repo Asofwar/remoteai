@@ -1,60 +1,37 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { loadDreamSkinStatus, loadDreamSkinThemePreview } from "../../api/backend";
 import type { DreamSkinStatus } from "../../types";
-import { BUILT_IN_DREAM_SKIN_THEMES } from "../../dreamSkinBuiltIns";
 import { DREAM_SKIN_STATUS_CHANGED } from "../dreamSkin/statusEvents";
-import { DEFAULT_GUI_THEME, useGuiTheme, type GuiTheme } from "./guiTheme";
 import { useGuiSkin } from "./guiSkin";
 
 const DEFAULT_OVERLAY_OPACITY = 0.8;
 type Skin = {
-  status: Pick<DreamSkinStatus, "installed" | "session" | "activeThemeAppearance" | "activeThemeOverlayOpacity">;
+  status: Pick<DreamSkinStatus, "installed" | "session" | "activeThemeOverlayOpacity">;
   image: string | null;
 };
 type SkinStyle = CSSProperties & Record<`--${string}`, string | number>;
 
-export function dreamSkinStyle({ status, image }: Skin, theme: GuiTheme = DEFAULT_GUI_THEME): SkinStyle | undefined {
+export function dreamSkinStyle({ status, image }: Skin): SkinStyle | undefined {
   if (!status.installed || status.session === "paused" || !image) return undefined;
   const opacity = status.activeThemeOverlayOpacity;
   const overlay = typeof opacity === "number" && Number.isFinite(opacity)
     ? Math.min(1, Math.max(0, opacity)) : DEFAULT_OVERLAY_OPACITY;
-  const style: SkinStyle = {
+  // Skin metadata must not override the GUI appearance, including "follow application".
+  return {
     "--gui-skin-image": `url(${JSON.stringify(image)})`,
     "--gui-skin-overlay": `${overlay * 100}%`,
   };
-  // An explicit GUI appearance takes precedence over the background theme's palette.
-  if (theme.mode !== "inherit") return style;
-  const appearance = status.activeThemeAppearance;
-  if (appearance === "light" || appearance === "dark") {
-    const dark = appearance === "dark";
-    Object.assign(style, {
-      colorScheme: appearance,
-      "--panel": dark ? "#17191c" : "#fbfcfa",
-      "--bg": dark ? "#121416" : "#f6f8f7",
-      "--ink": dark ? "#e6e8eb" : "#17211b",
-      "--muted": dark ? "#a4abb5" : "#52635a",
-      "--line": dark ? "#3e444b" : "#dfe5df",
-    });
-    if (theme.color === null) Object.assign(style, {
-      "--green-soft": dark ? "#1c3430" : "#e7f5f4",
-      "--green-selection": dark ? "#25443e" : "#dbf0ef",
-      "--green-selection-hover": dark ? "#213a35" : "#cfebea",
-    });
-  }
-  return style;
 }
 
 export function useDreamSkin(active: boolean) {
-  const theme = useGuiTheme();
   const settings = useGuiSkin();
   const sharedSkin = useSharedDreamSkin(active && settings.mode === "inherit");
   const selectedImage = useSelectedImage(active && settings.mode === "custom", settings);
   if (settings.mode === "none") return undefined;
-  if (settings.mode === "inherit") return sharedSkin ? dreamSkinStyle(sharedSkin, theme) : undefined;
+  if (settings.mode === "inherit") return sharedSkin ? dreamSkinStyle(sharedSkin) : undefined;
   return dreamSkinStyle({ image: selectedImage, status: {
     installed: true, session: "active", activeThemeOverlayOpacity: settings.overlayOpacity,
-    activeThemeAppearance: BUILT_IN_DREAM_SKIN_THEMES.find((entry) => entry.id === settings.themeId)?.appearance,
-  } }, theme);
+  } });
 }
 
 function useSelectedImage(active: boolean, { themeId, imageRevision }: ReturnType<typeof useGuiSkin>) {

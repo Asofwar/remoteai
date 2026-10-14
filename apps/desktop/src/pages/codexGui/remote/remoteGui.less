@@ -6,11 +6,11 @@
   .chat-conversation { background: transparent; }
   .gui-remote-tools { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
   .chat-message-region { color: var(--ink); font: inherit; }
-  .chat-sidebar { flex-basis: 236px; background: transparent; border: 0; }
+  .chat-sidebar { flex-basis: auto; background: transparent; border: 0; }
   .gui-remote-sidebar { flex: 1; min-width: 0; }
   .gui-remote-sidebar h2 { font-size: calc(var(--gui-font-size, 14px) - 1px); font-weight: 600; }
   .chat-header { min-height: 38px; height: 38px; padding: 4px 14px; gap: 6px;
-    border-bottom: 1px solid var(--line); background: transparent;
+    border-bottom: 0; background: transparent;
     .ant-btn-icon { display: inline-flex; align-items: center; }
     > .chat-back { min-width: 26px; width: 26px; height: 26px; padding: 0; align-self: center;
       svg { width: 14px; height: 14px; } }
@@ -77,11 +77,11 @@
 }
 @media (max-width: 1150px) {
   .gui-remote-workspace.chat-page {
-    .chat-sidebar { flex-basis: 200px; }
     .chat-message-content { padding: 20px; }
     .chat-composer-dock, .gui-remote-project { padding-inline: 16px; }
   }
 }
+.chat-drawer .gui-remote-sidebar { width: 100%; }
 @media (max-width: 860px) {
   .gui-remote-workspace.chat-page {
     .chat-header .chat-connection-info { max-width: 45%; }

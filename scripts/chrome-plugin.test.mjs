@@ -64,6 +64,15 @@ test('website access remains pending until the user decides and denial grants no
   assert.deepEqual(storage.session,{});
 });
 
+test('noninteractive cleanup checks never reopen a denied website permission prompt', async () => {
+  await assert.rejects(permissionModule.authorize('https://example.com', 'first', undefined, { prompt: false }), /许可/);
+  assert.deepEqual((await permissionModule.status()).pending, []);
+  storage.session.sessionGrants = [{ origin: 'https://example.com', clientId: 'first' }];
+  await permissionModule.authorize('https://example.com', 'first', undefined, { prompt: false });
+  await assert.rejects(permissionModule.authorize('https://example.com', 'second', undefined, { prompt: false }), /许可/);
+  assert.deepEqual((await permissionModule.status()).pending, []);
+});
+
 test('session grants are scoped to the selected home and permanent grants can be revoked',async()=>{
   const first=permissionModule.authorize('https://example.com/a','first');
   await new Promise(resolve=>setImmediate(resolve));

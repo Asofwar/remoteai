@@ -1,11 +1,13 @@
 import { guiText } from "../../i18n/guiText";
 import { useEffect, useRef } from "react";
-import { GitBranch, MessageSquare, Target } from "lucide-react";
+import { File, Folder, GitBranch, MessageSquare, Target } from "lucide-react";
 import { ComposerSkillIcon } from "./ComposerSkillIcon";
 import type { ComposerOption } from "./composerOptions";
 import styles from "./SkillInput.module.less";
 
-function menuLabels(kind: "coze" | "conversation" | "skill" | "command") {
+function menuLabels(kind: "coze" | "conversation" | "skill" | "command" | "file") {
+  if (kind === "file") return { heading: guiText("引用文件或文件夹"), label: guiText("项目文件"),
+    loading: guiText("正在搜索文件…"), empty: guiText("没有找到匹配的文件或文件夹") };
   if (kind === "coze") return { heading: "选择 Coze 内容", label: "Coze", loading: "正在加载 Coze 内容…",
     empty: "没有匹配的已发布内容，请先在 Coze 中发布。" };
   if (kind === "conversation") return { heading: guiText("引用对话 · 发送时带上近期内容"), label: guiText("对话"),
@@ -17,6 +19,7 @@ function menuLabels(kind: "coze" | "conversation" | "skill" | "command") {
 }
 
 function OptionIcon({ option }: { option: ComposerOption }) {
+  if (option.kind === "file") return option.directory ? <Folder size={18} /> : <File size={18} />;
   if (option.kind === "skill") return <ComposerSkillIcon skill={option.skill} />;
   if (option.kind === "coze") return <GitBranch size={18} aria-hidden="true" />;
   if (option.kind === "conversation") return <MessageSquare size={18} aria-hidden="true" />;
@@ -28,10 +31,11 @@ function OptionIcon({ option }: { option: ComposerOption }) {
   </svg>;
 }
 
-export function SkillMenu({ id, options, selected, loading, error, onChoose, below, skillsOnly, conversations, coze }: {
+export function SkillMenu({ id, options, selected, loading, error, onChoose, below,
+  skillsOnly, conversations, coze, files, truncated }: {
   id: string; options: ComposerOption[]; selected: number; loading: boolean; error: string;
   onChoose: (option: ComposerOption) => void;
-  below?: boolean; skillsOnly?: boolean; conversations?: boolean; coze?: boolean;
+  below?: boolean; skillsOnly?: boolean; conversations?: boolean; coze?: boolean; files?: boolean; truncated?: boolean;
 }) {
   const list = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -40,6 +44,7 @@ export function SkillMenu({ id, options, selected, loading, error, onChoose, bel
   let kind: Parameters<typeof menuLabels>[0] = skillsOnly ? "skill" : "command";
   if (conversations) kind = "conversation";
   if (coze) kind = "coze";
+  if (files) kind = "file";
   const labels = menuLabels(kind);
   return <div className={`${styles.menu} ${below ? styles.menuBelow : ""}`}
     onMouseDown={(event) => event.preventDefault()}>
@@ -57,6 +62,7 @@ export function SkillMenu({ id, options, selected, loading, error, onChoose, bel
     </div>
     {loading && <p role="status">{labels.loading}</p>}
     {error && <p role="status">{error}</p>}
+    {truncated && <p role="status">{guiText("仅显示部分结果，请输入更完整的名称或路径")}</p>}
     {!loading && !error && !options.length && <p role="status">{labels.empty}</p>}
   </div>;
 }

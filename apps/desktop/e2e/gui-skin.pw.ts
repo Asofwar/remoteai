@@ -7,10 +7,12 @@ for (const dark of [false, true]) {
       page.on("pageerror", (error) => errors.push(error.message));
       await page.route("https://fonts.googleapis.com/**", (route) => route.abort());
       await page.setViewportSize({ width: 1440, height: 900 });
-      await page.goto(`/e2e/gui-skin-harness.html${dark ? "?dark" : ""}`);
+      await page.goto(`/e2e/gui-skin-harness.html?shared${dark ? "&dark" : ""}`);
       await page.getByRole("tab", { name: "皮肤", exact: true }).click();
       const panel = page.getByRole("tabpanel", { name: "皮肤", exact: true });
       await expect(panel.getByText("先安装换肤组件")).toHaveCount(0);
+      await expect(panel.getByRole("radio", { name: "独立设置" })).toBeChecked();
+      await expect(page.getByLabel("皮肤效果")).not.toHaveAttribute("data-dream-skin");
       await page.getByPlaceholder("搜索皮肤").fill("preset-rose-reverie");
       const card = panel.locator("article").first();
       await card.getByRole("button").click();

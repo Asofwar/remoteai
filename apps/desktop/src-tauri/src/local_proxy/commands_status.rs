@@ -193,11 +193,7 @@ pub(crate) async fn set_official_model_context_window<R: Runtime + 'static>(
             crate::storage::ModelContextWindowUpdate::Model { model, context_window },
         )?;
         if let Ok(paths) = resolve_paths(&app) {
-            if let Err(error) = update_cached_official_model_context_windows(
-                &paths,
-                settings.gpt_5_6_sol_context_window,
-                &settings.official_model_context_windows,
-            ) {
+            if let Err(error) = update_cached_official_model_context_windows(&app, &paths, &settings) {
                 log_proxy_error!("failed to update cached official model context windows: {error}");
             }
         }
@@ -248,11 +244,7 @@ fn set_gpt_5_6_sol_context_window_blocking<R: Runtime>(
         crate::storage::ModelContextWindowUpdate::Global(context_window),
     )?;
     let paths = resolve_paths(app)?;
-    if let Err(error) = update_cached_official_model_context_windows(
-        &paths,
-        context_window,
-        &settings.official_model_context_windows,
-    ) {
+    if let Err(error) = update_cached_official_model_context_windows(app, &paths, &settings) {
         // The proxy applies the override on the next model request even if this best-effort cache refresh races Codex.
         log_proxy_error!("failed to update the cached GPT-5.6 Sol context window: {error}");
     }

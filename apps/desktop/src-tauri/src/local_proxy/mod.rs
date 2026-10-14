@@ -29,6 +29,7 @@ pub(crate) mod gui_system_prompts;
 pub(crate) mod lan_keys;
 mod lan_usage_capture;
 mod model_catalog_deadline;
+mod official_context_models;
 mod official_input;
 mod official_model_cache;
 mod official_model_request;

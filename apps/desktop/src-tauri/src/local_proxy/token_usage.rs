@@ -22,10 +22,10 @@ fn official_model_context_windows(paths: &Paths) -> HashMap<String, u64> {
         .unwrap_or_default()
 }
 
-fn update_cached_official_model_context_windows(
+fn update_cached_official_model_context_windows<R: Runtime>(
+    app: &tauri::AppHandle<R>,
     paths: &Paths,
-    global_context_window: u64,
-    model_context_windows: &std::collections::BTreeMap<String, u64>,
+    settings: &AppSettings,
 ) -> Result<(), String> {
     if !should_update_official_model_cache(paths) {
         return Ok(());
@@ -35,7 +35,14 @@ fn update_cached_official_model_context_windows(
         return Ok(());
     }
     let mut catalog = read_json(&path)?;
-    if apply_official_context_windows(&mut catalog, global_context_window, model_context_windows) {
+    let completed =
+        official_context_models::complete(app, &mut catalog, &settings.official_model_context_windows);
+    let updated = apply_official_context_windows(
+        &mut catalog,
+        settings.gpt_5_6_sol_context_window,
+        &settings.official_model_context_windows,
+    );
+    if completed || updated {
         write_json_if_changed(&path, &catalog)?;
     }
     Ok(())

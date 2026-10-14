@@ -108,6 +108,9 @@ fn models_payload<R: Runtime>(
         payload,
         settings.gpt_5_6_sol_context_window,
         &settings.official_model_context_windows,
+        |catalog| {
+            official_context_models::complete(app, catalog, &settings.official_model_context_windows)
+        },
     )
 }
 
@@ -134,6 +137,7 @@ fn override_official_model_context_windows(
     mut payload: UpstreamPayload,
     global_context_window: u64,
     model_context_windows: &std::collections::BTreeMap<String, u64>,
+    complete_models: impl FnOnce(&mut Value) -> bool,
 ) -> Result<UpstreamPayload, String> {
     if payload.status != 200 {
         return Ok(payload);
@@ -149,7 +153,10 @@ fn override_official_model_context_windows(
     }
     let mut catalog = serde_json::from_slice::<Value>(&body)
         .map_err(|error| format!("Upstream model catalog is not valid JSON: {error}"))?;
-    if apply_official_context_windows(&mut catalog, global_context_window, model_context_windows) {
+    let completed = complete_models(&mut catalog);
+    let updated =
+        apply_official_context_windows(&mut catalog, global_context_window, model_context_windows);
+    if completed || updated {
         body = serde_json::to_vec(&catalog)
             .map_err(|error| format!("Failed to encode model catalog: {error}"))?;
         replace_model_catalog_etags(&mut payload.response_headers, &body);
@@ -204,7 +211,7 @@ fn override_model_context_window(
     context_window: u64,
 ) -> Result<UpstreamPayload, String> {
     let overrides = std::collections::BTreeMap::from([(model.to_string(), context_window)]);
-    override_official_model_context_windows(payload, context_window, &overrides)
+    override_official_model_context_windows(payload, context_window, &overrides, |_| false)
 }
 
 fn override_model_image_input(

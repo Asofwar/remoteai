@@ -8,6 +8,7 @@ export interface ProjectDirectoriesResponse {
   truncated: boolean;
 }
 export interface ProjectPickerProps {
+  title?: string;
   cwd?: string;
   load: (directory: string) => Promise<ProjectDirectoriesResponse>;
   choose: (project: ChatProject) => void;

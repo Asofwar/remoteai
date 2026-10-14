@@ -11,6 +11,7 @@ export function demoProjectDirectories(input: Record<string, unknown>): ProjectD
     { name: LONG_PROJECT_NAME, path: `${ROOT}/${LONG_PROJECT_NAME}` },
     { name: '不可访问的文件夹', path: `${ROOT}/unavailable` },
   ] };
+  if (directory === `${ROOT}/demo`) return { directory, parent: ROOT, entries: [], truncated: false };
   if (directory === `${ROOT}/${LONG_PROJECT_NAME}`) return { directory, parent: ROOT, entries: [], truncated: false };
   throw new Error('Fixture directory unavailable');
 }

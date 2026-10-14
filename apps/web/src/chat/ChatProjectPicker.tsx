@@ -7,7 +7,7 @@ import { useProjectDirectories } from '../../../../shared/remote-chat/client/use
 export function ChatProjectPicker(props: ProjectPickerProps) {
   useLanguage();
   const { result, loading, error, browse, retry } = useProjectDirectories(props);
-  return <AdaptiveSheet open title={t("选择项目")} width={400} onClose={props.close}>
+  return <AdaptiveSheet open title={props.title ?? t("选择项目")} width={400} onClose={props.close}>
     <div className="chat-settings chat-project-picker">
       <p className="chat-muted chat-project-path">{result?.directory || t("此电脑")}</p>
       <div className="chat-row">

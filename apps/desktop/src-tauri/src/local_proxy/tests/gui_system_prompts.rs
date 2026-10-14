@@ -46,6 +46,9 @@ impl Drop for RestoreExternalPrompts {
 
 #[test]
 fn gui_prompt_changes_are_independent_during_active_requests_and_polling() {
+    if run_gui_runtime_test_in_subprocess() {
+        return;
+    }
     let _guard = GUI_SPEED_TEST_LOCK.lock().unwrap();
     let _prompts = RestoreExternalPrompts::install();
     let upstream = Server::http("127.0.0.1:0").unwrap();

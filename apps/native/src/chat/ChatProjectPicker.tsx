@@ -13,7 +13,7 @@ export function ChatProjectPicker(props: ProjectPickerProps) {
   const color = useThemeColor();
   useLanguage();
   const { result, loading, error, browse, retry } = useProjectDirectories(props);
-  return <BottomSheet fullWidthContent visible title={t("选择项目")} onClose={props.close} dragFromHeaderOnly
+  return <BottomSheet fullWidthContent visible title={props.title ?? t("选择项目")} onClose={props.close} dragFromHeaderOnly
     actions={[{ label: t("选择此文件夹"), tone: 'primary', disabled: loading || !result?.directory,
       onPress: () => { if (result?.directory) props.choose(directoryProject(result.directory)); } }]}>
     <View style={pickerStyles.root}>

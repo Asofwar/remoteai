@@ -7,7 +7,8 @@ import previewImage from '../src-tauri/icons/32x32.png?inline';
 import { changeDemoComposer, composerErrors, demoComposer } from './demo-composer';
 import { guiSidebar } from '../src/pages/codexGui/sidebarBridge';
 import { SIDEBAR_EVENT } from '../../../shared/remote-chat/sidebar';
-import { saveProject } from '../src/pages/codexGui/projectCatalog';
+import { readProjects, saveProject } from '../src/pages/codexGui/projectCatalog';
+import { directoryProject } from '../../../shared/remote-chat/projectDirectories';
 import { historyDelta, type HistoryVersion } from '../../../shared/remote-chat/historySync';
 import { historyNotification } from '../../../shared/remote-chat/historyNotification';
 import { RemoteImages } from '../src/remoteChat/images';
@@ -74,6 +75,17 @@ export function demoResponse(request: RpcRequest, link: DemoLink): unknown {
   operations.push({ ...input, method: request.method });
   const download = demoDownloads(input);
   if (download) return download.value;
+  if (input.operation === 'guiProjects') {
+    return readProjects().map(project => ({ cwd: project.path, label: project.name }));
+  }
+  if (input.operation === 'guiProjectSelect') {
+    const directory = demoProjectDirectories({ directory: input.cwd }).directory;
+    const project = directoryProject(directory);
+    if (!readProjects().some(saved => saved.path === directory)) saveProject({ path: directory, name: project.label });
+    const selected = threads.get(String(input.threadId));
+    if (selected) selected.cwd = directory;
+    return project;
+  }
   if (GUI_TOOL_OPERATIONS.has(String(input.operation))) return demoGuiTools(input);
   if (input.operation === 'usageSummary') return { totalTokens: 123456, estimatedCostUsd: 1.25,
     primaryRemainingPercent: 75, primaryRemainingAggregated: false, providerEstimatedCost: null };

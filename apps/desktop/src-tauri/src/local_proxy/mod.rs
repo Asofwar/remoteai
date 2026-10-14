@@ -148,6 +148,7 @@ mod tests {
     include!("tests/http_streaming.rs");
     include!("tests/lan_http.rs");
     include!("tests/gui_routing.rs");
+    include!("tests/gui_runtime_isolation.rs");
     include!("tests/gui_runtime.rs");
     include!("tests/gui_system_prompts.rs");
     include!("tests/gui_home_isolation.rs");

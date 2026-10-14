@@ -1,9 +1,8 @@
 import { t, useLanguage } from '../i18n';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { ChatComputer } from '../../../../shared/remote-chat/devices';
 import type { ChatState } from './types';
 import type { ChatController } from '../../../../shared/remote-chat/client/controller';
-import { ChatProjectPicker } from './ChatProjectPicker';
 import { ChatReconnectButton } from './ChatReconnectButton';
 import { HOST_IDENTITY_CHANGED } from '../../../../shared/remote-chat/trustedHost';
 import { HostIdentityVerification } from './HostIdentityVerification';
@@ -16,15 +15,12 @@ export function ChatConnectionInfo({ state, controller, device, active, chooseDe
   state: ChatState; controller: ChatController; device?: ChatComputer; active: boolean; chooseDevice: () => void;
 }) {
   useLanguage();
-  const [picking, setPicking] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [healthOpen, setHealthOpen] = useState(false);
-  const canChoose = active && state.ready && !state.selected && !state.sending;
   const canReconnect = active && device && !state.ready && !state.connecting && state.mode !== 'connecting';
   let status = modeLabels[state.mode];
   if (!state.ready && (state.mode === 'direct' || state.mode === 'relay')) status = t("正在同步聊天…");
   if (!state.ready && state.error) status = t("连接未完成");
-  useEffect(() => { if (!canChoose) setPicking(false); }, [canChoose]);
   return <>
     <div className="chat-connection-info chat-muted">
       <div className="chat-connection-summary">
@@ -41,16 +37,10 @@ export function ChatConnectionInfo({ state, controller, device, active, chooseDe
           label={t('核对电脑身份')} onClick={() => setVerifying(true)}>
           {t('核对电脑身份')}</ChatConnectionAction>}
         {canReconnect && <ChatReconnectButton retryAt={state.retryAt} onClick={controller.connectNow} />}
-        {!state.selected && !canReconnect && <ChatConnectionAction className="chat-project-name" label={t("选择项目")}
-          disabled={!canChoose} onClick={() => setPicking(true)}>
-          {state.draftProject?.label || t("未选择项目")}</ChatConnectionAction>}
       </div>
     </div>
     {healthOpen && <ChatConnectionHealth state={state} device={device}
       reconnect={controller.connectNow} close={() => setHealthOpen(false)} />}
-    {picking && canChoose && <ChatProjectPicker cwd={state.draftProject?.cwd}
-      load={controller.loadProjectDirectories} close={() => setPicking(false)}
-      choose={(project) => { controller.chooseDraftProject(project); setPicking(false); }} />}
     {verifying && <HostIdentityVerification confirm={controller.confirmHostIdentity} close={() => setVerifying(false)} />}
   </>;
 }

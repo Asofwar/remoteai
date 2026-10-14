@@ -98,6 +98,7 @@ export function ChatComposer(props: ComposerProps) {
     if (event.key === 'Escape') { setAdding(false); menu.close(); }
   }}>
     {queue && <ChatQueue {...queue} {...state.queueEditor} editDisabled={state.queueEditor.editDisabled || busy} />}
+    {props.projectPicker}
     <form className={`chat-composer${compact && !desktop && !suggestion.text ? ' is-compact' : ''}`}
       onSubmit={event => { event.preventDefault(); void state.submit(); }}>
       <input ref={photoInput} type="file" accept="image/*" multiple hidden aria-label={t("选择相册图片")}

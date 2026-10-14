@@ -217,7 +217,7 @@ for (const [access, label] of [['danger-full-access', '完全访问'], ['read-on
 for (const relay of [false, true]) {
   test(`keeps chat connected across browser tabs and app pages over ${relay ? 'relay' : 'direct'}`,
     async ({ page, request }) => backgroundJourney(page, request, relay));
-  test(`selects a computer folder for a new chat over ${relay ? 'relay' : 'direct'}`,
+  test(`switches existing projects and adds a project over ${relay ? 'relay' : 'direct'}`,
     async ({ page, request }) => projectPickerJourney({ page, request, relay }));
   test(`sends album photos over ${relay ? 'relay' : 'direct'}`,
     async ({ page, request }, info) => attachmentJourney({ page, request, info, relay }));

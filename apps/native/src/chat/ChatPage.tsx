@@ -11,6 +11,7 @@ import type { AuthSession, RemoteDevice } from '../types';
 import { ChatApproval } from './ChatApprovals';
 import { ChatAsyncQuestions } from './ChatAsyncQuestions';
 import { ChatComposer } from './ChatComposer';
+import { ChatProjectSwitch } from './ChatProjectSwitch';
 import { ChatOverlay } from './ChatOverlay';
 import { queueProps } from '../../../../shared/remote-chat/client/queueProps';
 import { ChatMessages } from './ChatMessages';
@@ -203,6 +204,7 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
       scope: JSON.stringify([session.baseUrl, session.email, device?.deviceId]), storage: Storage,
     })}
       queue={queueProps(state, controller)}
+      projectPicker={<ChatProjectSwitch state={state} controller={controller} active={active && foreground} />}
       connection={{ client: controller.guiAccounts, deviceName: device?.name,
         chooseDevice: () => setPickingDevice(true) }}
       goals={controller.goals} goal={state.selected ? state.goals?.[state.selected.id] : null} goalBusy={state.goalBusy}
@@ -215,7 +217,7 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
       catalog={catalog} cwd={state.selected?.cwd ?? state.draftProject?.cwd ?? ''}
       compactReason={compactUnavailableReason(state)} compacting={!!state.compacting
         && state.compacting === state.selected?.id} compact={controller.compact}
-      settingsBusy={state.settingsBusy} settingsError={state.settingsError}
+      settingsBusy={state.settingsBusy || !!state.workspaceBusy} settingsError={state.settingsError}
       updateSettings={(settings) => controller.setSettings(settings)}
       active={active} ready={ready} sending={state.sending} running={running}
       upload={state.upload} reconnecting={state.mode === 'connecting' || state.mode === 'offline'}

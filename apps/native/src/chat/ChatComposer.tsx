@@ -3,7 +3,7 @@ import { ComposerSuggestion } from './ComposerSuggestion';
 import type { PromptSuggestionSource } from '../../../../shared/chat/nextPromptSuggestion';
 import { ComposerInput } from './ComposerInput';
 import { t, useLanguage } from '../i18n';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Keyboard, Pressable, ScrollView, Text, View } from 'react-native';
 import { ChatSettings } from './ChatSettings';
 import type { ChatConnectionProps } from './ChatProfileMenu';
@@ -47,6 +47,7 @@ import type { QueueProps } from '../../../../shared/remote-chat/client/queueProp
 import { useQueueEditor } from '../../../../shared/remote-chat/client/useQueueEditor';
 
 interface Props {
+  projectPicker?: ReactNode;
   suggestions?: PromptSuggestionSource;
   connection: ChatConnectionProps;
   upload?: UploadProgress;
@@ -83,7 +84,8 @@ interface Props {
   loadConversations: ConversationSearch;
 }
 
-export function ChatComposer({ suggestions, models, selection, settingsBusy, settingsError, updateSettings,
+export function ChatComposer({ projectPicker, suggestions, models, selection, settingsBusy, settingsError,
+  updateSettings,
   readUsage, readConversationMetrics, usageActive, tokenUsage, contextSettings, connection, queue, goals, goal, goalBusy,
   threadId, active, ready, sending, running, upload, reconnecting = false, interrupted = false, send, interrupt,
   catalog, cwd, compactReason, compacting, compact, loadCatalog, loadFiles, loadConversations }: Props) {
@@ -193,6 +195,7 @@ export function ChatComposer({ suggestions, models, selection, settingsBusy, set
   };
   return <View style={styles.composerDock}>
     {queue && <ChatQueue {...queue} {...queueEditor} />}
+    {projectPicker}
     <View style={[styles.composer, compactField && styles.composerCompact]}>
     {!!draft.error && <Text accessibilityRole="alert" style={styles.error}>{draft.error}</Text>}
     {compacting && <Text style={styles.subtitle}>{t("正在压缩上下文…")}</Text>}

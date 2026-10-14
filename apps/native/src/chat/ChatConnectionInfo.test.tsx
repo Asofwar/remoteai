@@ -18,7 +18,6 @@ vi.mock('react', async original => ({ ...await original<typeof React>(),
 }));
 vi.mock('react-native', () => ({ Text: 'Text', View: 'View', Pressable: 'Pressable',
   StyleSheet: { create: <T,>(styles: T) => styles } }));
-vi.mock('./ChatProjectPicker', () => ({ ChatProjectPicker: 'ProjectPicker' }));
 vi.mock('./ChatConnectionHealth', () => ({ ChatConnectionHealth: 'ConnectionHealth' }));
 vi.mock('./HostIdentityVerification', () => ({ HostIdentityVerification: 'IdentityVerification' }));
 

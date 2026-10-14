@@ -8,6 +8,7 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import type { ChatComputer } from '../../../../shared/remote-chat/devices';
 import { ChatApproval } from './ChatApproval';
 import { ChatComposer } from './ChatComposer';
+import { ChatProjectSwitch } from './ChatProjectSwitch';
 import type { NativeFileDrop } from './composerProps';
 import { queueProps } from '../../../../shared/remote-chat/client/queueProps';
 import { ChatMessages } from './ChatMessages';
@@ -141,6 +142,8 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
         || state.compacting === state.selected?.id} answer={controller.answerAsyncQuestion} />
     {composerHeader}
     <ChatComposer suggestions={remotePromptSuggestion(state, controller.suggestNextPrompt, { scope })}
+      projectPicker={!composerHeader && <ChatProjectSwitch state={state} controller={controller}
+        active={active && foreground} />}
       queue={queueProps(state, controller)} readClipboardImages={readClipboardImages} nativeFileDrop={nativeFileDrop}
       connection={{ client: controller.guiAccounts, deviceName: device?.name ?? t("选择电脑"),
         chooseDevice: () => setPickingDevice(true) }}

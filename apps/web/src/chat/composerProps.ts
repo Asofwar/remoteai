@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { PromptSuggestionSource } from '../../../../shared/chat/nextPromptSuggestion';
 import type { Model, SendInput, ThreadTokenUsage } from './types';
 import type { ChatConnectionProps } from './ChatProfileMenu';
@@ -21,6 +22,7 @@ export interface NativeFileDrop {
 }
 
 export interface ComposerProps {
+  projectPicker?: ReactNode;
   suggestions?: PromptSuggestionSource;
   connection: ChatConnectionProps;
   readClipboardImages?: () => Promise<File[]>;

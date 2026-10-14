@@ -3,6 +3,9 @@ static GUI_SPEED_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 #[test]
 fn help_requests_use_only_gui_selection_and_do_not_inherit_custom_prompts() {
+    if run_gui_runtime_test_in_subprocess() {
+        return;
+    }
     use crate::codex_config::{HELP_ACCOUNT_REVISION_HEADER, HELP_REQUEST_PURPOSE, LOCAL_PROXY_REQUEST_PURPOSE_HEADER};
     use crate::codex_gui::account_selection;
     let _guard = GUI_SPEED_TEST_LOCK.lock().unwrap();
@@ -38,6 +41,9 @@ fn help_requests_use_only_gui_selection_and_do_not_inherit_custom_prompts() {
 
 #[test]
 fn help_requests_reject_a_stale_selection_without_contacting_the_provider() {
+    if run_gui_runtime_test_in_subprocess() {
+        return;
+    }
     use crate::codex_config::{HELP_ACCOUNT_REVISION_HEADER, HELP_REQUEST_PURPOSE, LOCAL_PROXY_REQUEST_PURPOSE_HEADER};
     let _guard = GUI_SPEED_TEST_LOCK.lock().unwrap();
     let upstream = Server::http("127.0.0.1:0").unwrap();
@@ -54,12 +60,14 @@ fn help_requests_reject_a_stale_selection_without_contacting_the_provider() {
 
 struct GuiRuntimeFixture {
     app: tauri::App<tauri::test::MockRuntime>,
-    root: PathBuf,
     base_url: String,
 }
 
 #[test]
 fn help_model_is_not_replaced_by_provider_defaults_or_image_routing() {
+    if run_gui_runtime_test_in_subprocess() {
+        return;
+    }
     use crate::codex_config::{HELP_ACCOUNT_REVISION_HEADER, HELP_REQUEST_PURPOSE, LOCAL_PROXY_REQUEST_PURPOSE_HEADER};
     let _guard = GUI_SPEED_TEST_LOCK.lock().unwrap();
     let upstream = Server::http("127.0.0.1:0").unwrap();
@@ -93,14 +101,13 @@ fn help_model_is_not_replaced_by_provider_defaults_or_image_routing() {
 
 impl GuiRuntimeFixture {
     fn new(upstream: &Server) -> Self {
-        Self::with_app(upstream, breakdown_responsiveness_test_app())
+        Self::with_app(upstream, gui_runtime_test_app())
     }
 
     fn with_app(upstream: &Server, app: tauri::App<tauri::test::MockRuntime>) -> Self {
         app.manage(crate::codex_gui::GuiState::default());
         app.manage(crate::codex_gui::web::WebEventState::default());
         let paths = resolve_paths(app.handle()).unwrap();
-        let root = paths.state_file.parent().unwrap().to_path_buf();
         let mut provider = openai_provider(format!("http://{}/v1", upstream.server_addr()));
         provider.id = "gui-runtime".into();
         provider.kind = ProviderKind::Custom;
@@ -122,7 +129,6 @@ impl GuiRuntimeFixture {
         let base_url = gui_runtime::ensure_started(app.handle()).unwrap();
         Self {
             app,
-            root,
             base_url,
         }
     }
@@ -159,15 +165,6 @@ impl Drop for GuiRuntimeFixture {
         stop_server();
         gui_runtime::shutdown(self.app.handle());
         set_proxy_service_tier(ProxyServiceTier::Default);
-        assert!(self
-            .root
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .starts_with("com.codex-switch.breakdown-test."));
-        if let Err(error) = fs::remove_dir_all(&self.root) {
-            eprintln!("GUI runtime fixture cleanup failed: {error}");
-        }
     }
 }
 
@@ -202,6 +199,9 @@ fn runtime_upstream_reply(request: Request, tier: &str) {
 
 #[test]
 fn gui_transport_runs_without_external_proxy_and_keeps_speed_usage_and_polling_independent() {
+    if run_gui_runtime_test_in_subprocess() {
+        return;
+    }
     let _guard = GUI_SPEED_TEST_LOCK.lock().unwrap();
     let upstream = Server::http("127.0.0.1:0").unwrap();
     let fixture = GuiRuntimeFixture::new(&upstream);

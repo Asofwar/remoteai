@@ -87,7 +87,7 @@ html:has(.app-shell.chat-active), body:has(.app-shell.chat-active) { overscroll-
 .chat-connection-info .chat-connection { font: inherit; color: inherit; }
 .chat-connection-name { min-width: 0; }
 .chat-connection-status { flex-shrink: 0; max-width: 55%; }
-.chat-connection-name, .chat-connection-status, .chat-project-name {
+.chat-connection-name, .chat-connection-status {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 /* Keep recovery actions outside the truncating summary, wrapping them on narrow screens. */

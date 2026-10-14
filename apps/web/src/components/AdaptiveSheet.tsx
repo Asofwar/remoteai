@@ -14,6 +14,7 @@ interface AdaptiveSheetProps {
   width?: number;
   className?: string;
   presentation?: "adaptive" | "drawer";
+  afterOpenChange?: (open: boolean) => void;
 }
 
 export function AdaptiveSheet({
@@ -27,6 +28,7 @@ export function AdaptiveSheet({
   width = 520,
   className,
   presentation = "adaptive",
+  afterOpenChange,
 }: AdaptiveSheetProps) {
   useLanguage();
   const screens = Grid.useBreakpoint();
@@ -40,6 +42,7 @@ export function AdaptiveSheet({
     ? <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>{back}{heading}</div> : heading;
   if (presentation === "drawer") {
     return <Drawer open={open} title={titleContent} placement="right" width={`min(${width}px, 100vw)`}
+      afterOpenChange={afterOpenChange}
       className={className}
       onClose={onClose} destroyOnHidden closable={{ 'aria-label': t("关闭"), placement: 'end' }}>
       {children}

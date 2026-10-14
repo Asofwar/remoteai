@@ -1,6 +1,8 @@
 import type { Channel } from '@tauri-apps/api/core';
 import previewImage from '../src-tauri/icons/32x32.png?inline';
 import { saveGuiFontSize } from '../src/pages/codexGui/guiAppearance';
+import { applyThemeMode } from '../src/utils/themeMode';
+import '../src/styles.css';
 
 const endpoint = new URLSearchParams(location.search).get('socket')!;
 const sockets = new Map<string, WebSocket>();
@@ -73,7 +75,7 @@ Object.assign(window, { __TAURI_INTERNALS__: { invoke,
   transformCallback: (callback: (value: unknown) => void) => { callbacks.set(++callbackId, callback); return callbackId; },
   unregisterCallback: (id: number) => { callbacks.delete(id); } },
   __TAURI_EVENT_PLUGIN_INTERNALS__: { unregisterListener: (_event: string, id: number) => { listeners.delete(id); } },
-  remoteGuiFixture: { commands, beats: () => beats, setFontSize: saveGuiFontSize,
+  remoteGuiFixture: { commands, beats: () => beats, setFontSize: saveGuiFontSize, setThemeMode: applyThemeMode,
     pauseDirectory: () => { holdDirectory = true; },
     copyImage: () => { clipboardImages = [{ mimeType: 'image/png', data: previewImage.split(',')[1] }]; },
     dropFiles: (position: { x: number; y: number }) => {
@@ -91,6 +93,7 @@ declare global {
   interface Window { remoteGuiFixture: {
     commands: string[]; beats: () => number; pauseDirectory: () => void; releaseDirectory: () => void;
     setFontSize: (size: number) => boolean;
+    setThemeMode: (mode: 'light' | 'dark') => void;
     copyImage: () => void; pauseClipboard: () => void; releaseClipboard: () => void;
     dropFiles: (position: { x: number; y: number }) => void;
   } }

@@ -9,7 +9,8 @@ module.exports = function withChatBackground(config) {
   config = withAndroidManifest(config, (result) => {
     const manifest = result.modResults.manifest;
     manifest['uses-permission'] ??= [];
-    for (const name of ['FOREGROUND_SERVICE', 'FOREGROUND_SERVICE_REMOTE_MESSAGING', 'WAKE_LOCK']) {
+    for (const name of ['FOREGROUND_SERVICE', 'FOREGROUND_SERVICE_REMOTE_MESSAGING',
+      'FOREGROUND_SERVICE_CONNECTED_DEVICE', 'CHANGE_NETWORK_STATE', 'WAKE_LOCK']) {
       const permission = 'android.permission.' + name;
       if (!manifest['uses-permission'].some((entry) => entry.$['android:name'] === permission)) {
         manifest['uses-permission'].push({ $: { 'android:name': permission } });
@@ -17,9 +18,11 @@ module.exports = function withChatBackground(config) {
     }
     const application = manifest.application[0];
     application.service ??= [];
-    if (!application.service.some((entry) => entry.$['android:name'] === SERVICE)) {
+    const service = application.service.find((entry) => entry.$['android:name'] === SERVICE);
+    if (service) service.$['android:foregroundServiceType'] = 'remoteMessaging|connectedDevice';
+    else {
       application.service.push({ $: { 'android:name': SERVICE, 'android:exported': 'false',
-        'android:foregroundServiceType': 'remoteMessaging', 'android:stopWithTask': 'true' } });
+        'android:foregroundServiceType': 'remoteMessaging|connectedDevice', 'android:stopWithTask': 'true' } });
     }
     return result;
   });

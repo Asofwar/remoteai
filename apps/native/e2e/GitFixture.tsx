@@ -17,7 +17,7 @@ function App() {
     <ChatOverlay>
     <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}>
       <Text style={{ flex: 1 }}>Git tools fixture</Text>
-      {fonts && <ChatTools client={client} cwd="/projects/demo" active connected deviceName="测试电脑" />}
+      {fonts && <ChatTools client={client} cwd="/projects/demo" scope="git-fixture" active connected deviceName="测试电脑" />}
     </View>
     </ChatOverlay>
   </SafeAreaView></SafeAreaProvider>;

@@ -24,24 +24,30 @@ class ChatConnectionService : HeadlessJsTaskService() {
         CHANNEL_ID, "聊天连接", NotificationManager.IMPORTANCE_LOW
       ).apply { description = "在后台接收电脑上的聊天回复"; setShowBadge(false) })
     }
+    instance = this
+    updateNotification()
+    running = true
+  }
+
+  private fun updateNotification() {
     val launch = packageManager.getLaunchIntentForPackage(packageName)
     val pending = launch?.let {
       PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
     val notification = NotificationCompat.Builder(this, CHANNEL_ID)
       .setSmallIcon(android.R.drawable.stat_notify_chat)
-      .setContentTitle("Remote AI 聊天")
-      .setContentText("后台接收电脑回复，点击返回应用")
+      .setContentTitle(if (mappingEnabled) "Remote AI 端口映射" else "Remote AI 聊天")
+      .setContentText(if (mappingEnabled) "端口映射正在运行，点击返回应用" else "后台接收电脑回复，点击返回应用")
       .setContentIntent(pending)
       .setCategory(NotificationCompat.CATEGORY_SERVICE)
       .setOngoing(true).setShowWhen(false).setOnlyAlertOnce(true)
       .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
       .build()
     val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-      ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
+      ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING or
+        (if (mappingEnabled) ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE else 0)
     } else 0
     ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, type)
-    running = true
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -60,6 +66,8 @@ class ChatConnectionService : HeadlessJsTaskService() {
 
   override fun onDestroy() {
     running = false
+    instance = null
+    mappingEnabled = false
     reactContext?.let { context ->
       if (context.hasActiveReactInstance()) {
         context.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
@@ -75,6 +83,12 @@ class ChatConnectionService : HeadlessJsTaskService() {
     const val STOP_EVENT = "codexChatConnectionStopped"
     private const val CHANNEL_ID = "chat-connection"
     private const val NOTIFICATION_ID = 7301
+    private var instance: ChatConnectionService? = null
+    private var mappingEnabled = false
+    fun setPortMappingEnabled(enabled: Boolean) {
+      mappingEnabled = enabled
+      instance?.updateNotification()
+    }
     @Volatile var running = false
       private set
   }

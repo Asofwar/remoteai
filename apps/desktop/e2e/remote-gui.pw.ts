@@ -67,12 +67,12 @@ test('remote chat sidebar resizes and restores its width after hiding and mobile
     await chooseHost(page, 'Office PC');
     await expect(page.locator('.gui-remote-workspace:visible .chat-connection-status'))
       .toContainText('P2P', { timeout: 20_000 });
-    const ports = page.getByRole('button', { name: '端口转发', exact: true });
+    const ports = page.getByRole('button', { name: '端口映射', exact: true });
     const portsBounds = await ports.boundingBox();
     const desktopBounds = await page.getByRole('button', { name: '打开远程桌面' }).boundingBox();
     expect(portsBounds!.x + portsBounds!.width).toBeLessThan(desktopBounds!.x);
     await ports.click();
-    const forwardingPanel = page.getByRole('region', { name: '端口转发设置' });
+    const forwardingPanel = page.getByRole('region', { name: '端口映射设置' });
     await expect(forwardingPanel).toBeInViewport();
     const remotePort = forwardingPanel.getByRole('spinbutton', { name: '远程端口' });
     await expect(remotePort).toBeEnabled();
@@ -383,6 +383,8 @@ test('searches hosts beside the project picker and stays usable during slow disc
 
 test('matches local GUI layout and sends pasted images and dropped files over Relay', async ({ context, page }) => {
   test.setTimeout(90_000);
+  // The fixture opts into the shared skin; the GUI now defaults to its own skin selection.
+  await context.addInitScript(() => localStorage.setItem('codex-switch:gui-skin', JSON.stringify({ mode: 'inherit' })));
   const office = await context.newPage();
   await office.goto(`/e2e/chat-harness.html?role=desktop&demo&blocked=true&device=computer-one`
     + `&title=Office&socket=${encodeURIComponent(endpoint)}`);
@@ -403,13 +405,14 @@ test('matches local GUI layout and sends pasted images and dropped files over Re
   await expect(page.locator('.chat-conversation')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await page.evaluate(() => {
     window.remoteGuiFixture.setFontSize(16);
+    window.remoteGuiFixture.setThemeMode('dark');
     window.dispatchEvent(new CustomEvent('codex-switch:dream-skin-status-changed', { detail: {
       installed: true, session: 'running', activeThemeId: 'fixture', activeThemeAppearance: 'dark',
       activeThemeOverlayOpacity: 0.85,
     } }));
   });
   await expect(page.locator('.chat-message-region')).toHaveCSS('color', 'rgb(230, 232, 235)');
-  await expect(page.locator('.chat-markdown').first()).toHaveCSS('font-size', '16px');
+  await expect(page.getByText('可以，今天先完成这三件事：', { exact: true })).toHaveCSS('font-size', '16px');
   await page.getByRole('button', { name: '访问权限：帮我批准', exact: true }).click();
   await expect(page.locator('.chat-composer-access-menu')).toBeVisible();
   await expect(page.locator('.ant-popover:visible')).toHaveCSS('opacity', '1');

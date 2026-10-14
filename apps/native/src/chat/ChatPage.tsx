@@ -165,6 +165,7 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
         <Text style={styles.buttonText}>{t("恢复")}</Text></Pressable>}
       <View style={styles.headerTools}>
         <ChatTools client={controller.guiTools} active={active && foreground} connected={ready}
+          scope={JSON.stringify([session.baseUrl, session.email, device?.deviceId ?? ''])}
           deviceName={device?.name} cwd={state.selected?.cwd ?? state.draftProject?.cwd ?? ''} />
       </View>
     </View>

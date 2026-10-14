@@ -10,7 +10,7 @@ import type { ForwardingClient, ForwardingEntry, PortForwardingService } from '.
 import launcherStyles from '../GuiRemoteDesktop.module.less';
 import styles from './portForwarding.module.less';
 
-const STATUS_TEXT = { stopped: '已停止', starting: '正在启动…', running: '转发中',
+const STATUS_TEXT = { stopped: '已停止', starting: '正在启动…', running: '映射中',
   stopping: '正在停止…', error: '启动失败' } as const;
 
 export function PortForwarding(props: {
@@ -22,8 +22,8 @@ export function PortForwarding(props: {
   const count = entries.filter(entry => entry.status === 'running').length;
   return <Popover trigger="click" placement="bottomRight" open={open} onOpenChange={setOpen} fresh
     styles={{ root: { maxWidth: 400 } }} content={<section className={styles.panel}
-      aria-hidden={!open || !props.active} aria-label={t('端口转发设置')}>
-      <header><strong>{t('端口转发')}</strong><span>{entries.length}/{MAX_PORT_MAPPINGS}</span></header>
+      aria-hidden={!open || !props.active} aria-label={t('端口映射设置')}>
+      <header><strong>{t('端口映射')}</strong><span>{entries.length}/{MAX_PORT_MAPPINGS}</span></header>
       <p>{t('将远程电脑的端口映射到本机，方便在本机访问。')}</p>
       {!props.connected && <Alert type="info" message={t('连接已断开，重新连接后可再次启动。')} />}
       <div className={styles.list}>
@@ -34,8 +34,8 @@ export function PortForwarding(props: {
       <MappingForm service={service} disabled={!props.connected || entries.length >= MAX_PORT_MAPPINGS} />
       <footer>{t('支持 TCP，仅本机可访问。')}</footer>
     </section>}>
-    <button type="button" className={launcherStyles.launcher} aria-label={t('端口转发')} aria-expanded={open}>
-      <Cable size={14} aria-hidden="true" /><span>{t('端口转发')}</span>
+    <button type="button" className={launcherStyles.launcher} aria-label={t('端口映射')} aria-expanded={open}>
+      <Cable size={14} aria-hidden="true" /><span>{t('端口映射')}</span>
       {count > 0 && <span className={styles.count}>{count}</span>}
     </button>
   </Popover>;
@@ -97,7 +97,7 @@ function MappingRow({ entry, service, connected, onOpen }: {
       </Tooltip>
       <Button size="small" loading={entry.status === 'stopping'}
         disabled={entry.status === 'stopping' || (!connected && !running && !busy)}
-        aria-label={`${t(running || busy ? '停止转发' : '启动转发')} ${label}`}
+        aria-label={`${t(running || busy ? '停止映射' : '启动映射')} ${label}`}
         icon={running || busy ? <Square size={12} /> : <Play size={12} />}
         onClick={() => { void (running || busy ? service.stop(entry.id) : service.start(entry.id)); }}>
         {t(running || busy ? '停止' : '启动')}</Button>

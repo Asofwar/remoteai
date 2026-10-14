@@ -9,15 +9,24 @@ import { ChatTerminal } from './ChatTerminal';
 import { ChatGit } from './git/ChatGit';
 import { RemoteDesktop } from './desktop/RemoteDesktop';
 import { ChatToolsPopover } from './ChatToolsPopover';
+import { PortMappings } from './portMapping/PortMappings';
 import { palette, useStyles } from './styles';
 
 interface Props {
   client: GuiToolsClient; cwd: string; active: boolean; connected: boolean; deviceName?: string;
+  scope: string;
 }
 export function ChatTools(props: Props) {
-  useLanguage(); return <ProjectTools key={props.cwd} {...props} />; }
+  useLanguage();
+  const [mapping, setMapping] = useState(false);
+  return <>
+    <ProjectTools key={props.cwd} {...props} openMappings={() => setMapping(true)} />
+    <PortMappings client={props.client.files} scope={props.scope} connected={props.connected}
+      active={props.active} deviceName={props.deviceName} open={mapping} close={() => setMapping(false)} />
+  </>;
+}
 
-function ProjectTools({ client, ...props }: Props) {
+function ProjectTools({ client, ...props }: Props & { openMappings: () => void }) {
   const styles = useStyles();
   const color = useThemeColor();
   const menuStyles = useMenuStyles();
@@ -34,6 +43,11 @@ function ProjectTools({ client, ...props }: Props) {
       style={styles.back} onPress={() => { Keyboard.dismiss(); setMenu(value => !value); }}>
       <Ionicons name="construct-outline" size={24} color={color(palette.ink, 'ink')} /></Pressable>
     {menu && props.active && <ChatToolsPopover anchor={anchor} close={() => setMenu(false)}>
+      <Pressable accessibilityRole="button" style={({ pressed }) => [menuStyles.item, pressed && menuStyles.pressed]}
+        onPress={() => { setMenu(false); props.openMappings(); }}>
+        <Ionicons name="swap-horizontal-outline" size={20} color={color(palette.ink, 'ink')} />
+        <Text style={menuStyles.label}>{t('端口映射')}</Text>
+      </Pressable>
       <Pressable accessibilityRole="button" disabled={!props.connected}
         accessibilityState={{ disabled: !props.connected }}
         style={({ pressed }) => [menuStyles.item, pressed && menuStyles.pressed, !props.connected && styles.disabled]}

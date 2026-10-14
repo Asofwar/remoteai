@@ -1,0 +1,20 @@
+.port-mappings { display: grid; gap: 14px; max-width: 400px; }
+.port-mappings p { margin: 0; color: var(--muted, #718078); line-height: 1.6; overflow-wrap: anywhere; }
+.port-mappings [role=alert] { color: #c74e47; }
+.port-mapping-row { border: 1px solid var(--border, #dfe5df); border-radius: 12px; padding: 12px; min-width: 0; }
+.port-mapping-row > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.port-mapping-row [role=status] { font-size: 12px; color: var(--muted, #718078); }
+.port-mapping-row .ant-btn-link { padding-inline: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.port-mapping-form { display: grid; gap: 10px; }
+.port-mapping-form label { display: grid; gap: 6px; }
+.port-mapping-form .ant-input-number { width: 100%; }
+.port-mapping-preview .ant-drawer-body { display: flex; flex-direction: column; gap: 12px; min-height: 0; padding: 16px; }
+.port-mapping-preview iframe { width: 100%; flex: 1; min-height: 200px; border: 1px solid #dfe5df; background: #fff; }
+.port-mapping-navigation { display: flex; gap: 8px; }
+.port-mapping-navigation input { min-width: 0; }
+.port-mapping-notice { max-width: 400px; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .port-mapping-preview .ant-drawer-body { padding: 10px; }
+  .port-mapping-navigation { gap: 4px; }
+  .port-mapping-navigation .ant-btn { padding-inline: 8px; }
+}

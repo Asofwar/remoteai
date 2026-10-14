@@ -26,6 +26,7 @@
     "@xterm/xterm": "^6.0.0",
     "antd": "^5.29.3",
     "antd-mobile": "^5.41.1",
+    "es-module-lexer": "^3.0.3",
     "katex": "^0.16.47",
     "lowlight": "^3.3.0",
     "lucide-react": "^0.468.0",

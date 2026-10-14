@@ -112,6 +112,6 @@ it('marks an unexpectedly closed listener as failed and releases its remote reso
       ? new Promise((_resolve, reject) => { fail = reject; }) : original(command, args));
   service.add(3000, 13000); await flush();
   fail(new Error('Listener gone')); await flush();
-  expect(service.snapshot()[0]).toMatchObject({ status: 'error', error: '转发已中断，请重新启动。' });
+  expect(service.snapshot()[0]).toMatchObject({ status: 'error', error: '映射已中断，请重新启动。' });
   expect(client.closeResource).toHaveBeenCalledTimes(1);
 });

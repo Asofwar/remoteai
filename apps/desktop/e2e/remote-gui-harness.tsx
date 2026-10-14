@@ -10,18 +10,21 @@ import { GuiToolbox } from '../src/pages/codexGui/GuiToolbox';
 import { GuiHostPicker } from '../src/pages/codexGui/GuiHostPicker';
 import { ProjectPicker } from '../src/pages/codexGui/ProjectPicker';
 import { DetailsWorkspace } from '../src/pages/codexGui/DetailsWorkspace';
+import { guiFontStyle, useGuiFontSize } from '../src/pages/codexGui/guiAppearance';
 import { createAsyncGitFixture } from '../../../shared/remote-chat/testing/gitFixture';
 import 'antd/dist/reset.css';
 
 const localGit = createAsyncGitFixture();
 
 function Harness() {
+  const fontSize = useGuiFontSize();
   const [localDraft, setLocalDraft] = useState('Local unsent draft');
   const [project, setProject] = useState('/local/workspace');
   const computers = useGuiComputers({ active: true, identity: { baseUrl: 'https://fixture.test', userId: 'owner' },
     login: () => {} });
   const device = computers.current;
-  return <ConfigProvider><header style={{ height: 48 }}>Codex GUI</header><main style={{ height: 'calc(100vh - 48px)' }}>
+  return <ConfigProvider><header style={{ height: 48 }}>Codex GUI</header>
+    <main style={{ ...guiFontStyle(fontSize), height: 'calc(100vh - 48px)' }}>
     <div hidden={Boolean(device)} style={{ height: '100%' }}>
       <DetailsWorkspace active={!device} selected={project}>
       <div className={`${styles.page} local-workspace`}><aside className={styles.sidebar}>
@@ -45,7 +48,7 @@ function Harness() {
 }
 
 const style = document.createElement('style');
-style.textContent = `*{box-sizing:border-box}body{margin:0;font-family:Microsoft YaHei,sans-serif}
+style.textContent = `*{box-sizing:border-box}body{margin:0;min-width:0;font-family:Microsoft YaHei,sans-serif}
   :root{--ink:#233329;--panel:#fff;--bg:#f6f8f7;--line:#dfe6e1;--muted:#66796d;--green:#168348;
   --green-dark:#126a3b;--green-selection:#c6f4e8;--green-selection-hover:#e7f4ec}
   .local-workspace{display:flex;height:100%}.local-workspace aside{width:236px;flex-shrink:0}

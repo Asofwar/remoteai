@@ -36,6 +36,7 @@ function WebChat({ session, device, ...props }: Props & {
   return <ConnectedChat {...props} chat={chat} device={device} email={session.email}
     headerEnd={<div className="chat-header-tools">
       <ChatTools client={chat.controller.guiTools} active={props.active}
+        scope={JSON.stringify([session.baseUrl, session.email, device?.deviceId ?? ''])}
         connected={chat.state.ready} deviceName={device?.name}
         cwd={chat.state.selected?.cwd ?? chat.state.draftProject?.cwd ?? ''} />
     </div>}

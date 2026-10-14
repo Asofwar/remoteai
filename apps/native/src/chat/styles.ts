@@ -64,8 +64,8 @@ export const useStyles = createThemedStyles((color) => ({
   status: { fontSize: 12, lineHeight: 18, color: color(palette.muted, 'muted'), marginVertical: 6 },
   // Bound the whole dock after keyboard resizing; draft content scrolls while actions stay visible.
   composerDock: { maxHeight: '75%', flexShrink: 1 },
-  composer: { padding: 12, gap: 10, flexShrink: 1, minHeight: 96 },
-  composerCompact: { minHeight: 80 },
+  composer: { paddingHorizontal: 12, paddingBottom: 12, gap: 10, flexShrink: 1, minHeight: 84 },
+  composerCompact: { minHeight: 68 },
   composerField: { padding: 8, gap: 4, backgroundColor: color('#fff', 'surface'), borderRadius: 26, flexShrink: 1 },
   composerContent: { flexGrow: 0, flexShrink: 1 },
   composerContentInner: { gap: 4 },

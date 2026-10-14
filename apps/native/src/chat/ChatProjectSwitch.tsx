@@ -50,7 +50,7 @@ export function ChatProjectSwitch(props: ProjectSwitchProps) {
 }
 
 const useStyles = createThemedStyles(color => ({
-  bar: { maxWidth: 400, marginHorizontal: 8, marginBottom: 6 },
+  bar: { maxWidth: 400, marginHorizontal: 24 },
   trigger: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 7,
     maxWidth: '100%', minHeight: 36, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 10 },
   label: { flexShrink: 1, color: color('#6f8177', 'muted'), fontSize: 13, lineHeight: 20 },

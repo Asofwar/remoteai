@@ -62,8 +62,8 @@ function MappingRow({ entry, service, connected, preview }: {
   const busy = entry.status === 'starting' || entry.status === 'stopping';
   return <article aria-label={String(entry.remotePort)} className="port-mapping-row">
     <div><strong>{t('远程端口')} {entry.remotePort}</strong><span role="status">{t(STATUS[entry.status])}</span></div>
-    <Button type="link" disabled={!running} onClick={preview}>
-      http://127.0.0.1:{entry.remotePort}</Button>
+    <Button type="link" className="port-mapping-address" disabled={!running} onClick={preview}>
+      <span>http://127.0.0.1:{entry.remotePort}</span><span aria-hidden="true">›</span></Button>
     <div>
       <Button disabled={!running} onClick={preview}>{t('在 Remote AI 中预览')}</Button>
       <Button disabled={entry.status === 'stopping' || (!connected && !running && !busy)}

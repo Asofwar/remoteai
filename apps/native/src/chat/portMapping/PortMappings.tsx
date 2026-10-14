@@ -10,6 +10,7 @@ import { t } from '../../i18n';
 import { useStyles } from '../styles';
 import { usePortMappings } from './usePortMappings';
 import { MappingPreview } from './MappingPreview';
+import { MappingOpenActions } from './MappingOpenActions';
 
 const STATUS = { stopped: '已停止', starting: '正在启动…', running: '映射中',
   stopping: '正在停止…', error: '启动失败' } as const;
@@ -20,26 +21,34 @@ export function PortMappings(props: {
 }) {
   const styles = useStyles();
   const { entries, service } = usePortMappings(props);
-  const [preview, setPreview] = useState<string>();
-  const selected = entries.find(entry => entry.id === preview && entry.status === 'running');
-  useEffect(() => { if (!props.active || !selected) setPreview(undefined); }, [props.active, selected]);
+  const [selection, setSelection] = useState<{ id: string; view: 'actions' | 'preview' }>();
+  const selected = entries.find(entry => entry.id === selection?.id && entry.status === 'running');
+  const previewing = !!selected && selection?.view === 'preview';
+  const closeActions = () => setSelection(undefined);
+  useEffect(() => {
+    if (!props.active || !props.open || !selected) setSelection(undefined);
+  }, [props.active, props.open, selected]);
   return <>
-    <BottomSheet visible={props.active && props.open && !selected} title={t('端口映射')}
-      subtitle={props.deviceName} onClose={props.close} maxWidth={400}>
+    <BottomSheet visible={props.active && props.open && !previewing}
+      title={t(selected ? '打开映射地址' : '端口映射')}
+      subtitle={selected ? `http://127.0.0.1:${selected.localPort}` : props.deviceName}
+      onClose={selected ? closeActions : props.close} onBack={selected ? closeActions : undefined} maxWidth={400}>
+      {selected ? <MappingOpenActions key={selected.id} port={selected.localPort}
+        preview={() => setSelection({ id: selected.id, view: 'preview' })} opened={closeActions} /> :
       <SheetScrollView contentContainerStyle={{ gap: 12 }} keyboardShouldPersistTaps="handled">
-        <Text style={styles.subtitle}>{t('将远程电脑的端口映射到手机，点击地址即可预览。')}</Text>
+        <Text style={styles.subtitle}>{t('映射启动后，点击地址可选择应用内预览或浏览器打开。')}</Text>
         {!props.connected && <Text style={styles.subtitle}>{t('连接已断开，重新连接后可再次启动。')}</Text>}
         {!entries.length && <Text style={styles.subtitle}>{t('还没有端口映射')}</Text>}
         {entries.map(entry => <MappingRow key={entry.id} entry={entry} service={service}
-          connected={props.connected} preview={() => setPreview(entry.id)} />)}
+          connected={props.connected} open={() => setSelection({ id: entry.id, view: 'actions' })} />)}
         <MappingForm service={service} disabled={!props.connected || entries.length >= MAX_PORT_MAPPINGS} />
         <Text style={styles.subtitle}>{t('支持 TCP，仅本机可访问。')}</Text>
         {Platform.OS === 'ios' && <Text style={styles.subtitle}>
           {t('切到其他应用后，映射可能中断，建议在此预览。')}</Text>}
-      </SheetScrollView>
+      </SheetScrollView>}
     </BottomSheet>
-    {selected && props.active && <MappingPreview key={selected.id} port={selected.localPort}
-      close={() => setPreview(undefined)} />}
+    {selected && previewing && props.active && props.open && <MappingPreview
+      key={selected.id} port={selected.localPort} close={closeActions} />}
   </>;
 }
 
@@ -73,8 +82,8 @@ function MappingForm({ service, disabled }: { service: PortForwardingService; di
   </View>;
 }
 
-function MappingRow({ entry, service, connected, preview }: {
-  entry: ForwardingEntry; service: PortForwardingService; connected: boolean; preview: () => void;
+function MappingRow({ entry, service, connected, open }: {
+  entry: ForwardingEntry; service: PortForwardingService; connected: boolean; open: () => void;
 }) {
   const styles = useStyles();
   const [notice, setNotice] = useState('');
@@ -93,9 +102,12 @@ function MappingRow({ entry, service, connected, preview }: {
         onPress={() => { void service.remove(entry.id); }}>
         <Text style={styles.buttonText}>×</Text></Pressable>
     </View>
-    <Pressable accessibilityRole="link" disabled={!running} onPress={preview}>
-      <Text style={[styles.buttonText, !running && styles.disabled]}>127.0.0.1:{entry.localPort}</Text></Pressable>
-    <View style={styles.row}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`127.0.0.1:${entry.localPort}`}
+      accessibilityHint={t('选择应用内预览或浏览器打开')} disabled={!running} onPress={open}
+      style={[styles.button, styles.row, !running && styles.disabled]}>
+      <Text style={[styles.buttonText, { flex: 1 }]}>127.0.0.1:{entry.localPort}</Text>
+      <Text style={styles.buttonText}>{t('打开')} ›</Text></Pressable>
+    <View style={[styles.row, { flexWrap: 'wrap' }]}>
       <Pressable accessibilityRole="button" style={[styles.button, !running && styles.disabled]}
         disabled={!running} onPress={() => { void copy(); }}>
         <Text style={styles.buttonText}>{t('复制本地地址')}</Text></Pressable>

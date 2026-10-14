@@ -3,7 +3,12 @@ export const portForwardingEnglish: Readonly<Record<string, string>> = {
   '在 Remote AI 中预览': 'Preview in Remote AI',
   '端口映射设置': 'Port mapping settings',
   '端口映射预览': 'Port mapping preview',
-  '将远程电脑的端口映射到手机，点击地址即可预览。': 'Map a remote port to your phone, then tap its address to preview.',
+  '打开映射地址': 'Open mapped address',
+  '打开': 'Open',
+  '无法打开浏览器，请重试。': 'Could not open the browser. Please try again.',
+  '选择应用内预览或浏览器打开': 'Choose in-app preview or open in your browser',
+  '映射启动后，点击地址可选择应用内预览或浏览器打开。':
+    'Once the mapping starts, tap its address to preview in the app or open in your browser.',
   '添加远程端口，点击地址即可在此预览网页。': 'Add a remote port, then click its address to preview the website here.',
   '网页映射仅在当前页面中使用。关闭页面或切换电脑后会停止。':
     'Web mappings work within this page. Closing it or switching computers stops them.',
@@ -49,8 +54,12 @@ export const portForwardingRussian: Readonly<Record<string, string>> = {
   '在 Remote AI 中预览': 'Предпросмотр в Remote AI',
   '端口映射设置': 'Настройки проброса портов',
   '端口映射预览': 'Предпросмотр порта',
-  '将远程电脑的端口映射到手机，点击地址即可预览。':
-    'Подключите удалённый порт к телефону и нажмите на адрес для просмотра.',
+  '打开映射地址': 'Открыть адрес порта',
+  '打开': 'Открыть',
+  '无法打开浏览器，请重试。': 'Не удалось открыть браузер. Попробуйте снова.',
+  '选择应用内预览或浏览器打开': 'Выберите просмотр в приложении или открытие в браузере',
+  '映射启动后，点击地址可选择应用内预览或浏览器打开。':
+    'После запуска нажмите на адрес для просмотра в приложении или открытия в браузере.',
   '添加远程端口，点击地址即可在此预览网页。':
     'Добавьте удалённый порт и нажмите на адрес для просмотра сайта.',
   '网页映射仅在当前页面中使用。关闭页面或切换电脑后会停止。':

@@ -24,8 +24,9 @@ remote host addresses are outside the current scope.
 ## Phone app
 
 Open **工具 → 端口映射**. Add a remote port and an optional local port. The phone binds only its own
-`127.0.0.1`; tapping a running address opens an isolated WebView, with back, refresh and
-**在浏览器中打开** controls. Stopping a mapping releases its listener and accepted connections.
+`127.0.0.1`; tapping a running address or its **打开** label shows **在 Remote AI 中预览** and
+**在浏览器中打开**. Either option can be chosen directly from the mapping list. The in-app preview
+uses an isolated WebView with back, refresh and browser controls. Stopping a mapping releases its listener and connections.
 The TCP server adapter waits for native close acknowledgement before allowing the port to be reused.
 
 Android retains a foreground service while any mapping is active, with a **端口映射** notification.

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReadTokenSummary, TokenSummary } from '../tokenSummary';
 import { createDashboardLoader } from '../../../apps/desktop/src/components/TokenUsageDashboard/dashboardLoader';
 
+const DEFAULT_SUMMARY_WEEKS = 2;
+
 export function useTokenSummary({ read, active }: { read: ReadTokenSummary; active: boolean }) {
-  const [weeks, setWeeks] = useState<number>();
+  const [weeks, setWeeks] = useState(DEFAULT_SUMMARY_WEEKS);
   const [data, setData] = useState<TokenSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -40,5 +42,5 @@ export function useTokenSummary({ read, active }: { read: ReadTokenSummary; acti
 
   const changeWeeks = useCallback((value: number) => { setData(null); setWeeks(value); }, []);
   const refresh = useCallback(() => reload.current(), []);
-  return { data, weeks: weeks ?? data?.weeks, loading, error, changeWeeks, refresh };
+  return { data, weeks, loading, error, changeWeeks, refresh };
 }

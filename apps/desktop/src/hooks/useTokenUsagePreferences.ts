@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { loadAppSettings, updateTokenUsagePreferences } from "../api/backend";
 
-export const DEFAULT_TOKEN_USAGE_WEEKS = 20;
+export const DEFAULT_TOKEN_USAGE_WEEKS = 10;
 export const MIN_TOKEN_USAGE_WEEKS = 1;
 export const MAX_TOKEN_USAGE_WEEKS = 52;
 export const DEFAULT_TOKEN_USAGE_REFRESH_SECONDS = 60;

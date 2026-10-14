@@ -6,7 +6,7 @@ import { loadLongContextCostSettings } from '../utils/tokenCostLongContext';
 import { MAX_SUMMARY_WEEKS, MIN_SUMMARY_WEEKS, type TokenSummary } from '../../../../shared/remote-chat/tokenSummary';
 import { loadOfficialUsage } from '../api/officialUsage';
 
-const DEFAULT_WEEKS = 20;
+const DEFAULT_WEEKS = 10;
 const DEFAULT_REFRESH_SECONDS = 60;
 
 export async function readTokenSummary(requestedWeeks: unknown): Promise<TokenSummary> {

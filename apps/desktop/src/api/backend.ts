@@ -641,7 +641,7 @@ export async function loadAppSettings(): Promise<AppSettings> {
       themeColor: normalizeThemeColor(window.localStorage.getItem(THEME_COLOR_PREVIEW_KEY) ?? DEFAULT_THEME_COLOR),
       cloudBaseUrl: window.localStorage.getItem(CLOUD_BASE_URL_PREVIEW_KEY) ?? DEFAULT_CLOUD_BASE_URL,
       showCustomCloudServer: false,
-      tokenUsageWeeks: Number(window.localStorage.getItem(TOKEN_USAGE_WEEKS_PREVIEW_KEY)) || 20,
+      tokenUsageWeeks: Number(window.localStorage.getItem(TOKEN_USAGE_WEEKS_PREVIEW_KEY)) || 10,
       tokenUsageRefreshSeconds: Number(window.localStorage.getItem(TOKEN_USAGE_REFRESH_PREVIEW_KEY)) || 60,
       codexUsageSummaryEnabled: window.localStorage.getItem(CODEX_USAGE_SUMMARY_PREVIEW_KEY) !== "false",
       autoDisableStatusCodes: previewAutoDisableStatusCodes(),

@@ -228,7 +228,7 @@ pub(crate) const MAX_GPT_5_6_SOL_CONTEXT_WINDOW: u64 = 1_050_000;
 pub(crate) const MIN_GPT_5_6_SOL_CONTEXT_WINDOW: u64 = 1_000;
 
 fn default_token_usage_weeks() -> u16 {
-    20
+    10
 }
 
 fn default_token_usage_refresh_seconds() -> u64 {

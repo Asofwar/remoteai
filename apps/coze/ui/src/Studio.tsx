@@ -7,6 +7,7 @@ import { ResourceEditor } from "./ResourceEditor";
 import { BackupButton } from "./projects/BackupButton";
 import { TemplateLibrary } from "./projects/TemplateLibrary";
 import { SharedAppView } from "./projects/SharedAppView";
+import { StopCozeButton } from "./StopCozeButton";
 
 const icons = { app: Boxes, agent: Bot, workflow: GitBranch, knowledge: BookOpen,
   prompt: FileText, table: Database, plugin: Wrench };
@@ -100,6 +101,7 @@ export function Studio() {
         if (dirty) { void message.success("模板已创建，当前修改已保留。"); return; }
         void api<Resource>("get_resource", { id }).then((resource) => { setKind(resource.kind); saved(resource); })
           .catch((error: unknown) => setError(errorText(error))); }} />
+      <StopCozeButton />
       </div>
     </aside>
     <main className="studio-main">

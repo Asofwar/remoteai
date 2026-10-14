@@ -24,13 +24,11 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; }
 .studio-nav-button > svg { flex-shrink: 0; }
 .studio-nav-button.selected, .studio-nav-button:hover { background: var(--hover); color: #7d71e8; }
 .studio-nav-button:focus-visible { outline: 2px solid #7d71e8; outline-offset: -2px; }
+.studio-nav-button:disabled { cursor: wait; opacity: .6; background: transparent; color: inherit; }
 .studio-nav-footer { flex-shrink: 0; display: flex; flex-direction: column; gap: 4px;
   border-top: 1px solid var(--border); padding-top: 12px; color: var(--muted); }
 .studio-main { flex: 1; min-width: 0; padding: 28px; }
 .studio > .studio-main { min-height: 0; overflow: auto; overscroll-behavior: contain; }
-/* Reserve room for the desktop stop control without pushing the sidebar down. */
-:root[data-embedded=true] .studio-main { padding-top: 44px; }
-:root[data-embedded=true] .studio-workflow > .studio-main { padding-top: 36px; }
 .collection-header, .editor-header, .workflow-toolbar { display: flex; justify-content: space-between; align-items: center;
   gap: 16px; margin-bottom: 20px; }
 .resource-search { max-width: 420px; margin: 8px 0 24px; }

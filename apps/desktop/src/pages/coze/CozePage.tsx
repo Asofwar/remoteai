@@ -1,8 +1,9 @@
-import { Alert, Button, Popconfirm, Progress, Space } from "antd";
+import { Alert, Button, Progress, Space } from "antd";
 import { BookOpen, Bot, Download, GitBranch } from "lucide-react";
 import { isDesktopApp } from "../../api/backend";
 import { guiText } from "../../i18n/guiText";
 import { useCoze } from "./useCoze";
+import { CozeWorkspace } from "./CozeWorkspace";
 import styles from "./CozePage.module.less";
 
 export default function CozePage({ active }: { active: boolean }) {
@@ -11,14 +12,7 @@ export default function CozePage({ active }: { active: boolean }) {
   if (!isDesktopApp) return <div className={styles.welcome}>
     <h1>Coze</h1><p>{guiText("请在这台电脑的 Remote AI 中打开 Coze。")}</p>
   </div>;
-  if (status?.url) return <div className={styles.workspace}>
-    {coze.error && <Alert type="error" message={coze.error} />}
-    <div className={styles.toolbar}><Popconfirm title={guiText("停止 Coze？已保存的内容会保留。")}
-      styles={{ root: { maxWidth: 400 } }} onConfirm={() => coze.stop()}>
-      <Button size="small" loading={coze.busy}>{guiText("停止 Coze")}</Button>
-    </Popconfirm></div>
-    <iframe title="Coze" src={status.url} sandbox="allow-scripts allow-same-origin allow-downloads" />
-  </div>;
+  if (status?.url) return <CozeWorkspace url={status.url} busy={coze.busy} error={coze.error} onStop={coze.stop} />;
   const progress = status?.total ? Math.floor(status.downloaded / status.total * 100) : undefined;
   const phase = status?.phase === "verifying" ? guiText("正在检查下载内容…")
     : status?.phase === "installing" || status?.phase === "starting"

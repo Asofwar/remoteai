@@ -6,6 +6,9 @@ use std::sync::{
 };
 use tiny_http::{Header, Response, Server};
 
+const CLEANUP_RETRIES: usize = 40;
+const CLEANUP_RETRY_DELAY: Duration = Duration::from_millis(50);
+
 struct CapturedRequest {
     body: Value,
     purpose: Option<String>,
@@ -75,13 +78,13 @@ fn serve(server: Server, stop: Arc<AtomicBool>, bodies: Arc<Mutex<Vec<CapturedRe
     }
 }
 
-fn remove_fixture(root: &std::path::Path) {
+async fn remove_fixture(root: &std::path::Path) {
     // Windows can briefly retain SQLite handles after the CLI process has exited.
-    for _ in 0..40 {
+    for _ in 0..CLEANUP_RETRIES {
         match std::fs::remove_dir_all(root) {
             Ok(()) => return,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
-            Err(_) => std::thread::sleep(Duration::from_millis(50)),
+            Err(_) => tokio::time::sleep(CLEANUP_RETRY_DELAY).await,
         }
     }
     std::fs::remove_dir_all(root).unwrap();
@@ -124,7 +127,7 @@ async fn real_cli_generates_a_private_title_with_configured_model_and_effort() {
     let result = name_first_turn(&binary, &root, request).await;
     stop.store(true, Ordering::Release);
     worker.join().unwrap();
-    remove_fixture(&root);
+    remove_fixture(&root).await;
     assert_eq!(result.unwrap(), "熊骑车 SVG 动画");
     let bodies = bodies.lock().unwrap();
     assert_eq!(bodies.first().unwrap().body["model"], "gpt-6-astra");
@@ -138,7 +141,11 @@ async fn real_cli_generates_a_private_title_with_configured_model_and_effort() {
     assert_eq!(body["model"], "gpt-5.6-luna");
     assert_eq!(body["reasoning"]["effort"], "low");
     assert_eq!(body["text"]["format"]["type"], "json_schema");
-    assert!(body["tools"].as_array().is_none_or(Vec::is_empty));
+    assert!(
+        body["tools"].as_array().is_none_or(Vec::is_empty),
+        "Unexpected title tools: {}",
+        body["tools"]
+    );
     assert_eq!(
         bodies.len(),
         2,

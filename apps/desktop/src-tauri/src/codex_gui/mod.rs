@@ -6,6 +6,7 @@ mod attachment_tests;
 mod attachment_uploads;
 pub(crate) mod auto_switch_policy;
 pub(crate) mod auto_switch_settings;
+mod cli_command;
 mod client;
 pub(crate) mod clipboard;
 mod clipboard_dingtalk;

@@ -42,6 +42,13 @@ fn uses_admin_settings_in_an_ephemeral_read_only_thread() {
     assert_eq!(start["modelProvider"], "codex-switch-gui");
     assert_eq!(start["config"]["features.shell_tool"], false);
     assert_eq!(start["config"]["features.plugins"], false);
+    assert_eq!(start["config"]["features.view_image"], false);
+    assert_eq!(start["config"]["features.image_generation"], false);
+    assert_eq!(start["config"]["features.goals"], false);
+    assert_eq!(
+        start["config"]["tools.experimental_request_user_input.enabled"],
+        false
+    );
     let turn = turn_params("private", &request);
     assert_eq!(turn["threadId"], "private");
     assert_eq!(turn["model"], "custom-model");
@@ -130,6 +137,10 @@ fn naming_home_does_not_import_personal_tools_or_project_config() {
     assert!(!config.contains("private-tool"));
     assert!(!config.contains("mcp_servers"));
     let config: toml_edit::DocumentMut = config.parse().unwrap();
+    assert_eq!(
+        config["features"]["image_generation"].as_bool(),
+        Some(false)
+    );
     assert_eq!(
         config["model_providers"]["codex-switch-gui"]["base_url"].as_str(),
         Some(base_url)

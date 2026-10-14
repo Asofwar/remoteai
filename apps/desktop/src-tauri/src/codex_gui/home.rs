@@ -104,6 +104,8 @@ pub(super) fn prepare_title_home(gui_home: &Path, base_url: &str) -> Result<Path
     let mut config = isolated_config("", &target, base_url)?
         .parse::<DocumentMut>()
         .map_err(|_| GuiError::Startup)?;
+    // Disable extension startup before initialize; thread overrides only affect later turns.
+    config["features"]["image_generation"] = value(false);
     config["model_providers"][GUI_PROVIDER_ID]["http_headers"]
         [crate::codex_config::LOCAL_PROXY_REQUEST_PURPOSE_HEADER] =
         value(crate::codex_config::TITLE_GENERATION_REQUEST_PURPOSE);

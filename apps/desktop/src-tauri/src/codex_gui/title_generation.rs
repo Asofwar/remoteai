@@ -46,7 +46,9 @@ pub(super) fn start_params(settings: &TitleSettings, cwd: &str) -> Value {
             "features.shell_tool": false, "features.apply_patch_freeform": false,
             "features.multi_agent": false, "features.multi_agent_v2": false,
             "features.plugins": false, "features.apps": false, "features.hooks": false,
-            "features.shell_snapshot": false, "features.memories": false
+            "features.shell_snapshot": false, "features.memories": false,
+            "features.view_image": false, "features.image_generation": false,
+            "features.goals": false, "tools.experimental_request_user_input.enabled": false
         }
     });
     super::home::scope_thread_request("thread/start", &mut params);

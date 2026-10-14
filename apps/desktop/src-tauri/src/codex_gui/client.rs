@@ -27,7 +27,7 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Manager};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-    process::{Child, ChildStdin, ChildStdout, Command},
+    process::{Child, ChildStdin, ChildStdout},
     sync::{oneshot, Mutex},
     time::{timeout, Duration},
 };
@@ -88,7 +88,7 @@ impl Client {
         home: PathBuf,
         projectless_root: PathBuf,
     ) -> Result<Arc<Self>> {
-        let mut command = Command::new(executable.path);
+        let mut command = super::cli_command::new(&executable.path);
         // Keep every override in the app-server argument scope; subcommand overrides replace root ones.
         command.arg("app-server");
         super::conversation_tools::configure(app.clone(), &mut command).await?;

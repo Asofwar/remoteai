@@ -41,6 +41,14 @@ visit starts with the current supported account; later switches and restarts pre
 GUI connections start automatically, even when the external proxy is off. A GUI account switch applies
 to subsequent requests without interrupting an existing reply. Shared automatic fallback and concurrent
 account routing do not change the GUI's selected account.
+The managed CLI connects directly to the GUI's private loopback endpoint, even when an HTTP proxy is
+enabled. Chat, title generation and plugin processes inherit existing proxy settings with
+`localhost`, `127.0.0.1` and `::1` added to their proxy bypass rules. This does not change system or
+user environment settings. The local port can change between application starts.
+The managed external Codex model refresh also bypasses proxies when reading Remote AI's local catalog.
+Automatic conversation titles use a private CLI session with tools disabled, including image tools,
+goal management and user questions. The title process disables image generation before initialization
+so that its extension does not start in the private workspace.
 The GUI's remaining quota and Provider model choices follow its own selection. All connected GUI browsers
 share this selection, and upstream Remote AI Providers continue to use the live Codex model catalog.
 
@@ -413,6 +421,17 @@ cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
 cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --test codex_switch_lib_tests
 npm exec -w @codex-switch/desktop -- playwright test --config playwright.chat.config.ts file-menu.pw.ts
+```
+
+The opt-in proxy regression uses the installed CLI with local fixtures only. It starts the CLI with
+HTTP/HTTPS/ALL proxy variables and no loopback bypass, then checks the production child environment
+fix: model discovery, three saved turns (including one after idle), and continued proxy use for an
+external hostname. A fixture proxy returns 502 if any loopback request reaches it.
+
+```powershell
+$env:CODEX_GUI_TEST_CLI = '<installed-package>/bin/codex.exe'
+cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --test codex_switch_lib_tests `
+  codex_gui::cli_command::cli_tests::real_cli_bypasses_proxy_for_models_and_repeated_turns -- --ignored --nocapture
 ```
 
 The opt-in installer smoke test downloads and verifies a real release into a temporary directory:

@@ -303,16 +303,23 @@ fn fetch_model_refresh_catalog(
         crate::providers::LOCAL_PROXY_PORT,
         client_version
     );
-    let response = Client::builder()
-        .timeout(timeout)
-        .build()
-        .map_err(|error| format!("Failed to create the model catalog client: {error}"))?
+    let response = model_catalog_client(timeout)?
         .get(url)
         .bearer_auth(crate::providers::LOCAL_PROXY_TOKEN)
         .send()
         .and_then(reqwest::blocking::Response::error_for_status)
         .map_err(|error| format!("Official model catalog request failed: {error}"))?;
     parse_official_model_catalog(response, selected_model, client_version)
+}
+
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+fn model_catalog_client(timeout: Duration) -> Result<Client, String> {
+    // This client only reads our local model endpoint; upstream routing belongs to that endpoint.
+    Client::builder()
+        .no_proxy()
+        .timeout(timeout)
+        .build()
+        .map_err(|error| format!("Failed to create the model catalog client: {error}"))
 }
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
@@ -420,3 +427,6 @@ fn unique_reasoning_efforts(
 
 #[cfg(all(test, any(target_os = "windows", target_os = "macos")))]
 mod tests;
+
+#[cfg(all(test, any(target_os = "windows", target_os = "macos")))]
+mod proxy_tests;

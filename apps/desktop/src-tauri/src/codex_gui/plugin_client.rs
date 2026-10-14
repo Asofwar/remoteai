@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 use std::{path::PathBuf, process::Stdio, time::Duration};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines},
-    process::{Child, ChildStdin, ChildStdout, Command},
+    process::{Child, ChildStdin, ChildStdout},
     time::timeout,
 };
 
@@ -52,7 +52,7 @@ impl PluginClient {
     }
 
     async fn connect(binary: Executable, home: PathBuf) -> Result<Self> {
-        let mut command = Command::new(binary.path);
+        let mut command = super::cli_command::new(&binary.path);
         command
             .arg("app-server")
             .env("CODEX_HOME", &home)

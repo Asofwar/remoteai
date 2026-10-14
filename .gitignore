@@ -1,5 +1,6 @@
 node_modules/
 .nx/
+.idea/
 dist/
 apps/*/dist/
 apps/admin-go/public/

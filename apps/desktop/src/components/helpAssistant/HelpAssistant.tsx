@@ -17,7 +17,8 @@ import assistantIcon from './assistant-icon.jpg';
 import styles from './helpAssistant.module.less';
 
 export function HelpAssistant(props: { language: Language; page: DashboardPage; onOpenCodex: () => void }) {
-  const { visible, setVisible } = useHelpAssistantVisibility();
+  const { visible: enabled, setVisible } = useHelpAssistantVisibility();
+  const visible = enabled && props.page !== 'codexGui';
   const [expanded, setExpanded] = useState(false);
   const open = visible && expanded;
   const assistant = useHelpAssistant({ open, page: props.page });

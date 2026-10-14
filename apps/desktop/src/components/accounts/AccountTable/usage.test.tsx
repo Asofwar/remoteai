@@ -66,6 +66,75 @@ async function render(overrides: Partial<typeof props> = {}) {
   await act(async () => root.render(<AccountTable {...props} {...overrides} />));
 }
 
+it.each([true, false])("switches from table account and quota areas with proxy enabled=%s", async (hotSwitchEnabled) => {
+  await render({ displayMode: "table", hotSwitchEnabled, accounts: [{ ...account, active: false }] });
+  const row = container.querySelector<HTMLElement>(`tr[data-row-key="${account.id}"]`)!;
+  expect(row.classList.contains("account-switchable-row")).toBe(true);
+  await act(async () => row.querySelector<HTMLElement>(".plan-tag")!.click());
+  expect(props.onSwitch).toHaveBeenCalledExactlyOnceWith(account.id);
+  vi.mocked(props.onSwitch).mockClear();
+  await act(async () => row.querySelector<HTMLElement>(".account-token-cost")!.click());
+  expect(props.onSwitch).toHaveBeenCalledExactlyOnceWith(account.id);
+});
+
+it.each(["table", "cards"] as const)("keeps %s account-area switching within availability rules", async (displayMode) => {
+  const inactive = { ...account, active: false };
+  const cases: Partial<typeof props>[] = [
+    { accounts: [account] },
+    { busyAccountId: account.id },
+    { concurrentAccountRoutingEnabled: true },
+    { accounts: [{ ...inactive, localProxyCompatible: false }] },
+    { hotSwitchEnabled: false, accounts: [{ ...inactive, directSwitchCompatible: false }] },
+  ];
+  for (const overrides of cases) {
+    await render({ displayMode, accounts: [inactive], ...overrides });
+    await act(async () => container.querySelector<HTMLElement>(".plan-tag")!.click());
+    expect(props.onSwitch).not.toHaveBeenCalled();
+    expect(container.querySelector(".account-switchable-row")).toBeNull();
+  }
+  await render({ displayMode, accounts: [inactive] });
+  await act(async () => container.querySelector<HTMLElement>(".plan-tag")!.click());
+  expect(props.onSwitch).toHaveBeenCalledExactlyOnceWith(account.id);
+});
+
+it("keeps table selection, details, group editing and action buttons independent from area switching", async () => {
+  localStorage.setItem("codex-switch:account-table-group-column-preference", "true");
+  await render({ displayMode: "table", accounts: [{ ...account, active: false }] });
+  const row = container.querySelector<HTMLElement>(`tr[data-row-key="${account.id}"]`)!;
+  await act(async () => row.querySelector<HTMLElement>(".ant-checkbox-wrapper")!.click());
+  expect(row.querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked).toBe(true);
+  await act(async () => row.querySelector<HTMLButtonElement>(".ant-table-row-expand-icon")!.click());
+  expect(props.onLoadAccountDetails).toHaveBeenCalledWith(account.id);
+  await act(async () => row.querySelector<HTMLButtonElement>(".account-group-button")!.click());
+  expect(document.querySelector(".account-group-editor")).not.toBeNull();
+  await act(async () => document.querySelector<HTMLElement>(".account-group-editor-actions")!.click());
+  await act(async () => row.querySelector<HTMLButtonElement>(".account-actions-column button")!
+    .parentElement!.click());
+  expect(props.onSwitch).not.toHaveBeenCalled();
+  const switchButton = row.querySelector<HTMLButtonElement>(".account-actions-column button")!;
+  expect(switchButton.textContent).toBe("table.switch");
+  await act(async () => switchButton.click());
+  expect(props.onSwitch).toHaveBeenCalledExactlyOnceWith(account.id);
+});
+
+it("keeps numeric setting wrappers and suffixes independent from table switching", async () => {
+  await render({
+    displayMode: "table", accounts: [{ ...account, active: false }],
+    autoSwitchOnQuotaExhaustion: true,
+    customAutoSwitchPriorityEnabled: true, customAutoSwitchThresholdEnabled: true,
+  });
+  const row = container.querySelector<HTMLElement>(`tr[data-row-key="${account.id}"]`)!;
+  const priority = row.querySelector<HTMLElement>(".auto-switch-priority-input")!;
+  const suffix = row.querySelector<HTMLElement>(".ant-input-number-suffix")!;
+  expect(priority).not.toBeNull();
+  expect(suffix).not.toBeNull();
+  await act(async () => priority.click());
+  await act(async () => suffix.click());
+  expect(props.onSwitch).not.toHaveBeenCalled();
+  await act(async () => row.querySelector<HTMLElement>(".plan-tag")!.click());
+  expect(props.onSwitch).toHaveBeenCalledExactlyOnceWith(account.id);
+});
+
 it("shows credits in a separate column and reuses usage refresh without overlapping clicks", async () => {
   // Existing saved column preferences must still include the newly added column.
   localStorage.setItem("codex-switch:account-table-column-order", JSON.stringify(["fiveHours", "oneWeek"]));

@@ -82,8 +82,6 @@ export const useStyles = createThemedStyles((color) => ({
   composerAddText: { color: color(palette.ink, 'ink'), fontSize: 28, lineHeight: 32 },
   input: { minHeight: 40, maxHeight: 150, fontSize: 16, lineHeight: 23, color: color(palette.ink, 'ink'),
     paddingHorizontal: 8, paddingVertical: 8, textAlignVertical: 'top' },
-  inputCompact: { height: 44, minHeight: 44, maxHeight: 44, marginLeft: 40, marginRight: 88,
-    textAlignVertical: 'center' },
   compactButton: { minHeight: 36, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10,
     backgroundColor: color(palette.pale, 'accentSoft'), justifyContent: 'center' },
   settings: { gap: 12, maxWidth: 400, width: '100%', alignSelf: 'center' },

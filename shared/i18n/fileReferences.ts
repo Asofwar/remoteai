@@ -11,7 +11,7 @@ export const fileReferencesEnglish: Readonly<Record<string, string>> = {
     'Describe a task, % files, @ conversations, / skills, # Coze…',
   '描述任务，% 引用文件，@ 引用对话，/ 选择命令和技能…':
     'Describe a task, % files, @ conversations, / commands and skills…',
-  '发消息，% 引用文件，@ 引用对话…': 'Message, % files, @ conversations…',
+  '% 引用文件，@ 引用对话…': '% files, @ conversations…',
 };
 
 export const fileReferencesRussian: Readonly<Record<string, string>> = {
@@ -27,5 +27,5 @@ export const fileReferencesRussian: Readonly<Record<string, string>> = {
     'Опишите задачу, % файлы, @ диалоги, / навыки, # Coze…',
   '描述任务，% 引用文件，@ 引用对话，/ 选择命令和技能…':
     'Опишите задачу, % файлы, @ диалоги, / команды и навыки…',
-  '发消息，% 引用文件，@ 引用对话…': 'Сообщение, % файлы, @ диалоги…',
+  '% 引用文件，@ 引用对话…': '% файлы, @ диалоги…',
 };

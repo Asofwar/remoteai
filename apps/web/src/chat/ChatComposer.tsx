@@ -1,5 +1,6 @@
 import { useComposerSuggestion } from '../../../../shared/chat/useComposerSuggestion';
 import { ComposerSuggestion } from './ComposerSuggestion';
+import { ComposerInput } from './ComposerInput';
 import { t, useLanguage } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUp, ChevronDown, File, Folder, MessageSquare, Pause, Play, Plus,
@@ -91,7 +92,7 @@ export function ChatComposer(props: ComposerProps) {
   const closeMenus = () => { menu.close(); setAdding(false); };
   const showSettings = () => { closeMenus(); setSettings(true); };
   const placeholder = desktop ? t('描述任务，% 引用文件，@ 引用对话，/ 选择命令和技能…')
-    : t('发消息，% 引用文件，@ 引用对话…');
+    : t('% 引用文件，@ 引用对话…');
   return <div className="chat-composer-dock" ref={dock} onKeyDown={event => {
     if (event.defaultPrevented || event.nativeEvent.isComposing || event.keyCode === 229) return;
     if (event.key === 'Escape') { setAdding(false); menu.close(); }
@@ -151,7 +152,7 @@ export function ChatComposer(props: ComposerProps) {
                 disabled={busy} onClick={() => attachments.remove(item)}><X size={14} /></button></span>)}</div>
           <ComposerQuotes disabled={busy} />
           <ComposerSuggestion text={suggestion.text} accept={suggestion.accept} />
-          <textarea ref={menu.input} aria-label={t("聊天消息")} value={draft.text} maxLength={100_000} rows={1}
+          <ComposerInput ref={menu.input} aria-label={t("聊天消息")} value={draft.text} maxLength={100_000} rows={1}
             readOnly={state.queueEditor.loading}
             onBeforeInput={suggestion.dismiss} onCompositionStart={suggestion.dismiss}
             onCompositionEnd={suggestion.restore}

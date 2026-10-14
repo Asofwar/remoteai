@@ -189,3 +189,28 @@ it('discards a file result after switching projects and does not send failed sea
   expect(host.textContent).not.toContain('private path');
   await key('Enter'); expect(props.send).not.toHaveBeenCalled();
 });
+
+it.each([false, true])('references the new project before sending (desktop=%s)', async desktop => {
+  vi.mocked(matchMedia).mockReturnValue({ matches: desktop, addEventListener: vi.fn(),
+    removeEventListener: vi.fn() } as unknown as MediaQueryList);
+  vi.mocked(props.loadFiles).mockImplementation(async request => {
+    const name = request.cwd === '/remote/project' ? 'unique-a.ts' : 'unique-b.ts';
+    return { directory: request.cwd!, parent: null, truncated: false,
+      entries: [{ name, path: `${request.cwd}/${name}`, directory: false }] };
+  });
+  await type('%unique');
+  expect(host.querySelector('.chat-file-menu')?.textContent).toContain('unique-a.ts');
+  await render({ cwd: '/remote/other' });
+  expect(host.querySelector('.chat-file-menu')).toBeNull();
+  await type('%unique-b');
+  expect(props.loadFiles).toHaveBeenLastCalledWith({ cwd: '/remote/other', threadId: 'current', query: 'unique-b' });
+  expect(host.querySelector('.chat-file-menu')?.textContent).toContain('unique-b.ts');
+  expect(host.querySelector('.chat-file-menu')?.textContent).not.toContain('unique-a.ts');
+  await key('Enter');
+  expect(props.send).not.toHaveBeenCalled();
+  expect(host.querySelector('.chat-capsule')?.textContent).toContain('unique-b.ts');
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="发送消息"]')!.click());
+  expect(props.send).toHaveBeenCalledWith(expect.objectContaining({ attachments: [
+    { kind: 'file', name: 'unique-b.ts', path: '/remote/other/unique-b.ts' },
+  ] }));
+});

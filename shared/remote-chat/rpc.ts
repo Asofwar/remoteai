@@ -10,12 +10,14 @@ const TRANSFER_CHARS_PER_SECOND = 128 * 1024;
 const SMALL_REQUEST_CHARS = 1024 * 1024;
 const MAX_TIMER_MS = 2_147_483_647;
 const GIT_ACTION_TIMEOUT_MS = 5 * 60_000;
-// Leave time for the host's 140-second catalog recovery before the remote read expires.
+// Source switches also await the host's 140-second catalog recovery before replying.
 const MODEL_CATALOG_TIMEOUT_MS = 150_000;
 function requestTimeout(body: unknown) {
   const operation = (body as { operation?: unknown } | null)?.operation;
   if (operation === 'guiGitAction' || operation === 'guiGitWorkspace') return GIT_ACTION_TIMEOUT_MS;
-  if (operation === 'models' || operation === 'composerSet') return MODEL_CATALOG_TIMEOUT_MS;
+  if (operation === 'models' || operation === 'composerSet' || operation === 'guiAccountSelect') {
+    return MODEL_CATALOG_TIMEOUT_MS;
+  }
   if (operation === 'fileBulk' && (body as { action?: string }).action === 'open') return BULK_LIMITS.prepareMs;
   // The direct size allowance is not a transfer estimate and must not turn a timeout into a multi-day wait.
   const chars = operation === 'queueEdit' ? chatMessageCharLimit('relay') : (JSON.stringify(body)?.length ?? 0);

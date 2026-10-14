@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { LocalDesktopClipboard } from '../../../../shared/remote-desktop/clipboard';
+import { ClipboardReadUnavailableError, type ClipboardContent, type LocalDesktopClipboard }
+  from '../../../../shared/remote-desktop/clipboard';
 
 const CLIPBOARD_ACCESS_ERROR = '无法访问剪贴板，请重新复制后再试。';
 const RETRY_DELAY_MS = 60;
@@ -17,9 +18,19 @@ async function withClipboardRetry<T>(operation: () => Promise<T>): Promise<T> {
   }
 }
 
+async function readLocalClipboard() {
+  try { return await withClipboardRetry(() => invoke<ClipboardContent>('remote_desktop_read_local_clipboard')); }
+  catch (error) {
+    // The native IPC boundary currently returns fixed public error messages instead of error codes.
+    const message = error instanceof Error ? error.message : error;
+    if (message === CLIPBOARD_ACCESS_ERROR) throw new ClipboardReadUnavailableError(CLIPBOARD_ACCESS_ERROR);
+    throw error;
+  }
+}
+
 /** Native file clipboard entries remain available for pasting into Explorer after closing the viewer. */
 export const localDesktopClipboard: LocalDesktopClipboard = {
   files: true,
-  read: () => withClipboardRetry(() => invoke('remote_desktop_read_local_clipboard')),
+  read: readLocalClipboard,
   write: content => withClipboardRetry(() => invoke('remote_desktop_write_local_clipboard', { content })),
 };

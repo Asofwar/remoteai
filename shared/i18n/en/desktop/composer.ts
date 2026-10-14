@@ -88,6 +88,7 @@ export const composer = {
   "正在查找应用…": "Finding apps…",
   "未能读取应用，请重新打开菜单": "Could not load apps. Please reopen the menu.",
   "查看差异": "View changes",
+  "预览文件": "Preview file",
   "另存为…": "Save as…",
   "复制路径": "Copy path",
   "复制文件": "Copy file",

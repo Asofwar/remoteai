@@ -3,7 +3,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useDesktopClipboard } from '../../../web/src/chat/desktop/useDesktopClipboard';
-import type { ClipboardContent } from '../../../../shared/remote-desktop/clipboard';
+import { ClipboardReadUnavailableError, type ClipboardContent } from '../../../../shared/remote-desktop/clipboard';
 
 const text = (value: string): ClipboardContent => ({ format: 'text', text: value });
 const clipboard = { read: vi.fn(), write: vi.fn(), copy: vi.fn(), paste: vi.fn() };
@@ -169,7 +169,17 @@ it('allows native copy/paste for folders or hosts that disable clipboard sharing
 });
 
 it('preserves native paste when reading the local clipboard is unavailable', async () => {
-  localClipboard.read.mockRejectedValueOnce(new Error('denied'));
+  localClipboard.read.mockRejectedValueOnce(new ClipboardReadUnavailableError('无法访问剪贴板，请重新复制后再试。'));
   await act(async () => state.pasteShortcut!());
   expect(clipboard.paste).toHaveBeenCalledWith(false); expect(clipboard.write).not.toHaveBeenCalled();
 });
+
+it.each(['剪贴板内容过大，请分批复制（每次最多 64 MB）。', '暂不支持复制文件夹，请先压缩后再复制。'])(
+  'stops native paste when readable local content fails validation: %s', async error => {
+    localClipboard.read.mockRejectedValueOnce(error);
+    await act(async () => state.pasteShortcut!());
+    expect(state.status).toBe(error);
+    expect(clipboard.paste).not.toHaveBeenCalled();
+    expect(clipboard.write).not.toHaveBeenCalled();
+  },
+);

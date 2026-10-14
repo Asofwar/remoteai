@@ -1,15 +1,14 @@
-import { createThemedStyles } from '../theme/styles';
 import { t, useLanguage } from '../i18n';
 import { useEffect, useState } from 'react';
-import { Text } from 'react-native';
-import { palette } from './styles';
+import { Pressable, Text } from 'react-native';
+import { useConnectionInfoStyles } from './connectionInfoStyles';
 
 const DOT_INTERVAL_MS = 400;
 const DOTS = ['.', '..', '...'];
 const MILLISECONDS_PER_SECOND = 1000;
 
 export function ChatReconnectButton({ retryAt, onPress }: { retryAt: number | null; onPress: () => void }) {
-  const reconnectStyles = useReconnectStyles();
+  const styles = useConnectionInfoStyles();
   useLanguage();
   const [tick, setTick] = useState({ now: Date.now(), dots: 0 });
   useEffect(() => {
@@ -18,11 +17,9 @@ export function ChatReconnectButton({ retryAt, onPress }: { retryAt: number | nu
     return () => clearInterval(timer);
   }, []);
   const seconds = retryAt === null ? null : Math.max(0, Math.ceil((retryAt - tick.now) / MILLISECONDS_PER_SECOND));
-  return <Text accessibilityRole="button" accessibilityLabel={t("立即连接")} onPress={onPress}
-    style={reconnectStyles.text}>
-    {t("立即连接")}{seconds === null ? '' : t("（{value1}秒）", { value1: seconds })}{DOTS[tick.dots]}</Text>;
+  return <Pressable accessibilityRole="button" accessibilityLabel={t("立即连接")} onPress={onPress}
+    style={styles.action}>
+    <Text style={styles.actionText}>
+      {t("立即连接")}{seconds === null ? '' : t("（{value1}秒）", { value1: seconds })}{DOTS[tick.dots]}</Text>
+  </Pressable>;
 }
-
-const useReconnectStyles = createThemedStyles((color) => ({
-  text: { color: color(palette.green, 'accent') },
-}));

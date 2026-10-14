@@ -2,6 +2,8 @@ import { decodeClipboardBytes, encodeClipboardBytes, MAX_CLIPBOARD_BYTES, MAX_CL
   type ClipboardContent, type LocalDesktopClipboard } from '../../../../../shared/remote-desktop/clipboard';
 import { downloadBlob } from '../fileDownloadTarget';
 
+const BASELINE_READ_TIMEOUT_MS = 250;
+
 export async function filesContent(files: File[], image = false): Promise<ClipboardContent> {
   if (!files.length || files.length > MAX_CLIPBOARD_FILES
     || files.reduce((total, file) => total + file.size, 0) > MAX_CLIPBOARD_BYTES) {
@@ -43,8 +45,18 @@ export async function readBrowserClipboard(): Promise<ClipboardContent> {
   throw new Error('剪贴板中没有可发送的内容，请重新复制或选择文件。');
 }
 
-/** Observing provenance must not trigger a new clipboard-read permission prompt during copy. */
+/** Observing provenance during copy or file sending must not request clipboard-read permission. */
 export async function readBrowserClipboardBaseline(): Promise<ClipboardContent | undefined> {
+  // Baseline reads are optional and must not hold the gesture open if the browser or system stalls.
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([readGrantedClipboard(), new Promise<undefined>(resolve => {
+      timeout = setTimeout(() => resolve(undefined), BASELINE_READ_TIMEOUT_MS);
+    })]);
+  } finally { clearTimeout(timeout); }
+}
+
+async function readGrantedClipboard(): Promise<ClipboardContent | undefined> {
   try {
     const permission = await navigator.permissions?.query({ name: 'clipboard-read' as PermissionName });
     if (permission?.state === 'granted') return await readBrowserClipboard();

@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
 import { localDesktopClipboard } from './localClipboard';
+import { ClipboardReadUnavailableError } from '../../../../shared/remote-desktop/clipboard';
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 const accessError = '无法访问剪贴板，请重新复制后再试。';
@@ -18,7 +19,7 @@ it('retries a temporary local clipboard lock without repeating the remote gestur
 
 it('bounds clipboard access retries and preserves the error', async () => {
   vi.useFakeTimers(); vi.mocked(invoke).mockRejectedValue(accessError);
-  const reading = expect(localDesktopClipboard.read()).rejects.toBe(accessError);
+  const reading = expect(localDesktopClipboard.read()).rejects.toBeInstanceOf(ClipboardReadUnavailableError);
   await vi.runAllTimersAsync(); await reading;
   expect(invoke).toHaveBeenCalledTimes(3);
 });

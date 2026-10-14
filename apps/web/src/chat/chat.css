@@ -82,11 +82,22 @@ html:has(.app-shell.chat-active), body:has(.app-shell.chat-active) { overscroll-
 .chat-device-switch, .chat-connection { border: 0; background: transparent; text-align: left; cursor: pointer; }
 .chat-device-switch { padding: 18px; border-top: 1px solid var(--chat-border); }
 .chat-connection { max-width: 100%; padding: 0; font: inherit; font-size: 12px; }
-.chat-connection-info { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chat-connection-info .chat-connection { display: inline; max-width: none; font: inherit; color: inherit; }
+.chat-connection-info { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; column-gap: 8px; }
+.chat-connection-summary { display: flex; align-items: center; flex: 1 1 120px; min-width: 0; }
+.chat-connection-info .chat-connection { font: inherit; color: inherit; }
+.chat-connection-name { min-width: 0; }
+.chat-connection-status { flex-shrink: 0; max-width: 55%; }
+.chat-connection-name, .chat-connection-status, .chat-project-name {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Keep recovery actions outside the truncating summary, wrapping them on narrow screens. */
+.chat-connection-actions { display: flex; flex-wrap: wrap; align-items: center; column-gap: 8px; max-width: 100%; }
+.chat-connection-actions .chat-connection { min-height: 24px; overflow-wrap: anywhere; }
 .chat-connection-info .chat-connection:focus-visible { outline: 1px solid currentColor; outline-offset: -1px; }
-.chat-connection-info .chat-connection[aria-disabled="true"] { cursor: default; }
-.chat-connection-info .chat-reconnect { color: var(--app-accent, #238578); }
+.chat-connection-info .chat-connection:disabled { cursor: default; }
+.chat-connection-info .chat-reconnect, .chat-connection-info .chat-connection-verify {
+  color: var(--app-accent, #238578);
+}
 .chat-project-picker { max-width: 400px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
 .chat-project-path { overflow-wrap: anywhere; }
 .chat-project-folders { max-height: 340px; }

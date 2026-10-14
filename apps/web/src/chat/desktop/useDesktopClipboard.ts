@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ClipboardContent, LocalDesktopClipboard } from '../../../../../shared/remote-desktop/clipboard';
+import { ClipboardReadUnavailableError, type ClipboardContent, type LocalDesktopClipboard }
+  from '../../../../../shared/remote-desktop/clipboard';
 import type { DesktopClipboard } from '../../../../../shared/remote-desktop/clipboardTransfer';
 import { ClipboardOrigin } from '../../../../../shared/remote-desktop/clipboardOrigin';
-import { readPastedContent } from '../../../../../shared/chat/clipboard';
+import { MISSING_CLIPBOARD_IMAGES, readPastedContent } from '../../../../../shared/chat/clipboard';
 import { browserDesktopClipboard, downloadClipboardFile, filesContent, readBrowserClipboardBaseline }
   from './clipboardContent';
 import { useClipboardQueue } from './useClipboardQueue';
@@ -24,13 +25,19 @@ export function useDesktopClipboard({ active, clipboard, localClipboard }: Optio
     return () => { origin.current.reset(); pendingCopies.current = 0; };
   }, [active]);
 
+  const readLocalForPaste = () => local.read().catch(error => {
+    if (error instanceof ClipboardReadUnavailableError) return undefined;
+    throw error;
+  });
+  const readBaseline = () => localClipboard ? local.read().catch(() => undefined) : readBrowserClipboardBaseline();
   const send = (content: () => Promise<ClipboardContent>, fromFiles = false) => {
     void run(async current => {
       const value = await content();
-      const baseline = fromFiles ? await local.read().catch(() => undefined) : value;
+      const baseline = fromFiles ? readBaseline() : Promise.resolve(value);
       if (!current()) return;
       await clipboard.write(value, true, report(current));
-      if (current()) { origin.current.remember(baseline); setStatus(''); }
+      const before = await baseline;
+      if (current()) { origin.current.remember(before); setStatus(''); }
     });
   };
   const copy = (shortcut?: 'copy' | 'cut') => {
@@ -39,7 +46,7 @@ export function useDesktopClipboard({ active, clipboard, localClipboard }: Optio
     void run(async current => {
       setReceived(undefined); setNeedsSave(false); origin.current.remember();
       // Read the local baseline alongside the remote gesture; local access cannot block native copy/cut.
-      const baseline = localClipboard ? local.read().catch(() => undefined) : readBrowserClipboardBaseline();
+      const baseline = readBaseline();
       try {
         const content = await (shortcut ? clipboard.copy(shortcut, report(current))
           : clipboard.read(undefined, report(current)));
@@ -69,7 +76,8 @@ export function useDesktopClipboard({ active, clipboard, localClipboard }: Optio
     // Browser paste data may predate a copy still in flight. Such a gesture belongs to the remote clipboard.
     const copying = pendingCopies.current > 0;
     void run(async current => {
-      const content = await read().catch(() => undefined);
+      // Only unavailable clipboard reads may yield undefined; invalid local content must stop the gesture.
+      const content = await read();
       if (!current()) return;
       const revision = await clipboard.paste(!copying && origin.current.preferLocal(content));
       if (!current()) return;
@@ -78,10 +86,12 @@ export function useDesktopClipboard({ active, clipboard, localClipboard }: Optio
     });
   };
   const paste = (data: DataTransfer) => {
-    if (localClipboard) { pasteAutomatic(local.read); return; }
-    if (pendingCopies.current) { pasteAutomatic(async () => undefined); return; }
+    if (localClipboard) { pasteAutomatic(readLocalForPaste); return; }
     const { files, text, missingImages } = readPastedContent(data);
-    if (missingImages || (!files.length && !text)) { pasteAutomatic(async () => undefined); return; }
+    if (missingImages) {
+      void run(async () => { throw new Error(MISSING_CLIPBOARD_IMAGES); }); return;
+    }
+    if (!files.length && !text) { pasteAutomatic(async () => undefined); return; }
     const image = !data.getData('text/plain');
     pasteAutomatic(() => files.length ? filesContent(files, image) : Promise.resolve({ format: 'text', text }));
   };
@@ -95,6 +105,6 @@ export function useDesktopClipboard({ active, clipboard, localClipboard }: Optio
     });
   };
   return { open, setOpen, busy, status, progress, received, copy, paste, save, needsSave, nativeFiles: local.files,
-    pasteShortcut: localClipboard ? () => pasteAutomatic(local.read) : undefined,
+    pasteShortcut: localClipboard ? () => pasteAutomatic(readLocalForPaste) : undefined,
     pasteLocal: () => send(local.read), sendFiles: (files: File[]) => send(() => filesContent(files), true) };
 }

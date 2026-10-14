@@ -2,7 +2,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { readBrowserClipboardBaseline } from '../../../web/src/chat/desktop/clipboardContent';
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 it.each(['prompt', 'denied'])('does not read or prompt for clipboard access when permission is %s', async state => {
   const readText = vi.fn();
@@ -18,4 +18,15 @@ it('records a baseline only with an existing grant and tolerates unsupported per
   await expect(readBrowserClipboardBaseline()).resolves.toEqual({ format: 'text', text: 'old local' });
   vi.stubGlobal('navigator', {});
   await expect(readBrowserClipboardBaseline()).resolves.toBeUndefined();
+});
+
+it('bounds waiting for the permission query without reading the clipboard', async () => {
+  vi.useFakeTimers();
+  const readText = vi.fn();
+  vi.stubGlobal('navigator', { permissions: { query: vi.fn(() => new Promise(() => {})) },
+    clipboard: { readText } });
+  const baseline = readBrowserClipboardBaseline();
+  await vi.advanceTimersByTimeAsync(250);
+  await expect(baseline).resolves.toBeUndefined();
+  expect(readText).not.toHaveBeenCalled();
 });

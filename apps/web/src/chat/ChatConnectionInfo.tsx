@@ -27,32 +27,24 @@ export function ChatConnectionInfo({ state, controller, device, active, chooseDe
   useEffect(() => { if (!canChoose) setPicking(false); }, [canChoose]);
   return <>
     <div className="chat-connection-info chat-muted">
-      <ChatConnectionAction label={t("选择电脑")} onClick={chooseDevice}>
-        {device ? device.name : t("选择电脑，开始聊天")}
-      </ChatConnectionAction>
-      {device && <>
-        {' · '}
-        <ChatConnectionAction className="chat-connection-status"
-          label={`${status} · ${t('连接体检')}`} expanded={healthOpen}
-          onClick={() => setHealthOpen(true)}>
-          <span role="status">{status}</span>
+      <div className="chat-connection-summary">
+        <ChatConnectionAction className="chat-connection-name" label={t("选择电脑")} onClick={chooseDevice}>
+          {device ? device.name : t("选择电脑，开始聊天")}
         </ChatConnectionAction>
-      </>}
-      {canReconnect && <>
-        {' · '}
-        <ChatReconnectButton retryAt={state.retryAt} onClick={controller.connectNow} />
-      </>}
-      {state.error === HOST_IDENTITY_CHANGED && <>
-        {' · '}
-        <ChatConnectionAction label={t('核对电脑身份')} onClick={() => setVerifying(true)}>
-          {t('核对电脑身份')}</ChatConnectionAction>
-      </>}
-      {!state.selected && !canReconnect && <>
-        {' · '}
-        <ChatConnectionAction className="chat-project-name" label={t("选择项目")}
+        {device && <ChatConnectionAction className="chat-connection-status"
+          label={`${status} · ${t('连接体检')}`} expanded={healthOpen} onClick={() => setHealthOpen(true)}>
+          {' · '}<span role="status">{status}</span>
+        </ChatConnectionAction>}
+      </div>
+      <div className="chat-connection-actions">
+        {state.error === HOST_IDENTITY_CHANGED && <ChatConnectionAction className="chat-connection-verify"
+          label={t('核对电脑身份')} onClick={() => setVerifying(true)}>
+          {t('核对电脑身份')}</ChatConnectionAction>}
+        {canReconnect && <ChatReconnectButton retryAt={state.retryAt} onClick={controller.connectNow} />}
+        {!state.selected && !canReconnect && <ChatConnectionAction className="chat-project-name" label={t("选择项目")}
           disabled={!canChoose} onClick={() => setPicking(true)}>
-          {state.draftProject?.label || t("未选择项目")}</ChatConnectionAction>
-      </>}
+          {state.draftProject?.label || t("未选择项目")}</ChatConnectionAction>}
+      </div>
     </div>
     {healthOpen && <ChatConnectionHealth state={state} device={device}
       reconnect={controller.connectNow} close={() => setHealthOpen(false)} />}

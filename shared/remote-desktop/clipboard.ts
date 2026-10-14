@@ -5,6 +5,8 @@ export const MAX_CLIPBOARD_FILES = 32;
 export const MAX_CONTROL_MESSAGE_BYTES = 64 * 1024;
 export type ClipboardContent = { format: 'text'; text: string } | { format: 'image'; data: string }
   | { format: 'files'; files: { name: string; data: string }[] };
+/** An inaccessible local clipboard may preserve a remote paste; invalid content must still fail. */
+export class ClipboardReadUnavailableError extends Error {}
 /** Platform clipboard access, invoked only in response to a copy or paste gesture. */
 export interface LocalDesktopClipboard {
   files: boolean;

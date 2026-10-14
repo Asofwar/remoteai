@@ -23,9 +23,12 @@ export function effectiveProjectThread(thread: Thread): Thread {
 }
 
 export function applyProjectOverride(body: Record<string, unknown>) {
-  if (!['resume', 'send'].includes(String(body.operation)) || typeof body.threadId !== 'string') return;
+  if (!['resume', 'send', 'projectFiles'].includes(String(body.operation)) || typeof body.threadId !== 'string') return;
   const cwd = getGuiController().getSnapshot().projectOverrides?.[body.threadId];
-  if (cwd !== undefined) body.cwd = cwd;
+  if (cwd === undefined) return;
+  body.cwd = cwd;
+  // The app-server retains the old cwd until the next turn; only the host-confirmed override may replace it.
+  if (body.operation === 'projectFiles') delete body.threadId;
 }
 
 export async function selectRemoteProject(body: Record<string, unknown>): Promise<ChatProject> {

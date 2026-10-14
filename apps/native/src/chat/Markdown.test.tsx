@@ -1,6 +1,7 @@
 import React, { Children, isValidElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { answer } from '../../../../shared/chat/lineBreakFixture.json';
+import userMessages from '../../../../shared/chat/userMessageFixture.json';
 import { ChatMarkdown } from './Markdown';
 
 vi.mock('react', async importOriginal => ({ ...await importOriginal<typeof React>(),
@@ -49,6 +50,10 @@ function nativeTextCount(node: ReactNode): number {
 
 it.each([false, true])('keeps every model separator and answer line (user=%s)', user => {
   expect(textContent(<ChatMarkdown text={answer} user={user} />)).toBe(answer);
+});
+
+it.each(Object.entries(userMessages))('preserves every character of the %s user message', (_name, text) => {
+  expect(textContent(<ChatMarkdown text={text} user />)).toBe(text);
 });
 
 it('keeps soft and explicit breaks across inline formatting without inserting blank lines', () => {

@@ -3,12 +3,50 @@ import { createRequire } from 'node:module';
 import fixture from '../../../shared/chat/markdownFixture.json' with { type: 'json' };
 import lineBreaks from '../../../shared/chat/lineBreakFixture.json' with { type: 'json' };
 import lists from '../../../shared/chat/listAlignmentFixture.json' with { type: 'json' };
+import userMessages from '../../../shared/chat/userMessageFixture.json' with { type: 'json' };
 import { screenshot } from './chat-helpers';
 const { markdownAnswer, markdownQuestion } = fixture;
 const require = createRequire(import.meta.url);
 const { parseMarkdown, renderMathParagraph }: typeof import('../../native/src/chat/markdownTree') =
   require('../../native/src/chat/markdownTree');
 const { mathDocument }: typeof import('../../native/src/chat/mathDocument') = require('../../native/src/chat/mathDocument');
+
+test('shows every user message character inside its bubble at different widths', async ({ page }, info) => {
+  await page.route('**/display-fixture.json', route => route.fulfill({ json: {
+    id: 'user-text', cwd: '', preview: '', updatedAt: 1, turns: [{ id: 'turn', status: 'completed',
+      items: Object.entries(userMessages).map(([id, text]) => ({ id, type: 'userMessage', text })),
+    }],
+  } }));
+  await page.goto('e2e/chat-display-harness.html');
+  const widths = info.project.name === 'mobile' ? [390, 320] : [1280, 900];
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const [id, text] of Object.entries(userMessages)) {
+      const bubble = page.locator(`[data-message-id="${id}"] .chat-user-message`);
+      await expect.poll(() => bubble.innerText()).toBe(text);
+      const clipped = await bubble.evaluate(node => {
+        const bounds = node.getBoundingClientRect();
+        const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+        const missing: string[] = [];
+        while (walker.nextNode()) {
+          const textNode = walker.currentNode;
+          for (let index = 0; index < (textNode.textContent?.length ?? 0); index++) {
+            const range = document.createRange();
+            range.setStart(textNode, index);
+            range.setEnd(textNode, index + 1);
+            const rect = range.getBoundingClientRect();
+            if (rect.width && (rect.left < bounds.left - 1 || rect.right > bounds.right + 1
+              || rect.top < bounds.top - 1 || rect.bottom > bounds.bottom + 1)) missing.push(range.toString());
+          }
+        }
+        return missing;
+      });
+      expect(clipped, `${id} at ${width}px`).toEqual([]);
+    }
+    expect(await page.locator('.chat-messages').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+    await screenshot(page, info, `user-text-${width}`);
+  }
+});
 
 test('aligns loose list markers with the first paragraph and keeps subsequent paragraph spacing', async ({ page }, info) => {
   await page.route('**/display-fixture.json', route => route.fulfill({ json: {

@@ -17,10 +17,19 @@ class ChatTextViewManager : ReactTextViewManager() {
 
 private class ChatTextView(context: ThemedReactContext) : ReactTextView(context) {
   private val selectionTouch = ChatSelectionTouch(this) { super.onTouchEvent(it) }
+  private val reportOverflow = Runnable { reportChatTextOverflow(this) }
+
+  override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+    super.onLayout(changed, left, top, right, bottom)
+    // Wait for Android to finish rebuilding the selectable text layout before checking its last line.
+    removeCallbacks(reportOverflow)
+    post(reportOverflow)
+  }
 
   override fun onTouchEvent(event: MotionEvent): Boolean = selectionTouch.onTouchEvent(event)
 
   override fun onDetachedFromWindow() {
+    removeCallbacks(reportOverflow)
     selectionTouch.cancel()
     super.onDetachedFromWindow()
   }

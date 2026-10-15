@@ -1,16 +1,16 @@
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import { gitGraph, GRAPH_ROW_HEIGHT } from '../../../../../shared/remote-chat/gitGraph';
+import { GIT_HISTORY_CONTENT_WIDTH, GIT_HISTORY_DATE_FORMAT } from '../../../../../shared/remote-chat/gitHistoryLayout';
 import type { RemoteGit } from '../../../../../shared/remote-chat/useRemoteGit';
 import { t, getLocale } from '../../i18n';
 import './gitHistory.css';
 
-const DATE_FORMAT: Intl.DateTimeFormatOptions = {
-  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-};
+const HISTORY_STYLE = { '--git-history-compact-width': `${GIT_HISTORY_CONTENT_WIDTH}px`,
+  '--git-history-compact-height': `${GRAPH_ROW_HEIGHT}px` } as CSSProperties;
 
 export function GitHistory({ panel, connected }: { panel: RemoteGit; connected: boolean }) {
   const graph = useMemo(() => gitGraph(panel.commits), [panel.commits]);
-  return <div className="git-history">
+  return <div className="git-history" style={HISTORY_STYLE}>
     {!panel.busy && !panel.commits.length && <p className="git-notice">{t('还没有提交记录。')}</p>}
     {graph.rows.map(row => <button type="button" key={row.commit.hash} className="git-history-row"
       style={{ minWidth: `calc(${row.width}px + var(--git-history-content-width, 560px))` }}
@@ -28,7 +28,8 @@ export function GitHistory({ panel, connected }: { panel: RemoteGit; connected: 
         </span>
         <small className="git-history-hash">{row.commit.hash.slice(0, 8)}</small>
         <small className="git-history-author">{row.commit.author}</small>
-        <time dateTime={row.commit.date}>{new Date(row.commit.date).toLocaleString(getLocale(), DATE_FORMAT)}</time>
+        <time dateTime={row.commit.date}>{
+          new Date(row.commit.date).toLocaleString(getLocale(), GIT_HISTORY_DATE_FORMAT)}</time>
       </span>
     </button>)}
     {panel.hasMore && <button type="button" className="git-more" disabled={panel.busy || !connected}

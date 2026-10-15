@@ -46,7 +46,11 @@
 .git-history-summary .git-refs em { overflow: hidden; text-overflow: ellipsis; padding: 0 5px; }
 /* Follow the drawer width, including when it is resized inside a wide window. */
 @container git-history (max-width: 700px) {
-  .chat-git .git-history-row { --git-history-content-width: 270px; height: 48px; padding: 0 12px; }
+  .chat-git .git-history-row {
+    --git-history-content-width: var(--git-history-compact-width);
+    height: var(--git-history-compact-height);
+    padding: 0 12px;
+  }
   .git-history-text { grid-template-columns: 8ch minmax(40px, 1fr) auto; gap: 0 8px; }
   .git-history-summary { grid-column: 1 / -1; }
   .git-history-text time { font-size: 10px; }

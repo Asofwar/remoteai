@@ -7,6 +7,8 @@ const BUILT_IN_PERMISSION_ZH: Record<string, PermissionMetadata> = {
   "admin.token-pricing.read": { group: "内容", name: "查看模型计价", description: "查看模型价格和快速模式倍率。" },
   "admin.token-pricing.manage": { group: "内容", name: "管理模型计价", description: "添加模型并修改价格和快速模式倍率。" },
   "admin.chat-settings.read": { group: "内容", name: "查看聊天设置", description: "查看 GUI 自动起名及手机和网页的聊天设置。" },
+  "admin.update-sharing.read": { group: "内容", name: "查看下载设置", description: "查看安装包共享和下载优化设置。" },
+  "admin.update-sharing.manage": { group: "内容", name: "管理下载设置", description: "管理安装包共享和下载优化设置。" },
   "admin.chat-settings.manage": { group: "内容", name: "管理聊天设置", description: "设置 GUI 自动起名及手机和网页的聊天限制。" },
   "self.accounts.read": {
     group: "自助服务",

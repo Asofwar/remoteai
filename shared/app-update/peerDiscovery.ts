@@ -55,7 +55,7 @@ class Discovery {
     if (this.closed || !this.authenticated || this.requestId || this.delivering || this.sessions.size >= MAX_PEERS) return;
     this.requestId = `android-update-${++this.sequence}`;
     this.send({ type: 'update-peer-find', requestId: this.requestId, artifact: this.options.artifact,
-      maxPeers: MAX_PEERS, packageProtocol: 2, ownOnly: true, refill: true });
+      maxPeers: MAX_PEERS, packageProtocol: 2, ownOnly: false, refill: true });
     clearTimeout(this.timer);
     this.timer = setTimeout(() => { this.requestId = ''; this.initialize([]); }, LOOKUP_TIMEOUT_MS);
   }
@@ -78,7 +78,7 @@ class Discovery {
       const configs = message.type === 'update-peer-offers' ? message.configs : [message.config];
       if (message.artifact !== this.options.artifact || !Array.isArray(configs) || !configs.length
         || configs.length + this.sessions.size > MAX_PEERS || !configs.every(validUpdatePeerConfig)
-        || configs.some(config => !config.sameAccount || config.packageProtocol !== 2 || this.sessions.has(config.sessionId))
+        || configs.some(config => config.packageProtocol !== 2 || this.sessions.has(config.sessionId))
         || new Set(configs.map(config => config.sessionId)).size !== configs.length) { this.fail(); return; }
       configs.forEach(config => this.sessions.add(config.sessionId));
       if (!this.initialized) this.initialize(configs);

@@ -55,14 +55,14 @@ export function findUpdatePeers(session: UpdatePeerSession, artifact: string,
         if (message.type === 'devices-snapshot' && !requested) {
           requested = true;
           socket.send(JSON.stringify({ type: 'update-peer-find', requestId, artifact, maxPeers: 3,
-            packageProtocol: options.protocol ?? 2, ownOnly: options.ownOnly !== false }));
+            packageProtocol: options.protocol ?? 2, ownOnly: options.ownOnly === true }));
         }
         if (message.requestId !== requestId) return;
         if (message.type === 'update-peer-unavailable') { fail(); return; }
         const configs = message.type === 'update-peer-offers' ? message.configs : [message.config];
         if (message.artifact !== artifact || !Array.isArray(configs) || !configs.length || configs.length > 3
           || !configs.every(validUpdatePeerConfig)
-          || (options.ownOnly !== false && configs.some(config => !config.sameAccount))
+          || (options.ownOnly === true && configs.some(config => !config.sameAccount))
           || new Set(configs.map(config => config.sessionId)).size !== configs.length) {
           fail(); return;
         }

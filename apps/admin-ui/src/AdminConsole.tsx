@@ -21,6 +21,7 @@ import { useAuthenticatedApi } from "./hooks/useAuthenticatedApi";
 import { ApprovalsPage } from "./pages/ApprovalsPage";
 import { AnnouncementPage } from "./pages/AnnouncementPage";
 import { ChatSettingsPage } from "./pages/ChatSettingsPage";
+import { UpdateSharingPage } from "./pages/UpdateSharingPage";
 import { TokenPricingPage } from "./pages/TokenPricingPage";
 import { CurrencyPage } from "./pages/CurrencyPage";
 import { CodexHomePresetsPage } from "./pages/CodexHomePresetsPage";
@@ -144,6 +145,7 @@ const emptyAnnouncementClickOverview: AnnouncementClickOverview = {
 const menuPermissions: Record<MenuKey, Permission> = {
   chatTraffic: "admin.chat-traffic.read",
   chatSettings: "admin.chat-settings.read",
+  updateSharing: "admin.update-sharing.read",
   dashboard: "admin.dashboard.read",
   myAccounts: "self.accounts.read",
   users: "admin.users.read",
@@ -175,6 +177,7 @@ const menuOrder: MenuKey[] = [
   "currency",
   "tokenPricing",
   "chatSettings",
+  "updateSharing",
   "chatTraffic",
   "codexHomePresets",
   "emailTemplates",
@@ -1315,6 +1318,10 @@ export function AdminConsole({ dark, onThemeChange }: AdminConsoleProps) {
     if (activeKey === "chatSettings") {
       return <ChatSettingsPage api={api}
         canManage={Boolean(profile?.permissions?.includes('admin.chat-settings.manage'))} />;
+    }
+    if (activeKey === "updateSharing") {
+      return <UpdateSharingPage api={api}
+        canManage={Boolean(profile?.permissions?.includes('admin.update-sharing.manage'))} />;
     }
 
     if (activeKey === "chatTraffic") {

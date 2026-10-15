@@ -26,8 +26,9 @@ it('authenticates before requesting distinct sources and keeps the lease until t
   socket.onopen();
   expect(JSON.parse(socket.send.mock.calls[0][0])).toEqual({ type: 'subscribe-devices', accessToken: 'token' });
   socket.receive({ type: 'devices-snapshot', devices: [] });
-  expect(JSON.parse(socket.send.mock.calls[1][0])).toMatchObject({ type: 'update-peer-find', maxPeers: 3 });
-  socket.receive({ type: 'update-peer-offers', requestId: 'android-update', artifact, configs: [config(1), config(2)] });
+  expect(JSON.parse(socket.send.mock.calls[1][0])).toMatchObject({ type: 'update-peer-find', maxPeers: 3, ownOnly: false });
+  socket.receive({ type: 'update-peer-offers', requestId: 'android-update', artifact,
+    configs: [config(1), { ...config(2), sameAccount: false }] });
   const lease = await result;
   expect(lease.configs).toHaveLength(2);
   expect(socket.close).not.toHaveBeenCalled();
@@ -39,7 +40,7 @@ it('authenticates before requesting distinct sources and keeps the lease until t
 });
 
 it.each(['timeout', 'wrong-artifact', 'duplicate', 'expired', 'unavailable', 'other-account'])('cleans up after %s', async failure => {
-  const result = findUpdatePeers(session, artifact);
+  const result = findUpdatePeers(session, artifact, { ownOnly: true });
   const rejected = expect(result).rejects.toThrow('Update sharing unavailable');
   const socket = Socket.latest;
   if (failure === 'timeout') await vi.advanceTimersByTimeAsync(6_000);

@@ -16,7 +16,7 @@ class Socket {
 const artifact = 'a'.repeat(64);
 const session = { baseUrl: 'https://example.test/api', accessToken: 'fixture' };
 const config = (index: number) => ({ sessionId: `update-00000000-0000-4000-8000-00000000000${index}`,
-  secret: 'b'.repeat(64), desktop: false, sameAccount: true, packageProtocol: 2, expiresAt: Date.now() + 60_000,
+  secret: 'b'.repeat(64), desktop: false, sameAccount: false, packageProtocol: 2, expiresAt: Date.now() + 60_000,
   servers: ['udp://fixture:1'], stunServers: [] });
 const offer = (request: number, indices: number[]) => ({ type: 'update-peer-offers',
   requestId: `android-update-${request}`, artifact, configs: indices.map(config) });
@@ -32,7 +32,7 @@ it('starts empty and adds sources appearing during the official download', async
   const lease = await pending;
   expect(lease.configs).toEqual([]);
   await vi.advanceTimersByTimeAsync(12_000);
-  expect(socket.messages().at(-1)).toMatchObject({ type: 'update-peer-find', refill: true, ownOnly: true });
+  expect(socket.messages().at(-1)).toMatchObject({ type: 'update-peer-find', refill: true, ownOnly: false });
   socket.receive(offer(2, [1, 2]));
   await Promise.resolve();
   expect(onPeers).toHaveBeenCalledWith([config(1), config(2)]);
@@ -66,12 +66,12 @@ it('releases late and rejected grants without losing existing sources', async ()
   lease.close();
 });
 
-it('never expands account scope or accepts duplicate peer grants', async () => {
+it('rejects duplicate peer grants', async () => {
   const pending = watchUpdatePeers({ session, artifact, onPeers: vi.fn() });
   const rejected = expect(pending).rejects.toThrow();
   const socket = Socket.latest;
   socket.onopen(); socket.receive({ type: 'devices-snapshot' });
-  socket.receive({ ...offer(1, [1]), configs: [{ ...config(1), sameAccount: false }] });
+  socket.receive(offer(1, [1, 1]));
   await rejected;
   expect(socket.close).toHaveBeenCalledOnce();
 });

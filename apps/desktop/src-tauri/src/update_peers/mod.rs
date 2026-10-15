@@ -14,6 +14,7 @@ mod origin_blocks;
 pub(crate) mod packages;
 mod parallel;
 pub(crate) mod policy;
+mod remote_policy;
 mod signaling;
 mod snapshot;
 mod transfer;
@@ -70,11 +71,12 @@ pub(crate) fn setup<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Resu
         broker: watch::channel(None).0,
         uploads: Arc::new(Semaphore::new(MAX_UPLOADS)),
         downloads: Semaphore::new(1),
-        policy: policy::Policy::new(app.path().app_config_dir()?.join("update-sharing.json")),
+        policy: policy::Policy::new(),
         mirror_base: watch::channel(None).0,
     });
     app.manage(service.clone());
     tauri::async_runtime::spawn(service.policy.clone().run());
+    tauri::async_runtime::spawn(remote_policy::run(service.clone()));
     tauri::async_runtime::spawn(android::run(service));
     tauri::async_runtime::spawn(async move {
         if let Err(error) = cache.restore().await {

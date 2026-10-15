@@ -12,6 +12,7 @@ export type MenuKey =
   | "officialModels"
   | "announcement"
   | "chatSettings"
+  | "updateSharing"
   | "chatTraffic"
   | "currency"
   | "tokenPricing"

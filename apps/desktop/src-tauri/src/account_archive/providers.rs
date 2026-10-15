@@ -21,6 +21,7 @@ fn provider_payload_from_profile(
     field_modified_at: crate::models::ProviderFieldModifiedAt,
 ) -> ProviderSyncPayload {
     ProviderSyncPayload {
+        request_options: provider.request_options,
         id: provider.id,
         kind: provider.kind,
         name: provider.name,
@@ -51,6 +52,7 @@ fn provider_payload_from_profile(
 
 fn provider_payload_to_profile(provider: &ProviderSyncPayload) -> Result<ProviderProfile, String> {
     Ok(ProviderProfile {
+        request_options: provider.request_options.clone(),
         id: provider.id.clone(),
         kind: provider.kind,
         name: provider.name.clone(),

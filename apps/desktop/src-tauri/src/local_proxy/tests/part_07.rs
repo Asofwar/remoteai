@@ -46,6 +46,7 @@
         });
 
         let provider = ProviderProfile {
+            request_options: Default::default(),
             id: "deepseek".to_string(),
             kind: ProviderKind::Custom,
             name: "DeepSeek".to_string(),

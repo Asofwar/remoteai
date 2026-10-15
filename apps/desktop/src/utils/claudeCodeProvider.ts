@@ -19,7 +19,7 @@ type ClaudeCodeIdentity = Pick<ProviderInput, "kind" | "name" | "baseUrl" | "api
 export function isClaudeCodeProvider(provider: Provider | ClaudeCodeIdentity) {
   return provider.kind === "custom"
     && provider.name.trim() === CLAUDE_CODE_PROVIDER_NAME
-    && provider.apiFormat === "openaiChat"
+    && (provider.apiFormat === "openaiChat" || provider.apiFormat === "anthropicMessages")
     && isOfficialClaudeBaseUrl(provider.baseUrl);
 }
 

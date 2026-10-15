@@ -99,14 +99,71 @@ fn forward_anthropic_official<R: tauri::Runtime>(
     convert_responses_payload(payload, stream, model)
 }
 
+struct AnthropicProviderContext<'a> {
+    headers: &'a [(String, String)],
+    session_id: Option<&'a str>,
+}
+
+#[cfg(test)]
 fn forward_anthropic_provider(
     body: Vec<u8>,
     provider: &ProviderProfile,
     subagent_model: &str,
     session_id: Option<&str>,
 ) -> Result<UpstreamPayload, String> {
-    let request: Value = serde_json::from_slice(&body)
+    forward_anthropic_provider_with_context(
+        body,
+        provider,
+        subagent_model,
+        AnthropicProviderContext {
+            headers: &[],
+            session_id,
+        },
+    )
+}
+
+fn forward_anthropic_provider_with_context(
+    body: Vec<u8>,
+    provider: &ProviderProfile,
+    subagent_model: &str,
+    context: AnthropicProviderContext<'_>,
+) -> Result<UpstreamPayload, String> {
+    let mut request: Value = serde_json::from_slice(&body)
         .map_err(|error| format!("Anthropic request body is not valid JSON: {error}"))?;
+    if !request.is_object() {
+        return Err("The request body must be a JSON object".to_string());
+    }
+    let selected_model = anthropic_provider_model(&request, provider, subagent_model);
+    let format = provider
+        .model_api_formats
+        .get(&selected_model)
+        .copied()
+        .unwrap_or(provider.api_format);
+    if format == ProviderApiFormat::AnthropicMessages {
+        request["model"] = Value::String(selected_model);
+        let mut headers = context
+            .headers
+            .iter()
+            .filter(|(name, _)| name.eq_ignore_ascii_case("anthropic-beta"))
+            .cloned()
+            .collect::<Vec<_>>();
+        headers.extend(
+            context
+                .session_id
+                .into_iter()
+                .map(|id| ("session-id".to_string(), id.to_string())),
+        );
+        return anthropic_upstream::forward_messages(request, &headers, provider);
+    }
+    forward_anthropic_provider_bridge(request, provider, subagent_model, context.session_id)
+}
+
+fn forward_anthropic_provider_bridge(
+    request: Value,
+    provider: &ProviderProfile,
+    subagent_model: &str,
+    session_id: Option<&str>,
+) -> Result<UpstreamPayload, String> {
     validate_anthropic_search_options(&request).map_err(|error| error.to_string())?;
     let stream = request
         .get("stream")

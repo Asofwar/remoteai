@@ -20,6 +20,8 @@ import {
   type ModelReasoningConfig,
 } from "./providerUtils";
 import { useProviderBalanceDetection } from "./useProviderBalanceDetection";
+import { useProviderRequestOptions } from "./useProviderRequestOptions";
+import { ProviderAdvancedSettings } from "./ProviderAdvancedSettings";
 
 export interface ProviderModalProps {
   provider: Provider | null;
@@ -38,6 +40,7 @@ export function ProviderModal({ provider, saving, onClose, onSave, t }: Provider
   const [apiKey, setApiKey] = useState("");
   const [supportsFastMode, setSupportsFastMode] = useState(true);
   const balance = useProviderBalanceDetection({ provider, baseUrl, apiKey });
+  const requestOptions = useProviderRequestOptions(provider);
 
   useEffect(() => {
     setName(provider?.name ?? "");
@@ -82,6 +85,7 @@ export function ProviderModal({ provider, saving, onClose, onSave, t }: Provider
     && baseUrl.trim()
     && activeModel
     && modelsAreValid
+    && !requestOptions.error
     && (provider?.hasApiKey || apiKey.trim())
     && (!balance.balancePlatform || (balance.balanceQueryUrl.trim() && hasBalanceToken)),
   );
@@ -113,6 +117,7 @@ export function ProviderModal({ provider, saving, onClose, onSave, t }: Provider
       fastModeEnabled: supportsFastMode,
       apiKey: apiKey.trim() || undefined,
       apiFormat: provider?.apiFormat ?? "openaiResponses",
+      requestOptions: requestOptions.value,
       balancePlatform: detectedPlatform,
       balanceQueryUrl: detectedPlatform ? detectedBalanceQueryUrl : null,
       balanceQueryToken: balance.balanceQueryToken.trim() || undefined,
@@ -135,6 +140,7 @@ export function ProviderModal({ provider, saving, onClose, onSave, t }: Provider
         <h2>{provider ? t("providers.modal.editTitle") : t("providers.modal.addTitle")}</h2>
         <p>{t("providers.modal.description")}</p>
         <ProviderFormFields apiKey={apiKey} baseUrl={baseUrl} supportsFastMode={supportsFastMode}
+          allowModelDiscovery={!requestOptions.useFullUrl}
           modelConfigs={modelConfigs} name={name}
           provider={provider} saving={saving} activeModel={activeModel}
           balanceSettings={{
@@ -169,6 +175,7 @@ export function ProviderModal({ provider, saving, onClose, onSave, t }: Provider
             setNameTouched(true);
             setName(value);
           }} t={t} />
+        <ProviderAdvancedSettings options={requestOptions} saving={saving} t={t} />
         <div className="provider-modal-footer">
           <Button onClick={onClose} disabled={saving}>{t("providers.form.cancel")}</Button>
           <Button type="primary" icon={<Save size={14} />} loading={saving} disabled={!canSave}

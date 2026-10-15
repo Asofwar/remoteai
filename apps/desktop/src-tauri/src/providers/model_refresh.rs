@@ -366,6 +366,8 @@ pub(crate) struct ProviderInput {
     pub(crate) fast_mode_enabled: bool,
     pub(crate) api_format: ProviderApiFormat,
     #[serde(default)]
+    pub(crate) request_options: Option<crate::models::ProviderRequestOptions>,
+    #[serde(default)]
     pub(crate) balance_platform: Option<ProviderBalancePlatform>,
     #[serde(default)]
     pub(crate) balance_query_url: Option<String>,

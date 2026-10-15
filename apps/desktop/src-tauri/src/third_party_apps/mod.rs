@@ -50,6 +50,7 @@ pub(crate) fn provider_protocol(provider: &ProviderProfile) -> ProviderProtocol 
     match provider.api_format {
         crate::models::ProviderApiFormat::OpenaiResponses => ProviderProtocol::OpenaiResponses,
         crate::models::ProviderApiFormat::OpenaiChat => ProviderProtocol::OpenaiChat,
+        crate::models::ProviderApiFormat::AnthropicMessages => ProviderProtocol::Anthropic,
     }
 }
 
@@ -278,6 +279,7 @@ fn official_local_proxy_profile(
         models
     };
     ProviderProfile {
+        request_options: Default::default(),
         id: MANAGED_PROVIDER_ID.to_string(),
         kind: ProviderKind::OpenAi,
         name: "Remote AI".to_string(),
@@ -317,6 +319,7 @@ pub(crate) mod tests {
 
     pub(crate) fn provider() -> ProviderProfile {
         ProviderProfile {
+            request_options: Default::default(),
             id: MANAGED_PROVIDER_ID.to_string(),
             kind: ProviderKind::Custom,
             name: "Gateway".to_string(),

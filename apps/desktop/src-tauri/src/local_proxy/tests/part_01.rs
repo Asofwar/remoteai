@@ -37,6 +37,7 @@ fn read_upstream_payload(mut payload: UpstreamPayload) -> Vec<u8> {
 
 fn openai_provider(base_url: String) -> ProviderProfile {
     ProviderProfile {
+        request_options: Default::default(),
         id: "openai".to_string(),
         kind: ProviderKind::OpenAi,
         name: "OpenAI".to_string(),

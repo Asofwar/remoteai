@@ -7,6 +7,7 @@ import type { ModelReasoningConfig } from "./providerUtils";
 import { relayApiUrl } from "./providerUtils";
 
 interface ProviderFormFieldsProps {
+  allowModelDiscovery?: boolean;
   apiKey: string;
   baseUrl: string;
   supportsFastMode: boolean;
@@ -49,6 +50,7 @@ export function ProviderFastModeSupportControl({
 }
 
 export function ProviderFormFields({
+  allowModelDiscovery = true,
   apiKey,
   baseUrl,
   supportsFastMode,
@@ -83,7 +85,7 @@ export function ProviderFormFields({
     <RelayModelPicker baseUrl={relayApiUrl(baseUrl)} apiKey={apiKey}
       providerId={provider?.hasApiKey && relayApiUrl(provider.baseUrl) === relayApiUrl(baseUrl)
         ? provider.id : undefined}
-      enabled={Boolean(baseUrl.trim())} disabled={saving}
+      enabled={allowModelDiscovery && Boolean(baseUrl.trim())} disabled={saving}
       modelConfigs={modelConfigs} activeModel={activeModel}
       onModelConfigsChange={onModelConfigsChange} onActiveModelChange={onActiveModelChange} t={t} />
     <ProviderBalanceSettings {...balanceSettings} t={t} />

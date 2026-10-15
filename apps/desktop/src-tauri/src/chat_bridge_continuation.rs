@@ -6,6 +6,10 @@ use std::{
 
 use serde_json::{Map, Value};
 
+#[path = "chat_bridge_continuation_details.rs"]
+mod details;
+pub(crate) use details::{capture_reasoning_details, reasoning_details_for_item};
+
 const CONTINUATION_TTL: Duration = Duration::from_secs(30 * 60);
 const MAX_CONTINUATION_ENTRIES: usize = 512;
 const MAX_CONTINUATION_BYTES: usize = 32 * 1024 * 1024;
@@ -42,6 +46,7 @@ enum ContinuationReference {
 #[derive(Clone)]
 struct ContinuationEntry {
     reasoning_content: Option<Arc<str>>,
+    reasoning_details: Option<Arc<Value>>,
     thought_signature: Option<Arc<str>>,
     expires_at: Instant,
     sequence: u64,
@@ -122,6 +127,7 @@ impl ContinuationStore {
             key,
             ContinuationEntry {
                 reasoning_content: Some(Arc::from(text)),
+                reasoning_details: None,
                 thought_signature: None,
                 expires_at: now + CONTINUATION_TTL,
                 sequence: self.next_sequence,
@@ -135,11 +141,17 @@ impl ContinuationStore {
         self.remove_expired(now);
         let reasoning_content =
             bounded_field(message.get("reasoning_content"), MAX_REASONING_BYTES);
+        let reasoning_details = details::bounded_details(message.get("reasoning_details"));
         let Some(tool_calls) = message.get("tool_calls").and_then(Value::as_array) else {
             return;
         };
         for tool_call in tool_calls {
-            self.capture_tool_call(scope, tool_call, reasoning_content.clone(), now);
+            self.capture_tool_call(
+                scope,
+                tool_call,
+                (reasoning_content.clone(), reasoning_details.clone()),
+                now,
+            );
         }
         self.enforce_limits();
     }
@@ -148,9 +160,10 @@ impl ContinuationStore {
         &mut self,
         scope: &ContinuationScope,
         tool_call: &Value,
-        reasoning_content: Option<Arc<str>>,
+        reasoning: (Option<Arc<str>>, Option<Arc<Value>>),
         now: Instant,
     ) {
+        let (reasoning_content, reasoning_details) = reasoning;
         let Some(call_id) = non_empty_string(tool_call.get("id")) else {
             return;
         };
@@ -158,10 +171,14 @@ impl ContinuationStore {
             tool_call.pointer("/extra_content/google/thought_signature"),
             MAX_SIGNATURE_BYTES,
         );
-        if reasoning_content.is_none() && thought_signature.is_none() {
+        if reasoning_content.is_none() && reasoning_details.is_none() && thought_signature.is_none()
+        {
             return;
         }
-        let bytes = entry_bytes(&call_id, &reasoning_content, &thought_signature);
+        let bytes = entry_bytes(&call_id, &reasoning_content, &thought_signature)
+            + reasoning_details
+                .as_ref()
+                .map_or(0, |value| value.to_string().len());
         if bytes > MAX_CONTINUATION_BYTES {
             return;
         }
@@ -174,6 +191,7 @@ impl ContinuationStore {
             key,
             ContinuationEntry {
                 reasoning_content,
+                reasoning_details,
                 thought_signature,
                 expires_at: now + CONTINUATION_TTL,
                 sequence: self.next_sequence,
@@ -203,6 +221,7 @@ impl ContinuationStore {
             .map(|tool_call| self.continuation_for_tool_call(scope, tool_call))
             .collect::<Vec<_>>();
         restore_reasoning_content(message, &continuations);
+        details::restore_details(message, &continuations);
         let Some(tool_calls) = message.get_mut("tool_calls").and_then(Value::as_array_mut) else {
             return;
         };

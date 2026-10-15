@@ -282,6 +282,7 @@ pub(crate) struct AppInfo {
 pub(crate) enum ProviderApiFormat {
     OpenaiResponses,
     OpenaiChat,
+    AnthropicMessages,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

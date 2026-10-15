@@ -360,14 +360,20 @@ fn responses_request_converts_image_input_to_chat_content() {
 }
 
 #[test]
-fn deepseek_reasoning_preserves_all_codex_effort_levels() {
-    for effort in ["low", "medium", "high", "xhigh", "max"] {
+fn deepseek_reasoning_maps_codex_effort_levels() {
+    for (effort, expected) in [
+        ("low", "low"),
+        ("medium", "high"),
+        ("high", "high"),
+        ("xhigh", "high"),
+        ("max", "max"),
+    ] {
         let responses = json!({ "reasoning": { "effort": effort } });
         let mut chat = json!({});
 
         apply_deepseek_reasoning(&responses, &mut chat);
 
-        assert_eq!(chat["reasoning_effort"], effort);
+        assert_eq!(chat["reasoning_effort"], expected);
         assert_eq!(chat["thinking"]["type"], "enabled");
     }
 }
@@ -386,6 +392,7 @@ fn deepseek_none_disables_thinking_without_effort() {
 #[test]
 fn provider_image_generation_request_preserves_gpt_image_model() {
     let provider = ProviderProfile {
+        request_options: Default::default(),
         id: "images".to_string(),
         kind: ProviderKind::Custom,
         name: "Images".to_string(),

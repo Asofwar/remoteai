@@ -21,6 +21,9 @@ struct ChatSseReader<R> {
     event_type: String,
     text: String,
     reasoning_content: String,
+    inline_reasoning: inline_reasoning::InlineReasoning,
+    reasoning_details: chat_reasoning::ReasoningDetails,
+    has_explicit_reasoning: bool,
     reasoning_id: String,
     reasoning_output_index: Option<usize>,
     message_output_index: Option<usize>,
@@ -55,6 +58,9 @@ impl<R: BufRead> ChatSseReader<R> {
             event_type: String::new(),
             text: String::new(),
             reasoning_content: String::new(),
+            inline_reasoning: inline_reasoning::InlineReasoning::default(),
+            reasoning_details: chat_reasoning::ReasoningDetails::default(),
+            has_explicit_reasoning: false,
             reasoning_id,
             reasoning_output_index: None,
             message_output_index: None,
@@ -135,11 +141,10 @@ impl<R: BufRead> ChatSseReader<R> {
             return;
         }
         self.observe_termination(&value);
-        if let Some(reasoning) = chat_stream_reasoning_delta(&value) {
-            self.append_reasoning_delta(reasoning);
-        }
+        self.observe_reasoning(&value);
         if let Some(delta) = chat_stream_delta_text(&value) {
-            self.append_text_delta(delta);
+            let split = self.inline_reasoning.push(delta);
+            self.append_split_content(split);
         }
         if let Some(tool_calls) = value
             .pointer("/choices/0/delta/tool_calls")
@@ -158,6 +163,7 @@ impl<R: BufRead> ChatSseReader<R> {
         if self.completed {
             return;
         }
+        self.flush_inline_reasoning();
         let termination = self.termination.unwrap_or(ChatCompletionStatus::Failed(
             "The upstream response ended before it was complete.",
         ));
@@ -201,6 +207,10 @@ impl<R: BufRead> ChatSseReader<R> {
             &self.reasoning_id,
             &self.reasoning_content,
         );
+        let details = self.reasoning_details.value();
+        if let Some(details) = &details {
+            chat_bridge_continuation::capture_reasoning_details(scope, &self.reasoning_id, details);
+        }
         let tool_calls = self
             .tools
             .values()
@@ -210,10 +220,13 @@ impl<R: BufRead> ChatSseReader<R> {
         if tool_calls.is_empty() {
             return;
         }
-        let message = json!({
+        let mut message = json!({
             "reasoning_content": self.reasoning_content,
             "tool_calls": tool_calls
         });
+        if let Some(details) = details {
+            message["reasoning_details"] = details;
+        }
         chat_bridge_continuation::capture_message(scope, &message);
     }
 
@@ -254,14 +267,7 @@ impl<R: BufRead> ChatSseReader<R> {
         if delta.is_empty() {
             return;
         }
-        if self.reasoning_output_index.is_none() {
-            let output_index = self.allocate_output_index();
-            self.reasoning_output_index = Some(output_index);
-            self.push_pending(response_reasoning_start_sse(
-                &self.reasoning_id,
-                output_index,
-            ));
-        }
+        self.ensure_reasoning_started();
         self.reasoning_content.push_str(delta);
         let output_index = self.reasoning_output_index.unwrap_or(0);
         self.push_pending(response_reasoning_delta_sse(
@@ -269,6 +275,42 @@ impl<R: BufRead> ChatSseReader<R> {
             output_index,
             delta,
         ));
+    }
+
+    fn ensure_reasoning_started(&mut self) {
+        if self.reasoning_output_index.is_some() {
+            return;
+        }
+        let output_index = self.allocate_output_index();
+        self.reasoning_output_index = Some(output_index);
+        self.push_pending(response_reasoning_start_sse(
+            &self.reasoning_id,
+            output_index,
+        ));
+    }
+
+    fn observe_reasoning(&mut self, value: &Value) {
+        if let Some(delta) = value.pointer("/choices/0/delta") {
+            self.reasoning_details.observe(delta);
+        }
+        if let Some(reasoning) = chat_stream_reasoning_delta(value) {
+            self.has_explicit_reasoning = true;
+            self.append_reasoning_delta(&reasoning);
+        } else if !self.reasoning_details.is_empty() {
+            self.ensure_reasoning_started();
+        }
+    }
+
+    fn append_split_content(&mut self, split: inline_reasoning::SplitText) {
+        if !self.has_explicit_reasoning {
+            self.append_reasoning_delta(&split.reasoning);
+        }
+        self.append_text_delta(&split.text);
+    }
+
+    fn flush_inline_reasoning(&mut self) {
+        let split = self.inline_reasoning.finish();
+        self.append_split_content(split);
     }
 }
 

@@ -194,9 +194,10 @@ fn forward_provider(
 ) -> Result<UpstreamPayload, String> {
     let client = http_client()?;
     let upstream_endpoint = upstream_endpoint_for_codex_request(url);
-    let upstream_url = build_upstream_url(&provider.base_url, &upstream_endpoint);
+    let upstream_url = provider_request_options::url(provider, &upstream_endpoint);
     let body = enforce_provider_service_tier(body, headers, provider);
     let body = provider_body_for_upstream(method, &upstream_endpoint, body, provider);
+    let body = apply_provider_body_options(method, &body, provider)?;
     diagnostic_event(json!({
         "event": "provider_request_prepared", "request": diagnostic_request_options(&body),
         "responsesLite": responses_lite::enabled(headers)
@@ -210,7 +211,8 @@ fn forward_provider(
             } else {
                 request.bearer_auth(provider.api_key.trim())
             };
-            apply_forward_headers(request, headers, true).body(body.clone())
+            provider_request_options::headers(apply_forward_headers(request, headers, true), provider)
+                .body(body.clone())
         },
         "Provider proxy request failed",
     )?;
@@ -229,6 +231,11 @@ fn forward_provider_request(
     body: Vec<u8>,
     provider: &ProviderProfile,
 ) -> Result<UpstreamPayload, String> {
+    if provider_request_options::uses_full_url(provider)
+        && (*method != Method::Post || !is_response_create_endpoint(request_path(url)))
+    {
+        return Err("This endpoint only supports new responses".to_string());
+    }
     // Validate before automatic API fallback so malformed Lite requests are never replayed as Chat.
     let body = responses_lite::prepare(method, url, headers, body)
         .map_err(|error| error.to_string())?;
@@ -238,8 +245,19 @@ fn forward_provider_request(
     {
         return forward_provider_with_api_fallback(method, url, headers, body, provider);
     }
+    let request = serde_json::from_slice::<Value>(&body).unwrap_or(Value::Null);
+    let format = provider
+        .model_api_formats
+        .get(&selected_provider_model(&request, provider))
+        .copied()
+        .unwrap_or(provider.api_format);
     if is_responses_endpoint(request_path(url))
-        && provider.api_format == ProviderApiFormat::OpenaiChat
+        && format == ProviderApiFormat::AnthropicMessages
+    {
+        return Err("This provider does not support this response operation".to_string());
+    }
+    if is_responses_endpoint(request_path(url))
+        && format == ProviderApiFormat::OpenaiChat
     {
         return forward_chat_bridge(method, url, headers, body, provider);
     }
@@ -344,5 +362,19 @@ fn forward_provider_with_format(
             forward_provider(method, url, headers, body, provider)
         }
         ProviderApiFormat::OpenaiChat => forward_chat_bridge(method, url, headers, body, provider),
+        ProviderApiFormat::AnthropicMessages => anthropic_upstream::forward(method, headers, body, provider),
     }
+}
+
+fn apply_provider_body_options(
+    method: &Method,
+    body: &[u8],
+    provider: &ProviderProfile,
+) -> Result<Vec<u8>, String> {
+    if *method != Method::Post || provider.request_options.as_ref().is_none_or(|options| options.body.is_empty()) {
+        return Ok(body.to_vec());
+    }
+    let mut value = serde_json::from_slice(body).map_err(|_| "Request parameters are invalid")?;
+    provider_request_options::body(&mut value, provider);
+    serde_json::to_vec(&value).map_err(|_| "Could not prepare request parameters".to_string())
 }

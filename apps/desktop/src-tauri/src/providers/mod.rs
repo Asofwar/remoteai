@@ -1,6 +1,6 @@
 mod catalog_storage;
 mod reasoning_defaults;
-use reasoning_defaults::known_model_reasoning_efforts;
+pub(crate) use reasoning_defaults::known_model_reasoning_efforts;
 
 include!("model_refresh.rs");
 include!("config_repair.rs");
@@ -28,4 +28,5 @@ mod tests {
     include!("tests/model_refresh.rs");
     include!("tests/reasoning_defaults.rs");
     include!("tests/config_repair.rs");
+    include!("tests/request_options.rs");
 }

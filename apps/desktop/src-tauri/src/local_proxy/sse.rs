@@ -23,7 +23,7 @@ fn streaming_continuation_tool_call(tool: &StreamingToolCall) -> Value {
     tool_call
 }
 
-fn chat_stream_reasoning_delta(value: &Value) -> Option<&str> {
+fn chat_stream_reasoning_delta(value: &Value) -> Option<String> {
     value
         .pointer("/choices/0/delta")
         .and_then(chat_message_reasoning)

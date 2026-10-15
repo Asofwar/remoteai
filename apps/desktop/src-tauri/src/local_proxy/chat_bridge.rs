@@ -21,9 +21,9 @@ fn forward_chat_bridge(
         &tool_context,
         continuation_scope.as_ref(),
     );
-    if provider.balance_platform == Some(ProviderBalancePlatform::DeepSeek) {
-        apply_deepseek_reasoning(&responses_body, &mut chat_body);
-    }
+    provider_reasoning::apply(&responses_body, &mut chat_body, provider);
+    provider_tool_schema::adapt_chat_tool_schemas(&provider.base_url, &mut chat_body);
+    provider_request_options::body(&mut chat_body, provider);
     let stream = chat_body
         .get("stream")
         .and_then(Value::as_bool)
@@ -35,7 +35,9 @@ fn forward_chat_bridge(
         .or_else(|| Some("default".to_string()));
 
     let client = http_client()?;
-    let upstream_url = if provider.balance_platform == Some(ProviderBalancePlatform::DeepSeek) {
+    let upstream_url = if provider_request_options::uses_full_url(provider) {
+        provider.base_url.clone()
+    } else if provider.balance_platform == Some(ProviderBalancePlatform::DeepSeek) {
         providers::deepseek_endpoint_url(&provider.base_url, "/chat/completions")?.to_string()
     } else {
         build_upstream_url(&provider.base_url, "/chat/completions")
@@ -49,7 +51,8 @@ fn forward_chat_bridge(
                 request.bearer_auth(provider.api_key.trim())
             };
             // JSON supplies a default media type only when the forwarded headers have none.
-            apply_forward_headers(request, headers, true).json(&chat_body)
+            provider_request_options::headers(apply_forward_headers(request, headers, true), provider)
+                .json(&chat_body)
         },
         "Chat bridge request failed",
     )?;

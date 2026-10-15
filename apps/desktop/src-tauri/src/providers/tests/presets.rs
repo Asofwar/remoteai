@@ -195,6 +195,7 @@
     #[test]
     fn normalize_provider_profile_keeps_legacy_model_as_model_list() {
         let profile = normalize_provider_profile(ProviderProfile {
+            request_options: Default::default(),
             id: "p".to_string(),
             kind: ProviderKind::Custom,
             name: "Gateway".to_string(),

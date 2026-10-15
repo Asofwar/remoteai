@@ -12,7 +12,9 @@ macro_rules! log_proxy_error {
 
 mod anthropic_reasoning;
 mod anthropic_stream;
+mod anthropic_upstream;
 pub(crate) mod auto_reset;
+mod chat_reasoning;
 pub(crate) mod concurrent_quota;
 pub(crate) mod endpoints;
 mod error_capture;
@@ -26,6 +28,7 @@ mod gui_routing;
 pub(crate) mod gui_runtime;
 pub(crate) mod gui_speed;
 pub(crate) mod gui_system_prompts;
+mod inline_reasoning;
 pub(crate) mod lan_keys;
 mod lan_usage_capture;
 mod model_catalog_deadline;
@@ -34,6 +37,9 @@ mod official_context_startup;
 mod official_input;
 mod official_model_cache;
 mod official_model_request;
+mod provider_reasoning;
+mod provider_request_options;
+mod provider_tool_schema;
 pub(crate) use official_model_cache::admin_model_catalog;
 mod quota_detection;
 mod quota_sse;
@@ -112,6 +118,8 @@ include!("sse.rs");
 
 #[cfg(test)]
 mod tests {
+    include!("tests/provider_request_options.rs");
+    include!("tests/chat_reasoning_compatibility.rs");
     include!("tests/diagnostics.rs");
     include!("tests/diagnostics_failures.rs");
     include!("tests/chat_protocol_conversion.rs");

@@ -125,25 +125,9 @@ fn responses_to_chat_completions_with_context(
     result
 }
 
+#[cfg(test)]
 fn apply_deepseek_reasoning(responses_body: &Value, chat_body: &mut Value) {
-    let effort = responses_body
-        .pointer("/reasoning/effort")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty());
-    let Some(effort) = effort else {
-        return;
-    };
-    let thinking_type = if effort == "none" {
-        if let Some(object) = chat_body.as_object_mut() {
-            object.remove("reasoning_effort");
-        }
-        "disabled"
-    } else {
-        chat_body["reasoning_effort"] = Value::String(effort.to_string());
-        "enabled"
-    };
-    chat_body["thinking"] = json!({ "type": thinking_type });
+    provider_reasoning::apply_deepseek(responses_body, chat_body);
 }
 
 fn append_regular_input_message(item: &Value, messages: &mut Vec<Value>) {

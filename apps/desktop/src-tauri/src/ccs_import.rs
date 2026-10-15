@@ -245,6 +245,7 @@ fn pending_provider_input(
 ) -> ProviderInput {
     let model_reasoning_efforts = imported_model_reasoning_efforts(&models.available);
     ProviderInput {
+        request_options: Default::default(),
         id: None,
         kind: pending.kind,
         name,

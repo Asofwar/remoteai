@@ -85,6 +85,7 @@ export function ModelReasoningEditor({
     { label: t("providers.form.apiProtocolAuto"), value: "auto" },
     { label: "Responses", value: "openaiResponses" },
     { label: "Chat Completions", value: "openaiChat" },
+    { label: "Anthropic Messages", value: "anthropicMessages" },
   ];
 
   return <div className="provider-model-editor">

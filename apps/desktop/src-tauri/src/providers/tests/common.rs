@@ -22,6 +22,7 @@ base_url = "https://custom.example.com/v1"
 
     fn provider() -> ProviderProfile {
         ProviderProfile {
+            request_options: Default::default(),
             id: "p".to_string(),
             kind: ProviderKind::Custom,
             name: "Gateway".to_string(),

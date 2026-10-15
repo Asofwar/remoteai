@@ -202,10 +202,11 @@ fn chat_to_responses_json(
         .and_then(Value::as_str)
         .unwrap_or("unknown")
         .to_string();
-    let message = chat
+    let mut message = chat
         .pointer("/choices/0/message")
         .cloned()
         .unwrap_or_else(|| json!({}));
+    normalize_chat_message_reasoning(&mut message);
     let status = ChatCompletionStatus::from_chat(chat).unwrap_or(ChatCompletionStatus::Completed);
     if let Some(scope) = continuation_scope.filter(|_| status == ChatCompletionStatus::Completed) {
         chat_bridge_continuation::capture_message(scope, &message);
@@ -215,20 +216,12 @@ fn chat_to_responses_json(
         .and_then(value_to_text)
         .unwrap_or_default();
     let mut output = Vec::new();
-    if let Some(reasoning) = chat_message_reasoning(&message) {
-        if let Some(scope) =
-            continuation_scope.filter(|_| status == ChatCompletionStatus::Completed)
-        {
-            chat_bridge_continuation::capture_reasoning(
-                scope,
-                &format!("{LOCAL_REASONING_ITEM_ID_PREFIX}{id}"),
-                reasoning,
-            );
-        }
-        output.push(json!({
-            "type": "reasoning", "id": format!("{LOCAL_REASONING_ITEM_ID_PREFIX}{id}"),
-            "summary": [{ "type": "summary_text", "text": reasoning }]
-        }));
+    if let Some(reasoning) = chat_response_reasoning_item(
+        &message,
+        &id,
+        continuation_scope.filter(|_| status == ChatCompletionStatus::Completed),
+    ) {
+        output.push(reasoning);
     }
     if !content.is_empty() {
         output.push(json!({

@@ -94,6 +94,7 @@ impl<R: BufRead> ChatSseReader<R> {
         if self.completed {
             return;
         }
+        self.flush_inline_reasoning();
         let mut response = json!({
             "id": self.response_id,
             "object": "response",

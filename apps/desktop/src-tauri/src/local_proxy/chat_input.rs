@@ -3,6 +3,7 @@ struct ChatInputBuilder<'a> {
     tools: &'a CodexToolContext,
     pending_calls: Vec<Value>,
     reasoning: Option<String>,
+    reasoning_details: Option<Value>,
     scope: Option<&'a chat_bridge_continuation::ContinuationScope>,
 }
 
@@ -17,6 +18,7 @@ fn append_input_messages(
         tools,
         pending_calls: Vec::new(),
         reasoning: None,
+        reasoning_details: None,
         scope,
     };
     builder.append(input);
@@ -38,6 +40,9 @@ impl ChatInputBuilder<'_> {
                 self.reasoning = response_reasoning_text(item).or_else(|| {
                     let id = item.get("id")?.as_str()?;
                     chat_bridge_continuation::reasoning_for_item(self.scope?, id)
+                });
+                self.reasoning_details = item.get("id").and_then(Value::as_str).and_then(|id| {
+                    chat_bridge_continuation::reasoning_details_for_item(self.scope?, id)
                 });
             }
             Some("function_call") => self
@@ -71,11 +76,10 @@ impl ChatInputBuilder<'_> {
         }
         let message = &mut self.messages[previous_len];
         if message["role"] == "assistant" {
-            if let Some(reasoning) = &self.reasoning {
-                message["reasoning_content"] = json!(reasoning);
-            }
+            attach_chat_reasoning(message, &self.reasoning, &self.reasoning_details);
         } else if message["role"] == "user" {
             self.reasoning = None;
+            self.reasoning_details = None;
         }
     }
 
@@ -94,8 +98,8 @@ impl ChatInputBuilder<'_> {
             self.messages
                 .push(json!({ "role": "assistant", "content": null, "tool_calls": calls }));
         }
-        if let (Some(message), Some(reasoning)) = (self.messages.last_mut(), &self.reasoning) {
-            message["reasoning_content"] = json!(reasoning);
+        if let Some(message) = self.messages.last_mut() {
+            attach_chat_reasoning(message, &self.reasoning, &self.reasoning_details);
         }
     }
 }
@@ -125,15 +129,65 @@ fn response_reasoning_text(item: &Value) -> Option<String> {
     (!text.is_empty()).then_some(text)
 }
 
-fn chat_message_reasoning(message: &Value) -> Option<&str> {
-    ["reasoning_content", "reasoning"]
-        .into_iter()
-        .find_map(|key| {
-            message
-                .get(key)
-                .and_then(Value::as_str)
-                .filter(|text| !text.is_empty())
-        })
+fn chat_message_reasoning(message: &Value) -> Option<String> {
+    chat_reasoning::message_text(message)
+}
+
+fn attach_chat_reasoning(message: &mut Value, text: &Option<String>, details: &Option<Value>) {
+    if let Some(text) = text {
+        message["reasoning_content"] = json!(text);
+    }
+    if let Some(details) = details {
+        message["reasoning_details"] = details.clone();
+    }
+}
+
+fn normalize_chat_message_reasoning(message: &mut Value) {
+    if !message.is_object() {
+        return;
+    }
+    let explicit = chat_message_reasoning(message);
+    let content = message
+        .get("content")
+        .and_then(value_to_text)
+        .unwrap_or_default();
+    let mut parser = inline_reasoning::InlineReasoning::default();
+    let mut split = parser.push(&content);
+    let tail = parser.finish();
+    split.text.push_str(&tail.text);
+    split.reasoning.push_str(&tail.reasoning);
+    message["content"] = json!(split.text);
+    let reasoning = explicit.or_else(|| (!split.reasoning.is_empty()).then_some(split.reasoning));
+    if let Some(reasoning) = reasoning {
+        message["reasoning_content"] = json!(reasoning);
+    }
+}
+
+fn chat_response_reasoning_item(
+    message: &Value,
+    response_id: &str,
+    scope: Option<&chat_bridge_continuation::ContinuationScope>,
+) -> Option<Value> {
+    let reasoning = chat_message_reasoning(message);
+    let details = message
+        .get("reasoning_details")
+        .filter(|value| value.as_array().is_some_and(|items| !items.is_empty()));
+    if reasoning.is_none() && details.is_none() {
+        return None;
+    }
+    let item_id = format!("{LOCAL_REASONING_ITEM_ID_PREFIX}{response_id}");
+    if let Some(scope) = scope {
+        if let Some(reasoning) = &reasoning {
+            chat_bridge_continuation::capture_reasoning(scope, &item_id, reasoning);
+        }
+        if let Some(details) = details {
+            chat_bridge_continuation::capture_reasoning_details(scope, &item_id, details);
+        }
+    }
+    let summary = reasoning
+        .map(|text| json!([{ "type": "summary_text", "text": text }]))
+        .unwrap_or_else(|| json!([]));
+    Some(json!({ "type": "reasoning", "id": item_id, "summary": summary }))
 }
 
 fn agent_message_text(item: &Value) -> Option<String> {

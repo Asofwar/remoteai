@@ -5,7 +5,7 @@ use crate::models::{ModelReasoningEfforts, ReasoningEffort};
 const BUNDLED_REASONING_DEFAULTS: &str = include_str!("../../../src/modelReasoningDefaults.json");
 
 /// Defaults describe distinct reasoning modes, excluding aliases for the same upstream mode.
-pub(super) fn known_model_reasoning_efforts(model: &str) -> Option<&'static [ReasoningEffort]> {
+pub(crate) fn known_model_reasoning_efforts(model: &str) -> Option<&'static [ReasoningEffort]> {
     static DEFAULTS: OnceLock<ModelReasoningEfforts> = OnceLock::new();
     let defaults = DEFAULTS.get_or_init(|| {
         // This bundled constant is validated by tests; malformed data is a build-time defect.

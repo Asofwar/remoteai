@@ -25,6 +25,7 @@ import { CLAUDE_CODE_FALLBACK_MODELS } from "../utils/claudeCodeProvider";
 import { GROK_FALLBACK_MODELS } from "../utils/grokProvider";
 import { findProviderPreset } from "../utils/providerCatalog";
 import { loadStoredModelTokenCosts, persistStoredModelTokenCosts } from "../pages/providers/providerUtils";
+import { retainedRequestOptions } from "../pages/providers/providerRequestOptions";
 import { estimateTokenCost } from "../utils/tokenCost";
 import { summarizeProxyRequests } from "../utils/proxyConversationMetrics";
 import type { AccountQuotaHistory, DailyTokenUsageBreakdown } from "../types/tokenUsageAnalytics";
@@ -437,7 +438,7 @@ function normalizeModelApiFormats(models: string[], value: unknown): Provider["m
   const normalized: Provider["modelApiFormats"] = {};
   for (const model of models) {
     const apiFormat = (value as Record<string, unknown>)[model];
-    if (apiFormat === "openaiResponses" || apiFormat === "openaiChat") {
+    if (apiFormat === "openaiResponses" || apiFormat === "openaiChat" || apiFormat === "anthropicMessages") {
       normalized[model] = apiFormat;
     }
   }
@@ -895,12 +896,13 @@ export async function saveProviderProfile(provider: ProviderInput): Promise<Prov
     const models = normalizeModels(selectedModel, provider.models);
     const model = selectedModel || (models[0] ?? "");
     const apiFormat = kind === "openai" ? "openaiResponses" : provider.apiFormat;
+    const requestOptions = retainedRequestOptions(existing, provider);
     const next: Provider = {
       id: existing?.id ?? provider.id ?? previewProviderId(),
       kind,
       name: provider.name.trim(),
       group: kind === "custom" ? provider.group?.trim() || existing?.group || "" : "",
-      baseUrl: provider.baseUrl.trim().replace(/\/+$/, ""),
+      baseUrl: requestOptions?.useFullUrl ? provider.baseUrl.trim() : provider.baseUrl.trim().replace(/\/+$/, ""),
       model,
       models,
       modelReasoningEfforts: normalizeModelReasoningEfforts(models, provider.modelReasoningEfforts),
@@ -917,6 +919,7 @@ export async function saveProviderProfile(provider: ProviderInput): Promise<Prov
         : provider.modelSelectionControlledByCodex,
       fastModeEnabled: kind === "openai" ? true : (provider.fastModeEnabled ?? true),
       apiFormat,
+      requestOptions,
       active: existing?.active ?? false,
       autoSwitchEnabled: kind === "custom" && Boolean(existing?.autoSwitchEnabled),
       hasApiKey,

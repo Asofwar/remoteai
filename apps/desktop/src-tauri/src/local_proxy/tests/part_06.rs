@@ -369,6 +369,7 @@
     #[test]
     fn chat_bridge_honors_codex_selected_provider_model() {
         let provider = ProviderProfile {
+            request_options: Default::default(),
             id: "deepseek".to_string(),
             kind: ProviderKind::Custom,
             name: "DeepSeek".to_string(),

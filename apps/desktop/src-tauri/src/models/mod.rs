@@ -2,6 +2,8 @@ include!("accounts.rs");
 include!("auto_reset.rs");
 include!("lan_keys.rs");
 include!("providers.rs");
+mod provider_request_options;
+pub(crate) use provider_request_options::ProviderRequestOptions;
 mod sse_idle_timeout;
 pub(crate) use sse_idle_timeout::SseIdleTimeoutSettings;
 mod response_header_timeout;

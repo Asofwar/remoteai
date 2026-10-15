@@ -100,7 +100,7 @@ export function ClaudeCodeProviderModal({ provider, saving, onClose, onSave, t }
       modelSelectionControlledByCodex: true,
       fastModeEnabled: supportsFastMode,
       apiKey: apiKey.trim() || undefined,
-      apiFormat: "openaiChat",
+      apiFormat: "anthropicMessages",
       balancePlatform: null,
       balanceQueryUrl: null,
       balanceQueryUsesApiKey: true,

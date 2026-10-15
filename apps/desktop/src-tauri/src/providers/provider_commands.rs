@@ -69,7 +69,12 @@ pub(crate) fn save_provider_blocking<R: Runtime>(
     } else {
         normalize_provider_group(&provider.group)?
     };
-    let base_url = normalize_base_url(&provider.base_url)?;
+    let request_options = retained_request_options(
+        existing.as_ref(),
+        &provider.base_url,
+        provider.request_options,
+    );
+    let base_url = normalize_provider_endpoint(&provider.base_url, request_options.as_ref())?;
     let model = if kind == ProviderKind::OpenAi && provider.model.trim().is_empty() {
         DEFAULT_OFFICIAL_MODEL
     } else {
@@ -150,6 +155,7 @@ pub(crate) fn save_provider_blocking<R: Runtime>(
         model_selection_controlled_by_codex: provider.model_selection_controlled_by_codex,
         fast_mode_enabled: provider.fast_mode_enabled,
         api_format: provider.api_format,
+        request_options,
         balance_platform,
         balance_query_url,
         balance_query_token,
@@ -167,16 +173,11 @@ pub(crate) fn save_provider_blocking<R: Runtime>(
             write_active_provider_config(&target, &profile)?;
             refresh_codex_models_best_effort(&target, &profile);
         }
-    } else if write_codex
-        && state.active_provider_group.as_deref() == Some(profile.group.as_str())
+    } else if write_codex && state.active_provider_group.as_deref() == Some(profile.group.as_str())
     {
         let group_providers = provider_group_profiles(&paths, &profile.group)?;
         for target in crate::storage::resolve_enabled_paths(&app)? {
-            write_provider_group_local_proxy_config(
-                &target,
-                &profile.group,
-                &group_providers,
-            )?;
+            write_provider_group_local_proxy_config(&target, &profile.group, &group_providers)?;
             refresh_codex_group_models_best_effort(&target, &group_providers);
         }
     }

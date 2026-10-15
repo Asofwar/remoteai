@@ -25,7 +25,10 @@ pub(crate) fn is_claude_code_identity(
 ) -> bool {
     kind == ProviderKind::Custom
         && name.trim() == CLAUDE_CODE_PROVIDER_NAME
-        && api_format == ProviderApiFormat::OpenaiChat
+        && matches!(
+            api_format,
+            ProviderApiFormat::OpenaiChat | ProviderApiFormat::AnthropicMessages
+        )
         && validate_base_url(base_url).is_ok()
 }
 

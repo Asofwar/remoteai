@@ -11,6 +11,12 @@ fn forward_provider_api(
         provider_api_cache::forget_format(&provider.id, &model);
         return provider_api_attempt(format, 1, &mut send);
     }
+    if provider.api_format == ProviderApiFormat::AnthropicMessages
+        || provider_request_options::uses_full_url(provider)
+    {
+        provider_api_cache::forget_format(&provider.id, &model);
+        return provider_api_attempt(provider.api_format, 1, &mut send);
+    }
     let requires_responses = tool_request_requires_responses(&model, &request);
     let preferred = if requires_responses {
         ProviderApiFormat::OpenaiResponses
@@ -57,6 +63,7 @@ fn provider_api_attempt(
     let endpoint = match format {
         ProviderApiFormat::OpenaiResponses => "/responses",
         ProviderApiFormat::OpenaiChat => "/chat/completions",
+        ProviderApiFormat::AnthropicMessages => "/messages",
     };
     diagnostic_event(json!({
         "event": "provider_api_attempt_started", "attempt": attempt,
@@ -201,6 +208,7 @@ fn alternate_api_format(format: ProviderApiFormat) -> ProviderApiFormat {
     match format {
         ProviderApiFormat::OpenaiResponses => ProviderApiFormat::OpenaiChat,
         ProviderApiFormat::OpenaiChat => ProviderApiFormat::OpenaiResponses,
+        ProviderApiFormat::AnthropicMessages => ProviderApiFormat::AnthropicMessages,
     }
 }
 

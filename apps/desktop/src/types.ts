@@ -84,7 +84,7 @@ export interface AppInfo {
   version: string;
 }
 
-export type ProviderApiFormat = "openaiResponses" | "openaiChat";
+export type ProviderApiFormat = "openaiResponses" | "openaiChat" | "anthropicMessages";
 export type ModelApiFormats = Record<string, ProviderApiFormat>;
 export type ProviderKind = "custom" | "openai";
 export type ProviderBalancePlatform = "newApi" | "sub2Api" | "deepSeek" | "codexSwitch";
@@ -93,7 +93,14 @@ export type ModelReasoningEfforts = Record<string, ReasoningEffort[]>;
 export type ModelContextWindows = Record<string, number>;
 export type ModelTokenCosts = Record<string, number>;
 
+export interface ProviderRequestOptions {
+  useFullUrl: boolean;
+  headers: Record<string, string>;
+  body: Record<string, unknown>;
+}
+
 export interface Provider {
+  requestOptions?: ProviderRequestOptions | null;
   id: string;
   kind: ProviderKind;
   name: string;
@@ -126,6 +133,7 @@ export interface Provider {
 }
 
 export interface ProviderInput {
+  requestOptions?: ProviderRequestOptions;
   id?: string;
   kind: ProviderKind;
   name: string;

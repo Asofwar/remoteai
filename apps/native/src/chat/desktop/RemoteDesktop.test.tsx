@@ -75,6 +75,19 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+it.each(['ios', 'android'] as const)('leaves room below connection and retry text on %s', platform => {
+  Platform.OS = platform;
+  runtime.status = '正在连接桌面…';
+  const elements = render();
+  const message = elements.find(node => node.props.accessibilityRole === 'alert')!;
+  const retry = elements.find(node => node.type === Text && node.props.children === '重新连接')!;
+  for (const text of [message, retry]) {
+    expect(StyleSheet.flatten([text.props.style].flat())).toMatchObject({
+      fontSize: 14, lineHeight: 22, includeFontPadding: true, paddingVertical: 2,
+    });
+  }
+});
+
 it.each(['ios', 'android'] as const)('shows compact permission guidance and a check action on %s', platform => {
   Platform.OS = platform;
   runtime.status = '请在 Mac 上允许屏幕录制，必要时重启 Remote AI，随后将自动连接。已开启仍无效？请在 Mac 的远程设置中修复权限。';

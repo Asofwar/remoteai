@@ -50,8 +50,8 @@
   padding: 0; background: transparent; pointer-events: auto; border-radius: 6px; }
 .rd-status { position: absolute; top: 45px; left: 50%; transform: translateX(-50%); padding: 14px; border-radius: 12px;
   background: #222b3aee; width: max-content; max-width: calc(100% - 24px);
-  display: flex; align-items: center; gap: 12px; font-size: 14px; }
-.rd-status > span { min-width: 0; max-width: 400px; overflow-wrap: anywhere; }
+  display: flex; align-items: center; gap: 12px; font-size: 14px; line-height: 22px; }
+.rd-status > span { min-width: 0; max-width: 400px; padding-block: 2px; overflow-wrap: anywhere; }
 .rd-status button { flex-shrink: 0; white-space: nowrap; }
 .rd-status button, .rd-settings button { background: #333d50; padding: 10px 12px; border-radius: 9px; }
 .rd-status-empty { top: 50%; transform: translate(-50%, -50%); flex-direction: column;

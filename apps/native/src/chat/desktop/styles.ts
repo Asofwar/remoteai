@@ -25,7 +25,8 @@ export const useDesktopStyles = createThemedStyles((color) => ({
     borderRadius: 12, padding: 12, gap: 12 },
   messageText: { flexShrink: 1, minWidth: 0, maxWidth: 400 },
   retry: { flexShrink: 0, paddingVertical: 6 },
-  text: { color: color('#e7edf8', 'faint'), fontSize: 14 },
+  text: { color: color('#e7edf8', 'faint'), fontSize: 14, lineHeight: 22,
+    includeFontPadding: true, paddingVertical: 2 },
   hint: { color: color('#aebad0', 'faint'), fontSize: 12, lineHeight: 18 },
   cursor: { position: 'absolute', ...CURSOR_SIZE, zIndex: 2 },
   // Explicit image dimensions override Metro's 3x bitmap dimensions on both native platforms.

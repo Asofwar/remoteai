@@ -1,8 +1,9 @@
 import { DownloadPolicyError } from '../../../../shared/remote-chat/policy';
 import { DownloadCancelled } from '../../../../shared/remote-chat/fileDownload';
 import { BulkError } from '../../../../shared/remote-chat/bulkLimits';
-import { DownloadRetry } from '../../../../shared/remote-chat/downloadRetry';
+import { canRetryDownload, DownloadRetry } from '../../../../shared/remote-chat/downloadRetry';
 import { saveDownload } from './saveDownload';
+import { openBrowserDownload, type DownloadOpener } from './openDownload';
 import type { AuthSession } from '../types';
 import { deleteDownload, listDownloads, storeDownload } from './storage';
 import { transferDownload } from './transfer';
@@ -102,7 +103,7 @@ export class WebDownloadManager {
     if (flight) { flight.controller.abort(); await flight.done; }
     const task = this.tasks.find(task => task.id === id);
     if (task && task.status === 'queued') {
-      const paused: DownloadTask = { ...task, status: 'paused' };
+      const paused: DownloadTask = { ...task, status: 'paused', message: '' };
       // Remove it from scheduling before yielding to storage or a finishing sibling download.
       this.update(paused);
       await storeDownload(paused);
@@ -141,6 +142,17 @@ export class WebDownloadManager {
       if (!(error instanceof DownloadCancelled)) throw error;
     }
   }
+  async open(id: string, opener: DownloadOpener = openBrowserDownload) {
+    const task = this.tasks.find(task => task.id === id);
+    if (!task || !['completed', 'ready'].includes(task.status)) return;
+    try { await opener(task); }
+    catch (error) {
+      if (error instanceof BulkError && error.code === 'INTEGRITY_FAILED') {
+        await this.persist({ ...task, status: 'failed', verified: false, message: error.message });
+      }
+      throw error;
+    }
+  }
   private async persist(task: DownloadTask) {
     await storeDownload(task);
     this.update(task);
@@ -168,12 +180,12 @@ export class WebDownloadManager {
       this.clearRetry(task.id);
       await this.persist({ ...task, status: 'ready', bytesPerSecond: undefined });
     } catch (error) {
-      const paused = signal.aborted || (error instanceof BulkError
-        && ['PATH_UNAVAILABLE', 'EPOCH_EXPIRED'].includes(error.code));
-      const retrying = paused && !signal.aborted && !this.paused.has(task.id)
+      const paused = signal.aborted || error instanceof DownloadCancelled
+        || (error instanceof BulkError && error.code === 'CANCELLED');
+      const retrying = canRetryDownload(error) && !signal.aborted && !this.paused.has(task.id)
         && this.connected(task) && this.deferRetry(task);
       task = { ...task, status: retrying ? 'queued' : paused ? 'paused' : 'failed', bytesPerSecond: undefined,
-        message: retrying ? '连接暂时中断，正在重试…' : signal.aborted ? ''
+        message: retrying ? '下载暂时中断，正在重试…' : signal.aborted ? ''
           : error instanceof DownloadPolicyError || error instanceof BulkError ? error.message
           : '下载未完成，请检查连接和存储空间后重试。' };
       this.update(task);
@@ -183,7 +195,7 @@ export class WebDownloadManager {
     }
   }
   private deferRetry(task: DownloadTask) {
-    const delay = this.retries.next(task.id, task.received);
+    const delay = this.retries.next(task.id);
     if (delay === undefined) return false;
     this.retryTimers.set(task.id, setTimeout(() => { this.retryTimers.delete(task.id); this.schedule(); }, delay));
     return true;

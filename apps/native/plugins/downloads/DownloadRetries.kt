@@ -1,18 +1,16 @@
 package com.codexswitch.downloads
 
-private val RETRY_DELAYS_MS = listOf(1000L, 2000L, 4000L)
+private val RETRY_DELAYS_MS = listOf(1000L, 2000L, 4000L, 8000L, 16000L)
 
 /** Volatile intent: app restarts and explicit pauses never restart transfers automatically. */
 internal class DownloadRetries {
-  private data class Attempt(val progress: Long, val count: Int)
-  private val attempts = mutableMapOf<String, Attempt>()
+  private val attempts = mutableMapOf<String, Int>()
   private val waiting = mutableMapOf<String, Long>()
 
   fun defer(task: DownloadTask, now: Long): Boolean {
-    val previous = attempts[task.id]
-    val count = if (previous != null && task.received <= previous.progress) previous.count else 0
+    val count = attempts[task.id] ?: 0
     val delay = RETRY_DELAYS_MS.getOrNull(count) ?: return false
-    attempts[task.id] = Attempt(maxOf(task.received, previous?.progress ?: 0), count + 1)
+    attempts[task.id] = count + 1
     waiting[task.id] = now + delay
     return true
   }

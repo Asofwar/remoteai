@@ -1,4 +1,4 @@
-import { Download, Pause, Play, Trash2 } from 'lucide-react';
+import { Download, ExternalLink, Pause, Play, Trash2 } from 'lucide-react';
 import { t } from '../i18n';
 import type { DownloadTask } from './types';
 
@@ -10,9 +10,9 @@ export function formatBytes(value: number) {
 const STATUS = { queued: '等待下载', preparing: '准备并校验文件', downloading: '下载中', verifying: '正在校验',
   ready: '文件已就绪', saving: '正在保存', paused: '已暂停', completed: '已完成', failed: '下载失败' };
 
-export function DownloadCard({ task, busy, connected, action, remove, text = t }: {
+export function DownloadCard({ task, busy, connected, action, open, remove, text = t }: {
   task: DownloadTask; busy: boolean; connected: boolean; action: () => void; remove: () => void;
-  text?: typeof t;
+  open: () => void; text?: typeof t;
 }) {
   const running = ['downloading', 'queued', 'preparing', 'verifying'].includes(task.status);
   const completed = ['completed', 'ready', 'saving'].includes(task.status);
@@ -29,6 +29,8 @@ export function DownloadCard({ task, busy, connected, action, remove, text = t }
     {task.message && <p role="status" className="download-notice">{text(task.message)}</p>}
     {!connected && !completed && <p className="download-notice">{text('连接原来的电脑后可继续下载。')}</p>}
     <div className="download-actions">
+      {completed && <button type="button" className="download-button" onClick={open}
+        disabled={busy || task.status === 'saving'}><ExternalLink size={17} />{text('打开')}</button>}
       <button type="button" className="download-button" onClick={action}
         disabled={busy || task.status === 'saving' || (!running && !completed && !connected)}>
         <Icon size={17} />{text(label)}</button>

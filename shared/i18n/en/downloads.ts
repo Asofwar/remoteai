@@ -1,4 +1,13 @@
 export const downloads: Readonly<Record<string, string>> = {
+  '文件就绪后可打开或保存到设备。下载中断后会自动重试，最多 5 次。':
+    'Open or save files when ready. Interrupted downloads retry automatically, up to 5 times.',
+  '切换页面后下载会继续，关闭网页会暂停。文件就绪后可打开或保存到设备。下载中断后会自动重试，最多 5 次。':
+    'Downloads continue between pages and pause when you close the tab. Open or save ready files. Up to 5 automatic retries.',
+  '下载暂时中断，正在重试…': 'Download interrupted. Retrying…',
+  '此文件需使用设备上的应用打开，请先保存到设备。': 'Save this file to your device to open it with an app.',
+  '无法打开文件，请允许弹出窗口后重试。': 'Allow pop-ups to open this file, then try again.',
+  '打开未完成，请重试或保存到设备后打开。': 'Could not open the file. Try again, or save it to your device first.',
+  '下载中断后会自动重试，最多 5 次。': 'Interrupted downloads retry automatically, up to 5 times.',
   '应用更新': 'App updates', '下载中 · {percent}%': 'Downloading · {percent}%',
   '更新已下载，点击打开应用安装。': 'Update downloaded. Tap to open the app and install.',
   '下载未完成，点击打开应用重试。': 'Download incomplete. Tap to open the app and retry.',

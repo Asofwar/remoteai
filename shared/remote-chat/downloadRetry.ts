@@ -1,14 +1,24 @@
-const RETRY_DELAYS_MS = [1000, 2000, 4000] as const;
+import { BulkError } from './bulkLimits';
+import { DownloadCancelled, DownloadValidationError } from './fileDownload';
+import { DownloadPolicyError } from './policy';
 
-/** Only verified progress earns another recovery budget; a dead connection cannot loop forever. */
+const RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 16000] as const;
+
+export function canRetryDownload(error: unknown) {
+  if (error instanceof DownloadCancelled || error instanceof DownloadPolicyError
+    || error instanceof DownloadValidationError) return false;
+  if (error instanceof BulkError) return ['PATH_UNAVAILABLE', 'EPOCH_EXPIRED', 'RESOURCE_LIMIT'].includes(error.code);
+  return !(error instanceof DOMException && ['AbortError', 'QuotaExceededError'].includes(error.name));
+}
+
+/** Five automatic retries per run; only explicit resumption starts a new budget. */
 export class DownloadRetry {
-  private attempts = new Map<string, { progress: number; count: number }>();
+  private attempts = new Map<string, number>();
 
-  next(id: string, verifiedBytes: number) {
-    const previous = this.attempts.get(id);
-    const count = previous && verifiedBytes <= previous.progress ? previous.count : 0;
+  next(id: string) {
+    const count = this.attempts.get(id) ?? 0;
     const delay = RETRY_DELAYS_MS[count];
-    this.attempts.set(id, { progress: Math.max(verifiedBytes, previous?.progress ?? 0), count: count + 1 });
+    if (delay !== undefined) this.attempts.set(id, count + 1);
     return delay;
   }
 

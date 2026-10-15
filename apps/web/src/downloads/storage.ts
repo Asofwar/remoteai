@@ -1,4 +1,5 @@
 import type { DownloadTask } from './types';
+import { bulkAssert } from '../../../../shared/remote-chat/bulkLimits';
 
 const DATABASE_NAME = 'codex-switch.web.downloads.v1';
 const TASKS = 'tasks';
@@ -87,9 +88,9 @@ export async function downloadContent(task: DownloadTask) {
     db.transaction(CHUNKS).objectStore(CHUNKS).getAll(chunkRange(task.id)));
   let offset = 0;
   for (const chunk of chunks) {
-    if (chunk.offset !== offset) throw new Error('Incomplete download');
+    bulkAssert(chunk.offset === offset, 'INTEGRITY_FAILED');
     offset += chunk.blob.size;
   }
-  if (offset !== task.size) throw new Error('Incomplete download');
+  bulkAssert(offset === task.size, 'INTEGRITY_FAILED');
   return new Blob(chunks.map(chunk => chunk.blob), { type: task.mimeType });
 }

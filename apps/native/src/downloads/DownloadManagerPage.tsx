@@ -34,6 +34,7 @@ export function DownloadManagerPage({ session, onBack }: { session: AuthSession;
       contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}
       ListHeaderComponent={<>
         <DownloadSources connection={connection} browse={setView} />
+        <Text style={styles.text}>{t('下载中断后会自动重试，最多 5 次。')}</Text>
         {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
         <View style={styles.sectionHeading}>
           <Text style={styles.sectionTitle}>{t("下载任务")}</Text>

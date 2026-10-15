@@ -16,6 +16,7 @@ import { resumeFixture } from './download-resume-fixture';
 Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true });
 
 const fixture = { ...resumeFixture, size: 4 * 1024 * 1024, revision: 'first', corrupt: false,
+  opens: 0, openFailures: 0, mimeType: 'application/octet-stream', textContent: '',
   offsets: [] as number[], closes: 0,
   bulk: false, recordBytes: 0, wireBytes: 0, cipherFailure: false, directAttempt: () => {},
   downloadLimit: (value: number) => setChatPolicy({ ...DEFAULT_CHAT_POLICY, fileDownloadMaxMb: value }),
@@ -29,16 +30,21 @@ const bulk = fixtureBulkClient(fixture);
 fixture.directAttempt = bulk.directAttempt;
 const client: DownloadClient = {
   bulk: bulk.client,
-  open: async ({ path }) => ({ id: path.endsWith('empty.txt') ? EMPTY_ID : FILE_ID,
+  open: async ({ path }) => {
+    fixture.opens++;
+    if (fixture.openFailures-- > 0) throw new Error('Temporary download failure');
+    return { id: path.endsWith('empty.txt') ? EMPTY_ID : FILE_ID,
     size: path.endsWith('empty.txt') ? 0 : fixture.size, name: path.split('/').at(-1)!,
-    mimeType: 'application/octet-stream', revision: fixture.revision }),
+    mimeType: fixture.mimeType, revision: fixture.revision };
+  },
   read: async ({ offset, length }) => {
     fixture.offsets.push(offset);
     fixture.peak = Math.max(fixture.peak, ++fixture.active);
     await new Promise(resolve => setTimeout(resolve, fixture.delay));
     fixture.active--;
     return { offset: fixture.corrupt ? offset + 1 : offset,
-      data: btoa((fixture.revision === 'first' ? 'A' : 'B').repeat(length)) };
+      data: btoa(fixture.textContent ? fixture.textContent.slice(offset, offset + length)
+        : (fixture.revision === 'first' ? 'A' : 'B').repeat(length)) };
   },
   close: async () => { fixture.closes++; },
   browse: async ({ directory, scope }) => {
@@ -49,6 +55,7 @@ const client: DownloadClient = {
     return { directory: root, entries: [
       ...(!root.endsWith('/folder') ? [{ name: 'folder', path: `${root}/folder`, directory: true }] : []),
       { name: 'sample.bin', path: `${root}/sample.bin`, directory: false },
+      { name: 'sample.md', path: `${root}/sample.md`, directory: false },
       { name: 'empty.txt', path: `${root}/empty.txt`, directory: false },
     ], truncated: false };
   },

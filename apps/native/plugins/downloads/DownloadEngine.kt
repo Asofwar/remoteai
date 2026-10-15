@@ -142,7 +142,7 @@ internal class DownloadEngine(
     val task = requireNotNull(jobs()[id])
     if (task.status == "completed") return
     saving[id]?.set(true)
-    release(task); task.status = "paused"
+    release(task); task.status = "paused"; task.data.put("message", "")
     changed(); pump()
   }
 
@@ -190,7 +190,7 @@ internal class DownloadEngine(
       .put("operation", operation).put("remoteId", task.remoteId).put("offset", offset).put("length", read.length)
     emit("downloadRequest", packet.toString())
     read.timeout = worker.schedule({
-      if (task.pending.containsKey(requestId)) { release(task); task.fail(); changed(); pump() }
+      if (task.pending.containsKey(requestId)) failTask(task, "PATH_UNAVAILABLE")
     }, if (operation == "open") maxOf(requestTimeout, PREPARE_TIMEOUT_MS) else requestTimeout, TimeUnit.MILLISECONDS)
   }
 
@@ -216,12 +216,17 @@ internal class DownloadEngine(
     read.timeout?.cancel(false)
     try {
       if (failureCode != null) throw BulkDownloadFailure(failureCode)
-      check(!failed)
+      if (failed) throw BulkDownloadFailure("PATH_UNAVAILABLE")
       val result = JSONObject(requireNotNull(json))
       if (read.operation == "open") opened(task, result) else received(task, read, result)
       if (task.received == task.size) complete(task) else fill(task)
     } catch (error: Exception) {
-      failTask(task, (error as? BulkDownloadFailure)?.code)
+      val code = when (error) {
+        is BulkDownloadFailure -> error.code
+        is java.io.IOException -> "STORAGE_FAILED"
+        else -> "INVALID_RECORD"
+      }
+      failTask(task, code)
     }
     return true
   }
@@ -229,10 +234,11 @@ internal class DownloadEngine(
   private fun failTask(task: DownloadTask, code: String?) {
     release(task); task.fail()
     if (code != null) task.data.put("message", bulkFailureMessage(code))
-    if (code in listOf("PATH_UNAVAILABLE", "EPOCH_EXPIRED", "CANCELLED")) task.status = "paused"
-    if (code in listOf("PATH_UNAVAILABLE", "EPOCH_EXPIRED")
-      && windows.containsKey(key(task.source)) && retries.defer(task, clock())) {
-      task.status = "queued"; task.data.put("message", "连接暂时中断，正在重试…")
+    if (code == "CANCELLED") task.status = "paused"
+    if (code == null || code in listOf("PATH_UNAVAILABLE", "EPOCH_EXPIRED", "RESOURCE_LIMIT")) {
+      if (windows.containsKey(key(task.source)) && retries.defer(task, clock())) {
+        task.status = "queued"; task.data.put("message", "下载暂时中断，正在重试…")
+      }
     }
     changed(); pump()
   }

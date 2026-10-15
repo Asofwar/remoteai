@@ -5,6 +5,7 @@ import { DownloadCard } from '../../../../web/src/downloads/DownloadCard';
 import { downloadManager } from '../../../../web/src/downloads/manager';
 import { useDownloadTasks } from '../../../../web/src/downloads/useDownloadTasks';
 import { desktopDownloadOwner } from '../../downloads/useDesktopDownloads';
+import { openDesktopDownload } from '../../downloads/openDownload';
 import { guiText } from '../../i18n/guiText';
 import { useGuiLanguage } from '../../i18n/useGuiLanguage';
 import type { CloudAuthState } from '../../types';
@@ -28,7 +29,7 @@ export function DownloadsPage({ auth }: { auth: CloudAuthState }) {
   useGuiLanguage();
   const owner = auth.authenticated && auth.baseUrl && auth.userId
     ? desktopDownloadOwner({ baseUrl: auth.baseUrl, userId: auth.userId }) : '';
-  const { tasks, busy, error, run } = useDownloadTasks(owner, confirmRemove);
+  const { tasks, busy, error, run } = useDownloadTasks(owner, { confirmRemove, openDownload: openDesktopDownload });
   const [filter, setFilter] = useState<Filter>('all');
   const ready = tasks.filter(task => READY_STATUSES.has(task.status)).length;
   const visible = tasks.filter(task => filter === 'all' || READY_STATUSES.has(task.status) === (filter === 'ready'));
@@ -43,12 +44,13 @@ export function DownloadsPage({ auth }: { auth: CloudAuthState }) {
         { value: 'active', label: `${guiText('未完成')} · ${tasks.length - ready}` },
         { value: 'ready', label: `${guiText('已就绪')} · ${ready}` },
       ]} />
-        <p>{guiText('切换页面后下载会继续，文件就绪后可保存到设备。')}</p>
+        <p>{guiText('文件就绪后可打开或保存到设备。下载中断后会自动重试，最多 5 次。')}</p>
       </div>
       {error && <p role="alert" className={styles.notice}>{guiText(error)}</p>}
       <div className={styles.tasks}>{visible.map(task => <DownloadCard key={task.id} task={task}
         busy={busy === task.id} connected={!!downloadManager.connectionForSource(task.source)?.ready}
-        action={() => { void run(task); }} remove={() => { void run(task, true); }} text={guiText} />)}</div>
+        action={() => { void run(task); }} open={() => { void run(task, 'open'); }}
+        remove={() => { void run(task, 'remove'); }} text={guiText} />)}</div>
       {!visible.length && <div className={styles.empty}><Download size={36} strokeWidth={1.5} />
         <h2>{guiText(tasks.length ? '没有符合条件的下载任务' : '还没有下载任务')}</h2>
         <p>{guiText('在聊天中打开文件并点击下载，任务会显示在这里。')}</p></div>}

@@ -31,6 +31,7 @@ mod conversation_hub;
 mod coze;
 #[cfg(windows)]
 mod desktop_service;
+mod download_files;
 mod dream_skin;
 mod dream_skin_community;
 mod dream_skin_market;
@@ -121,6 +122,7 @@ pub fn run() {
     }
 
     tauri::Builder::default()
+        .manage(download_files::DownloadFileState::default())
         .append_invoke_initialization_script(platform::interface_locale::initialization_script())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             match launch_options::LaunchOptions::parse(args) {
@@ -290,6 +292,7 @@ pub fn run() {
             system_tray::quick_menu::handle_window_event(window, event);
         })
         .invoke_handler(tauri::generate_handler![
+            download_files::download_file_action,
             coze::commands::coze_status,
             coze::commands::coze_install,
             coze::commands::coze_start,

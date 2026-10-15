@@ -265,15 +265,15 @@ class DownloadEngineTest : InstrumentationTestCase() {
 
   fun testUnavailableBulkPathRetriesWithABudgetAndSourceChangeRemainsAnExplicitFailure() {
     taskId = run { engine.enqueue(source) } as String
-    repeat(4) { attempt ->
+    repeat(6) { attempt ->
       val request = requests("open").last().getString("requestId")
       run { engine.accept(request, JSONObject().put("code", "PATH_UNAVAILABLE").toString(), true) }
-      if (attempt < 3) {
+      if (attempt < 5) {
         assertEquals("queued", snapshot().getString("status"))
-        run { tick += 5000 }; awaitOpens(attempt + 2)
+        run { tick += 16000 }; awaitOpens(attempt + 2)
       }
     }
-    assertEquals("paused", snapshot().getString("status"))
+    assertEquals("failed", snapshot().getString("status"))
     run { engine.resume(taskId) }
     val second = requests("open").last().getString("requestId")
     run { engine.accept(second, JSONObject().put("code", "SOURCE_CHANGED").toString(), true) }
@@ -293,6 +293,29 @@ class DownloadEngineTest : InstrumentationTestCase() {
     run { engine.accept(next, JSONObject().put("code", "PATH_UNAVAILABLE").toString(), true) }
     run { engine.connection("download-test", "pc", 0); tick += 5000; engine.connection("download-test", "pc", 5) }
     assertEquals("paused", snapshot().getString("status")); assertEquals(2, requests("open").size)
+  }
+
+  fun testOrdinaryRequestFailuresRetryFiveTimesAndProgressDoesNotResetTheBudget() {
+    taskId = run { engine.enqueue(source) } as String
+    repeat(6) { attempt ->
+      val request = requests("open").last().getString("requestId")
+      run { engine.accept(request, null, true) }
+      if (attempt < 5) {
+        assertEquals("queued", snapshot().getString("status"))
+        run { tick += 16000 }; awaitOpens(attempt + 2)
+      }
+    }
+    assertEquals("failed", snapshot().getString("status"))
+    val retries = DownloadRetries()
+    val task = DownloadTask.create(source)
+    repeat(5) { index ->
+      task.received = index.toLong()
+      assertTrue(retries.defer(task, tick))
+    }
+    task.received++
+    assertFalse(retries.defer(task, tick))
+    retries.clear(task.id)
+    assertTrue(retries.defer(task, tick))
   }
 
   fun testPauseResumeDoesNotDowngradeAPersistedBulkCheckpointOrTruncateItsFile() {

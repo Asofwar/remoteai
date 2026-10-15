@@ -25,6 +25,7 @@ export interface DownloadOptions {
   progress: (received: number, total: number) => void;
 }
 export class DownloadCancelled extends Error {}
+export class DownloadValidationError extends Error {}
 function checkCancelled(signal: AbortSignal) {
   if (signal.aborted) throw new DownloadCancelled();
 }
@@ -33,7 +34,7 @@ export function validateFileInfo(info: FileInfo, mode?: ConnectionMode) {
     || !Number.isSafeInteger(info.size) || info.size < 0
     || typeof info.name !== 'string' || !info.name || /[\\/\x00-\x1f\x7f]/.test(info.name)
     || info.name === '.' || info.name === '..' || typeof info.mimeType !== 'string') {
-    throw new Error('文件信息无效，请重试。');
+    throw new DownloadValidationError('文件信息无效，请重试。');
   }
   checkDownloadSize(info.size, mode);
   return info;
@@ -42,7 +43,7 @@ export function validateChunk(chunk: FileChunk, offset: number, length: number) 
   if (!chunk || chunk.offset !== offset || typeof chunk.data !== 'string'
     || chunk.data.length !== Math.ceil(length / 3) * 4
     || !/^[A-Za-z0-9+/]*={0,2}$/.test(chunk.data)
-    || base64Bytes(chunk.data) !== length) throw new Error('文件下载不完整，请重试。');
+    || base64Bytes(chunk.data) !== length) throw new DownloadValidationError('文件下载不完整，请重试。');
 }
 type ReadResult = { chunk: FileChunk } | { error: unknown };
 interface PendingRead { offset: number; length: number; result: Promise<ReadResult> }
@@ -62,7 +63,7 @@ export async function transferFileChunks(options: ChunkTransferOptions) {
   const pending: PendingRead[] = [];
   let nextOffset = options.offset ?? 0;
   if (!Number.isSafeInteger(nextOffset) || nextOffset < 0 || nextOffset > info.size) {
-    throw new Error('下载进度无效，请重新下载。');
+    throw new DownloadValidationError('下载进度无效，请重新下载。');
   }
   const fill = () => {
     checkCancelled(signal);

@@ -25,12 +25,13 @@ export function DownloadManagerPage({ owner, onBack }: { owner: string; onBack: 
     </div>
     <p className="download-help">{connection?.deviceName || t('先在聊天中连接电脑，即可浏览文件。')}
       {connection && <span role="status"> · {t(downloadConnectionLabel(connection.mode))}</span>}</p>
-    <p className="download-help">{t('切换页面后下载会继续。关闭网页会暂停，重新打开后可继续下载。文件就绪后点击“保存到设备”。')}</p>
+    <p className="download-help">{t('切换页面后下载会继续，关闭网页会暂停。文件就绪后可打开或保存到设备。下载中断后会自动重试，最多 5 次。')}</p>
     {error && <p role="alert" className="download-notice">{t(error)}</p>}
     <h3>{t('下载任务')} <small>{tasks.length}</small></h3>
     <div className="download-tasks">{tasks.map(task => <DownloadCard key={task.id} task={task} busy={busy === task.id}
       connected={!!connection?.ready && connection.deviceId === task.source.deviceId}
-      action={() => { void run(task); }} remove={() => { void run(task, true); }} />)}</div>
+      action={() => { void run(task); }} open={() => { void run(task, 'open'); }}
+      remove={() => { void run(task, 'remove'); }} />)}</div>
     {!tasks.length && <div className="download-empty"><Download size={38} /><h3>{t('还没有下载任务')}</h3>
       <p>{t('从上方浏览文件，或在聊天的文件预览中点击下载。')}</p></div>}
   </section>;

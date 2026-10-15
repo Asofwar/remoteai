@@ -28,6 +28,44 @@ fn normalizes_enabled_network_proxy() {
 }
 
 #[test]
+fn blank_network_proxy_address_defaults_to_loopback() {
+    for address in ["", " \t "] {
+        let settings = NetworkProxySettings {
+            enabled: true,
+            proxy_url: address.to_string(),
+            proxy_port: Some(7897),
+        };
+        let normalized = normalize_settings(settings.clone()).unwrap();
+        assert_eq!(normalized.proxy_url, "http://127.0.0.1");
+        assert_eq!(
+            network_proxy_url(&settings).unwrap().unwrap().as_str(),
+            "http://127.0.0.1:7897/"
+        );
+        assert_eq!(normalize_settings(normalized.clone()).unwrap(), normalized);
+    }
+}
+
+#[test]
+fn blank_network_proxy_address_still_requires_a_port() {
+    for proxy_port in [None, Some(0)] {
+        let error = normalize_settings(NetworkProxySettings {
+            enabled: true,
+            proxy_url: String::new(),
+            proxy_port,
+        })
+        .unwrap_err();
+        assert!(error.contains("proxy port"));
+    }
+}
+
+#[test]
+fn disabled_blank_network_proxy_stays_disabled() {
+    let settings = NetworkProxySettings::default();
+    assert_eq!(normalize_settings(settings.clone()).unwrap(), settings);
+    assert!(network_proxy_url(&settings).unwrap().is_none());
+}
+
+#[test]
 fn rejects_enabled_network_proxy_without_port() {
     let error = normalize_settings(NetworkProxySettings {
         enabled: true,

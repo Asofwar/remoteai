@@ -164,7 +164,7 @@ export const messages3 = {
   "settings.networkProxy.description": "Используйте прокси-сервер HTTP(S) или SOCKS для Remote AI. Если параметр выключен, используйте сетевые настройки вашего компьютера.",
   "settings.networkProxy.enabled": "Использовать сетевой прокси",
   "settings.networkProxy.address": "Адрес прокси",
-  "settings.networkProxy.addressPlaceholder": "http://127.0.0.1",
+  "settings.networkProxy.addressPlaceholder": "По умолчанию: 127.0.0.1",
   "settings.networkProxy.port": "Прокси-порт",
   "settings.networkProxy.portPlaceholder": "7897",
   "settings.networkProxy.invalidAddress": "Введите адрес прокси-сервера HTTP(S) или SOCKS без порта или пути.",

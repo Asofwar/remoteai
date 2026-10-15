@@ -6,6 +6,10 @@ const t: Translate = (key) => key;
 const settings = { enabled: true, proxyUrl: "http://127.0.0.1", proxyPort: 1080 };
 
 describe("network proxy settings", () => {
+  it.each(["", " \t "])("accepts a blank address %j with a valid port", (proxyUrl) => {
+    expect(validateProxy({ ...settings, proxyUrl }, t)).toBeNull();
+  });
+
   it.each(["http", "https", "socks4", "socks4a", "socks5", "socks5h"])(
     "accepts %s proxy addresses with a separate port", (scheme) => {
       expect(validateProxy({ ...settings, proxyUrl: `${scheme}://127.0.0.1` }, t)).toBeNull();
@@ -21,7 +25,9 @@ describe("network proxy settings", () => {
   );
 
   it.each([0, -1, 65_536, 1.5, null])("rejects invalid port %s", (proxyPort) => {
-    expect(validateProxy({ ...settings, proxyPort }, t)).toBe("settings.networkProxy.invalidPort");
+    for (const proxyUrl of [settings.proxyUrl, "", " \t "]) {
+      expect(validateProxy({ ...settings, proxyUrl, proxyPort }, t)).toBe("settings.networkProxy.invalidPort");
+    }
   });
 
   it("allows disabling an incomplete proxy", () => {

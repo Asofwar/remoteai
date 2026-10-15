@@ -13,6 +13,7 @@ use bypass::{bypass_rule_matches, should_proxy_target};
 use parsing::supported_proxy_scheme;
 
 static NETWORK_PROXY: OnceLock<RwLock<Option<Url>>> = OnceLock::new();
+const DEFAULT_NETWORK_PROXY_URL: &str = "http://127.0.0.1";
 
 #[derive(Clone, Debug, Default, PartialEq)]
 struct SystemProxyConfig {
@@ -195,9 +196,11 @@ fn network_proxy_url(settings: &NetworkProxySettings) -> Result<Option<Url>, Str
 }
 
 fn parse_network_proxy_base_url(value: &str) -> Result<String, String> {
-    if value.is_empty() {
-        return Err("Enter a proxy address".to_string());
-    }
+    let value = if value.is_empty() {
+        DEFAULT_NETWORK_PROXY_URL
+    } else {
+        value
+    };
     let url =
         Url::parse(value).map_err(|_| "Enter a valid HTTP(S) or SOCKS proxy URL".to_string())?;
     let valid = supported_proxy_scheme(url.scheme())

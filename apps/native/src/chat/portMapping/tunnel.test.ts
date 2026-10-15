@@ -4,6 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { NativeMappingTunnel } from './tunnel';
 import type { ForwardingClient } from '../../../../../shared/port-mapping/service';
 import type { TerminalLinkReply } from '../../../../../shared/terminal/links';
+import { StreamBudget } from '../../../../../shared/port-mapping/streamBudget';
 
 vi.mock('react-native-tcp-socket', () => ({ default: net }));
 vi.mock('buffer', async () => {
@@ -54,7 +55,7 @@ const client: ForwardingClient = {
       eof: socket.destroyed };
   },
 };
-function tunnel(port: number, budget = { active: 0, limit: 8 }) {
+function tunnel(port: number, budget = new StreamBudget()) {
   const instance = new NativeMappingTunnel(client, { localPort: port, bridgeBudget: budget, onClosed: vi.fn() });
   tunnels.push(instance); return instance;
 }
@@ -82,9 +83,9 @@ it('rejects an occupied local port without disturbing the existing service', asy
   expect(await (await fetch(`http://127.0.0.1:${occupied}`)).text()).toBe('existing');
 });
 
-it('preserves a large binary stream and closes excess connections within the shared budget', async () => {
+it('preserves binary bytes and buffers queued connections until the shared budget is available', async () => {
   const remote = await listen(net.createServer(socket => socket.pipe(socket)));
-  const local = await unusedPort(); const budget = { active: 0, limit: 1 };
+  const local = await unusedPort(); const budget = new StreamBudget(1);
   await tunnel(local, budget).resolve('resource', `http://127.0.0.1:${remote}`);
   const input = Buffer.alloc(150_000); for (let index = 0; index < input.length; index++) input[index] = index % 256;
   const socket = net.connect(local, '127.0.0.1');
@@ -98,6 +99,27 @@ it('preserves a large binary stream and closes excess connections within the sha
   });
   socket.write(input); expect(await received).toEqual(input);
   const excess = net.connect(local, '127.0.0.1');
-  await new Promise<void>(resolve => excess.once('close', () => resolve()));
+  const reply = new Promise<Buffer>(resolve => excess.once('data', resolve));
+  await new Promise<void>(resolve => excess.once('connect', resolve));
+  excess.write('queued request');
+  expect(excess.destroyed).toBe(false);
   expect(budget.active).toBe(1); socket.destroy();
+  expect(await reply).toEqual(Buffer.from('queued request'));
+  excess.destroy();
+});
+
+it('stops queued sockets immediately and reuses their local port without leaking a reservation', async () => {
+  const remote = await listen(http.createServer((_request, response) => response.end('restarted')));
+  const port = await unusedPort(); const budget = new StreamBudget(1);
+  const reserved = await budget.acquire(new AbortController().signal);
+  const first = tunnel(port, budget);
+  await first.resolve('resource', `http://127.0.0.1:${remote}`);
+  const waiting = net.connect(port, '127.0.0.1');
+  const closed = new Promise<void>(resolve => waiting.once('close', () => resolve()));
+  await new Promise<void>(resolve => waiting.once('connect', resolve));
+  await first.close(); await closed;
+  expect(budget.active).toBe(1); reserved!();
+  const second = tunnel(port, budget);
+  await second.resolve('resource', `http://127.0.0.1:${remote}`);
+  expect(await (await fetch(`http://127.0.0.1:${port}`)).text()).toBe('restarted');
 });

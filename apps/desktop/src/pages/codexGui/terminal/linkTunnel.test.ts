@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { TerminalLinkTunnels } from './linkTunnel';
 import type { TerminalLinkReply } from '../../../../../../shared/terminal/links';
+import { StreamBudget } from '../../../../../../shared/port-mapping/streamBudget';
 
 const flush = async () => { for (let index = 0; index < 30; index++) await Promise.resolve(); };
 const client = () => ({ list: vi.fn(), open: vi.fn(), read: vi.fn(), write: vi.fn(), resize: vi.fn(), close: vi.fn(),
@@ -66,7 +67,7 @@ it('shares the stream budget between mappings and returns capacity when a connec
     if (request.type === 'read') return new Promise<TerminalLinkReply>(resolve => reads.set(request.id!, resolve));
     return { type: 'done' as const };
   });
-  const bridgeBudget = { active: 0, limit: 1 };
+  const bridgeBudget = new StreamBudget(1);
   const first = new TerminalLinkTunnels(remote, native, { localPort: 13000, bridgeBudget });
   const second = new TerminalLinkTunnels(remote, native, { localPort: 15432, bridgeBudget });
   await first.resolve('first', 'http://localhost:3000');
@@ -74,11 +75,12 @@ it('shares the stream budget between mappings and returns capacity when a connec
   accepts.get('13000')!({ type: 'socket', id: 'one' }); await flush();
   accepts.get('15432')!({ type: 'socket', id: 'two' }); await flush();
   expect(bridgeBudget.active).toBe(1);
-  expect(native).toHaveBeenCalledWith({ type: 'close', id: 'two', scope: '15432' });
+  expect(native).not.toHaveBeenCalledWith({ type: 'close', id: 'two', scope: '15432' });
+  expect(reads.has('two')).toBe(false);
   reads.get('one')!({ type: 'data', data: '', eof: true }); await flush();
-  expect(bridgeBudget.active).toBe(0);
-  accepts.get('15432')!({ type: 'socket', id: 'three' }); await flush();
   expect(bridgeBudget.active).toBe(1);
-  reads.get('three')!({ type: 'data', data: '', eof: true }); await flush();
+  expect(reads.has('two')).toBe(true);
+  reads.get('two')!({ type: 'data', data: '', eof: true }); await flush();
+  expect(bridgeBudget.active).toBe(0);
   await first.close(); await second.close();
 });

@@ -6,7 +6,6 @@ import { decodeBase64, encodeBase64, httpRequest, HttpResponseReader, mappingUrl
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const WRITE_CHUNK_BYTES = 48 * 1024;
-const MAX_WAITING_REQUESTS = 128;
 
 /** A browser mapping owns authenticated remote sockets; it never presents a fake local listener. */
 export class WebMappingTunnel implements MappingTunnel {
@@ -14,7 +13,7 @@ export class WebMappingTunnel implements MappingTunnel {
   private origin = '';
   private closed = false;
   private readonly pending = new Set<AbortController>();
-  private readonly waiting = new Set<() => void>();
+  private readonly cancellation = new AbortController();
   private readonly sockets = new Set<MappingWebSocket>();
 
   constructor(private readonly client: ForwardingClient, private readonly options: MappingTunnelOptions) {}
@@ -30,49 +29,39 @@ export class WebMappingTunnel implements MappingTunnel {
 
   close = async () => {
     this.closed = true;
+    this.cancellation.abort();
     for (const request of this.pending) request.abort();
-    for (const wake of this.waiting) wake();
     for (const socket of this.sockets) socket.close();
   };
 
   openWebSocket = async (url: string, protocols: string[], emit: (event: MappingSocketEvent) => void) => {
-    await this.acquire();
+    const release = this.requireReservation(await this.options.bridgeBudget.acquire(this.cancellation.signal));
     const socket = new MappingWebSocket({ client: this.client, resource: this.resource, origin: this.origin, emit });
     this.sockets.add(socket);
     void socket.run(url, protocols).finally(() => {
-      this.sockets.delete(socket); this.options.bridgeBudget.active--;
-      this.waiting.values().next().value?.();
+      this.sockets.delete(socket); release();
     });
     return socket;
   };
 
   request = async (input: MappingHttpRequest): Promise<MappingHttpResponse> => {
     const url = mappingUrl(input.url, this.origin).href;
-    await this.acquire();
+    const release = this.requireReservation(await this.options.bridgeBudget.acquire(this.cancellation.signal));
     const abort = new AbortController();
     this.pending.add(abort);
     const timer = setTimeout(() => abort.abort(), REQUEST_TIMEOUT_MS);
     try { return await this.exchange({ ...input, url }, abort.signal); }
     finally {
-      clearTimeout(timer); this.pending.delete(abort); this.options.bridgeBudget.active--;
-      // The budget is shared by mappings. Other mappings retry their queue on a short timer.
-      this.waiting.values().next().value?.();
+      clearTimeout(timer); this.pending.delete(abort); release();
     }
   };
 
-  private async acquire() {
-    if (this.waiting.size >= MAX_WAITING_REQUESTS) throw new Error('Too many requests');
-    const deadline = Date.now() + REQUEST_TIMEOUT_MS;
-    while (!this.closed && this.options.bridgeBudget.active >= this.options.bridgeBudget.limit) {
-      if (Date.now() >= deadline) throw new Error('Preview busy');
-      await new Promise<void>(resolve => {
-        const wake = () => { clearTimeout(timer); this.waiting.delete(wake); resolve(); };
-        const timer = setTimeout(wake, 100);
-        this.waiting.add(wake);
-      });
+  private requireReservation(release: (() => void) | undefined) {
+    if (this.closed || !release) {
+      release?.();
+      throw new Error(this.closed ? 'Mapping stopped' : 'Preview busy');
     }
-    if (this.closed) throw new Error('Mapping stopped');
-    this.options.bridgeBudget.active++;
+    return release;
   }
 
   private async exchange(input: MappingHttpRequest, signal: AbortSignal): Promise<MappingHttpResponse> {

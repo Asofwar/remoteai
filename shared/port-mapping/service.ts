@@ -1,6 +1,7 @@
 import type { GuiToolsClient } from '../remote-chat/guiTools';
 import type { MappingTunnel, TunnelFactory } from './types';
 import { MAX_PORT_MAPPINGS, validPort, type PortMapping } from './settings';
+import { StreamBudget } from './streamBudget';
 
 export type ForwardingClient = Pick<GuiToolsClient['files'], 'openResource' | 'closeResource' | 'link'>;
 export interface ForwardingEntry extends PortMapping {
@@ -9,7 +10,6 @@ export interface ForwardingEntry extends PortMapping {
 }
 interface RunningMapping { tunnels: MappingTunnel; resource?: string }
 const START_ERROR = '映射未能启动，请确认远程服务已启动后重试。';
-const MAX_ACTIVE_STREAMS = 8;
 const LOCAL_ERRORS = new Set(['本地端口已被占用，请换一个端口。', '无法监听本地端口，请换一个端口重试。',
   '请更新应用后使用端口映射。', '请返回应用后重新启动映射。']);
 
@@ -20,7 +20,7 @@ export class PortForwardingService {
   private readonly listeners = new Set<() => void>();
   private readonly running = new Map<string, RunningMapping>();
   // Each stream keeps a remote read pending. Leave RPC capacity available for chat and other tools.
-  private readonly bridgeBudget = { active: 0, limit: MAX_ACTIVE_STREAMS };
+  private readonly bridgeBudget = new StreamBudget();
 
   constructor(private readonly client: ForwardingClient, saved: PortMapping[],
     private readonly platform: { createTunnel: TunnelFactory; createId: () => string }) {

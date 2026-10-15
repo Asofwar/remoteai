@@ -1,4 +1,5 @@
 import type { ForwardingClient } from './service';
+import type { StreamBudget } from './streamBudget';
 
 export interface MappingTunnel {
   resolve: (resource: string, url: string) => Promise<string>;
@@ -7,6 +8,6 @@ export interface MappingTunnel {
 export interface MappingTunnelOptions {
   localPort: number;
   onClosed: () => void;
-  bridgeBudget: { active: number; limit: number };
+  bridgeBudget: StreamBudget;
 }
 export type TunnelFactory = (client: ForwardingClient, options: MappingTunnelOptions) => MappingTunnel;

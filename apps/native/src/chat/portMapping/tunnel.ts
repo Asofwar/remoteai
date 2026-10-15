@@ -15,6 +15,7 @@ export class NativeMappingTunnel implements MappingTunnel {
   private stopping?: Promise<void>;
   private releaseBackground?: () => Promise<void>;
   private readonly bridges = new Set<() => void>();
+  private readonly waiting = new Set<() => void>();
 
   constructor(private readonly client: ForwardingClient, private readonly options: MappingTunnelOptions) {}
 
@@ -25,6 +26,7 @@ export class NativeMappingTunnel implements MappingTunnel {
 
   close = (): Promise<void> => {
     this.closed = true;
+    for (const cancel of this.waiting) cancel();
     this.stopping ??= this.shutdown();
     return this.stopping;
   };
@@ -42,7 +44,7 @@ export class NativeMappingTunnel implements MappingTunnel {
   private listen(resource: string, url: string): Promise<string> {
     return new Promise((resolve, reject) => {
       let started = false;
-      const server = TcpSocket.createServer(socket => this.accept({ socket, resource, url }));
+      const server = TcpSocket.createServer(socket => { void this.accept({ socket, resource, url }); });
       this.server = server;
       const timer = setTimeout(() => reject(new Error(PORT_UNAVAILABLE)), START_TIMEOUT_MS);
       server.on('error', error => {
@@ -61,13 +63,24 @@ export class NativeMappingTunnel implements MappingTunnel {
     });
   }
 
-  private accept(target: { socket: InstanceType<typeof TcpSocket.Socket>; resource: string; url: string }) {
-    const budget = this.options.bridgeBudget;
-    if (this.closed || budget.active >= budget.limit) { target.socket.destroy(); return; }
-    budget.active++;
+  private async accept(target: { socket: InstanceType<typeof TcpSocket.Socket>; resource: string; url: string }) {
+    if (this.closed) { target.socket.destroy(); return; }
+    const abort = new AbortController();
+    const cancel = () => { abort.abort(); target.socket.destroy(); };
+    // Pause before awaiting admission so the browser's first request remains buffered.
+    target.socket.pause();
+    target.socket.on('error', cancel);
+    target.socket.once('close', cancel);
+    this.waiting.add(cancel);
+    const release = await this.options.bridgeBudget.acquire(abort.signal);
+    this.waiting.delete(cancel);
+    target.socket.off('error', cancel);
+    target.socket.off('close', cancel);
+    if (!release || this.closed || target.socket.destroyed) { release?.(); cancel(); return; }
     const bridge = bridgeSocket({ ...target, client: this.client });
     this.bridges.add(bridge.close);
-    void bridge.done.finally(() => { this.bridges.delete(bridge.close); budget.active--; });
+    target.socket.resume();
+    await bridge.done.finally(() => { this.bridges.delete(bridge.close); release(); });
   }
 
   private async shutdown() {

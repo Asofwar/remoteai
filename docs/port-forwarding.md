@@ -67,8 +67,12 @@ rewrite HTTP, TLS or other application bytes.
 `TerminalLinkTunnels` accepts a fixed local port for manual mappings while retaining automatic port
 allocation for previews. The asynchronous Rust listener command validates the requested port and
 releases its bound socket before completing a stop, even with a pending accept. Manual mappings
-share an eight-stream concurrency budget per computer to retain chat RPC capacity; additional local
-connections are closed. A failed listener or disconnected session requires restarting its mapping.
+share an eight-stream concurrency budget per computer to retain chat RPC and cleanup capacity. Additional
+connections wait in FIFO order for up to 30 seconds instead of being closed as soon as the budget is full.
+The desktop accepts at most one waiting socket per listener and leaves further connections in the TCP backlog.
+Native sockets pause while waiting to preserve their initial request bytes. Web HTTP requests and WebSockets
+use the same admission queue. Stopping a mapping cancels its queued connections without affecting other mappings.
+A failed listener or disconnected session requires restarting its mapping.
 
 ## Verification
 
@@ -78,6 +82,9 @@ connections are closed. A failed listener or disconnected session requires resta
   late replies, cleanup, retries and disconnects. Settings tests cover device isolation and corrupt data.
 - `portForwarding/transport.test.ts` carries two byte streams through the existing encrypted transport
   while switching from P2P to Relay without restarting either mapping.
+- `terminal/linkTunnelConcurrency.test.ts` transfers 24 concurrent HTTP responses over real loopback sockets
+  while keeping an upgraded connection and chat RPC available, and checks cancellation and immediate port reuse.
+- `portForwarding/streamBudget.test.ts` covers FIFO admission, cancellation, bounded waiting and slot reuse.
 - `e2e/port-forwarding.pw.ts` covers form actions, preview/browser opening, copying, errors, reconnects, device switching,
   persistence and compact light/dark layouts; `e2e/remote-gui.pw.ts` verifies the real workspace entry.
 - Native `portMapping` tests cover real TCP/HTTP transfer, binary bytes, port conflicts, reuse and background leases.

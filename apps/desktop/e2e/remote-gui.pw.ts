@@ -183,7 +183,11 @@ for (const blocked of [false, true]) {
     await chooseComputer(page, 'Office PC');
     await page.getByRole('button', { name: 'Office', exact: true }).click();
     await expect(page.locator('.chat-connection-status')).toContainText(blocked ? 'Relay' : 'P2P');
-    await expect(page.getByRole('button', { name: '远程 Codex CLI 更新' })).toContainText('0.155.0');
+    const cliUpdate = page.getByRole('button', { name: '远程 Codex CLI 更新' });
+    await expect(cliUpdate).toHaveText('');
+    await cliUpdate.click();
+    await expect(page.getByRole('heading', { name: 'Codex 0.155.0', exact: true })).toBeVisible();
+    await cliUpdate.click();
     await expect(page.getByRole('button', { name: '打开工具箱', exact: true })).toHaveCount(0);
     await page.screenshot({ path: `../../.codex-tmp/gui-remote-git-${blocked ? 'relay' : 'p2p'}.png` });
     await page.locator('.gui-remote-project').getByRole('button', { name: '打开 Git', exact: true }).click();
@@ -249,7 +253,10 @@ for (const blocked of [false, true]) {
     await page.getByRole('button', { name: '远程 Codex CLI 更新' }).click();
     await page.getByRole('textbox', { name: '聊天消息', exact: true }).fill('Draft while remote tools are active');
     await expect.poll(() => page.evaluate(() => window.remoteGuiFixture.beats())).toBeGreaterThan(beats + 5);
-    await expect(page.getByRole('button', { name: '远程 Codex CLI 更新' })).toContainText('0.156.0');
+    await cliUpdate.click();
+    await expect(page.getByRole('heading', { name: 'Codex 0.156.0', exact: true })).toBeVisible();
+    await expect(cliUpdate).toHaveText('');
+    await cliUpdate.click();
     await page.screenshot({ path: `../../.codex-tmp/gui-remote-tools-${blocked ? 'relay' : 'p2p'}.png` });
     await page.getByRole('button', { name: '关闭终端 1', exact: true }).click();
     await expect.poll(() => office.evaluate(() => window.chatTest.demoState().operations

@@ -38,8 +38,7 @@ export function RemoteGuiTools({ controller, state, active, terminal }: {
       {installer.error && <Alert type="error" message={installer.error} />}
     </>}>
       <Button type="text" icon={<CliUpdateIcon version={installer.version} release={installer.release} />}
-        aria-label={guiText("远程 Codex CLI 更新")}>
-        {installer.version ? `v${installer.version}` : 'Codex'}</Button>
+        aria-label={guiText("远程 Codex CLI 更新")} />
     </Popover>
     <Tooltip title={terminalLabel} styles={{ root: { maxWidth: 400 } }}>
       <Button type="text" icon={<PanelBottom size={16} />} aria-label={terminalLabel}

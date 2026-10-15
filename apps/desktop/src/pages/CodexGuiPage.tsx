@@ -135,8 +135,7 @@ function Workspace({ active, accountPicker, windowControls, plugins, hostPicker,
             content={<Installer installer={installer} compact running={Boolean(running)} />}
             styles={{ root: { maxWidth: 400 } }}>
             <Button type="text" icon={<CliUpdateIcon version={installer.version} release={installer.release} />}
-              aria-label={guiText("Codex CLI 更新")}>
-              {installer.version ? `v${installer.version}` : "Codex"}</Button>
+              aria-label={guiText("Codex CLI 更新")} />
           </Popover>
           {isDesktopApp && view === "conversation" && <Tooltip title={terminal.open ? guiText("收起终端") : guiText("打开终端")}
             styles={{ root: { maxWidth: 400 } }}>

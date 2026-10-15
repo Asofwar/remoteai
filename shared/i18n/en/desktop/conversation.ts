@@ -2,9 +2,6 @@ export const conversation = {
   "图片附件": "Image attachments",
   "放大查看：图片 {value1}": "Enlarge image {value1}",
   "图片 {value1}：{value2}": "Image {value1}: {value2}",
-  "每 30 分钟自动检查并下载更新。下载完成后，若无进行中的对话就立即安装，否则等待后续检查或重启应用。":
-    "Checks for and downloads updates every 30 minutes. Updates install when no conversations are "
-    + "running, or at a later check or app restart.",
   "下载 Codex 后，就能在这里开始对话、处理代码和管理任务。": "Download Codex to start conversations, work on code, and manage tasks here.",
   "开始使用 Codex GUI": "Get started with Codex GUI",
   "在当前远程电脑上检查和更新 Codex。": "Check and update Codex on the selected remote computer.",

@@ -13,12 +13,11 @@ export function Installer({ installer, compact = false, running = false, remote 
 }) {
   const { version, release, checking, installing, progress, checked, check, install } = installer;
   const available = release && release.version !== version;
-  const description = version ? guiText("每 30 分钟自动检查并下载更新。下载完成后，若无进行中的对话就立即安装，否则等待后续检查或重启应用。")
-    : guiText("下载 Codex 后，就能在这里开始对话、处理代码和管理任务。");
   return <div className={compact ? styles.installCompact : styles.install}>
     {!compact && <div className={styles.welcomeIcon}><Terminal size={30} /></div>}
     <h2>{version ? `Codex ${version}` : guiText("开始使用 Codex GUI")}</h2>
-    <p>{remote && !version ? guiText("在当前远程电脑上检查和更新 Codex。") : description}</p>
+    {!version && <p>{remote ? guiText("在当前远程电脑上检查和更新 Codex。")
+      : guiText("下载 Codex 后，就能在这里开始对话、处理代码和管理任务。")}</p>}
     {!compact && <p className={styles.muted}>{isDesktopApp
       ? guiText("这里的对话独立保存，不会影响官方 Codex 的聊天记录。")
       : guiText("Codex 在运行 Remote AI 的主机上安装和运行，对话也保存在该主机。")}</p>}

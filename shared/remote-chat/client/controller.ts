@@ -16,6 +16,7 @@ import { ThreadActions, threadMutationPatch, type ThreadMutation } from './threa
 import { ThreadListRequests } from './threadListRequests';
 import { mergeThreadList } from './threadListSnapshot';
 import { forkConversation } from './forkConversation';
+import { RemoteMessageEditor } from './messageEdit';
 import { OfflineWriter, type OfflineHistoryStore } from './offline';
 import { offlineImage } from './offlineImages';
 import { validateChatImages } from '../attachments';
@@ -45,6 +46,15 @@ import { initialChatState, type ApprovalReply, type ChatProject, type ChatState,
 const SYNCHRONIZATION_RETRY_MS = 3000;
 
 export class ChatController {
+  readonly messageEditor = new RemoteMessageEditor({ snapshot: () => this.state,
+    update: patch => this.update(patch), request: body => this.request(body),
+    image: (threadId, source) => this.imagePreview(threadId, source, true), invalidate: threadId => {
+      this.histories.remove(threadId);
+      if (this.state.selected?.id !== threadId) return;
+      this.readGeneration += 1;
+      this.refreshThreadId = null;
+      this.update({ historyLoading: false, historyLoadingMore: false });
+    } });
   readonly threadActions = new ThreadActions({ snapshot: () => this.state, update: patch => this.update(patch),
     request: body => this.connection.request('request', body),
     complete: (body, result) => body.operation === 'threadPin'
@@ -510,6 +520,7 @@ export class ChatController {
   }
 
   async refreshSelected(older = false) {
+    if (this.messageEditor.busy) { this.historyDirty = true; return; }
     if (this.offline && !this.transportConnected) return;
     const selected = this.state.selected;
     if (!selected || this.refreshThreadId === selected.id) return;

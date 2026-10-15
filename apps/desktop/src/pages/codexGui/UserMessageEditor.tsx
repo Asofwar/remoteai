@@ -1,6 +1,6 @@
 import { guiText } from "../../i18n/guiText";
 import { useContext, useEffect, useRef, useState } from "react";
-import { Button } from "antd";
+import { Button, Popconfirm } from "antd";
 import type { Content, SkillReference } from "./types";
 import type { SubmitMessageEdit } from "./messageEditContent";
 import { MessageEditorImages } from "./MessageEditorImages";
@@ -9,15 +9,22 @@ import { useMessageEditDraft } from "./useMessageEditDraft";
 import { MessageEditContext } from "./messageEditContext";
 import styles from "./UserMessage.module.less";
 
-export function UserMessageEditor({ text, images, skills, disabled, onSubmit, onCancel }: {
+export function UserMessageEditor({ text, images, skills, disabled, onSubmit, onDelete, onCancel }: {
   text: string; images: Content[]; skills: SkillReference[];
-  disabled: boolean; onSubmit: SubmitMessageEdit; onCancel: () => void;
+  disabled: boolean; onSubmit: SubmitMessageEdit; onDelete?: () => Promise<boolean>; onCancel: () => void;
 }) {
   const editor = useRef<SkillInputHandle>(null);
   const { cwd, active } = useContext(MessageEditContext);
   const draft = useMessageEditDraft({ text, images, skills });
   const [saving, setSaving] = useState(false);
   const inFlight = useRef(false);
+  const remove = async () => {
+    if (inFlight.current || disabled || !active || !onDelete) return;
+    inFlight.current = true;
+    setSaving(true);
+    try { if (await onDelete()) onCancel(); }
+    finally { inFlight.current = false; setSaving(false); }
+  };
   useEffect(() => { editor.current?.focus(); }, []);
   const submit = async () => {
     if (inFlight.current || disabled || !active || draft.reading || draft.isReading() || !draft.draft.text.trim()) return;
@@ -37,6 +44,14 @@ export function UserMessageEditor({ text, images, skills, disabled, onSubmit, on
       onSend={() => void submit()} />
     {draft.error && <p className={styles.editorError} role="status">{draft.error}</p>}
     <div className={styles.editorActions}>
+      {onDelete && <Popconfirm title={guiText("删除这条消息？")}
+        description={guiText("这条消息及之后的所有消息都会删除，无法撤销。")}
+        overlayStyle={{ maxWidth: 400 }} okText={guiText("删除")} cancelText={guiText("取消")}
+        okButtonProps={{ danger: true, autoInsertSpace: false }} cancelButtonProps={{ autoInsertSpace: false }}
+        disabled={saving || disabled || !active} onConfirm={remove}>
+        <Button danger className={styles.deleteButton} autoInsertSpace={false}
+          disabled={saving || disabled || !active}>{guiText("删除消息")}</Button>
+      </Popconfirm>}
       <Button className={styles.cancelButton} autoInsertSpace={false} aria-label={guiText("取消编辑")}
         disabled={saving} onClick={onCancel}>{guiText("取消")}</Button>
       <Button className={styles.sendButton} autoInsertSpace={false} type="primary"

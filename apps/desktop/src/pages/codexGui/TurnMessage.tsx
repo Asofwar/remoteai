@@ -19,10 +19,11 @@ import { turnMessageGroups } from "./turnMessageGroups";
 export { groupTurnItems } from "../../../../../shared/chat/turnGroups";
 
 export const TurnMessage = memo(function TurnMessage({ turn, running, active, followsInterruption = false,
-  editableItemId, onEdit, editDisabled, threadId, visibleItems = turn.items, onFork, forkDisabled,
+  editableItemId, onEdit, onDelete, editDisabled, threadId, visibleItems = turn.items, onFork, forkDisabled,
   retry, onCancelRetry }: {
   turn: Turn; running: boolean; active: boolean; followsInterruption?: boolean;
   editableItemId?: string; onEdit?: SubmitMessageEdit; editDisabled?: boolean;
+  onDelete?: () => Promise<boolean>;
   threadId?: string;
   visibleItems?: Item[];
   onFork?: () => void; forkDisabled?: boolean;
@@ -48,6 +49,7 @@ export const TurnMessage = memo(function TurnMessage({ turn, running, active, fo
         completedAt={turn.completedAt} onFork={onFork}
         forkDisabled={forkDisabled || running || turn.status === "inProgress"}
         onEdit={group.items[0].id === editableItemId ? onEdit : undefined} editDisabled={editDisabled}
+        onDelete={group.items[0].id === editableItemId ? onDelete : undefined}
         streaming={running && group.items[0].status !== "completed"} /></div>}
     </Fragment>)}
     {responseIndex === -1 && !running && !isModelCapacityError(turn.error)

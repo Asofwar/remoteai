@@ -16,6 +16,7 @@ const thread: Thread = { id: "thread", cwd: "", preview: "", updatedAt: 1, turns
 let root: Root;
 let container: HTMLDivElement;
 const onEdit = vi.fn(async () => true);
+const onDelete = vi.fn(async () => true);
 const originalScrollTo = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollTo");
 
 beforeEach(async () => {
@@ -23,6 +24,7 @@ beforeEach(async () => {
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
   Object.defineProperty(HTMLElement.prototype, "scrollTo", { configurable: true, value: vi.fn() });
   onEdit.mockReset().mockResolvedValue(true);
+  onDelete.mockReset().mockResolvedValue(true);
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -38,7 +40,7 @@ afterEach(async () => {
 
 async function render(disabled = false, selected = thread.id, source = thread) {
   await act(async () => root.render(<Messages selected={selected} value={conversation(source)}
-    onEdit={onEdit} editDisabled={disabled} />));
+    onEdit={onEdit} onDelete={onDelete} editDisabled={disabled} />));
 }
 async function click(label: string) {
   const button = [...container.querySelectorAll("button")]
@@ -74,6 +76,18 @@ it("submits the edited text with the original message position", async () => {
   await click("编辑消息"); await type("修改后的问题"); await click("发送");
   expect(onEdit).toHaveBeenCalledExactlyOnceWith({ threadId: "thread", turnId: "last",
     itemId: "latest", text: "修改后的问题" });
+  expect(container.querySelector('[role="textbox"]')).toBeNull();
+});
+
+it('deletes from the original message only after confirmation, even with an empty draft', async () => {
+  await click('编辑消息'); await type(''); await click('删除消息');
+  expect(onDelete).not.toHaveBeenCalled();
+  expect(document.body.textContent).toContain('这条消息及之后的所有消息都会删除，无法撤销。');
+  const confirm = [...document.body.querySelectorAll<HTMLButtonElement>('.ant-popconfirm button')]
+    .find(button => button.textContent?.replaceAll(' ', '') === '删除')!;
+  await act(async () => confirm.click());
+  expect(onDelete).toHaveBeenCalledExactlyOnceWith({ threadId: 'thread', turnId: 'last', itemId: 'latest' });
+  expect(onEdit).not.toHaveBeenCalled();
   expect(container.querySelector('[role="textbox"]')).toBeNull();
 });
 

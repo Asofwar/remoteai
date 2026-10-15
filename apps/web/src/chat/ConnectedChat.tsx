@@ -11,7 +11,7 @@ import { ChatComposer } from './ChatComposer';
 import { ChatProjectSwitch } from './ChatProjectSwitch';
 import type { NativeFileDrop } from './composerProps';
 import { queueProps } from '../../../../shared/remote-chat/client/queueProps';
-import { ChatMessages } from './ChatMessages';
+import { ChatMessages, type RenderUserMessage } from './ChatMessages';
 import { ChatProcessing } from './ChatProcessing';
 import { ChatImageContext } from './ChatImage';
 import { ChatFileContext } from './ChatFileLink';
@@ -45,6 +45,7 @@ export interface ConnectedChatProps {
   chooseLocal?: () => void; accountPicker?: ReactNode; headerActions?: ReactNode;
   headerConnectionActions?: ReactNode; headerEnd?: ReactNode;
   renderSidebar?: (actions: ChatSidebarActions) => ReactNode;
+  renderUserMessage?: RenderUserMessage;
   composerHeader?: ReactNode;
   conversationFooter?: ReactNode;
   desktopDiffs?: boolean;
@@ -61,7 +62,7 @@ export interface ChatSidebarActions {
 /** Conversation UI shared by the web client and the desktop's remote workspace. */
 export function ConnectedChat({ chat, device, devices, active, scope, email, chooseDevice,
   chooseLocal, accountPicker, headerActions, headerConnectionActions, headerEnd, renderSidebar, composerHeader,
-  conversationFooter,
+  conversationFooter, renderUserMessage,
   readClipboardImages, nativeFileDrop, desktopDiffs }: ConnectedChatProps) {
   useLanguage();
   const { state, controller, foreground } = chat;
@@ -125,6 +126,7 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
       <TaskReviewProvider controller={controller} state={state} active={active && foreground}>
       <ChatRetryProvider controller={controller} state={state}>
       <ChatMessages key={state.selected?.id ?? 'new'} thread={state.selected} offline={!ready}
+        renderUserMessage={renderUserMessage}
         loading={state.historyLoading} loadingMore={state.historyLoadingMore} hasMore={state.historyHasMore}
         loadOlder={() => controller.loadOlder()}
         processing={runningTurn && <ChatProcessing key={runningTurn.id} turn={runningTurn}
@@ -140,6 +142,8 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
         || state.compacting === state.selected?.id} answer={controller.answerAsyncQuestion} />
     {composerHeader}
     <ChatComposer suggestions={remotePromptSuggestion(state, controller.suggestNextPrompt, { scope })}
+      recoveredEdit={controller.messageEditor.recoveredDrafts.get(state.selected?.id ?? '')}
+      consumeRecoveredEdit={() => controller.messageEditor.recoveredDrafts.delete(state.selected?.id ?? '')}
       connectionInfo={<ChatConnectionInfo state={state} controller={controller} device={device} active={active}
         chooseDevice={() => setPickingDevice(true)} />}
       projectPicker={!composerHeader && <ChatProjectSwitch state={state} controller={controller}

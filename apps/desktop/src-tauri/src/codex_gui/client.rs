@@ -177,8 +177,18 @@ impl Client {
 
     pub(super) async fn request(&self, method: &str, params: Value) -> Result<Value> {
         let _subscription = self.idle_threads.request_guard(method, &params).await;
+        let changed_thread = matches!(method, "thread/rollback" | "thread/revert")
+            .then(|| params["threadId"].clone());
         let mut result = self.request_internal(method, params).await?;
         super::conversation_context::display(&mut result);
+        if let Some(thread_id) = changed_thread {
+            self.emit(GuiEvent {
+                method: "thread/historyChanged".into(),
+                params: json!({"threadId": thread_id}),
+                id: None,
+            })
+            .await;
+        }
         Ok(result)
     }
 

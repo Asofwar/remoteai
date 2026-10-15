@@ -21,6 +21,7 @@ import './remoteGui.less';
 import { useDesktopDownloads } from '../../../downloads/useDesktopDownloads';
 import { RemoteFileEnvironment } from './RemoteFileEnvironment';
 import { PortForwarding } from '../portForwarding/PortForwarding';
+import { RemoteUserMessage } from './RemoteUserMessage';
 
 const TerminalPanel = lazy(() => import('../terminal/TerminalPanel'));
 const nativeFileDrop = { subscribe: subscribeFileDrop, readFiles: readDroppedFiles };
@@ -48,6 +49,8 @@ export default function RemoteGuiWorkspace(props: {
     <ConfigProvider getPopupContainer={popupContainer}>
     <RemoteFileEnvironment controller={chat.controller} ready={chat.state.ready} threadId={chat.state.selected?.id ?? null}>
     <ConnectedChat chat={chat} active={active} device={device} devices={computers.devices} email="" desktopDiffs
+      renderUserMessage={props => <RemoteUserMessage {...props} state={chat.state}
+        controller={chat.controller} active={active} />}
       scope={scope}
       chooseLocal={() => computers.choose(null)}
       chooseDevice={(id) => { const device = computers.devices.find((entry) => entry.deviceId === id);

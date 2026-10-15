@@ -24,6 +24,7 @@ beforeEach(() => {
   vi.mocked(guiApi.request).mockImplementation(async (request) => {
     if (request.operation === "list" || request.operation === "models") return { data: [], nextCursor: null };
     if (request.operation === "editMessage") return { thread: rolledBack, turn };
+    if (request.operation === "deleteMessage") return { thread: rolledBack };
     return { thread: source };
   });
 });
@@ -32,6 +33,30 @@ async function setup() {
   await controller.connect(); await controller.select(source.id);
   return controller;
 }
+
+it('deletes the last user message and all subsequent replies without sending another turn', async () => {
+  const controller = await setup();
+  const target = { threadId: source.id, turnId: 'last', itemId: 'user' };
+  expect(await controller.messageEditor.remove({ ...target, itemId: 'old-user' })).toBe(false);
+  expect(await controller.messageEditor.remove(target)).toBe(true);
+  expect(guiApi.request).toHaveBeenCalledWith({ operation: 'deleteMessage', ...target,
+    access: controller.getSnapshot().settings.access });
+  expect(controller.getSnapshot().conversations.source.turns.map(entry => entry.id)).toEqual(['old']);
+  expect(controller.getSnapshot().conversations.source.activeTurn).toBeNull();
+  expect(controller.getSnapshot().selected).toBe(source.id);
+  expect(controller.messageEditor.recoveredDrafts.size).toBe(0);
+  controller.dispose();
+});
+
+it('keeps history and allows retry if deleting fails', async () => {
+  const controller = await setup();
+  const before = controller.getSnapshot().conversations;
+  vi.mocked(guiApi.request).mockRejectedValue(new Error('删除失败'));
+  expect(await controller.messageEditor.remove(edit)).toBe(false);
+  expect(controller.getSnapshot().conversations).toBe(before);
+  expect(controller.getSnapshot()).toMatchObject({ sending: false, error: '删除失败' });
+  controller.dispose();
+});
 
 it("replaces the latest turn in the same conversation and sends current settings", async () => {
   const controller = await setup();

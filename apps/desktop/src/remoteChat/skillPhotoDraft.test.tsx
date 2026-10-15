@@ -85,3 +85,20 @@ it('sends an attachment-only first message and preserves text and attachments on
   expect(send).toHaveBeenNthCalledWith(1, { text: '', images: [], attachments, ...options.selection });
   expect(send).toHaveBeenNthCalledWith(2, { text: '', images: [], attachments, ...options.selection });
 });
+
+it('recovers edited text and attachments once without overwriting an existing composer draft', async () => {
+  const consumeRecovered = vi.fn();
+  await render({ threadId: 'chat' });
+  await act(async () => draft.setText('keep my draft'));
+  const recovered = { text: 'recovered $review', images, skills: [skill],
+    attachments: [{ kind: 'file' as const, path: '/project/note.txt', name: 'note.txt' }] };
+  await render({ recovered, consumeRecovered, sending: true });
+  expect(draft.text).toBe('keep my draft');
+  await render({ sending: false });
+  expect(draft.text).toBe('keep my draft\n\nrecovered $review');
+  expect(draft.images.map(image => image.url)).toEqual(images);
+  expect(draft.references).toEqual(recovered.attachments);
+  await render({ consumeRecovered: () => consumeRecovered() });
+  expect(consumeRecovered).toHaveBeenCalledTimes(1);
+  expect(draft.images).toHaveLength(1);
+});

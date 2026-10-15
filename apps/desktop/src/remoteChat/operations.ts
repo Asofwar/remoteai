@@ -35,6 +35,7 @@ import { guiToolRequest } from './guiTools';
 import { remoteTerminals, type RemoteTerminals } from './terminals';
 import { deleteRemoteThread, pinRemoteThread } from './threadActions';
 import { forkRemoteConversation } from './forkConversation';
+import { changeRemoteMessage } from './messageEdit';
 import { RemoteDesktopHost } from '../remoteDesktop/host';
 import { DESKTOP_OPERATION } from '../../../../shared/remote-desktop/protocol';
 import { RemoteThreadTitles } from './threadTitles';
@@ -175,6 +176,9 @@ export class ChatOperations {
   private async run(request: RpcRequest, mode: ConnectionMode, owner: string): Promise<unknown> {
     if (request.method === 'connect') return this.connect(request.body);
     const body = { ...object(request.body) };
+    if (request.method === 'request' && ['editMessage', 'deleteMessage'].includes(String(body.operation))) {
+      return this.images.prepare(await changeRemoteMessage(body), String(body.threadId));
+    }
     if (request.method === 'request' && body.operation === 'delete') return deleteRemoteThread(body.threadId);
     if (request.method === 'request' && body.operation === 'threadPin') return pinRemoteThread(body);
     if (request.method === 'request' && body.operation === 'forkLatest') return forkRemoteConversation(body.threadId);

@@ -167,6 +167,7 @@ function Workspace({ active, accountPicker, windowControls, plugins, hostPicker,
           retry={state.capacityRetry} onCancelRetry={() => controller.capacityRetry.cancel()}
           editCwd={state.selected ? state.projectOverrides[state.selected] : undefined}
           onEdit={controller.messageEditor.submit} editDisabled={!canEditMessage(state)}
+          onDelete={controller.messageEditor.remove}
           onFork={controller.forkConversation} forkDisabled={!canForkConversation(state)}
           onQuote={canQuote ? (quote) => composer.current?.addQuote(quote) ?? false : undefined}
           pendingRequest={state.pendingRequest} footer={<>

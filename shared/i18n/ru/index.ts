@@ -1,4 +1,5 @@
 import { imageAiRussian } from '../imageAi';
+import { messageEditingRussian } from '../messageEditing';
 import { fileReferencesRussian } from '../fileReferences';
 import { messages1 } from "./messages1";
 import { messages2 } from "./messages2";
@@ -19,6 +20,7 @@ import { cozeRussian } from '../coze';
 import { portForwardingRussian } from '../portForwarding';
 
 export const russian = {
+  ...messageEditingRussian,
   '分辨率': 'Разрешение',
   '选择分辨率': 'Выберите разрешение',
   '关闭分辨率列表': 'Закрыть список разрешений',

@@ -23,7 +23,8 @@ export function useComposerState(props: ComposerProps) {
   const dropTarget = useRef<HTMLDivElement>(null);
   const quotes = useChatQuotes();
   const disabled = !ready || settingsBusy || compacting;
-  const draft = useChatDraft({ threadId, sending, disabled: disabled || attachments.busy, selection, send });
+  const draft = useChatDraft({ threadId, sending, disabled: disabled || attachments.busy, selection, send,
+    recovered: props.recoveredEdit, consumeRecovered: props.consumeRecoveredEdit });
   const menu = useComposerMenu({ draft, scope: `${threadId ?? ''}:${props.cwd}`, active,
     refresh: props.catalog.refresh, compact: props.compact });
   const hasContent = draft.hasContent || attachments.items.length > 0 || Boolean(quotes?.quotes.length);

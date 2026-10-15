@@ -1,24 +1,17 @@
 import { guiText } from "../../i18n/guiText";
 import { guiApi } from "./api";
 import { conversation } from "./events";
-import { followsStoppedTurn, visibleContinuationItems } from "./continuation";
+import { lastUserMessage } from '../../../../../shared/chat/latestUserMessage';
+export { lastUserMessage } from '../../../../../shared/chat/latestUserMessage';
 import { editedMessageDraft } from "./editedMessageDraft";
 import type { MessageEditContent } from "./messageEditContent";
-import type { Conversation, GuiState, Item, MessageInput, Thread, Turn } from "./types";
+import type { Conversation, GuiState, MessageInput, Thread, Turn } from "./types";
 
 export interface MessageEdit extends MessageEditContent { threadId: string; turnId: string; itemId: string }
 export type EditMessage = (edit: MessageEdit) => Promise<boolean>;
-
-export function lastUserMessage(value?: Conversation): { turnId: string; item: Item } | undefined {
-  if (!value) return;
-  for (let index = value.turns.length - 1; index >= 0; index--) {
-    const turn = value.turns[index];
-    const items = followsStoppedTurn(value.turns[index - 1])
-      ? visibleContinuationItems(turn.items) : turn.items;
-    const item = items.filter((entry) => entry.type === "userMessage").at(-1);
-    if (item) return { turnId: turn.id, item };
-  }
-}
+export type MessageTarget = Pick<MessageEdit, "threadId" | "turnId" | "itemId">;
+export type DeleteMessage = (target: MessageTarget) => Promise<boolean>;
+export interface MessageChangeResult { thread: Thread; turn?: Turn; error?: string }
 
 export function canEditMessage(state: GuiState): boolean {
   const id = state.selected;
@@ -41,6 +34,36 @@ interface EditHost {
 export class GuiMessageEditor {
   readonly recoveredDrafts = new Map<string, MessageInput>();
   constructor(private host: EditHost) {}
+  remove: DeleteMessage = async (target) => {
+    const state = this.host.getSnapshot();
+    const before = state.conversations[target.threadId];
+    const last = lastUserMessage(before);
+    if (!canEditMessage(state) || state.selected !== target.threadId || last?.turnId !== target.turnId
+      || last.item.id !== target.itemId || last.item.localEcho) return false;
+    this.host.patch({ sending: true, error: "" });
+    try {
+      const result = await guiApi.request<MessageChangeResult>({ operation: "deleteMessage",
+        ...target, access: state.settings.access });
+      this.applyResult(before, result);
+      return true;
+    } catch (error) { this.host.report(error); return false; }
+    finally { this.host.patch({ sending: false }); this.host.flushQueue(); }
+  };
+
+  /** Reconcile both local and remote mutations without moving the host's current selection. */
+  applyResult(before: Conversation, { thread, turn }: MessageChangeResult) {
+    const latest = this.host.getSnapshot();
+    const received = latest.conversations[thread.id];
+    const originalIds = new Set(before.turns.map((entry) => entry.id));
+    const turns = new Map((thread.turns ?? []).map((entry) => [entry.id, entry]));
+    received?.turns.forEach((entry) => {
+      if (turns.has(entry.id) || !originalIds.has(entry.id)) turns.set(entry.id, entry);
+    });
+    this.host.patch({ conversations: { ...latest.conversations,
+      [thread.id]: conversation({ ...thread, turns: [...turns.values()] }, received) } });
+    if (turn) this.host.acceptTurn(thread.id, turn);
+    void this.host.refresh();
+  }
   submit: EditMessage = async (edit) => {
     const state = this.host.getSnapshot();
     const last = lastUserMessage(state.conversations[edit.threadId]);
@@ -49,25 +72,14 @@ export class GuiMessageEditor {
     const { model, effort, access } = state.settings;
     this.host.patch({ sending: true, error: "" });
     try {
-      const { thread, turn, error } = await guiApi.request<{ thread: Thread; turn?: Turn; error?: string }>({
+      const result = await guiApi.request<MessageChangeResult>({
         operation: "editMessage",
         ...edit, model: model || undefined, effort: effort || undefined, access,
         cwd: state.projectOverrides[edit.threadId] });
-      const latest = this.host.getSnapshot();
-      const received = latest.conversations[thread.id];
-      // Drop the replaced suffix, while keeping events newer than this edit request.
-      const originalIds = new Set(state.conversations[edit.threadId].turns.map((entry) => entry.id));
-      const turns = new Map((thread.turns ?? []).map((entry) => [entry.id, entry]));
-      received?.turns.forEach((entry) => {
-        if (turns.has(entry.id) || !originalIds.has(entry.id)) turns.set(entry.id, entry);
-      });
+      const { error } = result;
       if (error) this.recoveredDrafts.set(edit.threadId,
         editedMessageDraft(state.conversations[edit.threadId], edit));
-      this.host.patch({ selected: latest.selected === edit.threadId ? thread.id : latest.selected,
-        conversations: { ...latest.conversations,
-          [thread.id]: conversation({ ...thread, turns: [...turns.values()] }, received) } });
-      if (turn) this.host.acceptTurn(thread.id, turn);
-      void this.host.refresh();
+      this.applyResult(state.conversations[edit.threadId], result);
       if (error) { this.host.report(guiText("未能确认发送结果。修改内容已放回输入框，请检查对话后重试。")); return false; }
       return true;
     } catch (error) { this.host.report(error); return false; }

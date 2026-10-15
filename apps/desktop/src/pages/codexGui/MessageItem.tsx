@@ -36,16 +36,17 @@ function toolText(item: Item) {
   return item.text ?? item.review ?? item.aggregatedOutput ?? item.query ?? "";
 }
 
-export const MessageItem = memo(function MessageItem({ item, streaming, startedAt, onEdit, editDisabled,
+export const MessageItem = memo(function MessageItem({ item, streaming, startedAt, onEdit, onDelete, editDisabled,
   completedAt, onFork, forkDisabled }: {
   item: Item; streaming: boolean; startedAt?: number | null;
   onEdit?: SubmitMessageEdit; editDisabled?: boolean;
+  onDelete?: () => Promise<boolean>;
   completedAt?: number | null; onFork?: () => void; forkDisabled?: boolean;
 }) {
   useGuiLanguage();
   if (item.type === "modelChange") return <ModelChangeNotice item={item} />;
   if (item.type === "userMessage") return <UserMessage item={item} startedAt={startedAt}
-    onEdit={onEdit} editDisabled={editDisabled} />;
+    onEdit={onEdit} onDelete={onDelete} editDisabled={editDisabled} />;
   if (item.type === "agentMessage") return <AgentMessage item={item} streaming={streaming}
     completedAt={completedAt} onFork={onFork} forkDisabled={forkDisabled} />;
   const text = toolText(item);

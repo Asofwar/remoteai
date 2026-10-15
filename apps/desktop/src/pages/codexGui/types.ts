@@ -214,6 +214,7 @@ export type Request =
     | ({ operation: 'downloadOpen' } & import('../../../../../shared/remote-chat/downloads').DownloadOpen)
     | ({ operation: 'previewOpen' } & import('../../../../../shared/remote-chat/downloads').PreviewOpen)
   | ({ operation: 'downloadBrowse' } & import('../../../../../shared/remote-chat/downloads').DownloadBrowse)
+  | { operation: "deleteMessage"; threadId: string; turnId: string; itemId: string; access: AccessMode }
   | { operation: "editMessage"; threadId: string; turnId: string; itemId: string; text: string;
       removedImageIndexes?: number[]; images?: string[]; skills?: SkillReference[];
       model?: string; effort?: string; access: AccessMode; cwd?: string }

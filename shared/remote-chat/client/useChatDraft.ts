@@ -15,9 +15,11 @@ interface Options {
   disabled: boolean;
   selection: ComposerSettings;
   send: (input: SendInput) => Promise<boolean>;
+  recovered?: QueueDraft;
+  consumeRecovered?: () => void;
 }
 
-export function useChatDraft({ threadId, sending, disabled, selection, send }: Options) {
+export function useChatDraft({ threadId, sending, disabled, selection, send, recovered, consumeRecovered }: Options) {
   const [content, setContent] = useState(emptySkillDraft);
   const { text } = content;
   const setText = (value: string) => setContent((draft) => editSkillDraft(draft, value));
@@ -37,6 +39,7 @@ export function useChatDraft({ threadId, sending, disabled, selection, send }: O
   const generation = useRef(0);
   const busy = useRef(false);
   const submitting = useRef(false);
+  const recoveredEdits = useRef(new WeakSet<QueueDraft>());
   useEffect(() => () => { generation.current += 1; }, []);
   useEffect(() => {
     if (scope.current === threadId) return;
@@ -49,6 +52,17 @@ export function useChatDraft({ threadId, sending, disabled, selection, send }: O
     submitting.current = false;
     setText(''); setImages([]); setReferences([]); setError(''); setPicking(false);
   }, [threadId]);
+
+  useEffect(() => {
+    if (!recovered || sending || recoveredEdits.current.has(recovered)) return;
+    recoveredEdits.current.add(recovered);
+    consumeRecovered?.();
+    setContent(previous => queuedMessageText({ ...recovered,
+      text: [previous.text, recovered.text].filter(Boolean).join('\n\n'),
+      skills: [...draftSkills(previous), ...recovered.skills] }));
+    setImages(previous => [...previous, ...recovered.images.map(draftImage)]);
+    setReferences(previous => [...previous, ...(recovered.attachments ?? [])]);
+  }, [recovered, consumeRecovered, sending]);
 
   const addImages = async (pick: (remaining: number) => Promise<DraftImage[]>) => {
     if (busy.current || submitting.current || sending) return;

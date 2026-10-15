@@ -222,6 +222,9 @@ async fn execute_request(state: &GuiState, request: GuiRequest) -> Result<GuiRes
     if let GuiRequest::EditMessage(edit) = request {
         return message_edit::submit(&client, edit).await;
     }
+    if let GuiRequest::DeleteMessage(target) = request {
+        return message_edit::delete(&client, target).await;
+    }
     if let GuiRequest::ImagePreview {
         thread_id,
         source,

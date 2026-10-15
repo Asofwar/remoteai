@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Spin } from "antd";
 import { ArrowDown, Terminal } from "lucide-react";
 import type { Conversation } from "./types";
-import { lastUserMessage, type EditMessage } from "./editMessage";
+import { lastUserMessage, type EditMessage, type DeleteMessage } from "./editMessage";
 import { TurnMessage } from "./TurnMessage";
 import { useFollowScroll } from "./useFollowScroll";
 import { useMessageWindow } from "./useMessageWindow";
@@ -20,11 +20,12 @@ import { MessageEditContext } from "./messageEditContext";
 import type { CapacityRetryControl } from "./CapacityErrorNotice";
 
 export function Messages({ value, selected, active = true, footer, pendingRequest, onQuote,
-  onEdit, editDisabled, editCwd, onFork, forkDisabled, retry, onCancelRetry }: {
+  onEdit, onDelete, editDisabled, editCwd, onFork, forkDisabled, retry, onCancelRetry }: {
   value?: Conversation; selected: string | null; active?: boolean; footer?: ReactNode;
   pendingRequest?: PendingRequest;
   onQuote?: (quote: ReplyQuote) => boolean;
   onEdit?: EditMessage; editDisabled?: boolean; editCwd?: string;
+  onDelete?: DeleteMessage;
   onFork?: (threadId: string, turnId: string) => Promise<boolean>; forkDisabled?: boolean;
 } & CapacityRetryControl) {
   const last = lastUserMessage(value);
@@ -71,6 +72,8 @@ export function Messages({ value, selected, active = true, footer, pendingReques
             editDisabled={editDisabled || Boolean(value?.activeTurn || pendingRequest || last?.item.localEcho)}
             onEdit={onEdit && selected && last ? (content) => onEdit({ threadId: selected,
               turnId: turn.id, itemId: last.item.id, ...content }) : undefined}
+            onDelete={onDelete && selected && last ? () => onDelete({ threadId: selected,
+              turnId: turn.id, itemId: last.item.id }) : undefined}
             followsInterruption={followsInterruption}
             running={value?.activeTurn === turn.id} active={active} />)}
           {value?.error && <p className={styles.turnError} role="status">{value.error}</p>}

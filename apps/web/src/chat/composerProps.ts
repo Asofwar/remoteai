@@ -22,6 +22,8 @@ export interface NativeFileDrop {
 }
 
 export interface ComposerProps {
+  recoveredEdit?: import('../../../../shared/remote-chat/queue').QueueDraft;
+  consumeRecoveredEdit?: () => void;
   projectPicker?: ReactNode;
   connectionInfo?: ReactNode;
   suggestions?: PromptSuggestionSource;

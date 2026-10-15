@@ -28,8 +28,9 @@ const sentAtOptions: Intl.DateTimeFormatOptions = {
   hour: "2-digit", minute: "2-digit", hourCycle: "h23",
 };
 
-export function UserMessage({ item, startedAt, onEdit, editDisabled = false }: {
+export function UserMessage({ item, startedAt, onEdit, onDelete, editDisabled = false }: {
   item: Item; startedAt?: number | null; onEdit?: SubmitMessageEdit; editDisabled?: boolean;
+  onDelete?: () => Promise<boolean>;
 }) {
   const [editing, setEditing] = useState(false);
   const parts = visibleUserContent(item.content);
@@ -56,7 +57,7 @@ export function UserMessage({ item, startedAt, onEdit, editDisabled = false }: {
       {editing && onEdit ? <UserMessageEditor text={text} images={images}
         skills={parts.flatMap((part) => part.type === "skill" && part.path
           ? [{ name: part.name ?? "", path: part.path }] : [])}
-        disabled={editDisabled} onSubmit={onEdit}
+        disabled={editDisabled} onSubmit={onEdit} onDelete={onDelete}
         onCancel={() => setEditing(false)} /> : <>
         <MessageQuotes key={text} quotes={message.quotes} />
         {message.text && <div>{message.text}</div>}

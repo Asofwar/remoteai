@@ -20,6 +20,9 @@ import { ChatTurnTiming, desktopTimeline } from './ChatTurnTiming';
 import { ChatSelectionQuote } from './ChatSelectionQuote';
 import './messages.css';
 import './desktopMessages.css';
+import type { Item, Turn } from './types';
+
+export type RenderUserMessage = (props: { item: Item; turn: Turn }) => ReactNode;
 
 type WorkSelection = { type: 'work' | 'activities'; id: string };
 type Selection = WorkSelection | { type: 'item'; id: string; back?: WorkSelection }
@@ -49,9 +52,10 @@ function WorkSummary({ entry, open, inline, desktop }: {
   </div>;
 }
 
-function TimelineEntry({ entry, open, inline, desktop }: {
+function TimelineEntry({ entry, open, inline, desktop, renderUserMessage }: {
   entry: Entry; open: (selection: Selection) => void; inline: (id: string, value: boolean) => void;
   desktop: boolean;
+  renderUserMessage?: RenderUserMessage;
 }) {
   useLanguage();
   if (entry.kind === 'activities') {
@@ -73,13 +77,18 @@ function TimelineEntry({ entry, open, inline, desktop }: {
     onOpen={panel => open({ type: 'turn', id: entry.turn.id, panel })} />;
   if (entry.kind === 'work') return <WorkSummary entry={entry} inline={inline} desktop={desktop}
     open={() => open({ type: 'work', id: entry.id })} />;
+  if (entry.item.type === 'userMessage' && renderUserMessage) {
+    return renderUserMessage({ item: entry.item, turn: entry.turn });
+  }
   return <ChatMessage item={entry.item} process={entry.kind === 'process'} desktop={desktop}
     onInspect={() => inline(entry.turn.id, true)}
     onOpen={id => { if (entry.kind === 'process') inline(entry.turn.id, true); open({ type: 'item', id }); }}
     running={entry.turn.status === 'inProgress' && entry.item.status !== 'completed'} />;
 }
 
-export function ChatMessages(props: ChatMessagesProps & { processing?: ReactNode }) {
+export function ChatMessages(props: ChatMessagesProps & {
+  processing?: ReactNode; renderUserMessage?: RenderUserMessage;
+}) {
   useLanguage();
   const desktop = useDesktopLayout();
   const { thread, loading, loadingMore, hasMore, offline } = props;
@@ -114,7 +123,8 @@ export function ChatMessages(props: ChatMessagesProps & { processing?: ReactNode
           {timeline.map(entry => <Fragment key={entry.id}>
             {entry === runningSummary && props.processing}
             <div data-message-id={'item' in entry ? entry.item.id : entry.id} className={`chat-entry-${entry.kind}`}>
-              <TimelineEntry entry={entry} open={setSelection} inline={setInline} desktop={desktop} />
+              <TimelineEntry entry={entry} open={setSelection} inline={setInline} desktop={desktop}
+                renderUserMessage={props.renderUserMessage} />
             </div>
           </Fragment>)}
           {!runningSummary && props.processing}

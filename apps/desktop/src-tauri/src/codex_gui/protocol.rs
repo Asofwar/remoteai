@@ -41,6 +41,7 @@ pub(crate) enum GuiRequest {
         directory: String,
     },
     EditMessage(super::message_edit::EditRequest),
+    DeleteMessage(super::message_edit::DeleteRequest),
     ImagePreview {
         thread_id: String,
         source: String,
@@ -233,7 +234,7 @@ impl GuiRequest {
             Self::ProjectFiles(_) => Err(GuiError::InvalidRequest),
             Self::ProjectDirectories { .. } => Err(GuiError::InvalidRequest),
             Self::TextPreview { .. } => Err(GuiError::InvalidRequest),
-            Self::EditMessage(_) => Err(GuiError::InvalidRequest),
+            Self::EditMessage(_) | Self::DeleteMessage(_) => Err(GuiError::InvalidRequest),
             // Image previews are served locally, never forwarded as an app-server operation.
             Self::ImagePreview { .. } => Err(GuiError::InvalidRequest),
             Self::CozeCatalog => Err(GuiError::InvalidRequest),

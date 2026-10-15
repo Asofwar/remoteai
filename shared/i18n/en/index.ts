@@ -1,4 +1,5 @@
 import { imageAiEnglish } from '../imageAi';
+import { messageEditingEnglish } from '../messageEditing';
 import { fileReferencesEnglish } from '../fileReferences';
 import { messages } from './messages';
 import { terminalMessages } from './terminal';
@@ -15,6 +16,7 @@ import { cozeEnglish } from '../coze';
 import { portForwardingEnglish } from '../portForwarding';
 
 export const english: Readonly<Record<string, string>> = {
+  ...messageEditingEnglish,
   ...messages, ...terminalMessages, ...gitMessages, ...remoteDesktopMessages, ...mobile,
   ...reliabilityEnglish,
   ...reviewEnglish,

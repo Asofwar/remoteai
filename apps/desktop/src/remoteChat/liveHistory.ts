@@ -16,7 +16,7 @@ export class LiveHistory {
     const id = event.params.threadId ?? event.params.thread?.id;
     if (!id || event.id != null) return;
     if (['thread/started', 'thread/resumed', 'thread/archived', 'thread/unarchived', 'thread/deleted',
-      'thread/compacted'].includes(event.method)) {
+      'thread/compacted', 'thread/historyChanged'].includes(event.method)) {
       const tokenUsage = this.threads.get(id)?.tokenUsage;
       this.threads.delete(id);
       if (tokenUsage && event.method !== 'thread/deleted') {

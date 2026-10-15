@@ -101,6 +101,12 @@ function providerErrorMessage(error: unknown, t: Translate) {
   }
   if (message.includes("Aggregate API does not exist")) return t("providers.aggregate.error.notFound");
   if (message.includes("Enable the aggregate API")) return t("providers.aggregate.error.disabled");
+  if ([
+    "The maximum attempts must be", "The failure threshold must be", "The initial cooldown must be",
+    "The maximum cooldown must be", "Choose at most 32 retry status codes", "Check the failover settings",
+  ].some((prefix) => message.includes(prefix))) {
+    return t("providers.aggregate.failover.error.settings");
+  }
   if (message.includes("Model is required")) return t("providers.error.modelRequired");
   if (message.includes("Base URL is required")) return t("providers.error.baseUrlRequired");
   if (message.includes("Base URL must be an http:// or https:// URL with a host")) {

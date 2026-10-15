@@ -235,24 +235,6 @@
     }
 
     #[test]
-    fn aggregate_retryability_only_includes_transient_failures() {
-        assert!(aggregate_result_is_retryable(&Ok(json_payload(
-            503,
-            json!({ "error": "busy" })
-        ))));
-        assert!(aggregate_result_is_retryable(&Err(
-            "Provider proxy request failed: connection reset".to_string()
-        )));
-        assert!(!aggregate_result_is_retryable(&Ok(json_payload(
-            401,
-            json!({ "error": "unauthorized" })
-        ))));
-        assert!(!aggregate_result_is_retryable(&Err(
-            "Request body is invalid".to_string()
-        )));
-    }
-
-    #[test]
     fn configured_model_api_format_skips_automatic_fallback() {
         let (base_url, rx, handle) = spawn_single_chat_api_server();
         let mut provider = api_detection_provider(base_url);

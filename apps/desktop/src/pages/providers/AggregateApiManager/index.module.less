@@ -48,7 +48,21 @@
   justify-content: flex-end;
 }
 
+.failover {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.failover summary { cursor: pointer; font-weight: 600; }
+.hint { max-width: 400px; color: var(--muted); font-size: 12px; }
+.policyGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
+.memberHealth { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.memberHealth :global(.ant-tag) { max-width: min(100%, 400px); white-space: normal; overflow-wrap: anywhere; margin: 0; }
+.failover :global(.ant-form-item-explain) { max-width: 400px; }
+
 @media (max-width: 640px) {
+  .policyGrid { grid-template-columns: minmax(0, 1fr); }
   .heading,
   .row {
     align-items: stretch;

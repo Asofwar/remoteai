@@ -5,6 +5,7 @@ import {
   Network, RefreshCw, Server,
 } from "lucide-react";
 import type { AccountDisplayMode } from "../hooks/useAccountDisplayMode";
+import { useAggregateRuntimeRefresh } from "../hooks/useAggregateRuntimeRefresh";
 import type { Language, Translate } from "../i18n";
 import type {
   Account, AggregateApi, AggregateApiInput, ImageModelTarget, ImageRouteKind, LocalProxyStatus,
@@ -28,8 +29,6 @@ import { ProviderGroupManager } from "./providers/ProviderGroupManager";
 import { AggregateApiManager } from "./providers/AggregateApiManager";
 import { AggregateApiOverview } from "./providers/AggregateApiOverview";
 import { useProviderTokenUsage } from "./providers/useProviderTokenUsage";
-
-const AGGREGATE_RUNTIME_REFRESH_MS = 2_000;
 
 interface ProvidersPageProps {
   providers: Provider[];
@@ -132,24 +131,10 @@ export function ProvidersPage({
     setSelectedProviderIds((current) => current.filter((id) => providerIds.has(id)));
   }, [providers]);
 
-  useEffect(() => {
-    if (!active || !activeAggregateId) return undefined;
-    let refreshRunning = false;
-    const refreshCounts = async () => {
-      if (refreshRunning) return;
-      refreshRunning = true;
-      try {
-        await onRefreshAggregateApis();
-      } catch {
-        // Runtime statistics are best-effort and the next interval retries automatically.
-      } finally {
-        refreshRunning = false;
-      }
-    };
-    void refreshCounts();
-    const timer = window.setInterval(() => void refreshCounts(), AGGREGATE_RUNTIME_REFRESH_MS);
-    return () => window.clearInterval(timer);
-  }, [active, activeAggregateId, onRefreshAggregateApis]);
+  useAggregateRuntimeRefresh({
+    active: active && (Boolean(activeAggregateId) || showAggregateManager),
+    refresh: onRefreshAggregateApis,
+  });
 
   const usageForProvider = useProviderTokenUsage(tokenUsageRefreshSeconds, providers, active);
 

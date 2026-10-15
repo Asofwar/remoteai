@@ -26,6 +26,7 @@ import { GROK_FALLBACK_MODELS } from "../utils/grokProvider";
 import { findProviderPreset } from "../utils/providerCatalog";
 import { loadStoredModelTokenCosts, persistStoredModelTokenCosts } from "../pages/providers/providerUtils";
 import { retainedRequestOptions } from "../pages/providers/providerRequestOptions";
+import { copyFailoverPolicy, validFailoverPolicy } from "../pages/providers/AggregateApiManager/failoverPolicy";
 import { estimateTokenCost } from "../utils/tokenCost";
 import { summarizeProxyRequests } from "../utils/proxyConversationMetrics";
 import type { AccountQuotaHistory, DailyTokenUsageBreakdown } from "../types/tokenUsageAnalytics";
@@ -805,7 +806,11 @@ function readPreviewAggregateApis(): AggregateApi[] {
       && "name" in aggregate
       && "model" in aggregate
       && "memberProviderIds" in aggregate,
-    ));
+    )).map((aggregate) => ({
+      ...aggregate,
+      failoverPolicy: copyFailoverPolicy(aggregate.failoverPolicy),
+      memberHealth: aggregate.memberHealth ?? {},
+    }));
   } catch {
     return [];
   }
@@ -833,12 +838,17 @@ export async function saveAggregateApiProfile(input: AggregateApiInput): Promise
     }
     const aggregates = readPreviewAggregateApis();
     const index = input.id ? aggregates.findIndex((aggregate) => aggregate.id === input.id) : -1;
+    const previous = index >= 0 ? aggregates[index] : undefined;
+    const failoverPolicy = copyFailoverPolicy(input.failoverPolicy ?? previous?.failoverPolicy);
+    if (!validFailoverPolicy(failoverPolicy)) throw new Error("Check the failover settings and try again");
     const aggregate: AggregateApi = {
       ...input,
       id: input.id ?? previewProviderId(),
       memberProviderIds: memberIds,
       active: index >= 0 && aggregates[index].active && input.enabled,
       memberConversationCounts: index >= 0 ? aggregates[index].memberConversationCounts ?? {} : {},
+      failoverPolicy,
+      memberHealth: previous?.memberHealth ?? {},
     };
     if (index >= 0) aggregates[index] = aggregate;
     else aggregates.push(aggregate);

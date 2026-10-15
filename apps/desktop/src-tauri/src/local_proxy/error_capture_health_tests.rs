@@ -1,0 +1,128 @@
+use super::*;
+use serde_json::json;
+
+fn observe_chunks(capture: &mut ErrorCapture, bytes: &[u8]) -> Vec<ProxyCapturedError> {
+    let mut errors = Vec::new();
+    for chunk in bytes.chunks(3) {
+        errors.extend(capture.observe(chunk));
+    }
+    errors.extend(capture.finish());
+    errors
+}
+
+fn incomplete(reason: &str) -> Value {
+    json!({ "type": "response.incomplete", "response": {
+        "status": "incomplete", "incomplete_details": { "reason": reason }, "error": null,
+    } })
+}
+
+#[test]
+fn expected_incomplete_is_healthy_for_fragmented_streams_and_json() {
+    for reason in ["max_output_tokens", "content_filter"] {
+        let json = incomplete(reason).to_string();
+        for (streaming, body) in [(true, format!("data: {json}\n\n")), (false, json)] {
+            let mut capture = ErrorCapture::new_for_health(streaming, 200);
+            assert!(observe_chunks(&mut capture, body.as_bytes()).is_empty());
+            assert!(capture.terminal_seen());
+            assert!(!capture.error_seen());
+        }
+        let mut capture = ErrorCapture::new_for_health(false, 200);
+        let body = json!({ "status": "incomplete", "incomplete_details": { "reason": reason } });
+        assert!(observe_chunks(&mut capture, body.to_string().as_bytes()).is_empty());
+        assert!(capture.terminal_seen());
+    }
+}
+
+#[test]
+fn expected_incomplete_keeps_the_default_diagnostic_error() {
+    for reason in ["max_output_tokens", "content_filter"] {
+        let mut capture = ErrorCapture::new(true, 200);
+        let body = format!("data: {}\n\n", incomplete(reason));
+        assert_eq!(observe_chunks(&mut capture, body.as_bytes()).len(), 1);
+        assert!(capture.error_seen());
+    }
+}
+
+#[test]
+fn normal_incomplete_does_not_hide_a_subsequent_real_error() {
+    for error in [
+        json!({ "type": "error", "error": { "message": "upstream failed" } }),
+        json!({ "type": "response.failed", "response": { "error": { "message": "upstream failed" } } }),
+        json!({ "error": "upstream failed" }),
+        incomplete("server_error"),
+    ] {
+        let body = format!(
+            "data: {}\n\ndata: {error}\n\n",
+            incomplete("max_output_tokens")
+        );
+        let mut capture = ErrorCapture::new_for_health(true, 200);
+        assert_eq!(observe_chunks(&mut capture, body.as_bytes()).len(), 1);
+        assert!(capture.error_seen());
+    }
+}
+
+#[test]
+fn incomplete_with_an_explicit_error_or_http_failure_is_unhealthy() {
+    for pointer in ["/error", "/response/error"] {
+        let mut value = incomplete("max_output_tokens");
+        if pointer == "/error" {
+            value["error"] = json!({"message": "upstream failed"});
+        } else {
+            value["response"]["error"] = json!({"message": "upstream failed"});
+        }
+        let mut capture = ErrorCapture::new_for_health(true, 200);
+        let body = format!("data: {value}\n\n");
+        assert_eq!(observe_chunks(&mut capture, body.as_bytes()).len(), 1);
+    }
+    for streaming in [true, false] {
+        let value = incomplete("content_filter").to_string();
+        let body = if streaming {
+            format!("data: {value}\n\n")
+        } else {
+            value
+        };
+        let mut capture = ErrorCapture::new_for_health(streaming, 503);
+        assert_eq!(observe_chunks(&mut capture, body.as_bytes()).len(), 1);
+    }
+}
+
+#[test]
+fn incomplete_event_cannot_mask_an_explicit_failure_payload() {
+    for payload_type in ["error", "response.failed"] {
+        let mut value = incomplete("max_output_tokens");
+        value["type"] = json!(payload_type);
+        let body = format!("event: response.incomplete\ndata: {value}\n\n");
+        let mut capture = ErrorCapture::new_for_health(true, 200);
+        assert_eq!(observe_chunks(&mut capture, body.as_bytes()).len(), 1);
+    }
+    let body = format!("event: error\ndata: {}\n\n", incomplete("content_filter"));
+    let mut capture = ErrorCapture::new_for_health(true, 200);
+    assert_eq!(observe_chunks(&mut capture, body.as_bytes()).len(), 1);
+}
+
+#[test]
+fn unknown_incomplete_and_truncated_streams_remain_failures() {
+    for value in [
+        incomplete("server_error"),
+        incomplete("unknown"),
+        json!({ "type": "response.incomplete", "response": {} }),
+    ] {
+        let body = format!("data: {value}\n\n");
+        let mut capture = ErrorCapture::new_for_health(true, 200);
+        assert_eq!(observe_chunks(&mut capture, body.as_bytes()).len(), 1);
+        let mut capture = ErrorCapture::new_for_health(false, 200);
+        assert_eq!(
+            observe_chunks(&mut capture, value.to_string().as_bytes()).len(),
+            1
+        );
+    }
+    for body in [
+        "",
+        "data: {\"type\":\"response.output_text.delta\",\"delta\":\"hello\"}\n\n",
+        "data: {\"type\":\"response.incomplete\",",
+    ] {
+        let mut capture = ErrorCapture::new_for_health(true, 200);
+        assert_eq!(observe_chunks(&mut capture, body.as_bytes()).len(), 1);
+        assert!(!capture.terminal_seen());
+    }
+}

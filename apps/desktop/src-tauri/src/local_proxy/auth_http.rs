@@ -136,8 +136,10 @@ fn send_with_timeout_retries(
     mut build_request: impl FnMut() -> RequestBuilder,
     failure_context: &str,
 ) -> Result<ReqwestResponse, String> {
-    let request = upstream_transport::Request::prepare(build_request())
-        .map_err(|error| format!("{failure_context}: {error}"))?;
+    let request = upstream_transport::Request::prepare(build_request()).map_err(|error| {
+        failover_transport::record(Some(&error));
+        format!("{failure_context}: {error}")
+    })?;
     let mut attempt = 0;
     let result = retry_timeout_operation(
         || {
@@ -159,6 +161,7 @@ fn send_with_timeout_retries(
         },
         |error| request.can_retry(error),
     );
+    failover_transport::record(result.as_ref().err());
     match result {
         Ok(response) => Ok(response),
         Err(error) => Err(transport_error_detail(&error, failure_context, attempt)),
@@ -242,6 +245,7 @@ fn forwarded_response_headers(headers: &reqwest::header::HeaderMap) -> Vec<(Stri
         "etag",
         "x-models-etag",
         CODEX_RATE_LIMIT_REACHED_TYPE_HEADER,
+        "retry-after",
     ]
     .into_iter()
     .filter_map(|name| {

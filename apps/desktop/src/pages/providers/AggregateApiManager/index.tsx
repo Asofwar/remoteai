@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Button, Empty, Form, Input, Modal, Popconfirm, Select, Space, Switch, Tag } from "antd";
 import { Edit3, Plus, Power, Trash2 } from "lucide-react";
 import type { Translate } from "../../../i18n";
-import type { AggregateApi, AggregateApiInput, Provider } from "../../../types";
+import type { AggregateApi, AggregateApiInput, AggregateFailoverPolicy, Provider } from "../../../types";
 import { aggregateMemberNames } from "../aggregateApiPresentation";
+import { FailoverSettings } from "./FailoverSettings";
+import { MemberHealth } from "./MemberHealth";
+import { copyFailoverPolicy } from "./failoverPolicy";
 import styles from "./index.module.less";
 
 interface AggregateApiManagerProps {
@@ -26,6 +29,7 @@ interface AggregateFormValues {
   model: string;
   memberProviderIds: string[];
   enabled: boolean;
+  failoverPolicy: AggregateFailoverPolicy;
 }
 
 function providerModels(provider: Provider) {
@@ -69,12 +73,12 @@ export function AggregateApiManager(props: AggregateApiManagerProps) {
       model: aggregate?.model,
       memberProviderIds: aggregate?.memberProviderIds ?? [],
       enabled: aggregate?.enabled ?? true,
+      failoverPolicy: copyFailoverPolicy(aggregate?.failoverPolicy),
     });
     setShowEditor(true);
   };
 
-  const save = async () => {
-    const values = await form.validateFields();
+  const save = async (values: AggregateFormValues) => {
     const saved = await onSave({ id: editing?.id, ...values });
     if (saved) {
       setShowEditor(false);
@@ -102,7 +106,8 @@ export function AggregateApiManager(props: AggregateApiManagerProps) {
               <div><Space size={6}><strong>{aggregate.name}</strong>
                 {aggregate.active && <Tag color="green">{t("providers.aggregate.active")}</Tag>}
                 {!aggregate.enabled && <Tag>{t("providers.aggregate.disabled")}</Tag>}</Space>
-                <small>{aggregate.model}</small><span title={memberNames}>{memberNames}</span></div>
+                <small>{aggregate.model}</small><span title={memberNames}>{memberNames}</span>
+                <MemberHealth aggregate={aggregate} providers={providers} t={t} /></div>
               <Space className={styles.actions} size={4} wrap>
                 <Button size="small" icon={<Power size={13} />} loading={waiting}
                   disabled={!aggregate.enabled || (!proxyRunning && !aggregate.active)}
@@ -111,8 +116,10 @@ export function AggregateApiManager(props: AggregateApiManagerProps) {
                     : void props.onSwitch(aggregate.id)}>
                   {aggregate.active ? t("providers.action.cancelUse") : t("providers.action.switch")}
                 </Button>
-                <Button size="small" icon={<Edit3 size={13} />} onClick={() => openEditor(aggregate)} />
+                <Button size="small" icon={<Edit3 size={13} />} onClick={() => openEditor(aggregate)}
+                  aria-label={t("providers.aggregate.editTitle")} />
                 <Popconfirm title={t("providers.aggregate.deleteTitle")} placement="topRight"
+                  styles={{ body: { maxWidth: 400 } }}
                   onConfirm={() => props.onDelete(aggregate.id)}>
                   <Button size="small" danger icon={<Trash2 size={13} />} />
                 </Popconfirm>
@@ -122,11 +129,11 @@ export function AggregateApiManager(props: AggregateApiManagerProps) {
         </div>
       )}
     </div>
-    <Modal open={showEditor} title={editing
+    <Modal open={showEditor} width={600} title={editing
       ? t("providers.aggregate.editTitle") : t("providers.aggregate.createTitle")}
-      onCancel={() => setShowEditor(false)} onOk={() => void save()} confirmLoading={saving}
+      onCancel={() => setShowEditor(false)} onOk={() => form.submit()} confirmLoading={saving}
       okText={t("providers.aggregate.save")} destroyOnHidden>
-      <Form form={form} layout="vertical" requiredMark={false}>
+      <Form form={form} layout="vertical" requiredMark={false} disabled={saving} onFinish={save}>
         <Form.Item name="name" label={t("providers.aggregate.name")}
           rules={[{ required: true, whitespace: true, message: t("providers.aggregate.error.nameRequired") }] }>
           <Input maxLength={80} placeholder={t("providers.aggregate.namePlaceholder")} />
@@ -144,6 +151,7 @@ export function AggregateApiManager(props: AggregateApiManagerProps) {
         <Form.Item name="enabled" label={t("providers.aggregate.enabled")} valuePropName="checked">
           <Switch />
         </Form.Item>
+        <FailoverSettings form={form} t={t} />
       </Form>
     </Modal>
   </Modal>;

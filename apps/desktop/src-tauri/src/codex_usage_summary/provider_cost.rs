@@ -164,6 +164,7 @@ mod tests {
 
     fn config() -> AggregateApiConfig {
         AggregateApiConfig {
+            failover_policy: Default::default(),
             id: "pool".to_string(),
             name: "Pool".to_string(),
             model: "private-model".to_string(),

@@ -24,6 +24,24 @@ where
     })
 }
 
+/// Aggregates own their entire attempt budget; a final 429 must not start a second round.
+fn retry_upstream_request_for_target<F, S>(
+    aggregate: bool,
+    timeout: Duration,
+    mut request: F,
+    handle_quota_event: S,
+) -> Result<UpstreamPayload, String>
+where
+    F: FnMut() -> Result<UpstreamPayload, String>,
+    S: FnMut(&UpstreamPayload, UpstreamQuotaEvent) -> bool,
+{
+    if aggregate {
+        request()
+    } else {
+        retry_upstream_request(timeout, request, handle_quota_event)
+    }
+}
+
 fn retry_upstream_request_with<F, S, W>(
     timeout: Duration,
     mut request: F,

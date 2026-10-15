@@ -2,6 +2,7 @@ mod account_archive;
 mod account_quota_history;
 mod agent_identity;
 mod aggregate_api;
+mod aggregate_failover;
 mod aggregate_scheduler;
 mod antigravity_provider;
 mod auth;

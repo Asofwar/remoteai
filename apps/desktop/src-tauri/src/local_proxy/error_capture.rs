@@ -7,6 +7,12 @@ const MAX_ERROR_MESSAGE_CHARS: usize = 1000;
 const GENERIC_UPSTREAM_ERROR: &str = "The upstream service returned an error.";
 const INTERRUPTED_STREAM_ERROR: &str = "The upstream response ended before it was complete.";
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CapturePurpose {
+    Diagnostics,
+    MemberHealth,
+}
+
 /// A structured failure found in bytes already read from the upstream response.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct ProxyCapturedError {
@@ -16,6 +22,7 @@ pub(super) struct ProxyCapturedError {
 
 /// Observes response bytes without consuming the transport or retaining normal conversation text.
 pub(super) struct ErrorCapture {
+    purpose: CapturePurpose,
     event_stream: bool,
     http_status: u16,
     buffer: Vec<u8>,
@@ -31,6 +38,7 @@ pub(super) struct ErrorCapture {
 impl ErrorCapture {
     pub(super) fn new(event_stream: bool, http_status: u16) -> Self {
         Self {
+            purpose: CapturePurpose::Diagnostics,
             event_stream,
             http_status,
             buffer: Vec::new(),
@@ -41,6 +49,14 @@ impl ErrorCapture {
             terminal: false,
             finished: false,
             diagnostics: CaptureDiagnostics::default(),
+        }
+    }
+
+    /// Output limits and content filtering complete a healthy request without a service failure.
+    pub(super) fn new_for_health(event_stream: bool, http_status: u16) -> Self {
+        Self {
+            purpose: CapturePurpose::MemberHealth,
+            ..Self::new(event_stream, http_status)
         }
     }
 
@@ -114,6 +130,11 @@ impl ErrorCapture {
 
     fn finish_json(&mut self, errors: &mut Vec<ProxyCapturedError>) {
         let value = serde_json::from_slice::<Value>(&self.buffer).ok();
+        let expected_incomplete = self.health_incomplete_is_terminal(
+            value.as_ref().map(json_event_type).unwrap_or_default(),
+            value.as_ref(),
+        );
+        self.terminal |= expected_incomplete;
         let message = if self.http_status >= 400 {
             Some(
                 value
@@ -121,6 +142,8 @@ impl ErrorCapture {
                     .and_then(structured_error_message)
                     .unwrap_or_else(|| http_error_message(self.http_status)),
             )
+        } else if expected_incomplete {
+            None
         } else {
             value
                 .as_ref()
@@ -183,9 +206,14 @@ impl ErrorCapture {
             || is_terminal_event(event)
             || is_terminal_event(event_type)
             || value.as_ref().is_some_and(chat_completion_finished);
-        let failure = sse_error_message(event_type, value.as_ref());
+        let expected_incomplete = self.health_incomplete_is_terminal(event_type, value.as_ref());
+        let failure = if expected_incomplete {
+            None
+        } else {
+            sse_error_message(event_type, value.as_ref())
+        };
         let status = value.as_ref().and_then(structured_error_status);
-        self.terminal |= terminal;
+        self.terminal |= terminal || expected_incomplete;
         self.diagnostics.observe(Observation {
             event_type: if data.trim() == "[DONE]" {
                 "[DONE]"
@@ -202,6 +230,12 @@ impl ErrorCapture {
         if let Some(message) = failure {
             self.report(message, status, errors);
         }
+    }
+
+    fn health_incomplete_is_terminal(&self, event_type: &str, value: Option<&Value>) -> bool {
+        self.purpose == CapturePurpose::MemberHealth
+            && self.http_status < 400
+            && value.is_some_and(|value| expected_incomplete(event_type, value))
     }
 
     fn report(
@@ -289,13 +323,7 @@ fn sse_error_message(event_type: &str, value: Option<&Value>) -> Option<String> 
             None => "The upstream response was incomplete.".to_string(),
         });
     }
-    let explicit_error = value.is_some_and(|value| {
-        ["/error", "/response/error"].iter().any(|path| {
-            value
-                .pointer(path)
-                .is_some_and(|error| error.is_object() || nonempty_string(error).is_some())
-        })
-    });
+    let explicit_error = value.is_some_and(has_explicit_error);
     if !matches!(event_type, "error" | "response.failed") && !explicit_error {
         return None;
     }
@@ -304,6 +332,33 @@ fn sse_error_message(event_type: &str, value: Option<&Value>) -> Option<String> 
             .and_then(structured_error_message)
             .unwrap_or_else(|| GENERIC_UPSTREAM_ERROR.to_string()),
     )
+}
+
+fn expected_incomplete(event_type: &str, value: &Value) -> bool {
+    if event_type != "response.incomplete"
+        || has_explicit_error(value)
+        || matches!(json_event_type(value), "error" | "response.failed")
+        || ["/status", "/response/status"]
+            .iter()
+            .any(|path| value.pointer(path).and_then(Value::as_str) == Some("failed"))
+    {
+        return false;
+    }
+    [
+        "/response/incomplete_details/reason",
+        "/incomplete_details/reason",
+    ]
+    .iter()
+    .find_map(|path| value.pointer(path).and_then(nonempty_string))
+    .is_some_and(|reason| matches!(reason, "max_output_tokens" | "content_filter"))
+}
+
+fn has_explicit_error(value: &Value) -> bool {
+    ["/error", "/response/error"].iter().any(|path| {
+        value
+            .pointer(path)
+            .is_some_and(|error| error.is_object() || nonempty_string(error).is_some())
+    })
 }
 
 fn structured_error_message(value: &Value) -> Option<String> {
@@ -363,3 +418,7 @@ mod tests;
 #[cfg(test)]
 #[path = "error_capture_diagnostic_tests.rs"]
 mod diagnostic_tests;
+
+#[cfg(test)]
+#[path = "error_capture_health_tests.rs"]
+mod health_tests;

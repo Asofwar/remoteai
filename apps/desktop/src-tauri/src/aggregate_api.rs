@@ -7,7 +7,11 @@ use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Runtime};
 use uuid::Uuid;
 
+#[cfg(test)]
+mod tests;
+
 use crate::{
+    aggregate_failover::AggregateFailoverPolicy,
     aggregate_scheduler, local_proxy,
     models::{ModelContextWindows, ModelReasoningEfforts, ProviderKind, ProviderProfile},
     providers,
@@ -25,6 +29,8 @@ pub(crate) struct AggregateApiConfig {
     pub(crate) model: String,
     pub(crate) member_provider_ids: Vec<String>,
     pub(crate) enabled: bool,
+    #[serde(default)]
+    pub(crate) failover_policy: AggregateFailoverPolicy,
 }
 
 #[derive(Debug, Deserialize)]
@@ -35,6 +41,8 @@ pub(crate) struct AggregateApiInput {
     model: String,
     member_provider_ids: Vec<String>,
     enabled: bool,
+    #[serde(default)]
+    failover_policy: Option<AggregateFailoverPolicy>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -47,6 +55,8 @@ pub(crate) struct AggregateApiSummary {
     enabled: bool,
     active: bool,
     member_conversation_counts: HashMap<String, usize>,
+    failover_policy: AggregateFailoverPolicy,
+    member_health: HashMap<String, aggregate_scheduler::MemberStateSnapshot>,
 }
 
 #[tauri::command]
@@ -208,12 +218,8 @@ fn save_blocking<R: Runtime>(
 ) -> Result<AggregateApiSummary, String> {
     let paths = resolve_paths(app)?;
     let mut configs = read_configs(&paths)?;
-    let id = input
-        .id
-        .clone()
-        .unwrap_or_else(|| Uuid::new_v4().to_string());
-    validate_id(&id)?;
-    let config = normalize_input(id.clone(), input, &paths)?;
+    let config = normalize_update(input, &paths, &configs)?;
+    let id = config.id.clone();
     if let Some(existing) = configs.iter_mut().find(|aggregate| aggregate.id == id) {
         *existing = config.clone();
     } else {
@@ -279,6 +285,25 @@ fn activate_config<R: Runtime>(
     providers::activate_logical_provider(app, paths, &profile)
 }
 
+fn normalize_update(
+    mut input: AggregateApiInput,
+    paths: &Paths,
+    configs: &[AggregateApiConfig],
+) -> Result<AggregateApiConfig, String> {
+    let id = input
+        .id
+        .clone()
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+    validate_id(&id)?;
+    if input.failover_policy.is_none() {
+        input.failover_policy = configs
+            .iter()
+            .find(|config| config.id == id)
+            .map(|config| config.failover_policy.clone());
+    }
+    normalize_input(id, input, paths)
+}
+
 fn normalize_input(
     id: String,
     input: AggregateApiInput,
@@ -292,12 +317,17 @@ fn normalize_input(
         .map(|provider_id| providers::read_provider(paths, provider_id))
         .collect::<Result<Vec<_>, _>>()?;
     validate_members(&model, &profiles)?;
+    let mut failover_policy = input.failover_policy.unwrap_or_default();
+    failover_policy
+        .normalize()
+        .map_err(|error| error.to_string())?;
     Ok(AggregateApiConfig {
         id,
         name,
         model,
         member_provider_ids,
         enabled: input.enabled,
+        failover_policy,
     })
 }
 
@@ -394,6 +424,8 @@ fn summary(
         &config.member_provider_ids,
         active_session_ids,
     )?;
+    let member_health =
+        aggregate_scheduler::member_states(&config.id, &config.member_provider_ids)?;
     Ok(AggregateApiSummary {
         active: active_provider_id == Some(&expected_active_id),
         id: config.id,
@@ -402,6 +434,8 @@ fn summary(
         member_provider_ids: config.member_provider_ids,
         enabled: config.enabled,
         member_conversation_counts,
+        failover_policy: config.failover_policy,
+        member_health,
     })
 }
 
@@ -410,8 +444,15 @@ fn read_configs(paths: &Paths) -> Result<Vec<AggregateApiConfig>, String> {
     if !path.exists() {
         return Ok(Vec::new());
     }
-    serde_json::from_value(read_json(&path)?)
-        .map_err(|error| format!("Aggregate API configuration is invalid: {error}"))
+    let configs: Vec<AggregateApiConfig> = serde_json::from_value(read_json(&path)?)
+        .map_err(|error| format!("Aggregate API configuration is invalid: {error}"))?;
+    for config in &configs {
+        config
+            .failover_policy
+            .validate()
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(configs)
 }
 
 fn write_configs(paths: &Paths, configs: &[AggregateApiConfig]) -> Result<(), String> {

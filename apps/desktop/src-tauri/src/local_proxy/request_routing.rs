@@ -199,7 +199,8 @@ fn handle_proxy_request<R: Runtime>(
     let mut usage_context = make_usage_context(&target);
     let refresh_target = std::cell::Cell::new(false);
     let retry_timeout = upstream_429_retry_timeout(app)?;
-    let result = retry_upstream_request(
+    let result = retry_upstream_request_for_target(
+        matches!(target, ActiveTarget::Aggregate(_)),
         retry_timeout,
         || {
             if refresh_retry_target(&mut target, &refresh_target, || {

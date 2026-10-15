@@ -162,6 +162,23 @@ export interface ProviderInput {
   walletPassword?: string;
 }
 
+export interface AggregateFailoverPolicy {
+  enabled: boolean;
+  maxAttempts: number;
+  failureThreshold: number;
+  initialCooldownSeconds: number;
+  maxCooldownSeconds: number;
+  retryStatusCodes: number[];
+  retryOnNetworkErrors: boolean;
+  respectRetryAfter: boolean;
+}
+
+export interface AggregateMemberHealth {
+  state: "healthy" | "coolingDown" | "recovering";
+  consecutiveFailures: number;
+  retryAfterSeconds: number;
+}
+
 export interface AggregateApi {
   id: string;
   name: string;
@@ -170,6 +187,8 @@ export interface AggregateApi {
   enabled: boolean;
   active: boolean;
   memberConversationCounts: Record<string, number>;
+  failoverPolicy?: AggregateFailoverPolicy;
+  memberHealth?: Record<string, AggregateMemberHealth>;
 }
 
 export interface AggregateApiInput {
@@ -178,6 +197,7 @@ export interface AggregateApiInput {
   model: string;
   memberProviderIds: string[];
   enabled: boolean;
+  failoverPolicy?: AggregateFailoverPolicy;
 }
 
 export interface CcSwitchImportRequest {

@@ -4,7 +4,7 @@ export const GRAPH_ROW_HEIGHT = 76;
 export const GRAPH_LANE_WIDTH = 18;
 const COLORS = ['#0b8065', '#6274d7', '#c47728', '#b858a1', '#278ca1', '#bd5c54'];
 export interface GraphLine { x1: number; y1: number; x2: number; y2: number; color: string }
-export interface GraphRow { commit: GitCommit; x: number; color: string; lines: GraphLine[] }
+export interface GraphRow { commit: GitCommit; x: number; width: number; color: string; lines: GraphLine[] }
 interface Lane { hash: string; color: string }
 const x = (lane: number) => lane * GRAPH_LANE_WIDTH + GRAPH_LANE_WIDTH / 2;
 
@@ -12,7 +12,7 @@ const x = (lane: number) => lane * GRAPH_LANE_WIDTH + GRAPH_LANE_WIDTH / 2;
 export function gitGraph(commits: GitCommit[]) {
   let lanes: Lane[] = [];
   let colorIndex = 0;
-  let width = GRAPH_LANE_WIDTH;
+  let width = GRAPH_LANE_WIDTH * 2;
   const rows = commits.map(commit => {
     let lane = lanes.findIndex(entry => entry.hash === commit.hash);
     if (lane < 0) {
@@ -37,9 +37,10 @@ export function gitGraph(commits: GitCommit[]) {
       lines.push({ x1: x(lane), y1: GRAPH_ROW_HEIGHT / 2, x2: x(parent), y2: GRAPH_ROW_HEIGHT,
         color: next[parent].color });
     });
-    width = Math.max(width, Math.max(before.length, next.length) * GRAPH_LANE_WIDTH);
+    const rowWidth = (Math.max(before.length, next.length) + 1) * GRAPH_LANE_WIDTH;
+    width = Math.max(width, rowWidth);
     lanes = next;
-    return { commit, x: x(lane), color: node.color, lines };
+    return { commit, x: x(lane), width: rowWidth, color: node.color, lines };
   });
-  return { rows, width: width + GRAPH_LANE_WIDTH };
+  return { rows, width };
 }

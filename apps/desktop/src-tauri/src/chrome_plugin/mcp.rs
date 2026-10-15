@@ -10,11 +10,13 @@ use super::{
 };
 
 const TOOL_DEFINITIONS: &str = include_str!("../../resources/chrome-extension/tools.json");
+use super::sessions::ClientSessions;
 
 pub(super) fn run(root: &Path, client_id: &str) -> Result<()> {
     config::client_path(root, client_id)?;
     let mut input = io::stdin().lock();
     let mut output = io::stdout().lock();
+    let mut sessions = ClientSessions::default();
     loop {
         let mut line = String::new();
         let count = std::io::Read::take(&mut input, (MAX_REQUEST_BYTES + 1) as u64)
@@ -31,7 +33,7 @@ pub(super) fn run(root: &Path, client_id: &str) -> Result<()> {
         let Some(id) = request.get("id") else {
             continue;
         };
-        let response = match dispatch(root, client_id, &request) {
+        let response = match dispatch(root, client_id, &request, &mut sessions) {
             Ok(result) => json!({"jsonrpc":"2.0", "id":id, "result":result}),
             Err(error) => {
                 json!({"jsonrpc":"2.0", "id":id, "error":{"code":-32602,"message":error.to_string()}})
@@ -45,7 +47,12 @@ pub(super) fn run(root: &Path, client_id: &str) -> Result<()> {
     }
 }
 
-fn dispatch(root: &Path, client_id: &str, request: &Value) -> Result<Value> {
+fn dispatch(
+    root: &Path,
+    client_id: &str,
+    request: &Value,
+    sessions: &mut ClientSessions,
+) -> Result<Value> {
     match request["method"].as_str() {
         Some("initialize") => Ok(
             json!({"protocolVersion":"2024-11-05", "capabilities":{"tools":{}},
@@ -75,15 +82,20 @@ fn dispatch(root: &Path, client_id: &str, request: &Value) -> Result<Value> {
             serde_json::from_str(TOOL_DEFINITIONS).map_err(|_| BrowserError::Storage)
         }
         Some("tools/call") => {
-            let reply =
-                execute(root, client_id, &request["params"]).unwrap_or_else(BrowserReply::error);
+            let reply = execute(root, client_id, &request["params"], sessions)
+                .unwrap_or_else(BrowserReply::error);
             Ok(tool_result(reply))
         }
         _ => Err(BrowserError::InvalidRequest),
     }
 }
 
-fn execute(root: &Path, client_id: &str, params: &Value) -> Result<BrowserReply> {
+fn execute(
+    root: &Path,
+    client_id: &str,
+    params: &Value,
+    sessions: &mut ClientSessions,
+) -> Result<BrowserReply> {
     let record = config::load(root, client_id)?;
     if !record.enabled {
         return Err(BrowserError::Disabled);
@@ -113,14 +125,14 @@ fn execute(root: &Path, client_id: &str, params: &Value) -> Result<BrowserReply>
         args: Value::Object(args),
     };
     request.validate()?;
-    native::call(
-        &endpoint,
-        &BridgeRequest {
-            client_id: client_id.into(),
-            token: record.token,
-            request,
-        },
-    )
+    let request = BridgeRequest {
+        client_id: client_id.into(),
+        token: record.token,
+        session_id: Some(sessions.id.clone()),
+        request,
+    };
+    sessions.ensure(&endpoint, &request)?;
+    native::call(&endpoint, &request)
 }
 
 fn browsers(root: &Path, client_id: &str, record: &config::ClientRecord) -> Result<BrowserReply> {
@@ -128,6 +140,7 @@ fn browsers(root: &Path, client_id: &str, record: &config::ClientRecord) -> Resu
     let request = BridgeRequest {
         client_id: client_id.into(),
         token: record.token.clone(),
+        session_id: None,
         request: BrowserRequest {
             operation: Operation::Status,
             args: json!({}),

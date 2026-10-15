@@ -1,6 +1,6 @@
 import { assertRunning } from './permissions.js';
 import { workTabOwner, forgetWorkTab } from './tab-groups.js';
-import { finishConnection } from './debugger-connections.js';
+import { finishConnection, connectionOwner } from './debugger-connections.js';
 import { queueTarget } from './target-queue.js';
 import { invalidate } from './snapshot.js';
 
@@ -22,7 +22,7 @@ export async function finishTask(context, args) {
     await queueTarget({ targetId }, async () => {
       assertRunning(context.signal);
       try {
-        const released = await finishConnection({ targetId }, context.clientId);
+        const released = await finishConnection({ targetId }, connectionOwner(context));
         result[released ? 'releasedWorkerIds' : 'failedWorkerIds'].push(targetId);
       } catch { result.failedWorkerIds.push(targetId); }
     });
@@ -33,7 +33,7 @@ export async function finishTask(context, args) {
 async function finishTab(context, tabId, keep) {
   const { clientId, signal } = context;
   const owner = await workTabOwner(tabId);
-  const released = await finishConnection({ tabId }, clientId);
+  const released = await finishConnection({ tabId }, connectionOwner(context));
   assertRunning(signal);
   // Group membership is not ownership: users can move their own pages into a work group.
   if (!released || (owner && owner !== clientId)) return false;

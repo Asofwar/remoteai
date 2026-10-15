@@ -7,6 +7,8 @@ const Module = require('node:module');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 
+require('./patch-webview-permissions.cjs').applyWebViewPermissionsPatch();
+
 const workspaceModules = path.resolve(__dirname, '..', 'node_modules');
 process.env.NODE_PATH = [workspaceModules, process.env.NODE_PATH].filter(Boolean).join(path.delimiter);
 Module.Module._initPaths();

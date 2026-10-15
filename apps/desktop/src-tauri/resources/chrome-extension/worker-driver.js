@@ -1,6 +1,7 @@
 import { authorize, assertRunning } from './permissions.js';
 import { website } from './validation.js';
-import { acquireConnection, assertConnected, closeConnection, releaseConnection } from './debugger-connections.js';
+import { acquireConnection, assertConnected, finishConnection, releaseConnection, connectionOwner }
+  from './debugger-connections.js';
 import { queueTarget } from './target-queue.js';
 
 const MAX_LIST_WORKERS = 100;
@@ -47,7 +48,8 @@ async function run(context, workerId, operation) {
   const worker = await findWorker(context, workerId);
   const workerUrl = worker.url;
   const target = { targetId: workerId };
-  const connection = await acquireConnection(target, context.signal, context.clientId).catch(() => {
+  const owner = connectionOwner(context);
+  const connection = await acquireConnection(target, context.signal, owner).catch(() => {
     assertRunning(context.signal);
     throw new Error('无法连接这个 Worker，请关闭其开发者工具后重试。');
   });
@@ -57,7 +59,7 @@ async function run(context, workerId, operation) {
     if (current.url !== workerUrl) throw new Error('这个 Worker 已变化，请重新读取日志。');
   };
   // Cancellation must release a debugger command awaiting a worker that is shutting down.
-  const abort = () => { void closeConnection(connection); };
+  const abort = () => { void finishConnection(target, owner); };
   context.signal?.addEventListener('abort', abort, { once: true });
   if (context.signal?.aborted) abort();
   let completed = false;
@@ -68,7 +70,7 @@ async function run(context, workerId, operation) {
     completed = true;
     return result;
   } finally {
-    await releaseConnection(connection, completed && !context.signal?.aborted);
+    await releaseConnection(connection, completed && !context.signal?.aborted, owner);
     context.signal?.removeEventListener('abort', abort);
   }
 }

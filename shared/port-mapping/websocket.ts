@@ -8,7 +8,8 @@ const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 export type MappingSocketEvent = { type: 'open'; protocol: string }
-  | { type: 'message'; data: string | Uint8Array } | { type: 'close' } | { type: 'error' };
+  | { type: 'message'; data: string | Uint8Array }
+  | { type: 'close'; code: number; wasClean: boolean } | { type: 'error' };
 
 export function encodeFrame(opcode: number, payload: Uint8Array): Uint8Array {
   if (payload.length > MAX_FRAME_BYTES) throw new Error('Frame too large');
@@ -76,6 +77,8 @@ export class MappingWebSocket {
   private closed = false;
   private writes = Promise.resolve();
   private queued = 0;
+  private resolveStopped!: () => void;
+  private readonly stopped = new Promise<void>(resolve => { this.resolveStopped = resolve; });
   constructor(private readonly options: {
     client: ForwardingClient; resource: string; origin: string; emit: (event: MappingSocketEvent) => void;
   }) {}
@@ -91,37 +94,49 @@ export class MappingWebSocket {
       if (opened.type !== 'socket') throw new Error('Unexpected socket response');
       this.id = opened.id;
       if (this.closed) { this.release(); return; }
-      const leftover = await this.handshake(url, protocols);
-      await this.readFrames(leftover);
-    } catch { if (!this.closed) this.options.emit({ type: 'error' }); }
+      await Promise.race([this.handshake(url, protocols).then(leftover => this.readFrames(leftover)), this.stopped]);
+    } catch { this.fail(); }
     finally { this.close(); }
   }
 
   send(data: string | Uint8Array) {
     return this.write(encodeFrame(typeof data === 'string' ? 1 : 2, typeof data === 'string' ? encoder.encode(data) : data));
   }
-  close() {
+  close(wasClean = true) {
     if (this.closed) return;
     this.closed = true;
     this.release();
-    this.options.emit({ type: 'close' });
+    this.resolveStopped();
+    this.options.emit({ type: 'close', code: wasClean ? 1000 : 1006, wasClean });
+  }
+  private fail() {
+    if (this.closed) return;
+    this.options.emit({ type: 'error' });
+    this.close(false);
   }
   private release() {
-    if (this.id) void this.options.client.link(this.options.resource, { type: 'close', id: this.id }).catch(() => {
+    const id = this.id;
+    this.id = undefined;
+    if (id) void this.options.client.link(this.options.resource, { type: 'close', id }).catch(() => {
       // The owning resource provides final cleanup after a disconnected RPC.
     });
   }
   private write(bytes: Uint8Array): Promise<void> {
+    if (this.closed) return Promise.reject(new Error('Socket closed'));
+    if (this.queued + bytes.length > MAX_FRAME_BYTES) {
+      this.fail(); return Promise.reject(new Error('Socket queue full'));
+    }
     this.queued += bytes.length;
-    if (this.queued > MAX_FRAME_BYTES) { this.close(); return Promise.reject(new Error('Socket queue full')); }
     this.writes = this.writes.then(async () => {
       for (let offset = 0; offset < bytes.length; offset += LINK_CHUNK_BYTES) {
         if (this.closed || !this.id) throw new Error('Socket closed');
         await this.options.client.link(this.options.resource, { type: 'write', id: this.id,
           data: encodeBase64(bytes.subarray(offset, offset + LINK_CHUNK_BYTES)) });
       }
-      this.queued -= bytes.length;
-    });
+    }).catch(error => {
+      // A partial write cannot be safely replayed. End the socket even if reads remain healthy.
+      this.fail(); throw error;
+    }).finally(() => { this.queued -= bytes.length; });
     return this.writes;
   }
 
@@ -139,6 +154,7 @@ export class MappingWebSocket {
       const end = text.indexOf('\r\n\r\n');
       if (end < 0) { if (bytes.length > HEADER_LIMIT) throw new Error('Headers too large'); continue; }
       const expected = encodeBase64(new Uint8Array(await crypto.subtle.digest('SHA-1', encoder.encode(key + GUID))));
+      if (this.closed) throw new Error('Socket closed');
       const accept = /^sec-websocket-accept:\s*(.*?)\s*$/im.exec(text.slice(0, end))?.[1];
       if (!/^HTTP\/1\.[01] 101\b/.test(text) || accept !== expected) throw new Error('Invalid upgrade');
       const protocol = /^sec-websocket-protocol:\s*(.*?)\s*$/im.exec(text.slice(0, end))?.[1] ?? '';
@@ -153,12 +169,14 @@ export class MappingWebSocket {
     let bytes = initial;
     while (!this.closed) {
       for (const frame of parser.push(bytes)) {
+        if (this.closed) return;
         if (frame.opcode === 8) return;
         if (frame.opcode === 9) await this.write(encodeFrame(10, frame.data));
         if (frame.opcode === 1 || frame.opcode === 2) {
           this.options.emit({ type: 'message', data: frame.opcode === 1 ? decoder.decode(frame.data) : frame.data });
         }
       }
+      if (this.closed) return;
       const reply = await this.options.client.link(this.options.resource, { type: 'read', id: this.id! });
       if (reply.type !== 'data' || reply.eof) return;
       bytes = decodeBase64(reply.data);

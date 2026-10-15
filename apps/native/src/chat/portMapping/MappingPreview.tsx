@@ -36,6 +36,7 @@ export function MappingPreview({ port, close }: { port: number; close: () => voi
         allowFileAccessFromFileURLs={false} allowUniversalAccessFromFileURLs={false}
         sharedCookiesEnabled={false} thirdPartyCookiesEnabled={false}
         javaScriptCanOpenWindowsAutomatically={false} setSupportMultipleWindows={false}
+        // Android enforces this through patch-webview-permissions.cjs, including after redirects.
         geolocationEnabled={false} mediaCapturePermissionGrantType="deny"
         onShouldStartLoadWithRequest={request => /^https?:\/\//i.test(request.url)}
         onNavigationStateChange={state => setCanGoBack(state.canGoBack)}

@@ -2,7 +2,8 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { COZE_DESKTOP_READY, COZE_DESKTOP_STATE, COZE_DESKTOP_STOP } from "../../../../../shared/coze/desktopBridge";
+import { COZE_DESKTOP_READY, COZE_DESKTOP_STATE, COZE_DESKTOP_STOP, COZE_DESKTOP_STOP_READY }
+  from "../../../../../shared/coze/desktopBridge";
 import { CozeWorkspace } from "./CozeWorkspace";
 
 const url = "http://127.0.0.1:4321/";
@@ -23,6 +24,30 @@ beforeEach(async () => {
 afterEach(async () => {
   await act(async () => root.unmount()); host.remove();
   vi.restoreAllMocks(); vi.clearAllMocks(); vi.unstubAllGlobals();
+});
+
+it('keeps a working desktop stop control for old runtimes and failed initialization', async () => {
+  expect(host.textContent).toContain('停止 Coze');
+  await act(async () => { frame.dispatchEvent(new Event('load')); });
+  expect(host.textContent).toContain('停止 Coze');
+  await act(async () => { frame.dispatchEvent(new Event('error')); });
+  await act(async () => { host.querySelector('button')!.click(); });
+  const confirm = document.querySelector<HTMLButtonElement>('.ant-popconfirm-buttons .ant-btn-primary')!;
+  await act(async () => { confirm.click(); });
+  expect(stop).toHaveBeenCalledOnce();
+});
+
+it('hides the fallback only after the current frame confirms its stop control and restores it on reload', async () => {
+  await act(async () => { window.dispatchEvent(new MessageEvent('message', {
+    source: frame.contentWindow, origin, data: COZE_DESKTOP_READY,
+  })); });
+  expect(host.textContent).toContain('停止 Coze');
+  await act(async () => { window.dispatchEvent(new MessageEvent('message', {
+    source: frame.contentWindow, origin, data: COZE_DESKTOP_STOP_READY,
+  })); });
+  expect(host.textContent).not.toContain('停止 Coze');
+  await act(async () => { frame.dispatchEvent(new Event('load')); });
+  expect(host.textContent).toContain('停止 Coze');
 });
 
 it("only stops for messages from the current Coze frame and origin", async () => {

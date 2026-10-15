@@ -1,4 +1,5 @@
 export const COZE_DESKTOP_READY = "remoteai:coze:ready";
+export const COZE_DESKTOP_STOP_READY = "remoteai:coze:stop-ready";
 export const COZE_DESKTOP_STOP = "remoteai:coze:stop";
 export const COZE_DESKTOP_STATE = "remoteai:coze:state";
 

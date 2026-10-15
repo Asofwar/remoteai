@@ -144,7 +144,7 @@ test('compiled Native Messaging and MCP helpers authenticate, relay, revoke, and
     const incoming = [];
     framedMessages(host.stdout,message=>{
       incoming.push(message);
-      if (message.type === 'cancel' || message.request.operation === 'open') return;
+      if (message.type === 'cancel' || message.type === 'client-disconnected' || message.request.operation === 'open') return;
       const replies = {status:{paused:false},tabs:{tabs:[{tabId:42,title:'fixture'}]},
         finish:{closedTabIds:[42],keptTabIds:[],failedTabIds:[],releasedWorkerIds:['worker-1'],failedWorkerIds:[]},
         workers:{workers:[{workerId:'worker-1',url:'https://example.com/sw.js'}],scope:'profile'},
@@ -168,6 +168,22 @@ test('compiled Native Messaging and MCP helpers authenticate, relay, revoke, and
     assert.equal(JSON.parse(list.result.content[0].text).browsers[0].browserId,live.id);
     const tabs = await call('tools/call',{name:'browser_tabs',arguments:{browserId:live.id}});
     assert.equal(JSON.parse(tabs.result.content[0].text).tabs[0].tabId,42);
+    const sessionId = incoming.at(-1).sessionId;
+    assert.match(sessionId, /^[a-f0-9-]{36}$/);
+    const sibling = start([`--chrome-mcp=${first.clientId}`],root); children.push(sibling);
+    const siblingCall = rpc(sibling);
+    await siblingCall('tools/call',{name:'browser_tabs',arguments:{browserId:live.id}});
+    const siblingId = incoming.at(-1).sessionId;
+    assert.notEqual(sessionId, siblingId);
+    const siblingExited = once(sibling,'exit'); sibling.stdin.end(); await siblingExited;
+    await waitFor(()=>incoming.some(message=>message.type==='client-disconnected' && message.sessionId===siblingId));
+    assert.ok(!incoming.some(message=>message.type==='client-disconnected' && message.sessionId===sessionId));
+    const other = start([`--chrome-mcp=${second.clientId}`],root); children.push(other);
+    const otherCall = rpc(other);
+    await otherCall('tools/call',{name:'browser_tabs',arguments:{browserId:live.id}});
+    const otherExited = once(other,'exit'); other.kill(); await otherExited;
+    await waitFor(()=>incoming.some(message=>message.type==='client-disconnected' && message.clientId===second.clientId));
+    assert.ok(!incoming.some(message=>message.type==='client-disconnected' && message.sessionId===sessionId));
     const logs = await call('tools/call',{name:'browser_console_logs',
       arguments:{browserId:live.id,tabId:42,level:'error',limit:10,source:'browser',since:100,text:'fixture'}});
     assert.equal(logs.result.isError,false);
@@ -195,12 +211,20 @@ test('compiled Native Messaging and MCP helpers authenticate, relay, revoke, and
     first.record.enabled=false;await first.save();
     assert.equal((await pending).result.isError,true);
     await waitFor(()=>incoming.some(message=>message.type==='cancel'));
+    await waitFor(()=>incoming.some(message=>message.type==='client-disconnected' && message.sessionId===sessionId));
     const secondReply=await bridge(live.port,{clientId:second.clientId,token:second.record.token,
       request:{operation:'tabs',args:{}}});
     assert.equal(secondReply.result.tabs[0].tabId,42);
     first.record.enabled=true;await first.save();
+    await call('tools/call',{name:'browser_tabs',arguments:{browserId:live.id}});
+    const count = incoming.filter(message=>message.type==='client-disconnected' && message.clientId===first.clientId).length;
+    const mcpExited = once(mcp,'exit'); mcp.stdin.end(); await mcpExited;
+    await waitFor(()=>incoming.filter(message=>message.type==='client-disconnected' && message.clientId===first.clientId)
+      .length === count + 1);
+    const recovered = start([`--chrome-mcp=${first.clientId}`],root); children.push(recovered);
+    const recoveredCall = rpc(recovered);
     const exited=once(host,'exit');host.stdin.end();await exited;
-    const gone=await call('tools/call',{name:'browser_list',arguments:{}});
+    const gone=await recoveredCall('tools/call',{name:'browser_list',arguments:{}});
     assert.deepEqual(JSON.parse(gone.result.content[0].text).browsers,[]);
   } finally {
     await Promise.all(children.map(async child=>{

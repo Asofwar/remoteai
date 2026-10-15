@@ -45,6 +45,8 @@ pub(super) enum Operation {
 pub(super) struct BridgeRequest {
     pub(super) client_id: String,
     pub(super) token: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) session_id: Option<String>,
     pub(super) request: BrowserRequest,
 }
 
@@ -69,6 +71,8 @@ impl BrowserReply {
 pub(super) struct ExtensionRequest {
     pub(super) id: String,
     pub(super) client_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) session_id: Option<String>,
     pub(super) request: BrowserRequest,
 }
 

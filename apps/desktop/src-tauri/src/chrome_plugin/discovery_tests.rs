@@ -117,6 +117,7 @@ fn request() -> BridgeRequest {
     BridgeRequest {
         client_id: "a".repeat(64),
         token: "b".repeat(64),
+        session_id: None,
         request: BrowserRequest {
             operation: Operation::Status,
             args: json!({}),

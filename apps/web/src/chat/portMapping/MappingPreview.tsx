@@ -46,6 +46,7 @@ export function MappingPreview({ tunnel, origin, close }: {
       {status === 'error' && <Alert type="warning" message={t('网页未能完整加载，请确认服务已启动后刷新。')} />}
     </div>
     {presented && <iframe ref={frame} key={generation} title={t('端口映射预览')} sandbox="allow-scripts allow-forms"
+      allow="camera 'none'; microphone 'none'; geolocation 'none'"
       data-ready={status === 'ready'}
       referrerPolicy="no-referrer" srcDoc={PREVIEW_DOCUMENT} onLoad={() => {
         if (!frame.current || frame.current.dataset.attached) return;

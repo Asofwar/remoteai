@@ -115,6 +115,7 @@ fn status(root: &Path, home: &Path) -> Result<ChromePluginStatus> {
         let request = BridgeRequest {
             client_id: id,
             token: record.token.clone(),
+            session_id: None,
             request: BrowserRequest {
                 operation: Operation::Status,
                 args: json!({}),

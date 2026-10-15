@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 import { acquireConnection, assertConnected, closeConnection, releaseConnection, debuggerDetached,
-  hasDebuggerConnections, stopConnections, finishConnection }
+  hasDebuggerConnections, stopConnections, finishConnection, finishClientConnections }
   from '../apps/desktop/src-tauri/resources/chrome-extension/debugger-connections.js';
 import { initializePermissions } from '../apps/desktop/src-tauri/resources/chrome-extension/permissions.js';
 
@@ -18,6 +18,17 @@ beforeEach(async () => {
   await initializePermissions();
 });
 afterEach(() => stopConnections());
+
+test('session cleanup releases owned workers and keeps another session sharing a target', async () => {
+  await acquireConnection({ targetId: 'worker' }, undefined, 'first');
+  const shared = await acquireConnection({ tabId: 1 }, undefined, 'first');
+  await acquireConnection({ tabId: 1 }, undefined, 'second');
+  await finishClientConnections('first');
+  assertConnected(shared);
+  assert.deepEqual(calls.filter(([method]) => method === 'detach'), [['detach', { targetId: 'worker' }]]);
+  await finishClientConnections('second');
+  assert.equal(hasDebuggerConnections(), false);
+});
 
 test('connections survive long reasoning gaps until explicit task completion', async t => {
   t.mock.timers.enable({ apis: ['setTimeout'] });

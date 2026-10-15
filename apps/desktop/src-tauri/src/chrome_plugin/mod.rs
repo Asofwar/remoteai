@@ -11,6 +11,7 @@ mod native;
 mod private_storage;
 mod protocol;
 mod registration;
+mod sessions;
 mod transport;
 
 use std::{path::PathBuf, sync::Mutex};

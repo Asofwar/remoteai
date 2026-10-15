@@ -2,8 +2,8 @@ import { authorize, assertRunning } from './permissions.js';
 import { createFrameSessions } from './frame-sessions.js';
 import { markControlledTab, clearControlledTabs } from './tab-indicator.js';
 import { prepareBackgroundPage, restoreBackgroundPage, settleRendering } from './rendering.js';
-import { acquireConnection, assertConnected, closeConnection, releaseConnection,
-  stopConnections } from './debugger-connections.js';
+import { acquireConnection, assertConnected, finishConnection, releaseConnection,
+  stopConnections, connectionOwner } from './debugger-connections.js';
 import { queueTarget } from './target-queue.js';
 
 export function withTab(context, args, operation, options = {}) {
@@ -14,12 +14,13 @@ async function run(context, args, operation, { prepareInput = true }) {
   const tab = await chrome.tabs.get(args.tabId);
   await authorize(tab.url, context.clientId, context.signal);
   const target = { tabId: tab.id };
-  const connection = await acquireConnection(target, context.signal, context.clientId).catch(() => {
+  const owner = connectionOwner(context);
+  const connection = await acquireConnection(target, context.signal, owner).catch(() => {
     assertRunning(context.signal);
     throw new Error('无法连接这个标签页。请关闭其开发者工具或其他浏览器控制工具后重试。');
   });
   // Detaching also releases commands held open by a page dialog when the user cancels.
-  const abort = () => { void closeConnection(connection); };
+  const abort = () => { void finishConnection(target, owner); };
   context.signal?.addEventListener('abort', abort, { once: true });
   if (context.signal?.aborted) abort();
   const guard = async (options) => {
@@ -48,7 +49,7 @@ async function run(context, args, operation, { prepareInput = true }) {
     // A stale reference or a wait timeout does not end the debugging task. Recheck access
     // before retaining the transport, even when the requested page action failed.
     const authorized = await guard({ prompt: false }).then(() => true, () => false);
-    await releaseConnection(connection, authorized && cleaned && restored);
+    await releaseConnection(connection, authorized && cleaned && restored, owner);
     context.signal?.removeEventListener('abort', abort);
   }
 }

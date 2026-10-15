@@ -2,13 +2,16 @@ import * as permissions from './permissions.js';
 import { execute } from './operations.js';
 import { invalidate } from './snapshot.js';
 import { stopDebugging } from './driver.js';
-import { debuggerDetached, hasDebuggerConnections } from './debugger-connections.js';
+import { debuggerDetached, hasDebuggerConnections, finishClientConnections, connectionOwner }
+  from './debugger-connections.js';
 import { clearControlledTabs } from './tab-indicator.js';
 import { forgetWorkTab, renameWorkGroups } from './tab-groups.js';
 import { createBundleUpdater, UPDATE_ALARM } from './auto-update.js';
 
 const HOST = 'dev.codex_switch.chrome';
 const running = new Map();
+const clients = new Map();
+const cleanup = new Map();
 let port;
 let connectionError = '';
 const initialized = permissions.initializePermissions();
@@ -40,19 +43,36 @@ async function connect() {
 }
 
 async function handleRequest(source, message) {
+  if (port !== source) return;
   if (message.type === 'cancel') { running.get(message.id)?.abort(); return; }
+  if (!/^[a-f0-9]{64}$/.test(message.clientId)) return;
+  const owner = connectionOwner(message);
+  if (message.type === 'client-disconnected') {
+    for (const [id, client] of clients) {
+      if (client === owner) running.get(id)?.abort();
+    }
+    const closing = finishClientConnections(owner);
+    cleanup.set(owner, closing);
+    await closing;
+    if (cleanup.get(owner) === closing) cleanup.delete(owner);
+    return;
+  }
   if (typeof message.id !== 'string' || !/^[a-f0-9]{64}$/.test(message.clientId) || running.has(message.id)) return;
   const controller = new AbortController();
   running.set(message.id, controller);
+  clients.set(message.id, owner);
   let reply;
   try {
+    await cleanup.get(owner);
     if (updater.isReloading()) throw new Error('浏览器助手正在更新，请稍后重试。');
-    const result = await execute({ clientId: message.clientId, signal: controller.signal }, message.request);
+    const result = await execute({ clientId: message.clientId, sessionId: message.sessionId,
+      signal: controller.signal }, message.request);
     reply = { result, error: null };
   } catch (error) {
     reply = { result: null, error: error instanceof Error ? error.message : '浏览器操作未完成，请重试。' };
   } finally {
     running.delete(message.id);
+    clients.delete(message.id);
   }
   // A cancelled Chrome connection has no recipient; do not reconnect and replay a completed action.
   if (port === source) {

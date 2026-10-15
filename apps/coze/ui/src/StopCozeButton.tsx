@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Popconfirm } from "antd";
 import { Power } from "lucide-react";
 import {
-  COZE_DESKTOP_READY, COZE_DESKTOP_STOP, isCozeDesktopState,
+  COZE_DESKTOP_READY, COZE_DESKTOP_STOP, COZE_DESKTOP_STOP_READY, isCozeDesktopState,
 } from "../../../../shared/coze/desktopBridge";
 
 export function StopCozeButton() {
@@ -18,6 +18,10 @@ export function StopCozeButton() {
     window.parent.postMessage(COZE_DESKTOP_READY, "*");
     return () => window.removeEventListener("message", receive);
   }, []);
+  useEffect(() => {
+    // Acknowledge only after the host state has made the sidebar control visible.
+    if (desktop) window.parent.postMessage(COZE_DESKTOP_STOP_READY, desktop.origin);
+  }, [desktop]);
   if (!desktop) return null;
   return <Popconfirm title="停止 Coze？已保存的内容会保留。" placement="topLeft"
     okText="停止" cancelText="取消" disabled={desktop.busy} styles={{ root: { maxWidth: 400 } }}

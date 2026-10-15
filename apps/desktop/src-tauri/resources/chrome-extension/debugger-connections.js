@@ -3,6 +3,8 @@ import { clearControlledTabs } from './tab-indicator.js';
 
 const connections = new Map();
 const keyOf = target => target.tabId === undefined ? `worker:${target.targetId}` : `tab:${target.tabId}`;
+export const connectionOwner = context => context.sessionId
+  ? `${context.clientId}:${context.sessionId}` : context.clientId;
 
 // Callers serialize operations per target. Retain only the transport between operations;
 // page overrides, protocol subscriptions and frame sessions remain request-scoped.
@@ -19,14 +21,14 @@ export async function acquireConnection(target, signal, clientId) {
     connections.set(key, connection);
     connection.attaching = chrome.debugger.attach(target, '1.3');
   }
+  connection.clients.add(clientId);
   try {
     await connection.attaching;
     assertRunning(signal);
     assertConnected(connection);
-    connection.clients.add(clientId);
     return connection;
   } catch (error) {
-    await closeConnection(connection);
+    await finishConnection(target, clientId);
     throw error;
   }
 }
@@ -35,10 +37,17 @@ export function assertConnected(connection) {
   if (connection.closed) throw new Error('浏览器连接已结束，请重新操作。');
 }
 
-export function releaseConnection(connection, keepAlive) {
-  if (!keepAlive || connection.closed) return closeConnection(connection);
+export function releaseConnection(connection, keepAlive, clientId) {
+  if (connection.closed) return closeConnection(connection);
+  if (!keepAlive) return finishConnection(connection.target, clientId);
   // Reasoning and other tools can take arbitrarily long between browser actions.
   // Keep Chrome's banner stable until explicit task completion or a stop decision.
+}
+
+export async function finishClientConnections(clientId) {
+  await Promise.all([...connections.values()]
+    .filter(connection => connection.clients.has(clientId))
+    .map(connection => finishConnection(connection.target, clientId)));
 }
 
 export async function finishConnection(target, clientId) {

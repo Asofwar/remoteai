@@ -13,6 +13,13 @@ const page = `<!doctype html><html><head><title>Port mapping test</title><link r
 <button id="fetch">Fetch data</button><p id="result"></p><p id="socket">Connecting socket</p>
 <a href="/next">Next page</a><form action="/submit" method="post"><input name="message" value="mapping">
 <button type="submit">Submit form</button></form><script type="module" src="/main.js"></script></body></html>`;
+const interceptedForm = handler => `<!doctype html><form action="/submit?handler=${handler}" method="post">
+<button type="submit">Send once</button></form><p id="sent"></p><script>
+${handler}.addEventListener('submit', async event => {
+  event.preventDefault();
+  await fetch(${JSON.stringify('/submit?handler=' + encodeURIComponent(handler))}, { method: 'POST', body: 'once' });
+  document.querySelector('#sent').textContent = 'Sent once';
+});</script>`;
 const files = {
   '/': ['text/html', page],
   '/style.css': ['text/css', 'body{font:16px system-ui;background:#eef6f2;color:#12382a;padding:24px}img{width:48px}'],
@@ -29,10 +36,13 @@ catch { document.body.dataset.isolation='passed'; }
   '/label.js': ['text/javascript', 'export const label="Module loaded";'],
   '/api': ['text/plain', 'Mapped API response'],
   '/next': ['text/html', '<h1>Second mapped page</h1><a href="/">Home</a>'],
+  '/form-target': ['text/html', interceptedForm("document.querySelector('form')")],
+  '/form-document': ['text/html', interceptedForm('document')],
+  '/form-window': ['text/html', interceptedForm('window')],
 };
 const service = http.createServer(async (request, response) => {
   requests.push({ url: request.url, method: request.method });
-  if (request.url === '/submit') {
+  if (request.url.startsWith('/submit')) {
     let body = ''; for await (const chunk of request) body += chunk;
     response.setHeader('Content-Type', 'text/html'); response.end(`<h1>Received ${body}</h1>`); return;
   }

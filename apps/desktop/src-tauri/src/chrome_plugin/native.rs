@@ -13,9 +13,11 @@ use std::{
 
 use uuid::Uuid;
 
+use super::sessions::{self, HostRequest, SessionRequest};
 use super::{config, protocol::*, transport, BrowserError, Result};
 
-const MAX_CONNECTIONS: usize = 16;
+// Retained MCP leases must leave room for tool calls and discovery probes.
+const MAX_CONNECTIONS: usize = 64;
 pub(super) const REQUEST_TIMEOUT: Duration = Duration::from_secs(130);
 const STATUS_TIMEOUT: Duration = Duration::from_secs(1);
 const REVOCATION_INTERVAL: Duration = Duration::from_millis(250);
@@ -27,6 +29,7 @@ struct Host {
     pending: Mutex<Pending>,
     alive: AtomicBool,
     connections: AtomicUsize,
+    sessions: Mutex<HashMap<(String, String), usize>>,
 }
 
 pub(super) fn run(root: PathBuf) -> Result<()> {
@@ -45,6 +48,7 @@ pub(super) fn run(root: PathBuf) -> Result<()> {
         pending: Mutex::new(HashMap::new()),
         alive: AtomicBool::new(true),
         connections: AtomicUsize::new(0),
+        sessions: Mutex::new(HashMap::new()),
     });
     let id = Uuid::new_v4().to_string();
     let endpoint_path = host.root.join("endpoints").join(format!("{id}.json"));
@@ -141,10 +145,48 @@ fn handle(host: &Host, mut stream: TcpStream) -> Result<()> {
     stream
         .set_write_timeout(Some(Duration::from_secs(5)))
         .map_err(|_| BrowserError::Transport)?;
-    let request: BridgeRequest = transport::read_frame(&mut stream, transport::MAX_REQUEST_BYTES)?
+    let request: HostRequest = transport::read_frame(&mut stream, transport::MAX_REQUEST_BYTES)?
         .ok_or(BrowserError::InvalidRequest)?;
+    let request = match request {
+        HostRequest::Session(request) => return session(host, &mut stream, request),
+        HostRequest::Call(request) => request,
+    };
     let result = forward(host, request).unwrap_or_else(BrowserReply::error);
     transport::write_frame(&mut stream, &result, transport::MAX_RESPONSE_BYTES)
+}
+
+fn session(host: &Host, stream: &mut TcpStream, request: SessionRequest) -> Result<()> {
+    let SessionRequest::Session {
+        client_id,
+        session_id,
+        token,
+    } = &request;
+    config::authorize(&host.root, client_id, token)?;
+    Uuid::parse_str(session_id).map_err(|_| BrowserError::InvalidRequest)?;
+    let key = (client_id.clone(), session_id.clone());
+    {
+        let mut sessions = host.sessions.lock().map_err(|_| BrowserError::Transport)?;
+        *sessions.entry(key.clone()).or_default() += 1;
+    }
+    let reply = BrowserReply {
+        result: Some(serde_json::json!({})),
+        error: None,
+    };
+    let result = transport::write_frame(stream, &reply, transport::MAX_RESPONSE_BYTES)
+        .and_then(|()| sessions::wait(stream, &host.root, &request, &host.alive));
+    // Serialize the last-session notification with new registrations, before acknowledging a new lease.
+    let mut sessions = host.sessions.lock().map_err(|_| BrowserError::Transport)?;
+    if let Some(count) = sessions.get_mut(&key) {
+        *count -= 1;
+        if *count == 0 {
+            sessions.remove(&key);
+            let message = serde_json::json!({"type":"client-disconnected",
+                "clientId":client_id,"sessionId":session_id});
+            let mut writer = host.writer.lock().map_err(|_| BrowserError::Transport)?;
+            transport::write_frame(&mut *writer, &message, transport::MAX_REQUEST_BYTES)?;
+        }
+    }
+    result
 }
 
 fn forward(host: &Host, request: BridgeRequest) -> Result<BrowserReply> {
@@ -159,15 +201,10 @@ fn forward(host: &Host, request: BridgeRequest) -> Result<BrowserReply> {
     let outgoing = ExtensionRequest {
         id: id.clone(),
         client_id: request.client_id.clone(),
+        session_id: request.session_id.clone(),
         request: request.request.clone(),
     };
-    let sent = host
-        .writer
-        .lock()
-        .map_err(|_| BrowserError::Transport)
-        .and_then(|mut writer| {
-            transport::write_frame(&mut *writer, &outgoing, transport::MAX_REQUEST_BYTES)
-        });
+    let sent = send_request(host, &request, &outgoing);
     let result = sent.and_then(|()| await_reply(host, &request, receiver));
     host.pending
         .lock()
@@ -185,6 +222,18 @@ fn forward(host: &Host, request: BridgeRequest) -> Result<BrowserReply> {
         }
     }
     result
+}
+
+fn send_request(host: &Host, request: &BridgeRequest, outgoing: &ExtensionRequest) -> Result<()> {
+    // A departing session cannot notify Chrome and then have a previously queued request reattach it.
+    let sessions = host.sessions.lock().map_err(|_| BrowserError::Transport)?;
+    if let Some(session_id) = &request.session_id {
+        if !sessions.contains_key(&(request.client_id.clone(), session_id.clone())) {
+            return Err(BrowserError::Disconnected);
+        }
+    }
+    let mut writer = host.writer.lock().map_err(|_| BrowserError::Transport)?;
+    transport::write_frame(&mut *writer, outgoing, transport::MAX_REQUEST_BYTES)
 }
 
 fn await_reply(

@@ -15,9 +15,9 @@ let calls;
 let sequence;
 let local;
 
-async function request(tabId = 1) {
+async function request(tabId = 1, clientId = 'a'.repeat(64), sessionId) {
   const id = String(++sequence);
-  port.onMessage.emit({ id, clientId: 'a'.repeat(64), request: { operation: 'screenshot', args: { tabId } } });
+  port.onMessage.emit({ id, clientId, sessionId, request: { operation: 'screenshot', args: { tabId } } });
   for (let attempt = 0; attempt < 100; attempt++) {
     const reply = replies.find(item => item.id === id);
     if (reply) return reply;
@@ -63,6 +63,52 @@ beforeEach(async () => {
   await flush();
 });
 afterEach(() => stopDebugging());
+
+test('one MCP session ending releases only its ownership even within the same home', async () => {
+  const clientId = 'a'.repeat(64), first = crypto.randomUUID(), second = crypto.randomUUID();
+  await request(1, clientId, first); await request(2, clientId, first); await request(2, clientId, second);
+  port.onMessage.emit({ type: 'client-disconnected', clientId, sessionId: first });
+  await flush();
+  assert.deepEqual(calls.filter(([method]) => method === 'detach'), [['detach', { tabId: 1 }]]);
+  assert.equal((await request(2, clientId, second)).error, null);
+  assert.equal(calls.filter(([method]) => method === 'attach').length, 2);
+  port.onMessage.emit({ type: 'client-disconnected', clientId, sessionId: second });
+  await flush();
+  assert.equal(hasDebuggerConnections(), false);
+});
+
+test('client exit releases its tabs and workers but preserves another live client on a shared tab', async () => {
+  const first = 'a'.repeat(64), second = 'b'.repeat(64);
+  await request(1, first); await request(2, first); await request(2, second);
+  port.onMessage.emit({ type: 'client-disconnected', clientId: first });
+  await flush();
+  assert.deepEqual(calls.filter(([method]) => method === 'detach'), [['detach', { tabId: 1 }]]);
+  assert.equal((await request(2, second)).error, null);
+  assert.equal(calls.filter(([method]) => method === 'attach').length, 2);
+  port.onMessage.emit({ type: 'client-disconnected', clientId: second });
+  await flush();
+  assert.equal(hasDebuggerConnections(), false);
+});
+
+test('client exit aborts active and queued work without detaching another client', async () => {
+  const first = 'a'.repeat(64), second = 'b'.repeat(64);
+  await request(1, second);
+  let finish;
+  const held = new Promise(resolve => { finish = resolve; });
+  const original = chrome.debugger.sendCommand;
+  chrome.debugger.sendCommand = async (target, method) => {
+    if (method === 'Page.captureScreenshot') await held;
+    return original(target, method);
+  };
+  const active = request(1, first), queued = request(1, first);
+  await flush();
+  port.onMessage.emit({ type: 'client-disconnected', clientId: first });
+  finish();
+  assert.match((await active).error, /取消/);
+  assert.match((await queued).error, /取消/);
+  assert.equal(calls.filter(([method]) => method === 'detach').length, 0);
+  assert.equal((await request(1, second)).error, null);
+});
 
 test('the toolbar icon opens a native side panel', () => {
   assert.deepEqual(globalThis.panelBehavior, { openPanelOnActionClick: true });

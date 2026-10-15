@@ -7,6 +7,29 @@ test.beforeEach(async ({ request }) => {
   expect(Number.isInteger(servicePort)).toBe(true);
 });
 
+test('JavaScript form handlers send exactly one POST from target, document and window', async ({ page, request }) => {
+  await page.goto('e2e/port-mapping-harness.html');
+  await page.getByRole('button', { name: '端口映射', exact: true }).click();
+  await page.getByRole('spinbutton', { name: '远程端口' }).fill(String(servicePort));
+  await page.getByRole('button', { name: '添加并启动' }).click();
+  await page.getByRole('button', { name: `http://127.0.0.1:${servicePort}`, exact: true }).click();
+  const preview = page.frameLocator('iframe[title="端口映射预览"]');
+  for (const handler of ['target', 'document', 'window']) {
+    await page.getByRole('textbox', { name: '网页路径' }).fill(`/form-${handler}`);
+    await page.getByRole('button', { name: '打开', exact: true }).click();
+    await expect(preview.getByRole('button', { name: 'Send once' })).toBeVisible();
+    const before = await (await request.get('http://127.0.0.1:1496/state')).json();
+    await preview.getByRole('button', { name: 'Send once' }).click();
+    await expect(preview.locator('#sent')).toHaveText('Sent once');
+    // Wait past the deferred default action before checking the service's own request log.
+    await page.waitForTimeout(250);
+    const after = await (await request.get('http://127.0.0.1:1496/state')).json();
+    const posts = after.requests.slice(before.requests.length).filter((item: { method: string }) => item.method === 'POST');
+    expect(posts).toHaveLength(1);
+    await expect(preview.locator('#sent')).toHaveText('Sent once');
+  }
+});
+
 test('previews different IPs on the same port and restores their targets', async ({ page }) => {
   await page.goto('e2e/port-mapping-harness.html');
   await page.getByRole('button', { name: '端口映射', exact: true }).click();

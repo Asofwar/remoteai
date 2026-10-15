@@ -60,7 +60,9 @@
         const data = typeof event.data === 'string' ? event.data
           : this.binaryType === 'arraybuffer' ? event.data.buffer : new Blob([event.data]);
         message = new MessageEvent('message', { data });
-      } else if (event.type === 'close') message = new CloseEvent('close', { code: 1000, wasClean: true });
+      } else if (event.type === 'close') {
+        message = new CloseEvent('close', { code: event.code ?? 1006, wasClean: event.wasClean ?? false });
+      }
       else message = new Event(event.type);
       this.dispatchEvent(message); this['on' + event.type]?.(message);
     }
@@ -102,8 +104,8 @@
     }
     navigate({ url: url.href });
   });
-  document.addEventListener('submit', event => {
-    event.preventDefault();
+  function submitForm(event) {
+    if (event.defaultPrevented) return;
     const form = event.target;
     const method = (form.method || 'GET').toUpperCase();
     const values = new URLSearchParams();
@@ -112,6 +114,11 @@
     if (method === 'GET') { url.search = values.toString(); navigate({ url: url.href }); }
     else navigate({ url: url.href, method, headers: [['Content-Type', 'application/x-www-form-urlencoded']],
       body: new TextEncoder().encode(values.toString()) });
+  }
+  document.addEventListener('submit', event => {
+    // CSP form-action 'none' blocks native submission. Wait until all page handlers
+    // (including delegated document/window listeners) have had a chance to cancel it.
+    setTimeout(() => submitForm(event), 0);
   });
 
   async function render() {

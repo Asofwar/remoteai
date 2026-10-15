@@ -1,57 +1,86 @@
-use std::{io::Read, time::Duration};
+use std::time::Duration;
 
 use reqwest::blocking::Client;
 use serde_json::Value;
 use tauri::Runtime;
 use url::Url;
 
-use crate::{models::ProviderProfile, providers::read_provider, storage::resolve_paths};
+use crate::{
+    models::{ProviderApiFormat, ProviderProfile, ProviderRequestOptions},
+    providers::read_provider,
+    storage::resolve_paths,
+};
 
-const MAX_MODEL_RESPONSE_BYTES: u64 = 1024 * 1024;
+#[path = "provider_model_pages.rs"]
+mod pages;
 const MODEL_QUERY_TIMEOUT: Duration = Duration::from_secs(15);
+
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ModelDiscoveryOptions {
+    pub(crate) api_format: Option<ProviderApiFormat>,
+    pub(crate) request_options: Option<ProviderRequestOptions>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ModelDiscoveryRequest {
+    pub(crate) base_url: String,
+    pub(crate) api_key: String,
+    pub(crate) provider_id: Option<String>,
+    pub(crate) options: Option<ModelDiscoveryOptions>,
+}
 
 #[tauri::command]
 pub(crate) async fn fetch_relay_models<R: Runtime + 'static>(
     app: tauri::AppHandle<R>,
-    base_url: String,
-    api_key: String,
-    provider_id: Option<String>,
+    request: ModelDiscoveryRequest,
 ) -> Result<Vec<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let token = required_api_key(&app, &base_url, &api_key, provider_id.as_deref())?;
-        fetch_relay_models_blocking(&base_url, &token)
+        let ModelDiscoveryRequest {
+            base_url,
+            api_key,
+            provider_id,
+            options,
+        } = request;
+        let saved = if let Some(id) = provider_id.as_deref() {
+            let paths = resolve_paths(&app).map_err(|_| "Saved provider could not be loaded")?;
+            Some(read_provider(&paths, id).map_err(|_| "Saved provider could not be loaded")?)
+        } else {
+            None
+        };
+        let reusable = saved
+            .as_ref()
+            .filter(|p| reusable_api_key(p, &base_url).is_some());
+        let options = options.unwrap_or_default();
+        let format = options
+            .api_format
+            .or_else(|| reusable.map(|p| p.api_format))
+            .unwrap_or(ProviderApiFormat::OpenaiResponses);
+        let settings = options
+            .request_options
+            .or_else(|| reusable.and_then(|p| p.request_options.clone()));
+        let token = if api_key.trim().is_empty() {
+            reusable.map(|p| p.api_key.clone()).unwrap_or_default()
+        } else {
+            api_key.trim().to_owned()
+        };
+        fetch_models(&base_url, &token, format, settings.as_ref())
     })
     .await
     .map_err(|_| "Could not load models. Please try again".to_string())?
 }
 
-fn required_api_key<R: Runtime>(
-    app: &tauri::AppHandle<R>,
-    base_url: &str,
-    api_key: &str,
-    provider_id: Option<&str>,
-) -> Result<String, String> {
-    if !api_key.trim().is_empty() {
-        return Ok(api_key.trim().to_string());
-    }
-    if let Some(id) = provider_id {
-        let paths = resolve_paths(app).map_err(|_| "Saved provider could not be loaded")?;
-        let provider =
-            read_provider(&paths, id).map_err(|_| "Saved provider could not be loaded")?;
-        if let Some(token) = reusable_api_key(&provider, base_url) {
-            return Ok(token);
-        }
-    }
-    Err("Enter the API key before loading models".to_string())
-}
-
 fn reusable_api_key(provider: &ProviderProfile, base_url: &str) -> Option<String> {
-    // Reuse credentials only for the saved endpoint, including its API path.
-    let saved_url = normalized_relay_models_url(&provider.base_url)?;
-    let requested_url = relay_models_url(base_url).ok()?;
-    (saved_url == requested_url)
-        .then(|| provider.api_key.trim().to_string())
-        .filter(|key| !key.is_empty())
+    let same = crate::provider_discovery::same_endpoint(&provider.base_url, base_url)
+        || (provider
+            .request_options
+            .as_ref()
+            .is_none_or(|o| !o.use_full_url)
+            && normalized_relay_models_url(&provider.base_url)
+                .zip(relay_models_url(base_url).ok())
+                .is_some_and(|(a, b)| a == b));
+    same.then(|| provider.api_key.trim().to_owned())
 }
 
 fn normalized_relay_models_url(base_url: &str) -> Option<Url> {
@@ -70,87 +99,77 @@ pub(crate) fn fetch_relay_models_blocking(
     base_url: &str,
     api_key: &str,
 ) -> Result<Vec<String>, String> {
-    let token = api_key.trim();
-    if token.is_empty() {
-        return Err("Relay API key is required before fetching models".to_string());
-    }
-    let query_url = relay_models_url(base_url)?;
+    fetch_models(base_url, api_key, ProviderApiFormat::OpenaiResponses, None)
+}
+
+pub(crate) fn fetch_models(
+    base_url: &str,
+    api_key: &str,
+    format: ProviderApiFormat,
+    options: Option<&ProviderRequestOptions>,
+) -> Result<Vec<String>, String> {
+    let query_url = crate::provider_discovery::models_url(base_url, format, options)?;
     let client = crate::system_proxy::apply(Client::builder())
         .timeout(MODEL_QUERY_TIMEOUT)
-        .redirect(reqwest::redirect::Policy::limited(5))
+        .redirect(reqwest::redirect::Policy::none())
         .user_agent("Codex-Switch")
         .build()
         .map_err(|error| format!("Failed to create relay model query client: {error}"))?;
-    let response = client
-        .get(query_url)
-        .bearer_auth(token)
-        .header(reqwest::header::ACCEPT, "application/json")
-        .send()
-        .map_err(|error| format!("Relay model query failed: {error}"))?;
-    let payload = read_model_response(response)?;
-    parse_models(&payload)
+    pages::fetch(
+        &client,
+        pages::Query {
+            url: query_url,
+            api_key,
+            format,
+            options,
+        },
+    )
 }
 
 fn relay_models_url(base_url: &str) -> Result<Url, String> {
-    let normalized = base_url.trim().trim_end_matches('/');
-    crate::providers::ensure_not_local_proxy_base_url(normalized)?;
-    let mut url =
-        Url::parse(normalized).map_err(|error| format!("Relay Base URL is invalid: {error}"))?;
-    if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
-        return Err("Relay Base URL must be an http:// or https:// URL with a host".to_string());
-    }
-    let path = url.path().trim_end_matches('/');
-    url.set_path(&format!("{path}/models"));
-    url.set_query(None);
-    url.set_fragment(None);
-    Ok(url)
+    crate::provider_discovery::models_url(base_url, ProviderApiFormat::OpenaiResponses, None)
 }
 
-fn read_model_response(response: reqwest::blocking::Response) -> Result<Value, String> {
-    let status = response.status();
-    if !status.is_success() {
-        return Err(format!(
-            "Relay model query returned HTTP {}",
-            status.as_u16()
-        ));
-    }
-    if response
-        .content_length()
-        .is_some_and(|length| length > MAX_MODEL_RESPONSE_BYTES)
-    {
-        return Err("Relay model response is too large".to_string());
-    }
-    let mut bytes = Vec::new();
-    response
-        .take(MAX_MODEL_RESPONSE_BYTES + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|error| format!("Failed to read relay model response: {error}"))?;
-    if bytes.len() as u64 > MAX_MODEL_RESPONSE_BYTES {
-        return Err("Relay model response is too large".to_string());
-    }
-    serde_json::from_slice(&bytes)
-        .map_err(|error| format!("Relay model response is invalid JSON: {error}"))
-}
-
-fn parse_models(payload: &Value) -> Result<Vec<String>, String> {
+fn parse_model_page(payload: &Value) -> Result<Vec<String>, String> {
     let data = payload
         .get("data")
+        .or_else(|| payload.get("models"))
         .and_then(Value::as_array)
         .ok_or_else(|| "Relay model response is missing data".to_string())?;
     let mut models = Vec::new();
+    let mut seen = std::collections::HashSet::new();
     for item in data {
+        if item
+            .get("supportedGenerationMethods")
+            .and_then(Value::as_array)
+            .is_some_and(|methods| {
+                !methods
+                    .iter()
+                    .any(|method| method.as_str() == Some("generateContent"))
+            })
+        {
+            continue;
+        }
         let Some(model) = item
             .get("id")
+            .or_else(|| item.get("name"))
             .and_then(Value::as_str)
             .map(str::trim)
             .filter(|model| !model.is_empty())
         else {
             continue;
         };
-        if !models.iter().any(|existing| existing == model) {
+        let model = model.strip_prefix("models/").unwrap_or(model);
+        if !model.is_empty() && seen.insert(model.to_string()) {
             models.push(model.to_string());
         }
     }
+    Ok(models)
+}
+
+#[cfg(test)]
+fn parse_models(payload: &Value) -> Result<Vec<String>, String> {
+    let models = parse_model_page(payload)?;
     if models.is_empty() {
         Err("Relay did not return any available models".to_string())
     } else {
@@ -194,13 +213,19 @@ mod tests {
             Some("sk-saved-test")
         );
         provider.api_key.clear();
-        assert!(reusable_api_key(&provider, &provider.base_url).is_none());
+        assert_eq!(
+            reusable_api_key(&provider, &provider.base_url),
+            Some(String::new())
+        );
     }
 
     #[test]
     fn builds_models_url_from_openai_compatible_base_url() {
         let url = relay_models_url("https://relay.example.com/api/v1/?ignored=yes").unwrap();
-        assert_eq!(url.as_str(), "https://relay.example.com/api/v1/models");
+        assert_eq!(
+            url.as_str(),
+            "https://relay.example.com/api/v1/models?ignored=yes"
+        );
     }
 
     #[test]
@@ -216,6 +241,57 @@ mod tests {
         .unwrap();
 
         assert_eq!(models, vec!["gpt-5.6-sol", "claude-sonnet-4-5"]);
+    }
+
+    #[test]
+    fn native_discovery_filters_embedding_models_and_strips_resource_prefix() {
+        assert_eq!(
+            parse_models(&json!({"models":[
+                {"name":"models/generative","supportedGenerationMethods":["generateContent"]},
+                {"name":"models/embedding","supportedGenerationMethods":["embedContent"]}
+            ]}))
+            .unwrap(),
+            vec!["generative"]
+        );
+    }
+
+    #[test]
+    fn discovers_with_custom_headers_query_and_native_auth() {
+        let server = Server::http("127.0.0.1:0").unwrap();
+        let endpoint = format!("http://{}/v1/messages?tenant=east", server.server_addr());
+        let worker = std::thread::spawn(move || {
+            let request = server.recv().unwrap();
+            assert_eq!(request.url(), "/v1/models?tenant=east");
+            for (name, value) in [
+                ("x-api-key", "test"),
+                ("x-region", "west"),
+                ("anthropic-version", "2023-06-01"),
+            ] {
+                assert!(request
+                    .headers()
+                    .iter()
+                    .any(|h| h.field.equiv(name) && h.value.as_str() == value));
+            }
+            request
+                .respond(Response::from_string(r#"{"data":[{"id":"native"}]}"#))
+                .unwrap();
+        });
+        let options = ProviderRequestOptions {
+            use_full_url: true,
+            headers: [("x-region".into(), "west".into())].into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            fetch_models(
+                &endpoint,
+                "test",
+                ProviderApiFormat::AnthropicMessages,
+                Some(&options)
+            )
+            .unwrap(),
+            vec!["native"]
+        );
+        worker.join().unwrap();
     }
 
     #[test]

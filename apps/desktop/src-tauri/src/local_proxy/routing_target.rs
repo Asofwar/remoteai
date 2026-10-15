@@ -54,10 +54,10 @@ fn active_target_for_request<R: Runtime>(
                 return Err("Aggregate API is disabled".to_string());
             }
             let profiles = aggregate_api::member_profiles(&paths, &config)?;
-            return Ok(ActiveTarget::Aggregate(AggregateTarget {
+            return Ok(ActiveTarget::Aggregate(Box::new(AggregateTarget {
                 config,
                 profiles,
-            }));
+            })));
         }
         let provider = providers::read_provider(&paths, &id)?;
         providers::ensure_not_local_proxy_base_url(&provider.base_url)?;
@@ -214,9 +214,11 @@ fn append_proxy_diagnostic_result<R: Runtime>(
             });
             if !status_ok(payload.status) {
                 result["responseBody"] = match &payload.body {
-                    UpstreamBody::Buffered(body) => {
-                        diagnostic_response_body(body, payload.content_type.as_deref(), payload.status)
-                    }
+                    UpstreamBody::Buffered(body) => diagnostic_response_body(
+                        body,
+                        payload.content_type.as_deref(),
+                        payload.status,
+                    ),
                     UpstreamBody::Streaming(_) => json!({
                         "captured": false,
                         "reason": "streaming response body was not buffered"

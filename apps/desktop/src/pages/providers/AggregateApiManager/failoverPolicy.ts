@@ -10,6 +10,10 @@ export const FAILOVER_LIMITS = {
 
 export function defaultFailoverPolicy(): AggregateFailoverPolicy {
   return {
+    routingStrategy: "balanced",
+    recoverySuccessThreshold: 1,
+    errorRateThresholdPercent: null,
+    errorRateMinRequests: 10,
     enabled: true,
     maxAttempts: 3,
     failureThreshold: 2,
@@ -22,7 +26,8 @@ export function defaultFailoverPolicy(): AggregateFailoverPolicy {
 }
 
 export function copyFailoverPolicy(policy?: AggregateFailoverPolicy): AggregateFailoverPolicy {
-  return policy ? { ...policy, retryStatusCodes: [...policy.retryStatusCodes] } : defaultFailoverPolicy();
+  return policy ? { ...defaultFailoverPolicy(), ...policy,
+    retryStatusCodes: [...policy.retryStatusCodes] } : defaultFailoverPolicy();
 }
 
 export function isFailoverInteger(value: unknown, maximum: number): value is number {
@@ -37,7 +42,11 @@ export function validRetryStatusCodes(codes: unknown): codes is number[] {
 }
 
 export function validFailoverPolicy(policy: AggregateFailoverPolicy): boolean {
-  return typeof policy.enabled === "boolean"
+  return (policy.routingStrategy === undefined || ["balanced", "priority"].includes(policy.routingStrategy))
+    && isFailoverInteger(policy.recoverySuccessThreshold ?? 1, 10)
+    && isFailoverInteger(policy.errorRateMinRequests ?? 10, 100)
+    && (policy.errorRateThresholdPercent == null || isFailoverInteger(policy.errorRateThresholdPercent, 100))
+    && typeof policy.enabled === "boolean"
     && typeof policy.retryOnNetworkErrors === "boolean"
     && typeof policy.respectRetryAfter === "boolean"
     && isFailoverInteger(policy.maxAttempts, FAILOVER_LIMITS.maxAttempts)

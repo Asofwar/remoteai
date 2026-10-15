@@ -84,7 +84,7 @@ export interface AppInfo {
   version: string;
 }
 
-export type ProviderApiFormat = "openaiResponses" | "openaiChat" | "anthropicMessages";
+export type ProviderApiFormat = "openaiResponses" | "openaiChat" | "anthropicMessages" | "geminiGenerateContent";
 export type ModelApiFormats = Record<string, ProviderApiFormat>;
 export type ProviderKind = "custom" | "openai";
 export type ProviderBalancePlatform = "newApi" | "sub2Api" | "deepSeek" | "codexSwitch";
@@ -163,6 +163,10 @@ export interface ProviderInput {
 }
 
 export interface AggregateFailoverPolicy {
+  routingStrategy?: "balanced" | "priority";
+  recoverySuccessThreshold?: number;
+  errorRateThresholdPercent?: number | null;
+  errorRateMinRequests?: number;
   enabled: boolean;
   maxAttempts: number;
   failureThreshold: number;
@@ -184,6 +188,7 @@ export interface AggregateApi {
   name: string;
   model: string;
   memberProviderIds: string[];
+  memberModels?: Record<string, string>;
   enabled: boolean;
   active: boolean;
   memberConversationCounts: Record<string, number>;
@@ -196,6 +201,7 @@ export interface AggregateApiInput {
   name: string;
   model: string;
   memberProviderIds: string[];
+  memberModels?: Record<string, string>;
   enabled: boolean;
   failoverPolicy?: AggregateFailoverPolicy;
 }
@@ -633,6 +639,7 @@ export interface CloudAuthenticationResult {
   state: CloudAuthState;
   passwordSaved: boolean;
   credentialStorageUpdated: boolean;
+  syncWarning?: "aggregateSyncUnavailable";
 }
 
 export interface CloudSyncResult {
@@ -774,6 +781,7 @@ export interface FeedbackImageInput {
 }
 
 export interface AccountArchiveImportResult {
+  aggregatesImported?: number;
   imported: number;
   accountIds: string[];
   activeAccountId?: string | null;

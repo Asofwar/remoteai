@@ -4,6 +4,7 @@ import {
   defaultFailoverPolicy, FAILOVER_LIMITS, isFailoverInteger, validRetryStatusCodes,
 } from "./failoverPolicy";
 import styles from "./index.module.less";
+import { RoutingSettings } from "./RoutingSettings";
 
 interface FailoverSettingsProps {
   form: FormInstance;
@@ -39,6 +40,7 @@ export function FailoverSettings({ form, t }: FailoverSettingsProps) {
     </Form.Item>
     {!enabled && <p className={styles.hint}>{t("providers.aggregate.failover.disabledHint")}</p>}
     <div>
+      <RoutingSettings form={form} />
       <div className={styles.policyGrid}>
         <IntegerSetting name="maxAttempts" maximum={FAILOVER_LIMITS.maxAttempts} t={t} />
         <IntegerSetting name="failureThreshold" maximum={FAILOVER_LIMITS.failureThreshold} t={t} />

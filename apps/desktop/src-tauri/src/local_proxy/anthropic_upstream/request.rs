@@ -26,6 +26,8 @@ pub(super) fn convert(
     tools: &CodexToolContext,
     scope: &continuation::Scope,
 ) -> Result<Value, ConversionError> {
+    super::super::bridge_media::validate_responses(input, false)
+        .map_err(|_| ConversionError::UnsupportedContent)?;
     let mut chat_messages = Vec::new();
     if let Some(instructions) = input
         .get("instructions")
@@ -100,7 +102,15 @@ fn is_content_array(value: &Value) -> bool {
             && parts.iter().all(|part| {
                 matches!(
                     part["type"].as_str(),
-                    Some("text" | "input_text" | "output_text" | "image_url" | "input_image")
+                    Some(
+                        "text"
+                            | "input_text"
+                            | "output_text"
+                            | "image_url"
+                            | "input_image"
+                            | "input_file"
+                            | "file"
+                    )
                 )
             })
     })
@@ -138,6 +148,11 @@ fn content_part(part: &Value) -> Result<Value, ConversionError> {
             Ok(json!({ "type": "text", "text": part["text"] }))
         }
         Some("image_url" | "input_image") => image_part(part),
+        Some("file") => super::super::bridge_media::chat_file_to_anthropic(part)
+            .ok_or(ConversionError::UnsupportedContent),
+        Some("input_file") => super::super::bridge_media::responses_to_chat(part)
+            .and_then(|part| super::super::bridge_media::chat_file_to_anthropic(&part))
+            .ok_or(ConversionError::UnsupportedContent),
         _ => Err(ConversionError::UnsupportedContent),
     }
 }

@@ -1,6 +1,6 @@
 import { t, useLanguage } from '../i18n';
 import { useState } from 'react';
-import { remoteModelOptions, type RemoteModelTarget } from '../../../../shared/remote-chat/modelTarget';
+import { isRemoteAggregateId, remoteModelOptions, type RemoteModelTarget } from '../../../../shared/remote-chat/modelTarget';
 import { ChevronRight } from "lucide-react";
 import type { AccountSummary, RemoteDevice, RemoteProviderSummary } from "../types";
 import { AdaptiveSheet } from "./AdaptiveSheet";
@@ -41,6 +41,7 @@ export function RemoteModelSwitchSheet({
   };
   const selectProvider = async (providerId: string) => {
     if (!device?.online || busy || !providerAvailable) return;
+    if (isRemoteAggregateId(providerId) && !options.aggregateAvailable) return;
     if (await onSwitchProvider(device.deviceId, providerId, target)) onClose();
   };
   const selectProviderGroup = async (group: string) => {
@@ -98,11 +99,14 @@ export function RemoteModelSwitchSheet({
           })}
           {providers.map((provider) => {
             const current = options.providerId === provider.id;
+            const aggregate = isRemoteAggregateId(provider.id);
+            const unsupported = aggregate && !options.aggregateAvailable;
             return <button type="button"
-              disabled={busy || !device?.online || !providerAvailable || current}
+              disabled={busy || !device?.online || !providerAvailable || unsupported || current}
               key={`provider:${provider.id}`} onClick={() => void selectProvider(provider.id)}>
-              <span className="account-initial provider-initial">P</span><span>
-                <strong>{provider.name}</strong><small>{provider.model || t("由 Codex 选择模型")}</small></span>
+              <span className="account-initial provider-initial">{aggregate ? "A" : "P"}</span><span>
+                <strong>{provider.name}</strong><small>{unsupported ? t("请先更新 PC 端")
+                  : provider.model || t("由 Codex 选择模型")}</small></span>
               {switchingProviderId === provider.id
                 ? <span className="model-switch-loading">{t("切换中")}</span>
                 : current ? <b className="current-pill">{t("当前")}</b> : <ChevronRight size={18} />}

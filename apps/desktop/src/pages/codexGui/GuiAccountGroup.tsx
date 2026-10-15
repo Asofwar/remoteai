@@ -4,7 +4,7 @@ import { ProxyAccountDetails, type ProxyAccountDetailsProps } from './ProxyAccou
 import styles from './ProxyAccountPicker.module.less';
 
 export interface GuiAccountChoice {
-  kind: 'account' | 'provider';
+  kind: 'account' | 'provider' | 'aggregate';
   id: string; name: string; detail: string; selected: boolean; disabled?: boolean;
   accountDetails?: ProxyAccountDetailsProps; searchDetail?: string;
 }
@@ -17,9 +17,9 @@ export function GuiAccountGroup({ choices, onSelect, disabled }: {
       className={`${styles.option} ${choice.selected ? styles.selected : ''}`}
       aria-pressed={choice.selected} disabled={disabled || choice.disabled}
       onClick={() => { if (!choice.selected) onSelect(choice); }}>
-      <span className={`${styles.avatar} ${choice.kind === 'provider' ? styles.providerAvatar : ''}`}
-        role="img" aria-label={choice.kind === 'provider' ? guiText("第三方 Provider") : guiText("官方账号")}>
-        {choice.kind === 'provider' ? <Server size={16} aria-hidden="true" />
+      <span className={`${styles.avatar} ${choice.kind !== 'account' ? styles.providerAvatar : ''}`}
+        role="img" aria-label={choice.kind !== 'account' ? guiText("第三方 Provider") : guiText("官方账号")}>
+        {choice.kind !== 'account' ? <Server size={16} aria-hidden="true" />
         : Array.from(choice.name.trim())[0]?.toUpperCase() || '?'}</span>
       <span className={styles.accountBody}>
         <span className={styles.optionName} title={choice.name}>{choice.name}</span>

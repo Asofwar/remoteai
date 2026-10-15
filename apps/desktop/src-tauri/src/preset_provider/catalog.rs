@@ -51,6 +51,8 @@ pub(crate) struct PresetModelQuery {
     base_url: String,
     api_key: Option<String>,
     provider_id: Option<String>,
+    #[serde(default)]
+    request_options: Option<crate::models::ProviderRequestOptions>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -91,7 +93,10 @@ macro_rules! preset {
 
 const OPENROUTER_ENDPOINTS: &[&str] = &["https://openrouter.ai/api/v1"];
 const KIMI_ENDPOINTS: &[&str] = &["https://api.moonshot.ai/v1", "https://api.moonshot.cn/v1"];
-const GEMINI_ENDPOINTS: &[&str] = &["https://generativelanguage.googleapis.com/v1beta/openai"];
+const GEMINI_ENDPOINTS: &[&str] = &[
+    "https://generativelanguage.googleapis.com/v1beta",
+    "https://generativelanguage.googleapis.com/v1beta/openai",
+];
 const BAILIAN_ENDPOINTS: &[&str] = &[
     "https://coding.dashscope.aliyuncs.com/v1",
     "https://coding-intl.dashscope.aliyuncs.com/v1",
@@ -114,7 +119,7 @@ const VOLCENGINE_ENDPOINTS: &[&str] = &[
 const PRESET_SPECS: &[PresetSpec] = &[
     preset!(OpenRouter, "OpenRouter", OpenaiResponses, OPENROUTER_ENDPOINTS, false, true, OpenAi),
     preset!(Kimi, "Kimi", OpenaiChat, KIMI_ENDPOINTS, false, true, OpenAi),
-    preset!(Gemini, "Gemini API", OpenaiChat, GEMINI_ENDPOINTS, false, true, OpenAi),
+    preset!(Gemini, "Gemini API", GeminiGenerateContent, GEMINI_ENDPOINTS, false, true, OpenAi),
     preset!(Bailian, "Alibaba Cloud Model Studio", OpenaiChat, BAILIAN_ENDPOINTS, false, true, BailianStatic),
     preset!(Ollama, "Ollama", OpenaiResponses, &[], true, false, OpenAi),
     preset!(LmStudio, "LM Studio", OpenaiResponses, &[], true, false, LmStudioNative),
@@ -148,12 +153,18 @@ fn fetch_models_blocking<R: Runtime>(
     let query_url = models_url(spec, &request.base_url)?;
     let token = resolve_api_key(&app, spec, &request)?;
     let client = model_query_client(spec.local_only)?;
-    let mut query = client
-        .get(query_url)
-        .header(reqwest::header::ACCEPT, "application/json");
-    if !token.is_empty() {
-        query = query.bearer_auth(token);
+    let saved = request.provider_id.as_deref().and_then(|id| resolve_paths(&app).ok()
+        .and_then(|paths| read_provider(&paths, id).ok()));
+    let options = request.request_options.as_ref().or_else(|| saved.as_ref()
+        .filter(|p| crate::provider_discovery::same_endpoint(&p.base_url, &request.base_url))
+        .and_then(|p| p.request_options.as_ref()));
+    let format = api_format_for_base_url(spec, &request.base_url);
+    if format == ProviderApiFormat::GeminiGenerateContent {
+        let models = crate::provider_models::fetch_models(&request.base_url, &token, format, options)?;
+        let payload = serde_json::json!({"data": models.into_iter().map(|id| serde_json::json!({"id":id})).collect::<Vec<_>>()});
+        return parse_models(spec, &payload);
     }
+    let query = crate::provider_discovery::apply_headers(client.get(query_url), &token, format, options)?;
     let response = query
         .send()
         .map_err(|error| format!("Could not connect to {}: {error}", spec.name))?;
@@ -249,6 +260,9 @@ fn api_format_for_base_url(spec: &PresetSpec, base_url: &str) -> ProviderApiForm
         return spec.api_format;
     };
     match spec.id {
+        PresetProviderId::Gemini if url.path().trim_end_matches('/').ends_with("/openai") => {
+            ProviderApiFormat::OpenaiChat
+        }
         PresetProviderId::Bailian if !is_bailian_coding_endpoint(&url) => {
             ProviderApiFormat::OpenaiResponses
         }

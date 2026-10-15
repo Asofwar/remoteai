@@ -8,6 +8,16 @@ mod tests {
     fn archive_keeps_payload_encrypted_inside_plain_zip() {
         let payload = AccountArchivePayload {
             format_version: 2,
+            aggregates: vec![crate::aggregate_sync::AggregateSyncEntry {
+                id: "route-one".into(), modified_at: Utc::now(),
+                config: Some(serde_json::from_value(json!({
+                    "id":"route-one", "name":"Route", "model":"public", "enabled":true,
+                    "memberProviderIds":["provider-1","provider-2"],
+                    "memberModels":{"provider-1":"alias-a", "provider-2":"alias-b"},
+                    "failoverPolicy":{"routingStrategy":"priority","recoverySuccessThreshold":3,
+                        "errorRateThresholdPercent":40,"errorRateMinRequests":20}
+                })).unwrap()),
+            }],
             exported_at: "2026-07-04T00:00:00Z".to_string(),
             active_account_id: Some("account-1".to_string()),
             active_provider_id: Some("provider-1".to_string()),
@@ -97,6 +107,7 @@ mod tests {
             "plain-secret-password"
         );
         assert_eq!(restored.providers[0].api_key, "plain-secret-provider-key");
+        assert_eq!(restored.aggregates[0].config, payload.aggregates[0].config);
         assert_eq!(
             restored.providers[0].request_options,
             payload.providers[0].request_options

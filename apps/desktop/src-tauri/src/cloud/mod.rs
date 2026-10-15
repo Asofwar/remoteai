@@ -45,6 +45,7 @@ use crate::{
 };
 
 mod accounts;
+mod aggregates;
 mod assistance;
 mod auth;
 mod common;

@@ -10,6 +10,7 @@ fn forward_chat_bridge(
     }
     let mut responses_body: Value = serde_json::from_slice(&body)
         .map_err(|error| format!("Responses request body is not valid JSON: {error}"))?;
+    bridge_media::validate_responses(&responses_body, true)?;
     validate_anthropic_chat_tools(&responses_body, headers).map_err(|error| error.to_string())?;
     omit_unsupported_provider_service_tier(&mut responses_body, provider);
     let selected_model = selected_provider_model(&responses_body, provider);
@@ -21,9 +22,22 @@ fn forward_chat_bridge(
         &tool_context,
         continuation_scope.as_ref(),
     );
+    chat_bridge_continuation::restore_tool_history(
+        continuation_scope.as_ref(),
+        responses_body["previous_response_id"].as_str(),
+        &mut chat_body,
+    )?;
     provider_reasoning::apply(&responses_body, &mut chat_body, provider);
     provider_tool_schema::adapt_chat_tool_schemas(&provider.base_url, &mut chat_body);
     provider_request_options::body(&mut chat_body, provider);
+    let request_history = if continuation_scope.is_some() {
+        chat_body["messages"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
     let stream = chat_body
         .get("stream")
         .and_then(Value::as_bool)
@@ -51,60 +65,27 @@ fn forward_chat_bridge(
                 request.bearer_auth(provider.api_key.trim())
             };
             // JSON supplies a default media type only when the forwarded headers have none.
-            provider_request_options::headers(apply_forward_headers(request, headers, true), provider)
-                .json(&chat_body)
+            provider_request_options::headers(
+                apply_forward_headers(request, headers, true),
+                provider,
+            )
+            .json(&chat_body)
         },
         "Chat bridge request failed",
     )?;
-    let status = response.status().as_u16();
-    let content_type = response
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .map(str::to_string);
-    let response_headers = forwarded_response_headers(response.headers());
-    if stream && status_ok(status) && is_event_stream(content_type.as_deref()) {
-        return Ok(UpstreamPayload {
-            status,
-            content_type: Some("text/event-stream; charset=utf-8".to_string()),
-            response_headers,
-            body: UpstreamBody::Streaming(Box::new(ChatSseReader::new(
-                BufReader::new(response),
-                selected_model,
-                tool_context,
-                continuation_scope,
-            ))),
-            token_usage_service_tier: service_tier,
-            token_usage_account: None,
-        });
-    }
-
-    let body = response
-        .bytes()
-        .map_err(|error| format!("Failed to read chat bridge response: {error}"))?;
-    if !status_ok(status) {
-        return Ok(UpstreamPayload {
-            status,
-            content_type: content_type
-                .or_else(|| Some("application/json; charset=utf-8".to_string())),
-            response_headers,
-            body: UpstreamBody::Buffered(body.to_vec()),
-            token_usage_service_tier: service_tier,
-            token_usage_account: None,
-        });
-    }
-
-    let json: Value = serde_json::from_slice(&body)
-        .map_err(|_| "Chat bridge upstream returned non-JSON response".to_string())?;
-    let mut payload = json_payload(
-        status,
-        chat_to_responses_json(&json, &tool_context, continuation_scope.as_ref()),
-    );
-    payload.response_headers = response_headers;
+    let mut payload = chat_bridge_response::convert(
+        response,
+        chat_bridge_response::Context {
+            stream,
+            model: selected_model,
+            tools: tool_context,
+            scope: continuation_scope,
+            request_history,
+        },
+    )?;
     payload.token_usage_service_tier = service_tier;
     Ok(payload)
 }
-
 fn chat_continuation_scope(
     provider_id: &str,
     headers: &[(String, String)],

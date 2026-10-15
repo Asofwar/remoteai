@@ -76,8 +76,9 @@ export function CatalogProviderModal({
     providerId: provider?.id,
     savedCredentialAvailable,
     apiKeyRequired: preset.apiKeyRequired,
-    modelsAvailable: preset.modelsAvailable,
+    modelsAvailable: preset.modelsAvailable && !requestOptions.error,
     fallbackModels: [...endpoint.fallbackModels],
+    requestOptions: requestOptions.value,
     onModels: handleLoadedModels,
     t,
   });
@@ -132,6 +133,8 @@ export function CatalogProviderModal({
         normalizedModels,
         provider?.imageInputModels ?? [],
       ),
+      modelApiFormats: Object.fromEntries(Object.entries(provider?.modelApiFormats ?? {})
+        .filter(([model]) => normalizedModels.includes(model))),
       contextWindow: null,
       modelSelectionControlledByCodex: true,
       fastModeEnabled: supportsFastMode,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeRemoteModelState, remoteModelOptions } from '../../../../shared/remote-chat/modelTarget';
+import { mergeRemoteModelState, remoteModelOptions, remoteProviderCommand } from '../../../../shared/remote-chat/modelTarget';
 
 const device = {
   activeAccountId: 'proxy-account', activeProviderId: 'proxy-provider', activeProviderGroup: 'work',
@@ -8,6 +8,19 @@ const device = {
 };
 
 describe('remote model targets', () => {
+  it('routes aggregate identifiers through dedicated endpoints and guards older desktops', () => {
+    expect(remoteProviderCommand('aggregate:route', 'gui'))
+      .toEqual({ path: 'gui-aggregate', body: { aggregateId: 'route' } });
+    expect(remoteProviderCommand('aggregate:route', 'proxy'))
+      .toEqual({ path: 'aggregate', body: { aggregateId: 'route' } });
+    expect(remoteProviderCommand('plain', 'gui'))
+      .toEqual({ path: 'gui-provider', body: { providerId: 'plain' } });
+    expect(remoteModelOptions(device, 'gui').aggregateAvailable).toBe(false);
+    const capable = { ...device, capabilities: [...device.capabilities, 'aggregate-switch', 'gui-aggregate-switch'] };
+    expect(remoteModelOptions(capable, 'gui').aggregateAvailable).toBe(true);
+    expect(remoteModelOptions(capable, 'proxy').aggregateAvailable).toBe(false);
+    expect(remoteModelOptions({ ...capable, localProxyRunning: true }, 'proxy').aggregateAvailable).toBe(true);
+  });
   it('uses independent current choices and allows GUI switching before proxy startup', () => {
     expect(remoteModelOptions(device, 'gui')).toMatchObject({
       accountId: 'gui-account', providerId: null, group: null,

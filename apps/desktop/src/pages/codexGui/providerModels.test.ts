@@ -43,3 +43,13 @@ it("uses the aggregate's fixed model and reasoning supported by all members", ()
   expect(models.map((entry) => entry.model)).toEqual(["kimi-k3"]);
   expect(models[0].supportedReasoningEfforts).toEqual([{ reasoningEffort: "high", description: "" }]);
 });
+
+it("maps per-service reasoning capabilities to the aggregate's public model", () => {
+  const aggregate: AggregateApi = { id: "aggregate", name: "Pool", model: "shared",
+    memberProviderIds: ["relay", "second"], memberModels: { relay: "kimi-k3", second: "vendor/kimi" },
+    enabled: true, active: true, memberConversationCounts: {} };
+  const models = providerModels([provider, { ...provider, id: "second", active: false,
+    modelReasoningEfforts: { "vendor/kimi": ["high"] } }], [aggregate])!;
+  expect(models[0].model).toBe("shared");
+  expect(models[0].supportedReasoningEfforts.map(effort => effort.reasoningEffort)).toEqual(["high"]);
+});

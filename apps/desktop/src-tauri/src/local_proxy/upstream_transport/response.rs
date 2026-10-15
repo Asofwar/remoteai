@@ -10,19 +10,41 @@ pub(in crate::local_proxy) struct Response {
     response: reqwest::Response,
     pending: Bytes,
     idle_timeout: Option<Duration>,
+    response_idle: Duration,
+    sse_response_idle: Option<Duration>,
     finished: bool,
     deadline: Option<tokio::time::Instant>,
 }
 
 impl Response {
-    pub(super) fn new(response: reqwest::Response, idle_timeout: Option<Duration>) -> Self {
+    pub(super) fn new(response: reqwest::Response, timeouts: super::Timeouts) -> Self {
+        let content_type = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok());
+        let idle_timeout = if super::super::is_event_stream(content_type) {
+            timeouts.sse_response_idle
+        } else {
+            Some(timeouts.response_idle)
+        };
         Self {
             response,
             pending: Bytes::new(),
             idle_timeout,
+            response_idle: timeouts.response_idle,
+            sse_response_idle: timeouts.sse_response_idle,
             finished: false,
             deadline: None,
         }
+    }
+
+    /// Use detected framing while retaining the limits captured by this request worker.
+    pub(in crate::local_proxy) fn select_streaming(&mut self, streaming: bool) {
+        self.idle_timeout = if streaming {
+            self.sse_response_idle
+        } else {
+            Some(self.response_idle)
+        };
     }
 
     pub(super) fn with_deadline(mut self, deadline: Option<tokio::time::Instant>) -> Self {

@@ -121,6 +121,13 @@ fn protected_parameter(name: &str) -> bool {
             | "instructions"
             | "previous_response_id"
             | "conversation"
+            | "contents"
+            | "systemInstruction"
+            | "system_instruction"
+            | "cachedContent"
+            | "cached_content"
+            | "toolConfig"
+            | "tool_config"
             | "include"
             | "api_key"
             | "apiKey"
@@ -159,6 +166,13 @@ mod tests {
             "tools",
             "api_key",
             "stream_options",
+            "contents",
+            "systemInstruction",
+            "system_instruction",
+            "cachedContent",
+            "cached_content",
+            "toolConfig",
+            "tool_config",
         ] {
             let mut invalid = valid.clone();
             invalid.body.insert(field.into(), json!(false));

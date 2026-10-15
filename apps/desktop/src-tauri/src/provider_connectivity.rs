@@ -7,13 +7,12 @@ use url::Url;
 use crate::{
     claude_code_provider::is_claude_code_identity,
     grok_provider::is_grok_identity,
-    models::ProviderProfile,
+    models::{ProviderApiFormat, ProviderProfile},
     providers::{ensure_not_local_proxy_base_url, read_provider},
     storage::resolve_paths,
 };
 
 const CONNECTIVITY_TIMEOUT: Duration = Duration::from_secs(10);
-const ANTHROPIC_VERSION: &str = "2023-06-01";
 const LM_STUDIO_PROVIDER_NAME: &str = "LM Studio";
 
 #[derive(Debug)]
@@ -67,7 +66,21 @@ fn test_provider_connectivity_blocking<R: Runtime>(
     let paths = resolve_paths(app).map_err(|_| ConnectivityError::ProviderUnavailable)?;
     let provider = read_provider(&paths, id).map_err(|_| ConnectivityError::ProviderUnavailable)?;
     let endpoint = connectivity_endpoint(&provider);
-    let url = connectivity_url(&provider.base_url, endpoint)?;
+    let url = if matches!(endpoint, ConnectivityEndpoint::Standard)
+        || provider
+            .request_options
+            .as_ref()
+            .is_some_and(|o| o.use_full_url)
+    {
+        crate::provider_discovery::models_url(
+            &provider.base_url,
+            active_format(&provider),
+            provider.request_options.as_ref(),
+        )
+        .map_err(ConnectivityError::InvalidBaseUrl)?
+    } else {
+        connectivity_url(&provider.base_url, endpoint)?
+    };
     let client = connectivity_client(&url)?;
     let response = send_connectivity_request(&client, &url, &provider, endpoint)?;
     let status = response.status();
@@ -79,6 +92,14 @@ fn test_provider_connectivity_blocking<R: Runtime>(
         .unwrap_or("Unknown error")
         .to_string();
     Err(ConnectivityError::Http(status.as_u16(), reason))
+}
+
+fn active_format(provider: &ProviderProfile) -> ProviderApiFormat {
+    provider
+        .model_api_formats
+        .get(&provider.model)
+        .copied()
+        .unwrap_or(provider.api_format)
 }
 
 fn connectivity_endpoint(provider: &ProviderProfile) -> ConnectivityEndpoint {
@@ -120,7 +141,6 @@ fn connectivity_url(
         ConnectivityEndpoint::Standard => format!("{}/models", url.path().trim_end_matches('/')),
     };
     url.set_path(&path);
-    url.set_query(None);
     url.set_fragment(None);
     Ok(url)
 }
@@ -128,7 +148,7 @@ fn connectivity_url(
 fn connectivity_client(url: &Url) -> Result<Client, ConnectivityError> {
     let builder = ClientBuilder::new()
         .timeout(CONNECTIVITY_TIMEOUT)
-        .redirect(reqwest::redirect::Policy::limited(5))
+        .redirect(reqwest::redirect::Policy::none())
         .user_agent("Codex-Switch");
     let builder = if url.host_str().is_some_and(is_loopback_host) {
         builder.no_proxy()
@@ -150,21 +170,20 @@ fn send_connectivity_request(
     provider: &ProviderProfile,
     endpoint: ConnectivityEndpoint,
 ) -> Result<reqwest::blocking::Response, ConnectivityError> {
-    let mut request = client
-        .get(url.clone())
-        .header(reqwest::header::ACCEPT, "application/json");
-    let api_key = provider.api_key.trim();
-    if !api_key.is_empty() {
-        request = request.bearer_auth(api_key);
-    }
-    if matches!(endpoint, ConnectivityEndpoint::ClaudeCode) {
-        request = request
-            .header("anthropic-version", ANTHROPIC_VERSION)
-            .header("x-api-key", api_key);
-    }
-    request
-        .send()
-        .map_err(|error| ConnectivityError::Request(error.to_string()))
+    let format = if matches!(endpoint, ConnectivityEndpoint::ClaudeCode) {
+        ProviderApiFormat::AnthropicMessages
+    } else {
+        active_format(provider)
+    };
+    crate::provider_discovery::apply_headers(
+        client.get(url.clone()),
+        &provider.api_key,
+        format,
+        provider.request_options.as_ref(),
+    )
+    .map_err(ConnectivityError::InvalidBaseUrl)?
+    .send()
+    .map_err(|_| ConnectivityError::Request("Service unavailable".into()))
 }
 
 #[cfg(test)]

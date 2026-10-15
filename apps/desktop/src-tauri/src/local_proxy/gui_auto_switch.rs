@@ -97,7 +97,11 @@ pub(super) fn prepare<R: Runtime>(
     session: Option<&str>,
 ) -> Result<Route, AutoSwitchError> {
     let route = initial(app)?;
-    if !route.config.settings.enabled || matches!(route.selection, GuiAccountSelection::Provider(_))
+    if !route.config.settings.enabled
+        || matches!(
+            route.selection,
+            GuiAccountSelection::Provider(_) | GuiAccountSelection::Aggregate(_)
+        )
     {
         return Ok(route);
     }
@@ -359,7 +363,7 @@ pub(super) fn after_quota<R: Runtime>(
     if latest.seed.revision != route.seed.revision {
         let reusable = match &latest.selection {
             GuiAccountSelection::Account(id) => !failed.contains(id),
-            GuiAccountSelection::Provider(_) => true,
+            GuiAccountSelection::Provider(_) | GuiAccountSelection::Aggregate(_) => true,
             GuiAccountSelection::None => false,
         };
         return Ok((reusable && latest.selection != route.selection).then_some(latest));

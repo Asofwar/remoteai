@@ -22,12 +22,20 @@ pub(crate) struct SavedCloudLogin {
     pub(super) password: String,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) enum CloudSyncWarning {
+    AggregateSyncUnavailable,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct CloudAuthenticationResult {
     pub(super) state: CloudAuthState,
     pub(super) password_saved: bool,
     pub(super) credential_storage_updated: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) sync_warning: Option<CloudSyncWarning>,
 }
 
 #[derive(Deserialize)]

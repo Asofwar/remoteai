@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "maturity_tests.rs"]
+mod maturity;
+
 struct Scenario {
     scheduler: AggregateScheduler,
     policy: AggregateFailoverPolicy,

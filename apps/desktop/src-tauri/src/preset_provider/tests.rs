@@ -2,6 +2,33 @@ use super::{models_url, parse_models, preset_spec, PresetProviderId};
 use serde_json::json;
 
 #[test]
+fn gemini_native_models_use_generate_content_and_filter_other_methods() {
+    let spec = preset_spec(PresetProviderId::Gemini);
+    let base = "https://generativelanguage.googleapis.com/v1beta";
+    assert_eq!(
+        models_url(spec, base).unwrap().as_str(),
+        format!("{base}/models")
+    );
+    assert_eq!(
+        super::api_format_for_base_url(spec, base),
+        crate::models::ProviderApiFormat::GeminiGenerateContent
+    );
+    assert_eq!(
+        super::api_format_for_base_url(spec, &format!("{base}/openai")),
+        crate::models::ProviderApiFormat::OpenaiChat
+    );
+    let payload = json!({"models":[
+        {"name":"models/gemini-3-flash", "supportedGenerationMethods":["generateContent","countTokens"]},
+        {"name":"models/gemini-live", "supportedGenerationMethods":["bidiGenerateContent"]},
+        {"name":"models/gemini-embedding-001", "supportedGenerationMethods":["embedContent"]}
+    ]});
+    assert_eq!(
+        parse_models(spec, &payload).unwrap(),
+        vec!["gemini-3-flash"]
+    );
+}
+
+#[test]
 fn gemini_models_use_the_official_openai_compatible_endpoint() {
     let spec = preset_spec(PresetProviderId::Gemini);
     for base_url in [

@@ -1,6 +1,6 @@
 import { t } from '../i18n';
 import * as SecureStore from 'expo-secure-store';
-import { remoteModelPath, type RemoteModelTarget } from '../../../../shared/remote-chat/modelTarget';
+import { remoteModelPath, remoteProviderCommand, type RemoteModelTarget } from '../../../../shared/remote-chat/modelTarget';
 import type {
   AccountDetailsDraft,
   AccountOAuthPoll,
@@ -499,7 +499,7 @@ export async function fetchRemoteDevices(session: AuthSession): Promise<RemoteDe
 export async function fetchRemoteProviders(
   session: AuthSession,
 ): Promise<RemoteProviderSummary[]> {
-  const response = await authorizedRequest(session, '/devices/providers');
+  const response = await authorizedRequest(session, '/devices/providers?includeAggregates=true');
   if (!response.ok) throw new ApiError(await parseError(response), response.status);
   const payload: unknown = await response.json();
   if (!payload || typeof payload !== 'object' || !Array.isArray((payload as { providers?: unknown }).providers)) {
@@ -547,11 +547,12 @@ export async function switchRemoteDeviceProvider(
   providerId: string,
   target: RemoteModelTarget = 'proxy',
 ): Promise<RemoteModelSwitchResult> {
-  const path = `/devices/${encodeURIComponent(deviceId)}/${remoteModelPath('provider', target)}`;
+  const command = remoteProviderCommand(providerId, target);
+  const path = `/devices/${encodeURIComponent(deviceId)}/${command.path}`;
   const response = await authorizedRequest(session, path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ providerId }),
+    body: JSON.stringify(command.body),
   });
   if (!response.ok) throw new ApiError(await parseError(response), response.status);
   return response.json() as Promise<RemoteModelSwitchResult>;

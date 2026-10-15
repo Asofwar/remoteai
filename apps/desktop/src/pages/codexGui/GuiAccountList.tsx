@@ -10,6 +10,7 @@ interface Props {
   disabled: boolean; loading: boolean; footer: ReactNode;
   devicePicker: ReactNode;
   onSelectAccount: (id: string) => void; onSelectProvider: (id: string) => void;
+  onSelectAggregate?: (id: string) => void;
 }
 
 export function GuiAccountList(props: Props) {
@@ -20,6 +21,7 @@ export function GuiAccountList(props: Props) {
     <div className={styles.list} aria-busy={props.loading}>
       <GuiAccountGroup choices={choices} disabled={props.disabled} onSelect={(choice) => {
         if (choice.kind === 'account') props.onSelectAccount(choice.id);
+        else if (choice.kind === 'aggregate') props.onSelectAggregate?.(choice.id);
         else props.onSelectProvider(choice.id);
       }} />
     </div>

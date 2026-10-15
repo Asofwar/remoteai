@@ -21,6 +21,7 @@ it('reads the independent GUI account and sends only picker fields from this com
         } },
     ];
     if (command === 'list_providers') return [{ id: 'provider', name: 'Provider', model: 'model', apiKey: 'secret' }];
+    if (command === 'list_aggregate_apis') return [];
     throw new Error('Unexpected command');
   });
   const snapshot = await readGuiAccounts();
@@ -67,4 +68,24 @@ it('supports selecting a GUI provider through the same isolated command', async 
     .resolves.toEqual({ kind: 'provider', id: 'provider' });
   expect(invoke).toHaveBeenCalledExactlyOnceWith('codex_gui_switch_account',
     { selection: { kind: 'provider', id: 'provider' } });
+});
+
+it('lets remote clients select aggregates without converting them to providers', async () => {
+  vi.mocked(invoke).mockResolvedValue({ kind: 'aggregate', id: 'pool' });
+  await expect(selectGuiAccount({ kind: 'aggregate', id: 'pool' }))
+    .resolves.toEqual({ kind: 'aggregate', id: 'pool' });
+  expect(invoke).toHaveBeenCalledExactlyOnceWith('codex_gui_switch_account',
+    { selection: { kind: 'aggregate', id: 'pool' } });
+});
+
+it('publishes aggregate availability without exposing member settings', async () => {
+  vi.mocked(invoke).mockImplementation(async command => {
+    if (command === 'codex_gui_account_selection') return { kind: 'aggregate', id: 'pool' };
+    if (command === 'list_aggregate_apis') return [{ id: 'pool', name: 'Pool', model: 'shared',
+      enabled: true, memberModels: { private: 'deployment' }, failoverPolicy: { enabled: true } }];
+    return [];
+  });
+  expect((await readGuiAccounts()).choices).toEqual([
+    { kind: 'aggregate', id: 'pool', name: 'Pool', detail: 'shared', available: true },
+  ]);
 });

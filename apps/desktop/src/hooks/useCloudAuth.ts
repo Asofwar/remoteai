@@ -89,7 +89,11 @@ export function useCloudAuth(notify: (message: string) => void, t: Translate) {
       if (!result.credentialStorageUpdated) {
         notify(t("toast.cloudPasswordSaveFailed"));
       }
-      await syncAfterAuthentication();
+      if (result.syncWarning === "aggregateSyncUnavailable") {
+        notify(t("toast.cloudAggregateSyncUnavailable"));
+      } else {
+        await syncAfterAuthentication();
+      }
       return true;
     } catch (error) {
       notify(cloudLoginErrorMessage(error, t));
@@ -127,7 +131,11 @@ export function useCloudAuth(notify: (message: string) => void, t: Translate) {
       if (!result.credentialStorageUpdated) {
         notify(t("toast.cloudPasswordSaveFailed"));
       }
-      await syncAfterAuthentication();
+      if (result.syncWarning === "aggregateSyncUnavailable") {
+        notify(t("toast.cloudAggregateSyncUnavailable"));
+      } else {
+        await syncAfterAuthentication();
+      }
       return true;
     } catch (error) {
       notify(String(error));

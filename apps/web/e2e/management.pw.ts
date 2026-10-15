@@ -233,3 +233,28 @@ test('pending GUI switch prevents duplicate actions and a failure preserves the 
   await expect(page.getByRole('button', { name: /测试 Provider test-model/ })).toBeEnabled();
   await expect(page.getByRole('button', { name: /studio@example.test 官方模型/ })).toBeDisabled();
 });
+
+test('aggregate selections keep GUI and proxy targets independent', async ({ page }, info) => {
+  await navigate(page, '设备');
+  const open = async () => page.locator('.device-card').filter({ hasText: '我的工作电脑' })
+    .getByRole('button', { name: /切换模型/ }).click();
+  await open();
+  await page.getByRole('button', { name: 'Codex GUI 模型', exact: true }).click();
+  const guiRequest = page.waitForRequest('**/devices/sample-pc/gui-aggregate');
+  await page.getByRole('button', { name: /聚合测试 public-model/ }).click();
+  expect((await guiRequest).postDataJSON()).toEqual({ aggregateId: 'route-1' });
+  await open();
+  await expect(page.getByRole('button', { name: /alex@example.test 官方模型/ })).toBeDisabled();
+  await page.getByRole('button', { name: 'Codex GUI 模型', exact: true }).click();
+  await expect(page.getByRole('button', { name: /聚合测试 public-model/ })).toBeDisabled();
+  await page.getByRole('button', { name: '代理接口模型', exact: true }).click();
+  const proxyRequest = page.waitForRequest('**/devices/sample-pc/aggregate');
+  await page.getByRole('button', { name: /聚合测试 public-model/ }).click();
+  expect((await proxyRequest).postDataJSON()).toEqual({ aggregateId: 'route-1' });
+  await open();
+  await expect(page.getByRole('button', { name: /聚合测试 public-model/ })).toBeDisabled();
+  await page.getByRole('button', { name: /聚合测试 public-model/ }).scrollIntoViewIfNeeded();
+  await expect(page.getByText('代理接口模型已切换', { exact: true })).toBeHidden();
+  await noOverflow(page);
+  await page.screenshot({ path: info.outputPath('aggregate-model-selection.png'), animations: 'disabled' });
+});

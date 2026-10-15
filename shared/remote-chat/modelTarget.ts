@@ -20,8 +20,22 @@ export function mergeRemoteModelState<T extends RemoteModelState>(device: T, res
 }
 
 /** Keep existing proxy endpoints compatible with older desktop clients. */
-export function remoteModelPath(kind: 'account' | 'provider', target: RemoteModelTarget): string {
+export function remoteModelPath(kind: 'account' | 'provider' | 'aggregate', target: RemoteModelTarget): string {
   return target === 'gui' ? `gui-${kind}` : kind;
+}
+
+const AGGREGATE_ID_PREFIX = 'aggregate:';
+
+export function isRemoteAggregateId(id: string): boolean {
+  return id.startsWith(AGGREGATE_ID_PREFIX);
+}
+
+/** Preserve the existing provider selection shape while using a dedicated, capability-checked command. */
+export function remoteProviderCommand(id: string, target: RemoteModelTarget) {
+  if (isRemoteAggregateId(id)) {
+    return { path: remoteModelPath('aggregate', target), body: { aggregateId: id.slice(AGGREGATE_ID_PREFIX.length) } };
+  }
+  return { path: remoteModelPath('provider', target), body: { providerId: id } };
 }
 
 export function remoteModelOptions(device: (RemoteModelState & {
@@ -34,6 +48,8 @@ export function remoteModelOptions(device: (RemoteModelState & {
     supported,
     accountAvailable: !gui || supported,
     providerAvailable: supported && (gui || Boolean(device?.localProxyRunning)),
+    aggregateAvailable: (device?.capabilities.includes(gui ? 'gui-aggregate-switch' : 'aggregate-switch') ?? false)
+      && (gui || Boolean(device?.localProxyRunning)),
     groupSupported: !gui && (device?.capabilities.includes('provider-group-switch') ?? false),
     accountId: gui ? device?.guiAccountId : device?.activeAccountId,
     providerId: gui ? device?.guiProviderId : device?.activeProviderId,

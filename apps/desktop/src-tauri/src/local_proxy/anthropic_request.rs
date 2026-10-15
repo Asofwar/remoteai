@@ -156,6 +156,7 @@ fn anthropic_content_block(block: &Value, role: &str) -> Option<Value> {
             .and_then(Value::as_str)
             .map(|text| json!({ "type": response_text_type(role), "text": text })),
         Some("image") if role != "assistant" => anthropic_image_block(block),
+        Some("document") if role != "assistant" => bridge_media::anthropic_document(block),
         _ => None,
     }
 }
@@ -211,6 +212,7 @@ fn anthropic_tool_result_output(block: &Value) -> Value {
 
 fn anthropic_tool_result_part(part: &Value) -> Value {
     match part.get("type").and_then(Value::as_str) {
+        Some("document") => bridge_media::anthropic_document(part).unwrap_or(Value::Null),
         Some("text") => json!({
             "type": "input_text",
             "text": part.get("text").and_then(Value::as_str).unwrap_or_default()

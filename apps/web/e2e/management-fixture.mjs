@@ -21,13 +21,15 @@ const devices = [
   { deviceId: 'sample-pc', name: '我的工作电脑', platform: 'Windows', online: true,
     activeAccountId: accounts[0].id, activeProviderId: null, activeProviderGroup: null,
     guiAccountId: accounts[1].id, guiProviderId: null,
-    capabilities: ['provider-switch', 'provider-group-switch', 'gui-model-switch'],
+    capabilities: ['provider-switch', 'provider-group-switch', 'gui-model-switch',
+      'aggregate-switch', 'gui-aggregate-switch'],
     lastSeenAt: now, localProxyRunning: true },
   { deviceId: 'offline-pc', name: '备用电脑', platform: 'Windows', online: false,
     activeAccountId: accounts[0].id, capabilities: [], lastSeenAt: now, localProxyRunning: false },
 ];
 const initialDevices = structuredClone(devices);
 const providers = [{ id: 'provider-1', name: '测试 Provider', model: 'test-model', group: '工作分组' }];
+const aggregates = [{ id: 'aggregate:route-1', name: '聚合测试', model: 'public-model', group: '', kind: 'aggregate' }];
 let credits = [{ issuedAt: now, expiresAt: '2027-12-31' }];
 let vault = { entries: ['GitHub', 'OpenAI', 'AWS'].map((issuer, index) => ({
   id: `totp-${index}`, issuer, accountName: `review-${index}@example.test`, secret: 'JBSWY3DPEHPK3PXP',
@@ -53,16 +55,19 @@ const server = http.createServer(async (request, response) => {
   else if (path === '/sync/accounts/web-summary') result = { accounts };
   else if (path === '/devices') result = { devices };
   else if (path === '/devices/providers') result = { providers };
+  else if (path === '/devices/providers?includeAggregates=true') result = { providers: [...providers, ...aggregates] };
   else if (path?.startsWith('/devices/sample-pc/') && request.method === 'POST') {
     const device = devices[0];
     const input = JSON.parse(body);
     switch (path.split('/').at(-1)) {
       case 'gui-account': device.guiAccountId = input.accountId; device.guiProviderId = null; break;
       case 'gui-provider': device.guiAccountId = null; device.guiProviderId = input.providerId; break;
+      case 'gui-aggregate': device.guiAccountId = null; device.guiProviderId = `aggregate:${input.aggregateId}`; break;
       case 'account':
         device.activeAccountId = input.accountId; device.activeProviderId = null; device.activeProviderGroup = null;
         break;
       case 'provider': device.activeProviderId = input.providerId; device.activeProviderGroup = null; break;
+      case 'aggregate': device.activeProviderId = `aggregate:${input.aggregateId}`; device.activeProviderGroup = null; break;
       case 'provider-group': device.activeProviderId = null; device.activeProviderGroup = input.group; break;
       default: response.writeHead(404);
     }

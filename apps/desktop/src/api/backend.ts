@@ -439,7 +439,8 @@ function normalizeModelApiFormats(models: string[], value: unknown): Provider["m
   const normalized: Provider["modelApiFormats"] = {};
   for (const model of models) {
     const apiFormat = (value as Record<string, unknown>)[model];
-    if (apiFormat === "openaiResponses" || apiFormat === "openaiChat" || apiFormat === "anthropicMessages") {
+    if (apiFormat === "openaiResponses" || apiFormat === "openaiChat"
+      || apiFormat === "anthropicMessages" || apiFormat === "geminiGenerateContent") {
       normalized[model] = apiFormat;
     }
   }
@@ -833,18 +834,22 @@ export async function saveAggregateApiProfile(input: AggregateApiInput): Promise
     if (memberIds.length < 2) throw new Error("Select at least two APIs for the aggregate");
     const members = memberIds.map((id) => providers.find((provider) => provider.id === id));
     if (members.some((provider) => !provider)) throw new Error("Provider does not exist");
-    if (members.some((provider) => !provider?.models.includes(input.model))) {
-      throw new Error("Every API in an aggregate must support the selected model");
-    }
     const aggregates = readPreviewAggregateApis();
     const index = input.id ? aggregates.findIndex((aggregate) => aggregate.id === input.id) : -1;
     const previous = index >= 0 ? aggregates[index] : undefined;
+    const memberModels = Object.fromEntries(Object.entries(input.memberModels ?? previous?.memberModels ?? {})
+      .filter(([id]) => memberIds.includes(id)).map(([id, model]) => [id, model.trim()]));
+    if (members.some((provider) => !provider || ![provider.model, ...provider.models]
+      .includes(memberModels[provider.id] ?? input.model))) {
+      throw new Error("Every API in an aggregate must support the selected model");
+    }
     const failoverPolicy = copyFailoverPolicy(input.failoverPolicy ?? previous?.failoverPolicy);
     if (!validFailoverPolicy(failoverPolicy)) throw new Error("Check the failover settings and try again");
     const aggregate: AggregateApi = {
       ...input,
       id: input.id ?? previewProviderId(),
       memberProviderIds: memberIds,
+      memberModels,
       active: index >= 0 && aggregates[index].active && input.enabled,
       memberConversationCounts: index >= 0 ? aggregates[index].memberConversationCounts ?? {} : {},
       failoverPolicy,
@@ -1055,6 +1060,7 @@ export async function fetchClaudeCodeModels(
 }
 
 export interface PresetModelQuery {
+  requestOptions?: import("../types").ProviderRequestOptions;
   presetId: string;
   baseUrl: string;
   apiKey?: string;
@@ -1069,6 +1075,7 @@ export async function fetchPresetModels(
   return invoke<string[]>("fetch_preset_models", {
     request: {
       presetId: request.presetId,
+      requestOptions: request.requestOptions ?? null,
       baseUrl: request.baseUrl,
       apiKey: request.apiKey?.trim() || null,
       providerId: request.providerId ?? null,
@@ -1076,19 +1083,19 @@ export async function fetchPresetModels(
   });
 }
 
-export async function fetchRelayModels(baseUrl: string, apiKey: string, providerId?: string): Promise<string[]> {
+export async function fetchRelayModels(baseUrl: string, apiKey: string, providerId?: string,
+  options?: { apiFormat?: import("../types").ProviderApiFormat;
+    requestOptions?: import("../types").ProviderRequestOptions }): Promise<string[]> {
   if (!hasLocalBackend) {
     return [DEFAULT_OPENAI_PROVIDER_MODEL, "gpt-5.6-sol", "gpt-5.4"];
   }
   return invoke<string[]>("fetch_relay_models", {
-    baseUrl,
-    apiKey: apiKey.trim(),
-    providerId: providerId ?? null,
+    request: { baseUrl, apiKey: apiKey.trim(), providerId: providerId ?? null, options: options ?? null },
   });
 }
 
 export async function testProviderConnectivity(id: string): Promise<void> {
-  if (!isDesktopApp) return;
+  if (!hasLocalBackend) return;
   await invoke("test_provider_connectivity", { id });
 }
 

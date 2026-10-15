@@ -192,6 +192,15 @@ fn chat_to_responses_json(
     tool_context: &CodexToolContext,
     continuation_scope: Option<&chat_bridge_continuation::ContinuationScope>,
 ) -> Value {
+    chat_to_responses_json_with_history(chat, tool_context, continuation_scope, &[])
+}
+
+fn chat_to_responses_json_with_history(
+    chat: &Value,
+    tool_context: &CodexToolContext,
+    continuation_scope: Option<&chat_bridge_continuation::ContinuationScope>,
+    request_history: &[Value],
+) -> Value {
     let id = chat
         .get("id")
         .and_then(Value::as_str)
@@ -210,6 +219,7 @@ fn chat_to_responses_json(
     let status = ChatCompletionStatus::from_chat(chat).unwrap_or(ChatCompletionStatus::Completed);
     if let Some(scope) = continuation_scope.filter(|_| status == ChatCompletionStatus::Completed) {
         chat_bridge_continuation::capture_message(scope, &message);
+        chat_bridge_continuation::capture_response(scope, &id, &message, request_history);
     }
     let content = message
         .get("content")
@@ -229,7 +239,7 @@ fn chat_to_responses_json(
             "type": "message",
             "status": "completed",
             "role": "assistant",
-            "content": [{ "type": "output_text", "text": content, "annotations": [] }]
+            "content": [{ "type": "output_text", "text": content, "annotations": chat_annotations::extract(&message) }]
         }));
     }
     if let Some(tool_calls) = message.get("tool_calls").and_then(Value::as_array) {

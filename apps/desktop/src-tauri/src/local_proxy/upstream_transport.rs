@@ -171,16 +171,7 @@ impl Request {
             })?;
             sent_before_redirect |= !target.body.is_empty();
             if !target.follow(&response)? {
-                let content_type = response
-                    .headers()
-                    .get(header::CONTENT_TYPE)
-                    .and_then(|v| v.to_str().ok());
-                let idle = if super::is_event_stream(content_type) {
-                    self.timeouts.sse_response_idle
-                } else {
-                    Some(self.timeouts.response_idle)
-                };
-                return Ok(Response::new(response, idle).with_deadline(self.deadline));
+                return Ok(Response::new(response, self.timeouts).with_deadline(self.deadline));
             }
         }
     }

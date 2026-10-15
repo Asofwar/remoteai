@@ -1,9 +1,12 @@
 use super::*;
+use crate::aggregate_failover::AggregateRoutingStrategy;
+use std::collections::VecDeque;
 
 const MAX_ASSIGNMENTS: usize = 10_000;
 const MAX_SESSION_ID_BYTES: usize = 1024;
 const ASSIGNMENT_TTL: Duration = Duration::from_secs(24 * 60 * 60);
 const MAX_SERVER_RETRY_DELAY: Duration = Duration::from_secs(24 * 60 * 60);
+const ERROR_RATE_WINDOW: usize = 100;
 
 #[derive(Default)]
 pub(super) struct AggregateRuntime {
@@ -27,6 +30,8 @@ pub(super) struct MemberRuntime {
     consecutive_failures: u32,
     retry_at: Option<Instant>,
     probe_lease_id: Option<u64>,
+    recovery_successes: u32,
+    outcomes: VecDeque<bool>,
 }
 
 pub(super) struct LeaseToken {
@@ -49,8 +54,7 @@ impl AggregateRuntime {
         self.retain(options.member_ids, lease_id, now);
         let selected = self
             .sticky_member(options)
-            .or_else(|| self.recovery_candidate(options, now))
-            .or_else(|| self.least_loaded_member(options))
+            .or_else(|| self.routed_member(options, now))
             .ok_or_else(|| "All APIs in this aggregate are temporarily unavailable".to_string())?;
         let Some(member) = self.members.get_mut(&selected) else {
             return Err("The selected API is no longer available".to_string());
@@ -164,6 +168,26 @@ impl AggregateRuntime {
             .cloned()
     }
 
+    fn routed_member(&mut self, options: &SelectionOptions<'_>, now: Instant) -> Option<String> {
+        if options.policy.routing_strategy == AggregateRoutingStrategy::Balanced {
+            return self
+                .recovery_candidate(options, now)
+                .or_else(|| self.least_loaded_member(options));
+        }
+        options
+            .member_ids
+            .iter()
+            .find(|id| {
+                !options.excluded.contains(*id)
+                    && self.members.get(*id).is_some_and(|member| {
+                        !options.policy.enabled
+                            || (member.probe_lease_id.is_none()
+                                && member.retry_at.is_none_or(|retry_at| retry_at <= now))
+                    })
+            })
+            .cloned()
+    }
+
     fn sticky_member(&self, options: &SelectionOptions<'_>) -> Option<String> {
         let assignment = self.assignments.get(usable_session(options.session_id)?)?;
         self.healthy_candidate(&assignment.member_id, options)
@@ -224,11 +248,12 @@ impl MemberRuntime {
         now: Instant,
     ) {
         match outcome {
-            // Concurrent requests begun before the latest failure cannot clear that failure.
-            MemberOutcome::Success if token.failure_version == self.failure_version => {
-                self.consecutive_failures = 0;
-                self.retry_at = None;
-                self.probe_lease_id = None;
+            MemberOutcome::Success => {
+                self.record_outcome(false);
+                // Concurrent successes still count toward error rate, but cannot clear a newer failure.
+                if token.failure_version == self.failure_version {
+                    self.succeed(policy, now);
+                }
             }
             MemberOutcome::Failure { retry_after } => self.fail(policy, retry_after, now),
             MemberOutcome::Neutral if self.probe_lease_id == Some(token.lease_id) => {
@@ -238,6 +263,38 @@ impl MemberRuntime {
         }
     }
 
+    fn succeed(&mut self, policy: &AggregateFailoverPolicy, now: Instant) {
+        if self.probe_lease_id.take().is_some() {
+            self.recovery_successes = self.recovery_successes.saturating_add(1);
+            self.epoch = self.epoch.saturating_add(1);
+            if self.recovery_successes < policy.recovery_success_threshold {
+                self.retry_at = Some(now);
+                return;
+            }
+            self.outcomes.clear();
+        }
+        self.consecutive_failures = 0;
+        self.recovery_successes = 0;
+        self.retry_at = None;
+    }
+
+    fn record_outcome(&mut self, failed: bool) {
+        self.outcomes.push_back(failed);
+        if self.outcomes.len() > ERROR_RATE_WINDOW {
+            self.outcomes.pop_front();
+        }
+    }
+
+    fn error_rate_exceeded(&self, policy: &AggregateFailoverPolicy) -> bool {
+        policy
+            .error_rate_threshold_percent
+            .is_some_and(|threshold| {
+                self.outcomes.len() >= policy.error_rate_min_requests as usize
+                    && self.outcomes.iter().filter(|failed| **failed).count() * 100
+                        >= self.outcomes.len() * threshold as usize
+            })
+    }
+
     fn fail(
         &mut self,
         policy: &AggregateFailoverPolicy,
@@ -245,12 +302,14 @@ impl MemberRuntime {
         now: Instant,
     ) {
         self.consecutive_failures = self.consecutive_failures.saturating_add(1);
+        self.record_outcome(true);
         self.failure_version = self.failure_version.saturating_add(1);
         let server_cooldown =
             policy.respect_retry_after && retry_after.is_some_and(|delay| !delay.is_zero());
         if self.consecutive_failures >= policy.failure_threshold
             || self.probe_lease_id.is_some()
             || server_cooldown
+            || self.error_rate_exceeded(policy)
         {
             self.cool_down(policy, retry_after, now);
         }
@@ -263,6 +322,7 @@ impl MemberRuntime {
         now: Instant,
     ) {
         self.epoch = self.epoch.saturating_add(1);
+        self.recovery_successes = 0;
         self.probe_lease_id = None;
         let exponent = self
             .consecutive_failures

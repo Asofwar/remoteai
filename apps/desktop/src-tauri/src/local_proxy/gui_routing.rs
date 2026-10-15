@@ -31,6 +31,18 @@ pub(super) fn selected_target<R: Runtime>(
             providers::ensure_not_local_proxy_base_url(&provider.base_url)?;
             Ok(ActiveTarget::Provider(Box::new(provider)))
         }
+        GuiAccountSelection::Aggregate(id) => {
+            let paths = resolve_paths(app)?;
+            let config = aggregate_api::read_config(&paths, id)?;
+            if !config.enabled {
+                return Err("Aggregate API is disabled".into());
+            }
+            let profiles = aggregate_api::member_profiles(&paths, &config)?;
+            Ok(ActiveTarget::Aggregate(Box::new(AggregateTarget {
+                config,
+                profiles,
+            })))
+        }
         GuiAccountSelection::None => Err("请先选择 Codex GUI 账户。".to_string()),
     }
 }
@@ -80,6 +92,16 @@ fn models<R: Runtime>(
     target: &ActiveTarget,
     account_id: Option<&str>,
 ) -> Result<UpstreamPayload, String> {
+    if let ActiveTarget::Aggregate(aggregate) = target {
+        let provider = aggregate_api::logical_profile(&aggregate.config, &aggregate.profiles)?;
+        return super::gui_context::model_catalog(
+            provider_models_payload_with_image_route(&provider, false),
+            |catalog| {
+                crate::codex_gui::model_context::prepare_catalog(request.app, catalog, false)
+                    .map_err(|error| error.to_string())
+            },
+        );
+    }
     if let ActiveTarget::Provider(provider) = target {
         if !providers::uses_upstream_official_models(provider) {
             return super::gui_context::model_catalog(

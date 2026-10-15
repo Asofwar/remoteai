@@ -174,10 +174,11 @@ export function useAccountManager(
         notify(t("toast.archiveImported", {
           accounts: result.result.imported,
           providers: result.result.providersImported,
+          aggregates: result.result.aggregatesImported ?? 0,
         }));
         await load();
         await Promise.allSettled(result.result.accountIds.map(syncAddedAccount));
-        if (result.result.providerIds.length) await cloudSync?.pushAll?.();
+        if (result.result.providerIds.length || result.result.aggregatesImported) await cloudSync?.pushAll?.();
       }
     } catch (error) {
       notify(String(error));

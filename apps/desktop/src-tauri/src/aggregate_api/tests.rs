@@ -57,6 +57,7 @@ fn custom_policy() -> AggregateFailoverPolicy {
         retry_status_codes: vec![429, 503],
         retry_on_network_errors: false,
         respect_retry_after: false,
+        ..Default::default()
     }
 }
 
@@ -82,7 +83,7 @@ fn custom_policy_survives_file_roundtrip() {
     let fixture = Fixture::new();
     let mut config: AggregateApiConfig = serde_json::from_value(config_json()).unwrap();
     config.failover_policy = custom_policy();
-    write_configs(&fixture.paths, &[config.clone()]).unwrap();
+    write_configs(&fixture.paths, std::slice::from_ref(&config)).unwrap();
     assert_eq!(read_configs(&fixture.paths).unwrap(), [config]);
     let saved = read_json(&store_path(&fixture.paths).unwrap()).unwrap();
     assert_eq!(saved[0]["failoverPolicy"]["maxAttempts"], 7);
@@ -160,4 +161,44 @@ fn invalid_saved_policy_is_rejected_when_reading() {
     config["failoverPolicy"] = json!({ "maxCooldownSeconds": 3601 });
     fixture.save_json(json!([config]));
     assert!(read_configs(&fixture.paths).is_err());
+}
+
+#[test]
+fn member_aliases_validate_individually_and_survive_legacy_updates() {
+    let fixture = Fixture::new();
+    for (id, alias) in [("a", "deployment-a"), ("b", "vendor/model-b")] {
+        write_json_atomic(&fixture.paths.providers.join(format!("{id}.json")), &json!({
+            "id": id, "name": id, "baseUrl": "https://provider.example/v1", "apiKey": "test-key",
+            "model": alias, "apiFormat": "openaiResponses", "modelReasoningEfforts": {alias: ["high"]},
+            "modelContextWindows": {alias: 64000}, "imageInputModels": [alias],
+        })).unwrap();
+    }
+    let mut input = config_json();
+    input["model"] = json!("shared-model");
+    input["memberModels"] = json!({"a": "deployment-a", "b": "vendor/model-b"});
+    let config = normalize_update(
+        serde_json::from_value(input.clone()).unwrap(),
+        &fixture.paths,
+        &[],
+    )
+    .unwrap();
+    write_configs(&fixture.paths, std::slice::from_ref(&config)).unwrap();
+    let profiles = member_profiles(&fixture.paths, &config).unwrap();
+    let logical = logical_profile(&config, &profiles).unwrap();
+    assert_eq!(logical.model, "shared-model");
+    assert_eq!(logical.model_context_windows["shared-model"], 64000);
+    assert_eq!(logical.image_input_models, ["shared-model"]);
+    input.as_object_mut().unwrap().remove("memberModels");
+    let updated = normalize_update(
+        serde_json::from_value(input).unwrap(),
+        &fixture.paths,
+        std::slice::from_ref(&config),
+    )
+    .unwrap();
+    assert_eq!(updated.member_models, config.member_models);
+    let mut invalid = config;
+    invalid
+        .member_models
+        .insert("b".into(), "unsupported".into());
+    assert!(member_profiles(&fixture.paths, &invalid).is_err());
 }

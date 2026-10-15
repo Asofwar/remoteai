@@ -137,3 +137,61 @@ fn session_polling_remains_responsive_while_sse_waits_for_data() {
     assert_eq!(requests.len(), 1);
     assert!(requests[0].response_time_ms.is_none());
 }
+
+#[test]
+fn mislabeled_sse_uses_the_captured_stream_timeout_after_detection() {
+    use crate::local_proxy::{chat_bridge_response, CodexToolContext, UpstreamBody};
+    const CHAT: &str = "data: {\"choices\":[{\"delta\":{\"content\":\"hello\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n";
+    let (url, server) = delayed_response(
+        "application/json",
+        vec![(HEARTBEAT, Duration::ZERO), (CHAT, IDLE * 2)],
+    );
+    let mut request = prepared_request(url, Vec::new());
+    request.timeouts.sse_response_idle = None;
+    let payload = chat_bridge_response::convert(
+        request.send().unwrap(),
+        chat_bridge_response::Context {
+            stream: false,
+            model: "test".into(),
+            tools: CodexToolContext::default(),
+            scope: None,
+            request_history: Vec::new(),
+        },
+    )
+    .unwrap();
+    let UpstreamBody::Buffered(body) = payload.body else {
+        panic!("expected a JSON response")
+    };
+    let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(body["output"][0]["content"][0]["text"], "hello");
+    server.join().unwrap();
+}
+
+#[test]
+fn mislabeled_json_still_enforces_the_normal_body_idle_timeout() {
+    use crate::local_proxy::{chat_bridge_response, CodexToolContext};
+    let (url, server) = delayed_response(
+        "text/event-stream",
+        vec![
+            ("{", Duration::ZERO),
+            (
+                "\"choices\":[{\"message\":{\"content\":\"hello\"}}]}",
+                IDLE * 2,
+            ),
+        ],
+    );
+    let mut request = prepared_request(url, Vec::new());
+    request.timeouts.sse_response_idle = None;
+    let result = chat_bridge_response::convert(
+        request.send().unwrap(),
+        chat_bridge_response::Context {
+            stream: true,
+            model: "test".into(),
+            tools: CodexToolContext::default(),
+            scope: None,
+            request_history: Vec::new(),
+        },
+    );
+    assert!(result.is_err());
+    server.join().unwrap();
+}

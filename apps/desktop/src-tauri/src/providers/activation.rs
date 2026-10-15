@@ -472,6 +472,8 @@ pub(crate) fn delete_provider<R: Runtime>(
         fs::remove_file(&path).map_err(|error| format!("Failed to delete provider: {error}"))?;
     }
     crate::aggregate_api::remove_provider_membership(&paths, &id)?;
+    crate::codex_gui::account_selection::refresh_aggregate_selection(&app)
+        .map_err(|error| error.to_string())?;
     if let Some(active_id) = original_state
         .active_provider_id
         .as_deref()

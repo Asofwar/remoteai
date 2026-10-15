@@ -50,10 +50,19 @@ pub(super) fn body(body: &mut Value, provider: &ProviderProfile) {
     let Some(options) = &provider.request_options else {
         return;
     };
+    let client_tool_limit = body["max_tool_calls"].as_u64();
     if let Some(target) = body.as_object_mut() {
         for (key, value) in &options.body {
             merge(target.entry(key.clone()).or_insert(Value::Null), value);
         }
+    }
+    preserve_tool_limit(body, client_tool_limit);
+}
+
+fn preserve_tool_limit(body: &mut Value, client_limit: Option<u64>) {
+    if let Some(limit) = client_limit {
+        let configured = body["max_tool_calls"].as_u64().unwrap_or(limit);
+        body["max_tool_calls"] = Value::from(limit.min(configured));
     }
 }
 
@@ -71,6 +80,18 @@ fn merge(target: &mut Value, patch: &Value) {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn provider_overrides_cannot_relax_the_clients_search_budget() {
+        for configured in [json!(10), Value::Null, json!("unlimited")] {
+            let mut body = json!({"max_tool_calls": configured});
+            preserve_tool_limit(&mut body, Some(3));
+            assert_eq!(body["max_tool_calls"], 3);
+        }
+        let mut body = json!({"max_tool_calls": 1});
+        preserve_tool_limit(&mut body, Some(3));
+        assert_eq!(body["max_tool_calls"], 1);
+    }
 
     #[test]
     fn nested_parameters_preserve_unmodified_defaults() {

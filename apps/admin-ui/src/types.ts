@@ -402,7 +402,7 @@ export interface SyncProvider {
   contextWindow?: number | null;
   modelSelectionControlledByCodex: boolean;
   fastModeEnabled: boolean;
-  apiFormat: "openaiResponses" | "openaiChat" | "anthropicMessages";
+  apiFormat: "openaiResponses" | "openaiChat" | "anthropicMessages" | "geminiGenerateContent";
   lastModifiedAt?: string;
   hasApiKey: boolean;
 }

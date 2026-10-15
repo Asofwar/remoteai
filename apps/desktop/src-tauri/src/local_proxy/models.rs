@@ -109,7 +109,11 @@ fn models_payload<R: Runtime>(
         settings.gpt_5_6_sol_context_window,
         &settings.official_model_context_windows,
         |catalog| {
-            official_context_models::complete(app, catalog, &settings.official_model_context_windows)
+            official_context_models::complete(
+                app,
+                catalog,
+                &settings.official_model_context_windows,
+            )
         },
     )
 }
@@ -296,7 +300,7 @@ fn aggregate_models_payload(
         content_type: Some("application/json; charset=utf-8".to_string()),
         response_headers: vec![(
             "ETag".to_string(),
-            aggregate_models_etag(&target.config, image_input_route_enabled),
+            format!("\"aggregate-{}\"", short_hash_bytes(&body)),
         )],
         body: UpstreamBody::Buffered(body),
         token_usage_service_tier: None,
@@ -304,12 +308,15 @@ fn aggregate_models_payload(
     })
 }
 
-fn aggregate_models_etag(config: &AggregateApiConfig, image_input_route_enabled: bool) -> String {
-    format!(
-        "\"aggregate-{}-{}\"",
-        short_hash_str(&config.model),
-        u8::from(image_input_route_enabled)
-    )
+fn aggregate_models_etag(
+    target: &AggregateTarget,
+    image_input_route_enabled: bool,
+) -> Option<String> {
+    let profile = aggregate_api::logical_profile(&target.config, &target.profiles).ok()?;
+    let catalog =
+        providers::model_catalog_for_provider_with_image_route(&profile, image_input_route_enabled);
+    let body = serde_json::to_vec(&catalog).ok()?;
+    Some(format!("\"aggregate-{}\"", short_hash_bytes(&body)))
 }
 
 fn provider_models_etag_with_image_route(

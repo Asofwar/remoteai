@@ -1,4 +1,5 @@
-const TOOL_IMAGE_PLACEHOLDER: &str = "[Tool images are attached in the following user message.]";
+const TOOL_IMAGE_PLACEHOLDER: &str =
+    "[Tool attachments are included in the following user message.]";
 
 /// Chat tool messages only accept text. Lift images after the complete parallel tool batch.
 fn lift_chat_tool_images(messages: &mut Vec<Value>) {
@@ -6,14 +7,16 @@ fn lift_chat_tool_images(messages: &mut Vec<Value>) {
     let mut pending_calls = HashSet::new();
     let mut images = Vec::new();
     let mut deferred = Vec::new();
-    for mut message in std::mem::take(messages) {
+    let mut incoming = std::mem::take(messages).into_iter().peekable();
+    while let Some(mut message) = incoming.next() {
         if message["role"] == "tool" {
             extract_chat_tool_images(&mut message, &mut images);
             if let Some(id) = message.get("tool_call_id").and_then(Value::as_str) {
                 pending_calls.remove(id);
             }
             converted.push(message);
-            if pending_calls.is_empty() {
+            if pending_calls.is_empty() && incoming.peek().is_none_or(|next| next["role"] != "tool")
+            {
                 flush_chat_tool_images(&mut converted, &mut images, &mut deferred);
             }
             continue;
@@ -49,10 +52,11 @@ fn extract_chat_tool_images(message: &mut Value, images: &mut Vec<Value>) {
     let mut media = Vec::new();
     let mut remaining = Vec::new();
     for part in parts {
-        let image = part
-            .as_object()
-            .filter(|part| part.get("type") == Some(&json!("input_image")))
-            .and_then(responses_image_to_chat);
+        let image = bridge_media::responses_to_chat(&part).or_else(|| {
+            part.as_object()
+                .filter(|part| part.get("type") == Some(&json!("input_image")))
+                .and_then(responses_image_to_chat)
+        });
         if let Some(image) = image {
             media.push(image);
         } else {
@@ -66,7 +70,9 @@ fn extract_chat_tool_images(message: &mut Value, images: &mut Vec<Value>) {
         .get("tool_call_id")
         .and_then(Value::as_str)
         .unwrap_or_default();
-    images.push(json!({ "type": "text", "text": format!("Images returned by tool call {id}:") }));
+    images.push(
+        json!({ "type": "text", "text": format!("Attachments returned by tool call {id}:") }),
+    );
     images.extend(media);
     let text = remaining
         .iter()

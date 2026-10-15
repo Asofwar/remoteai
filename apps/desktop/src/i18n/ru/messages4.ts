@@ -349,6 +349,7 @@ export const messages4 = {
   "providers.catalog.editTitle": "Изменить пресет {provider}",
   "providers.catalog.endpoint": "Адрес API службы",
   "providers.catalog.endpoint.global": "Глобальный",
+  "providers.catalog.endpoint.native": "Нативный API",
   "providers.catalog.endpoint.china": "Китай",
   "providers.catalog.endpoint.international": "Международный",
   "providers.catalog.endpoint.local": "Локальный",

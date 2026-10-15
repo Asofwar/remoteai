@@ -27,7 +27,9 @@ pub(super) fn forward<R: Runtime>(
     let started_at = Instant::now();
     request.body =
         gui_system_prompts::apply(request.app, request.body).map_err(|error| error.to_string())?;
-    let result = retry_upstream_request(
+    let aggregate = matches!(attempt.borrow().target, ActiveTarget::Aggregate(_));
+    let result = retry_upstream_request_for_target(
+        aggregate,
         upstream_429_retry_timeout(request.app)?,
         || {
             let mut attempt = attempt.borrow_mut();
@@ -103,6 +105,11 @@ fn help_target<R: Runtime>(
             return Err("The selected provider does not support the help model".into());
         }
         provider.model = model.to_owned();
+    }
+    if let ActiveTarget::Aggregate(aggregate) = &target {
+        if aggregate.config.model != model {
+            return Err("The selected aggregate does not support the help model".into());
+        }
     }
     Ok(target)
 }

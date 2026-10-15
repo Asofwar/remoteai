@@ -156,6 +156,17 @@ pub(super) async fn capacity(app: AppHandle, model: String) -> Result<Option<u64
             super::account_selection::GuiAccountSelection::Provider(id) => {
                 provider_capacity(&app, &id, &model)
             }
+            super::account_selection::GuiAccountSelection::Aggregate(id) => {
+                let paths =
+                    crate::storage::resolve_paths(&app).map_err(|_| ContextError::Storage)?;
+                let config = crate::aggregate_api::read_config(&paths, &id)
+                    .map_err(|_| ContextError::Storage)?;
+                let profiles = crate::aggregate_api::member_profiles(&paths, &config)
+                    .map_err(|_| ContextError::Storage)?;
+                let provider = crate::aggregate_api::logical_profile(&config, &profiles)
+                    .map_err(|_| ContextError::Storage)?;
+                Ok(provider.model_context_windows.get(&model).copied())
+            }
             _ => Ok(None),
         }
     })

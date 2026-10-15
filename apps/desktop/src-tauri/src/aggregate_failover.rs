@@ -3,10 +3,22 @@ use serde::{Deserialize, Serialize};
 const DEFAULT_RETRY_STATUS_CODES: &[u16] = &[408, 425, 429, 500, 502, 503, 504];
 const MAX_RETRY_STATUS_CODES: usize = 32;
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum AggregateRoutingStrategy {
+    #[default]
+    Balanced,
+    Priority,
+}
+
 /// Controls retries within one request and health recovery across requests.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 pub(crate) struct AggregateFailoverPolicy {
+    pub(crate) routing_strategy: AggregateRoutingStrategy,
+    pub(crate) recovery_success_threshold: u32,
+    pub(crate) error_rate_threshold_percent: Option<u32>,
+    pub(crate) error_rate_min_requests: u32,
     pub(crate) enabled: bool,
     pub(crate) max_attempts: u32,
     pub(crate) failure_threshold: u32,
@@ -20,6 +32,10 @@ pub(crate) struct AggregateFailoverPolicy {
 impl Default for AggregateFailoverPolicy {
     fn default() -> Self {
         Self {
+            routing_strategy: AggregateRoutingStrategy::Balanced,
+            recovery_success_threshold: 1,
+            error_rate_threshold_percent: None,
+            error_rate_min_requests: 10,
             enabled: true,
             max_attempts: 3,
             failure_threshold: 2,
@@ -34,6 +50,10 @@ impl Default for AggregateFailoverPolicy {
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub(crate) enum AggregateFailoverPolicyError {
+    #[error("Recovery requires between 1 and 10 successful probes")]
+    RecoveryThreshold,
+    #[error("The error rate must be between 1 and 100 percent, with 1 to 100 requests")]
+    ErrorRate,
     #[error("The maximum attempts must be between 1 and 20")]
     Attempts,
     #[error("The failure threshold must be between 1 and 10")]
@@ -48,6 +68,16 @@ pub(crate) enum AggregateFailoverPolicyError {
 
 impl AggregateFailoverPolicy {
     pub(crate) fn validate(&self) -> Result<(), AggregateFailoverPolicyError> {
+        if !(1..=10).contains(&self.recovery_success_threshold) {
+            return Err(AggregateFailoverPolicyError::RecoveryThreshold);
+        }
+        if !(1..=100).contains(&self.error_rate_min_requests)
+            || self
+                .error_rate_threshold_percent
+                .is_some_and(|rate| !(1..=100).contains(&rate))
+        {
+            return Err(AggregateFailoverPolicyError::ErrorRate);
+        }
         if !(1..=20).contains(&self.max_attempts) {
             return Err(AggregateFailoverPolicyError::Attempts);
         }

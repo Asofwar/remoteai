@@ -193,6 +193,10 @@ fn lm_studio_model_is_supported(spec: &PresetSpec, entry: &Value) -> bool {
 }
 
 fn model_entry_is_supported(id: PresetProviderId, entry: &Value) -> bool {
+    if id == PresetProviderId::Gemini {
+        return entry.get("supportedGenerationMethods").and_then(Value::as_array)
+            .is_none_or(|methods| methods.iter().any(|method| method == "generateContent"));
+    }
     if id != PresetProviderId::Mistral {
         return true;
     }
@@ -221,6 +225,7 @@ fn model_id(id: PresetProviderId, entry: &Value) -> Option<&str> {
     let model = entry
         .get("id")
         .or_else(|| entry.get("key"))
+        .or_else(|| (id == PresetProviderId::Gemini).then(|| entry.get("name")).flatten())
         .and_then(Value::as_str)
         .map(str::trim)?;
     // Google's OpenAI-compatible list can return resource names such as models/gemini-2.5-pro.

@@ -22,6 +22,7 @@ pub(crate) enum GuiAccountSelection {
     None,
     Account(String),
     Provider(String),
+    Aggregate(String),
 }
 
 /// The revision also changes for a manual re-selection of the same account (A → B → A).
@@ -43,6 +44,9 @@ impl GuiAccountSelection {
         match self {
             Self::Account(id) => state.active_account_id = Some(id.clone()),
             Self::Provider(id) => state.active_provider_id = Some(id.clone()),
+            Self::Aggregate(id) => {
+                state.active_provider_id = Some(crate::aggregate_api::active_id(id))
+            }
             Self::None => {}
         }
     }
@@ -91,6 +95,23 @@ pub(crate) fn snapshot<R: Runtime>(
 ) -> Result<SelectionSnapshot, SelectionError> {
     let _guard = SELECTION_LOCK.lock().map_err(|_| SelectionError::Storage)?;
     snapshot_unlocked(app)
+}
+
+/// Refresh cached capabilities after aggregate edits, clearing a deleted or unavailable selection.
+pub(crate) fn refresh_aggregate_selection<R: Runtime>(
+    app: &AppHandle<R>,
+) -> Result<(), SelectionError> {
+    let current = snapshot(app)?;
+    if !matches!(current.selection, GuiAccountSelection::Aggregate(_)) {
+        return Ok(());
+    }
+    let next = match validate(app, &current.selection) {
+        Ok(()) => current.selection,
+        Err(SelectionError::Unavailable) => GuiAccountSelection::None,
+        Err(error) => return Err(error),
+    };
+    compare_and_switch(app, current.revision, &next)?;
+    Ok(())
 }
 
 fn snapshot_unlocked<R: Runtime>(app: &AppHandle<R>) -> Result<SelectionSnapshot, SelectionError> {
@@ -175,6 +196,19 @@ fn validate<R: Runtime>(
                 .map_err(|_| SelectionError::Unavailable)?;
             crate::providers::ensure_not_local_proxy_base_url(&provider.base_url)
                 .map_err(|_| SelectionError::Unavailable)?;
+        }
+        GuiAccountSelection::Aggregate(id) => {
+            let config = crate::aggregate_api::read_config(&paths, id)
+                .map_err(|_| SelectionError::Unavailable)?;
+            if !config.enabled {
+                return Err(SelectionError::Unavailable);
+            }
+            let profiles = crate::aggregate_api::member_profiles(&paths, &config)
+                .map_err(|_| SelectionError::Unavailable)?;
+            for profile in profiles {
+                crate::providers::ensure_not_local_proxy_base_url(&profile.base_url)
+                    .map_err(|_| SelectionError::Unavailable)?;
+            }
         }
         GuiAccountSelection::None => return Err(SelectionError::Unavailable),
     }

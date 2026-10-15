@@ -104,6 +104,13 @@ fn settings<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<GuiRequestSettings,
                 .map(|provider| provider.fast_mode_enabled)
                 .unwrap_or(false)
         }
+        GuiAccountSelection::Aggregate(id) => {
+            let paths = resolve_paths(app).map_err(|_| GuiProxyError::Unavailable)?;
+            crate::aggregate_api::read_config(&paths, &id)
+                .and_then(|config| crate::aggregate_api::member_profiles(&paths, &config))
+                .map(|profiles| profiles.iter().all(|provider| provider.fast_mode_enabled))
+                .unwrap_or(false)
+        }
         GuiAccountSelection::None => false,
     };
     let speed = speed(app);

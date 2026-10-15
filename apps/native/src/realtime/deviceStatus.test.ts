@@ -20,7 +20,7 @@ const device: RemoteDevice = {
   guiAccountId: 'gui-account',
   guiProviderId: null,
   localProxyRunning: true,
-  capabilities: ['provider-switch', 'restart-codex', 'gui-model-switch'],
+  capabilities: ['provider-switch', 'restart-codex', 'gui-model-switch', 'aggregate-switch', 'gui-aggregate-switch'],
   lastSeenAt: '2026-07-26T01:00:00.000Z',
   online: true,
 };

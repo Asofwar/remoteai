@@ -169,7 +169,7 @@ enum ActiveTarget {
     Official { model: String },
     Provider(Box<ProviderProfile>),
     ProviderGroup(Vec<ProviderProfile>),
-    Aggregate(AggregateTarget),
+    Aggregate(Box<AggregateTarget>),
 }
 
 struct AggregateTarget {

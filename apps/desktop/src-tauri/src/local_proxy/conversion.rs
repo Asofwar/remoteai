@@ -138,7 +138,10 @@ fn append_regular_input_message(item: &Value, messages: &mut Vec<Value>) {
             }
             return;
         }
-        if map.get("type").and_then(Value::as_str) == Some("input_image") {
+        if matches!(
+            map.get("type").and_then(Value::as_str),
+            Some("input_image" | "input_file" | "input_audio")
+        ) {
             if let Some(content) = responses_content_to_chat(item) {
                 messages.push(json!({ "role": "user", "content": content }));
             }
@@ -163,7 +166,7 @@ fn append_regular_input_message(item: &Value, messages: &mut Vec<Value>) {
 }
 
 fn responses_content_to_chat(value: &Value) -> Option<Value> {
-    if !contains_input_image(value) {
+    if !contains_chat_media(value) {
         return value_to_text(value).map(Value::String);
     }
     let mut parts = Vec::new();
@@ -171,6 +174,20 @@ fn responses_content_to_chat(value: &Value) -> Option<Value> {
     (!parts.is_empty()).then_some(Value::Array(parts))
 }
 
+fn contains_chat_media(value: &Value) -> bool {
+    match value {
+        Value::Array(items) => items.iter().any(contains_chat_media),
+        Value::Object(map) => {
+            matches!(
+                map.get("type").and_then(Value::as_str),
+                Some("input_image" | "input_file" | "input_audio")
+            ) || map.get("content").is_some_and(contains_chat_media)
+        }
+        _ => false,
+    }
+}
+
+// Image-specific routing must not divert file or audio requests to the image provider.
 fn contains_input_image(value: &Value) -> bool {
     match value {
         Value::Array(items) => items.iter().any(contains_input_image),
@@ -197,6 +214,11 @@ fn append_chat_content_parts(value: &Value, parts: &mut Vec<Value>) {
 
 fn append_chat_content_object(map: &serde_json::Map<String, Value>, parts: &mut Vec<Value>) {
     match map.get("type").and_then(Value::as_str) {
+        Some("input_file" | "input_audio") => {
+            if let Some(part) = bridge_media::responses_to_chat(&Value::Object(map.clone())) {
+                parts.push(part);
+            }
+        }
         Some("input_image") => {
             if let Some(part) = responses_image_to_chat(map) {
                 parts.push(part);

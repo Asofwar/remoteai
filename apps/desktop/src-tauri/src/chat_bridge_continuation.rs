@@ -8,7 +8,10 @@ use serde_json::{Map, Value};
 
 #[path = "chat_bridge_continuation_details.rs"]
 mod details;
+#[path = "chat_bridge_history.rs"]
+mod history;
 pub(crate) use details::{capture_reasoning_details, reasoning_details_for_item};
+pub(crate) use history::{capture_response, restore_tool_history};
 
 const CONTINUATION_TTL: Duration = Duration::from_secs(30 * 60);
 const MAX_CONTINUATION_ENTRIES: usize = 512;

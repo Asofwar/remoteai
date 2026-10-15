@@ -1,5 +1,5 @@
 import { invoke } from '../api/backend';
-import type { Account, Provider } from '../types';
+import type { Account, AggregateApi, Provider } from '../types';
 import { object } from '../../../../shared/remote-chat/protocol';
 import type { GuiAccountSelection, GuiAccountsSnapshot } from '../../../../shared/remote-chat/guiAccounts';
 import { guiAccountBalances } from './guiAccountBalances';
@@ -22,10 +22,11 @@ function accountDetail(account: Account) {
 }
 
 export async function readGuiAccounts(): Promise<GuiAccountsSnapshot> {
-  const [selection, accounts, providers] = await Promise.all([
+  const [selection, accounts, providers, aggregates] = await Promise.all([
     invoke<GuiAccountSelection>('codex_gui_account_selection'),
     invoke<Account[]>('list_accounts'),
     invoke<Provider[]>('list_providers'),
+    invoke<AggregateApi[]>('list_aggregate_apis'),
   ]);
   // Only send picker display fields; account credentials and private details stay on the computer.
   return {
@@ -41,15 +42,19 @@ export async function readGuiAccounts(): Promise<GuiAccountsSnapshot> {
         kind: 'provider' as const, id: provider.id, name: provider.name,
         detail: guiAccountBalances.detail(provider), searchDetail: provider.model, available: true,
       })),
+      ...(aggregates ?? []).map((aggregate) => ({
+        kind: 'aggregate' as const, id: aggregate.id, name: aggregate.name,
+        detail: aggregate.model, available: aggregate.enabled,
+      })),
     ],
   };
 }
 
 export async function selectGuiAccount(value: unknown): Promise<GuiAccountSelection> {
   const selection = object(value);
-  if (!['account', 'provider'].includes(String(selection.kind))
+  if (!['account', 'provider', 'aggregate'].includes(String(selection.kind))
     || typeof selection.id !== 'string' || !selection.id.trim() || selection.id.length > 160) {
     return Promise.reject(new Error('请选择可用账户。'));
   }
-  return switchGuiAccount({ kind: selection.kind as 'account' | 'provider', id: selection.id });
+  return switchGuiAccount({ kind: selection.kind as 'account' | 'provider' | 'aggregate', id: selection.id });
 }

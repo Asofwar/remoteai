@@ -13,6 +13,7 @@ const RESERVED_HEADERS = new Set([
 const RESERVED_PARAMETERS = new Set([
   "model", "stream", "stream_options", "input", "messages", "tools", "tool_choice", "system", "instructions",
   "previous_response_id", "conversation", "include", "api_key", "apiKey", "authorization",
+  "contents", "systemInstruction", "system_instruction", "cachedContent", "cached_content", "toolConfig", "tool_config",
 ]);
 
 export type OptionsError = "invalidJson" | "invalidHeaders" | "reservedBody" | "tooLarge" | "tooDeep";

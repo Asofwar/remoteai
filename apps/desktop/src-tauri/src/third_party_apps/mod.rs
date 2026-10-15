@@ -51,6 +51,9 @@ pub(crate) fn provider_protocol(provider: &ProviderProfile) -> ProviderProtocol 
         crate::models::ProviderApiFormat::OpenaiResponses => ProviderProtocol::OpenaiResponses,
         crate::models::ProviderApiFormat::OpenaiChat => ProviderProtocol::OpenaiChat,
         crate::models::ProviderApiFormat::AnthropicMessages => ProviderProtocol::Anthropic,
+        crate::models::ProviderApiFormat::GeminiGenerateContent => {
+            ProviderProtocol::OpenaiResponses
+        }
     }
 }
 
@@ -114,7 +117,7 @@ pub(crate) async fn set_third_party_app_write_settings<R: Runtime + 'static>(
 
 pub(crate) fn sync_after_switch<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     let settings = read_app_settings(app)?;
-    let provider = active_provider(app)?;
+    let provider = active_provider(app)?.map(external_app_profile);
     let official_context_window = settings.gpt_5_6_sol_context_window;
     let home = dirs::home_dir().ok_or_else(|| "无法定位用户主目录".to_string())?;
     let mut errors = Vec::new();
@@ -266,6 +269,25 @@ fn active_provider<R: Runtime>(app: &AppHandle<R>) -> Result<Option<ProviderProf
     Ok(None)
 }
 
+/// Native content generation is exposed to external clients through the local adapter.
+fn external_app_profile(mut provider: ProviderProfile) -> ProviderProfile {
+    if !crate::aggregate_api::is_active_id(&provider.id)
+        && provider.api_format != ProviderApiFormat::GeminiGenerateContent
+        && !provider
+            .model_api_formats
+            .values()
+            .any(|format| *format == ProviderApiFormat::GeminiGenerateContent)
+    {
+        return provider;
+    }
+    provider.base_url = LOCAL_PROXY_BASE_URL.to_string();
+    provider.api_key = LOCAL_PROXY_TOKEN.to_string();
+    provider.api_format = ProviderApiFormat::OpenaiResponses;
+    provider.request_options = None;
+    provider.model_api_formats.clear();
+    provider
+}
+
 fn official_local_proxy_profile(
     context_window: u64,
     models: Vec<String>,
@@ -345,6 +367,32 @@ pub(crate) mod tests {
             wallet_username: None,
             wallet_password: None,
         }
+    }
+
+    #[test]
+    fn native_content_generation_uses_local_adapter_for_external_apps() {
+        let mut native = provider();
+        native.api_format = ProviderApiFormat::GeminiGenerateContent;
+        let model = native.model.clone();
+        let normalized = external_app_profile(native);
+        assert_eq!(normalized.base_url, LOCAL_PROXY_BASE_URL);
+        assert_eq!(normalized.api_key, LOCAL_PROXY_TOKEN);
+        assert_eq!(normalized.model, model);
+        assert_eq!(
+            provider_protocol(&normalized),
+            ProviderProtocol::OpenaiResponses
+        );
+    }
+
+    #[test]
+    fn aggregate_aliases_use_local_adapter_for_external_apps() {
+        let mut aggregate = provider();
+        aggregate.id = crate::aggregate_api::active_id("fixture");
+        aggregate.model = "public-alias".into();
+        let normalized = external_app_profile(aggregate);
+        assert_eq!(normalized.base_url, LOCAL_PROXY_BASE_URL);
+        assert_eq!(normalized.model, "public-alias");
+        assert_eq!(normalized.api_format, ProviderApiFormat::OpenaiResponses);
     }
 
     #[test]

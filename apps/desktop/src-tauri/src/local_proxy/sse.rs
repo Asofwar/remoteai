@@ -14,7 +14,9 @@ fn chat_sse_to_responses_sse(sse: &str, model: &str) -> String {
 }
 
 fn streaming_continuation_tool_call(tool: &StreamingToolCall) -> Value {
-    let mut tool_call = json!({ "id": tool.call_id });
+    let mut tool_call = json!({ "id": tool.call_id, "type": "function", "function": {
+        "name": tool.name, "arguments": tool.arguments
+    } });
     if !tool.thought_signature.is_empty() {
         tool_call["extra_content"] = json!({
             "google": { "thought_signature": tool.thought_signature }
@@ -205,12 +207,19 @@ fn response_done_sse(
             }),
         );
     }
+    let annotations = metadata.annotations;
+    for (index, annotation) in annotations.iter().enumerate() {
+        push_sse(&mut output, "response.output_text.annotation.added", json!({
+            "type":"response.output_text.annotation.added", "item_id":message_id,
+            "output_index":message_index, "content_index":0, "annotation_index":index, "annotation":annotation
+        }));
+    }
     let message_item = json!({
         "id": message_id,
         "type": "message",
         "status": "completed",
         "role": "assistant",
-        "content": [{ "type": "output_text", "text": text, "annotations": [] }]
+        "content": [{ "type": "output_text", "text": text, "annotations": annotations }]
     });
     push_sse(
         &mut output,
@@ -231,7 +240,7 @@ fn response_done_sse(
             "item_id": message_id,
             "output_index": message_index,
             "content_index": 0,
-            "part": { "type": "output_text", "text": text }
+            "part": { "type": "output_text", "text": text, "annotations": annotations }
         }),
     );
     push_sse(

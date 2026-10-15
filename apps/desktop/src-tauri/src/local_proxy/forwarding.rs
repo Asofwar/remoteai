@@ -252,7 +252,7 @@ fn forward_provider_request(
         .copied()
         .unwrap_or(provider.api_format);
     if is_responses_endpoint(request_path(url))
-        && format == ProviderApiFormat::AnthropicMessages
+        && matches!(format, ProviderApiFormat::AnthropicMessages | ProviderApiFormat::GeminiGenerateContent)
     {
         return Err("This provider does not support this response operation".to_string());
     }
@@ -290,6 +290,7 @@ fn forward_provider_with_format(
         }
         ProviderApiFormat::OpenaiChat => forward_chat_bridge(method, url, headers, body, provider),
         ProviderApiFormat::AnthropicMessages => anthropic_upstream::forward(method, headers, body, provider),
+        ProviderApiFormat::GeminiGenerateContent => gemini_upstream::forward(method, headers, body, provider),
     }
 }
 

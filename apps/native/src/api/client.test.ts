@@ -253,7 +253,7 @@ describe('mobile Codex API client', () => {
     vi.stubGlobal('fetch', apiFetch);
 
     await expect(fetchRemoteProviders(session)).resolves.toEqual(providers);
-    expect(apiFetch.mock.calls[0]?.[0]).toBe('https://switch.example.com/devices/providers');
+    expect(apiFetch.mock.calls[0]?.[0]).toBe('https://switch.example.com/devices/providers?includeAggregates=true');
   });
 
   it('switches a remote desktop between official and provider models', async () => {
@@ -314,6 +314,20 @@ describe('mobile Codex API client', () => {
     ]);
     expect(apiFetch.mock.calls.map(call => JSON.parse(call[1].body))).toEqual([
       { accountId: 'account-2' }, { providerId: 'provider-1' },
+    ]);
+  });
+
+  it('switches aggregate choices without sending them as plain providers', async () => {
+    const apiFetch = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ online: true }), { status: 200 }));
+    vi.stubGlobal('fetch', apiFetch);
+    await switchRemoteDeviceProvider(session, 'device/1', 'aggregate:route', 'gui');
+    await switchRemoteDeviceProvider(session, 'device/1', 'aggregate:route', 'proxy');
+    expect(apiFetch.mock.calls.map(call => call[0])).toEqual([
+      'https://switch.example.com/devices/device%2F1/gui-aggregate',
+      'https://switch.example.com/devices/device%2F1/aggregate',
+    ]);
+    expect(apiFetch.mock.calls.map(call => JSON.parse(call[1].body))).toEqual([
+      { aggregateId: 'route' }, { aggregateId: 'route' },
     ]);
   });
 

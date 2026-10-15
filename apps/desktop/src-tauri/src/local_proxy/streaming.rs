@@ -31,12 +31,17 @@ struct ChatSseReader<R> {
     tools: BTreeMap<usize, StreamingToolCall>,
     tool_context: CodexToolContext,
     continuation_scope: Option<chat_bridge_continuation::ContinuationScope>,
+    request_history: Vec<Value>,
     metadata: ChatCompletionMetadata,
     termination: Option<ChatCompletionStatus>,
     completed: bool,
 }
 
 impl<R: BufRead> ChatSseReader<R> {
+    fn response_id(&self) -> &str {
+        &self.response_id
+    }
+
     fn new(
         upstream: R,
         model: String,
@@ -68,10 +73,16 @@ impl<R: BufRead> ChatSseReader<R> {
             tools: BTreeMap::new(),
             tool_context,
             continuation_scope,
+            request_history: Vec::new(),
             metadata: ChatCompletionMetadata::default(),
             termination: None,
             completed: false,
         }
+    }
+
+    fn with_request_history(mut self, request_history: Vec<Value>) -> Self {
+        self.request_history = request_history;
+        self
     }
 
     fn has_pending(&self) -> bool {
@@ -217,17 +228,23 @@ impl<R: BufRead> ChatSseReader<R> {
             .filter(|tool| !tool.call_id.is_empty())
             .map(streaming_continuation_tool_call)
             .collect::<Vec<_>>();
-        if tool_calls.is_empty() {
-            return;
-        }
         let mut message = json!({
-            "reasoning_content": self.reasoning_content,
-            "tool_calls": tool_calls
+            "content": self.text,
+            "reasoning_content": self.reasoning_content
         });
+        if !tool_calls.is_empty() {
+            message["tool_calls"] = json!(tool_calls);
+        }
         if let Some(details) = details {
             message["reasoning_details"] = details;
         }
         chat_bridge_continuation::capture_message(scope, &message);
+        chat_bridge_continuation::capture_response(
+            scope,
+            &self.response_id,
+            &message,
+            &self.request_history,
+        );
     }
 
     fn fail(&mut self, message: &'static str) {

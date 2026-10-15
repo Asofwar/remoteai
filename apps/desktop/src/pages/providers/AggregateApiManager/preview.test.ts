@@ -35,3 +35,22 @@ it("rejects invalid settings without overwriting the last saved aggregate", asyn
   } })).rejects.toThrow("Check the failover settings");
   expect((await loadAggregateApis())[0].failoverPolicy).toEqual(defaultFailoverPolicy());
 });
+
+it("persists member aliases and priority order across legacy updates", async () => {
+  localStorage.setItem("codex-switch:providers", JSON.stringify([
+    { id: "first", name: "First", baseUrl: "https://example.com", model: "deployment-one", models: ["deployment-one"] },
+    { id: "second", name: "Second", baseUrl: "https://example.com", model: "vendor/model", models: ["vendor/model"] },
+  ]));
+  const memberModels = { first: "deployment-one", second: "vendor/model" };
+  const saved = await saveAggregateApiProfile({ ...input, model: "shared", memberModels,
+    memberProviderIds: ["second", "first"], failoverPolicy: { ...defaultFailoverPolicy(),
+      routingStrategy: "priority", recoverySuccessThreshold: 3, errorRateThresholdPercent: 50 } });
+  await saveAggregateApiProfile({ ...input, id: saved.id, model: "shared", memberProviderIds: ["second", "first"] });
+  const [reloaded] = await loadAggregateApis();
+  expect(reloaded.memberModels).toEqual(memberModels);
+  expect(reloaded.memberProviderIds).toEqual(["second", "first"]);
+  expect(reloaded.failoverPolicy?.routingStrategy).toBe("priority");
+  await expect(saveAggregateApiProfile({ ...input, model: "shared", memberModels: {
+    first: "unsupported", second: "vendor/model",
+  } })).rejects.toThrow("must support the selected model");
+});

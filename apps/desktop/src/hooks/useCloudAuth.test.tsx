@@ -2,13 +2,13 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { loadCloudAuthState, loginCloud, syncCloudAccounts } from "../api/backend";
+import { loadCloudAuthState, loginCloud, registerCloud, syncCloudAccounts } from "../api/backend";
 import { translate, type Translate } from "../i18n";
 import type { CloudAuthState } from "../types";
 import { useCloudAuth } from "./useCloudAuth";
 
 vi.mock("../api/backend", () => ({
-  loadCloudAuthState: vi.fn(), loginCloud: vi.fn(), syncCloudAccounts: vi.fn(),
+  loadCloudAuthState: vi.fn(), loginCloud: vi.fn(), registerCloud: vi.fn(), syncCloudAccounts: vi.fn(),
 }));
 
 const initialState: CloudAuthState = {
@@ -83,3 +83,32 @@ it("keeps the pending login asynchronous and allows retry after failure", async 
   expect(auth.loading).toBe(false);
   expect(syncCloudAccounts).toHaveBeenCalledOnce();
 });
+
+it.each(["login", "register"] as const)(
+  "keeps %s successful when the cloud service cannot sync aggregate configurations",
+  async (action) => {
+    const signedIn = { ...initialState, authenticated: true, userEmail: "review@example.test" };
+    const result = {
+      state: signedIn, passwordSaved: false, credentialStorageUpdated: true,
+      syncWarning: "aggregateSyncUnavailable" as const,
+    };
+    vi.mocked(loginCloud).mockResolvedValue(result);
+    vi.mocked(registerCloud).mockResolvedValue(result);
+    await act(async () => {
+      const authenticated = action === "login"
+        ? auth.login("review@example.test", "correct", false)
+        : auth.register("review@example.test", "correct", "123456", false);
+      await expect(authenticated).resolves.toBe(true);
+    });
+    expect(auth.state).toEqual(signedIn);
+    expect(auth.loading).toBe(false);
+    expect(notify).toHaveBeenLastCalledWith("登录成功。聚合配置已保留在本机，云服务更新后即可同步。");
+    expect(syncCloudAccounts).not.toHaveBeenCalled();
+
+    // Explicit sync still reports an incomplete upload instead of claiming success.
+    vi.mocked(syncCloudAccounts).mockRejectedValue("Update the cloud service to sync aggregate APIs");
+    await act(async () => expect(auth.sync()).resolves.toBeNull());
+    expect(notify).toHaveBeenLastCalledWith("Update the cloud service to sync aggregate APIs");
+    expect(auth.state.authenticated).toBe(true);
+  },
+);

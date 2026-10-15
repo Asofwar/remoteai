@@ -41,10 +41,9 @@ fn forward_target_models_etag<R: Runtime>(
                 image_input_route_enabled(app),
             ))
         }
-        ActiveTarget::Aggregate(target) => Some(aggregate_models_etag(
-            &target.config,
-            image_input_route_enabled(app),
-        )),
+        ActiveTarget::Aggregate(target) => {
+            aggregate_models_etag(target, image_input_route_enabled(app))
+        }
         _ => None,
     })
 }

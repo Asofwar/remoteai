@@ -139,5 +139,7 @@ function remoteControlCapabilities(value: unknown): RemoteDevice['capabilities']
     || capability === 'provider-group-switch'
     || capability === 'restart-codex'
     || capability === 'gui-model-switch'
+    || capability === 'aggregate-switch'
+    || capability === 'gui-aggregate-switch'
   ));
 }

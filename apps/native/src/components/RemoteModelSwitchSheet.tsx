@@ -3,7 +3,7 @@ import { useThemeColor } from '../theme/store';
 import { t, useLanguage } from '../i18n';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useState } from 'react';
-import { remoteModelOptions, type RemoteModelTarget } from '../../../../shared/remote-chat/modelTarget';
+import { isRemoteAggregateId, remoteModelOptions, type RemoteModelTarget } from '../../../../shared/remote-chat/modelTarget';
 import type { AccountSummary, RemoteDevice, RemoteProviderSummary } from '../types';
 import { BottomSheet } from './BottomSheet';
 import { SheetScrollView } from './SheetScrollView';
@@ -94,6 +94,7 @@ export function RemoteModelSwitchSheet({
   };
   const selectProvider = async (providerId: string) => {
     if (!device?.online || busy || !providerAvailable) return;
+    if (isRemoteAggregateId(providerId) && !options.aggregateAvailable) return;
     if (await onSwitchProvider(device.deviceId, providerId, target)) onClose();
   };
   const selectProviderGroup = async (group: string) => {
@@ -159,13 +160,15 @@ export function RemoteModelSwitchSheet({
         })}
         {providers.map((provider) => {
           const current = options.providerId === provider.id;
+          const aggregate = isRemoteAggregateId(provider.id);
+          const unsupported = aggregate && !options.aggregateAvailable;
           return <ModelOption
             key={`provider:${provider.id}`}
-            badge="P"
+            badge={aggregate ? "A" : "P"}
             title={provider.name}
-            subtitle={provider.model || t("由 Codex 选择模型")}
+            subtitle={unsupported ? t("请先更新 PC 端") : provider.model || t("由 Codex 选择模型")}
             current={current}
-            disabled={busy || !device?.online || !providerAvailable || current}
+            disabled={busy || !device?.online || !providerAvailable || unsupported || current}
             loading={switchingProviderId === provider.id}
             onPress={() => void selectProvider(provider.id)}
           />;

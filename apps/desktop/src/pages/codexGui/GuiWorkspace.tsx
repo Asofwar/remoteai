@@ -34,14 +34,15 @@ export function GuiWorkspace(props: {
   const selection = useGuiAccountSelection({ ...props, active: localActive });
   return <><div hidden={Boolean(remote)} style={{ height: '100%' }}>
     <CodexGuiPage active={localActive} notificationTarget={props.notificationTarget}
-    focusMode={focusMode} providers={selection.providers} aggregateApis={[]}
+    focusMode={focusMode} providers={selection.providers} aggregateApis={selection.aggregateApis ?? []}
     hostPicker={isDesktopApp && <GuiHostPicker navigation={computers} active={localActive} />}
     windowControls={props.windowControls} plugins={props.plugins} accountPicker={
       <ProxyAccountPicker active={localActive} computers={isDesktopApp ? computers : undefined}
         accounts={selection.accounts} providers={selection.providers}
-        aggregateApis={[]} privacyMode={props.privacyMode}
+        aggregateApis={selection.aggregateApis ?? []} privacyMode={props.privacyMode}
         busy={false} loading={props.loading || selection.loading} selectionError={selection.error}
-        onSwitchAccount={selection.switchAccount} onSwitchProvider={selection.switchProvider} />
+        onSwitchAccount={selection.switchAccount} onSwitchProvider={selection.switchProvider}
+        onSwitchAggregate={selection.switchAggregate} />
     } /></div>
     {isDesktopApp && computers.identity &&
       <RemoteGuiWorkspaces key={JSON.stringify([computers.identity.baseUrl, computers.identity.userId])}

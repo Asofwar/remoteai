@@ -46,6 +46,8 @@ struct AccountArchivePayload {
     accounts: Vec<AccountArchiveEntry>,
     #[serde(default)]
     providers: Vec<ProviderSyncPayload>,
+    #[serde(default)]
+    aggregates: Vec<crate::aggregate_sync::AggregateSyncEntry>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -74,22 +76,28 @@ pub(crate) struct AccountArchiveImportResult {
     imported: usize,
     account_ids: Vec<String>,
     active_account_id: Option<String>,
+    aggregates_imported: usize,
     providers_imported: usize,
     provider_ids: Vec<String>,
     active_provider_id: Option<String>,
 }
 
 #[tauri::command]
-pub(crate) fn export_accounts_archive<R: Runtime>(
+pub(crate) async fn export_accounts_archive<R: Runtime + 'static>(
     app: tauri::AppHandle<R>,
     path: String,
 ) -> Result<String, String> {
-    let payload = collect_accounts(&app)?;
-    if payload.accounts.is_empty() && payload.providers.is_empty() {
+    tauri::async_runtime::spawn_blocking(move || export_archive_blocking(&app, &path))
+        .await.map_err(|_| "Could not export the archive".to_string())?
+}
+
+fn export_archive_blocking<R: Runtime>(app: &tauri::AppHandle<R>, path: &str) -> Result<String, String> {
+    let payload = collect_accounts(app)?;
+    if payload.accounts.is_empty() && payload.providers.is_empty() && payload.aggregates.is_empty() {
         return Err("No local accounts or providers to export".to_string());
     }
 
-    let output_path = normalize_archive_path(Path::new(&path));
+    let output_path = normalize_archive_path(Path::new(path));
     let archive = encode_archive(&payload)?;
     if let Some(parent) = output_path
         .parent()
@@ -104,11 +112,17 @@ pub(crate) fn export_accounts_archive<R: Runtime>(
 }
 
 #[tauri::command]
-pub(crate) fn import_accounts_archive<R: Runtime>(
+pub(crate) async fn import_accounts_archive<R: Runtime + 'static>(
     app: tauri::AppHandle<R>,
     path: String,
 ) -> Result<AccountArchiveImportResult, String> {
-    let payload = decode_archive(Path::new(&path))?;
+    tauri::async_runtime::spawn_blocking(move || import_archive_blocking(app, &path))
+        .await.map_err(|_| "Could not import the archive".to_string())?
+}
+
+fn import_archive_blocking<R: Runtime>(app: tauri::AppHandle<R>, path: &str)
+    -> Result<AccountArchiveImportResult, String> {
+    let payload = decode_archive(Path::new(path))?;
     let result = apply_archive(&app, payload)?;
     if !result.account_ids.is_empty() {
         app.emit("accounts-changed", ())
@@ -120,6 +134,9 @@ pub(crate) fn import_accounts_archive<R: Runtime>(
         if let Ok(paths) = resolve_paths(&app) {
             crate::providers::refresh_codex_models_for_current_target(&paths);
         }
+    }
+    if result.aggregates_imported > 0 {
+        app.emit("aggregate-apis-changed", ()).map_err(|e| e.to_string())?;
     }
     crate::system_tray::refresh_menu(&app);
     Ok(result)

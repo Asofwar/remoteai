@@ -1,6 +1,6 @@
 export const GUI_ACCOUNTS_EVENT = 'guiAccounts/changed';
 
-export type GuiAccountSelection = { kind: 'none' } | { kind: 'account' | 'provider'; id: string };
+export type GuiAccountSelection = { kind: 'none' } | { kind: 'account' | 'provider' | 'aggregate'; id: string };
 export type SelectableGuiAccount = Exclude<GuiAccountSelection, { kind: 'none' }>;
 export interface GuiAccountChoice {
   kind: SelectableGuiAccount['kind'];

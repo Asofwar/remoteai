@@ -59,7 +59,8 @@ fn forward_anthropic_official<R: tauri::Runtime>(
     )?;
     let request: Value = serde_json::from_slice(&body)
         .map_err(|error| format!("Anthropic request body is not valid JSON: {error}"))?;
-    validate_anthropic_search_options(&request).map_err(|error| error.to_string())?;
+    validate_anthropic_official_search(&request).map_err(|error| error.to_string())?;
+    bridge_media::validate_anthropic(&request)?;
     let stream = request
         .get("stream")
         .and_then(Value::as_bool)
@@ -165,6 +166,7 @@ fn forward_anthropic_provider_bridge(
     session_id: Option<&str>,
 ) -> Result<UpstreamPayload, String> {
     validate_anthropic_search_options(&request).map_err(|error| error.to_string())?;
+    bridge_media::validate_anthropic(&request)?;
     let stream = request
         .get("stream")
         .and_then(Value::as_bool)

@@ -15,6 +15,9 @@ enum AnthropicBridgeError {
 }
 
 fn apply_anthropic_request_options(request: &Value, body: &mut Value) {
+    if let Some(maximum) = anthropic_search_limit(request) {
+        body["max_tool_calls"] = json!(maximum);
+    }
     for (source, target) in [
         ("max_tokens", "max_output_tokens"),
         ("temperature", "temperature"),
@@ -95,9 +98,38 @@ fn validate_anthropic_search_options(request: &Value) -> Result<(), AnthropicBri
         {
             continue;
         }
-        if tool.get("blocked_domains").is_some() || tool.get("max_uses").is_some() {
+        let blocked = tool
+            .get("blocked_domains")
+            .is_some_and(|value| value.as_array().is_none_or(|domains| !domains.is_empty()));
+        let invalid_limit = tool
+            .get("max_uses")
+            .is_some_and(|value| value.as_u64().is_none_or(|limit| limit == 0));
+        if blocked || invalid_limit {
             return Err(AnthropicBridgeError::SearchRestrictionsUnsupported);
         }
+    }
+    Ok(())
+}
+
+fn anthropic_search_limit(request: &Value) -> Option<u64> {
+    request["tools"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|tool| {
+            tool["type"]
+                .as_str()
+                .is_some_and(|kind| kind.starts_with("web_search"))
+        })
+        .filter_map(|tool| tool["max_uses"].as_u64())
+        .min()
+}
+
+fn validate_anthropic_official_search(request: &Value) -> Result<(), AnthropicBridgeError> {
+    validate_anthropic_search_options(request)?;
+    // This backend has no reliable search-call budget; returning an error preserves the client's restriction.
+    if anthropic_search_limit(request).is_some() {
+        return Err(AnthropicBridgeError::SearchRestrictionsUnsupported);
     }
     Ok(())
 }
@@ -136,4 +168,37 @@ fn prepare_anthropic_official_request(body: &mut Value) {
         }
     }
     remove_incompatible_official_reasoning_from_input(body);
+}
+
+#[cfg(test)]
+mod search_limit_tests {
+    use super::*;
+
+    #[test]
+    fn maps_search_limits_without_relaxing_domain_filters() {
+        let request = json!({"tools":[{"type":"web_search_20250305", "name":"web_search",
+            "max_uses":3, "allowed_domains":["example.com"], "blocked_domains":[]}]});
+        validate_anthropic_search_options(&request).unwrap();
+        let converted = anthropic_to_responses(&request, "sol");
+        assert_eq!(converted["max_tool_calls"], 3);
+        assert_eq!(
+            converted["tools"][0]["filters"]["allowed_domains"],
+            json!(["example.com"])
+        );
+        assert!(validate_anthropic_official_search(&request).is_err());
+    }
+
+    #[test]
+    fn refuses_unrepresentable_blacklists_and_invalid_limits() {
+        for tool in [
+            json!({"blocked_domains":["private.example"]}),
+            json!({"max_uses":0}),
+            json!({"max_uses":-1}),
+            json!({"max_uses":"3"}),
+        ] {
+            let mut tool = tool;
+            tool["type"] = json!("web_search_20250305");
+            assert!(validate_anthropic_search_options(&json!({"tools":[tool]})).is_err());
+        }
+    }
 }

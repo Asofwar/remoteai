@@ -288,7 +288,13 @@ pub(super) async fn cloud_authenticate<R: Runtime>(
             apply_remote_provider(&app, &provider)?;
         }
         let _ = put_remote_accounts(&app, &client, &mut settings, &mut credentials)?;
-        let _ = put_remote_providers(&app, &client, &mut settings, &mut credentials)?;
+        put_remote_provider_records(&app, &client, &mut settings, &mut credentials)?;
+        let sync_warning = aggregates::authentication_warning(aggregates::sync_aggregates(
+            &app,
+            &client,
+            &mut settings,
+            &mut credentials,
+        ))?;
         let (password_saved, credential_storage_updated) = if remember_password {
             match update_saved_cloud_login(&settings, Some(&saved_login)) {
                 Ok(()) => (true, true),
@@ -312,6 +318,7 @@ pub(super) async fn cloud_authenticate<R: Runtime>(
             state: cloud_state(&settings, &credentials),
             password_saved,
             credential_storage_updated,
+            sync_warning,
         })
     })
     .await

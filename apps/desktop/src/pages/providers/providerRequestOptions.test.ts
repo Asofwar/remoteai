@@ -22,6 +22,12 @@ describe("provider advanced settings", () => {
     for (let depth = 0; depth < 10; depth += 1) body = { extra: body };
     expect(parseRequestOptions({ ...draft, body: JSON.stringify(body) }).error).toBe("tooDeep");
   });
+  it("protects native conversation and tool routing fields", () => {
+    for (const field of ["contents", "systemInstruction", "system_instruction", "cachedContent", "cached_content",
+      "toolConfig", "tool_config"]) {
+      expect(parseRequestOptions({ ...draft, body: JSON.stringify({ [field]: {} }) }).error).toBe("reservedBody");
+    }
+  });
   it("rejects prototype fields at every nesting level without modifying built-in prototypes", () => {
     for (const body of [
       '{"__proto__":{"polluted":true}}',

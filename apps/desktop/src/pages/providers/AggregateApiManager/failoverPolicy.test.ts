@@ -13,6 +13,9 @@ describe("aggregate failover validation", () => {
     { maxAttempts: 0 }, { maxAttempts: 21 }, { maxAttempts: 1.5 }, { failureThreshold: 11 },
     { initialCooldownSeconds: 301 }, { initialCooldownSeconds: 0 }, { maxCooldownSeconds: 3601 },
     { initialCooldownSeconds: 20, maxCooldownSeconds: 19 },
+    { recoverySuccessThreshold: 0 }, { recoverySuccessThreshold: 11 },
+    { errorRateThresholdPercent: 0 }, { errorRateThresholdPercent: 101 },
+    { errorRateMinRequests: 0 }, { errorRateMinRequests: 101 },
   ])("rejects invalid policy boundaries: %j", (override) => {
     expect(validFailoverPolicy({ ...defaultFailoverPolicy(), ...override })).toBe(false);
   });

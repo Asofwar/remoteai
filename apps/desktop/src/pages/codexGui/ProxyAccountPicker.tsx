@@ -22,6 +22,7 @@ export interface ProxyAccountPickerProps {
   selectionError?: string;
   onSwitchAccount: (id: string) => Promise<boolean>;
   onSwitchProvider: (id: string) => Promise<boolean>;
+  onSwitchAggregate?: (id: string) => Promise<boolean>;
 }
 
 export function ProxyAccountPicker(props: ProxyAccountPickerProps) {
@@ -50,6 +51,10 @@ export function ProxyAccountPicker(props: ProxyAccountPickerProps) {
     kind: "provider" as const, id: entry.id, name: entry.name, detail: entry.group || entry.model,
     selected: !aggregate && entry.active,
   }));
+  const aggregates = props.aggregateApis.map((entry) => ({
+    kind: "aggregate" as const, id: entry.id, name: entry.name, detail: entry.model,
+    selected: entry.active, disabled: !entry.enabled || !props.onSwitchAggregate,
+  }));
   useEffect(() => {
     if (!props.active) { setOpen(false); setSettingsOpen(false); }
   }, [props.active]);
@@ -65,9 +70,10 @@ export function ProxyAccountPicker(props: ProxyAccountPickerProps) {
     } catch { setError(guiText("切换未完成，请重试。")); }
     finally { switching.current = false; setSaving(false); }
   };
-  const panel = (devicePicker: ReactNode) => <GuiAccountList choices={[...accounts, ...providers]}
+  const panel = (devicePicker: ReactNode) => <GuiAccountList choices={[...accounts, ...providers, ...aggregates]}
     devicePicker={devicePicker} disabled={disabled} loading={saving || props.loading}
     onSelectAccount={(id) => void select(id, props.onSwitchAccount)}
+    onSelectAggregate={(id) => { if (props.onSwitchAggregate) void select(id, props.onSwitchAggregate); }}
     onSelectProvider={(id) => void select(id, props.onSwitchProvider)} footer={<>
       {error && <p className={styles.error} role="alert">{error}</p>}
       {props.selectionError && <p className={styles.error} role="alert">{props.selectionError}</p>}

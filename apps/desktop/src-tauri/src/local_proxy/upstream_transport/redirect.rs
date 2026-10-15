@@ -75,6 +75,7 @@ fn strip_credentials(headers: &mut header::HeaderMap) {
         "www-authenticate",
         "chatgpt-account-id",
         "x-api-key",
+        "x-goog-api-key",
         "api-key",
         "openai-api-key",
     ] {
@@ -93,6 +94,7 @@ mod tests {
             .post(url)
             .bearer_auth("test-secret")
             .header("ChatGPT-Account-Id", "test-account")
+            .header("x-goog-api-key", "google-test-secret")
             .body(vec![b'x'; 128 * 1024]);
         Request::prepare(builder).unwrap()
     }
@@ -150,7 +152,9 @@ mod tests {
             let mut next = receive(&next_server);
             assert_eq!(next.method(), &tiny_http::Method::Get);
             assert!(!next.headers().iter().any(|header| {
-                header.field.equiv("Authorization") || header.field.equiv("ChatGPT-Account-Id")
+                header.field.equiv("Authorization")
+                    || header.field.equiv("ChatGPT-Account-Id")
+                    || header.field.equiv("x-goog-api-key")
             }));
             let mut bytes = Vec::new();
             next.as_reader().read_to_end(&mut bytes).unwrap();

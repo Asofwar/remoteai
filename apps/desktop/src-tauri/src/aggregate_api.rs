@@ -7,6 +7,12 @@ use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Runtime};
 use uuid::Uuid;
 
+mod active_targets;
+mod models;
+pub(crate) use active_targets::refresh_targets;
+use models::validate_members;
+pub(crate) use models::{force_aggregate_model, logical_profile, member_model, member_profiles};
+
 #[cfg(test)]
 mod tests;
 
@@ -28,6 +34,8 @@ pub(crate) struct AggregateApiConfig {
     pub(crate) name: String,
     pub(crate) model: String,
     pub(crate) member_provider_ids: Vec<String>,
+    #[serde(default)]
+    pub(crate) member_models: HashMap<String, String>,
     pub(crate) enabled: bool,
     #[serde(default)]
     pub(crate) failover_policy: AggregateFailoverPolicy,
@@ -40,6 +48,8 @@ pub(crate) struct AggregateApiInput {
     name: String,
     model: String,
     member_provider_ids: Vec<String>,
+    #[serde(default)]
+    member_models: Option<HashMap<String, String>>,
     enabled: bool,
     #[serde(default)]
     failover_policy: Option<AggregateFailoverPolicy>,
@@ -52,6 +62,7 @@ pub(crate) struct AggregateApiSummary {
     name: String,
     model: String,
     member_provider_ids: Vec<String>,
+    member_models: HashMap<String, String>,
     enabled: bool,
     active: bool,
     member_conversation_counts: HashMap<String, usize>,
@@ -127,67 +138,26 @@ pub(crate) fn read_config(paths: &Paths, id: &str) -> Result<AggregateApiConfig,
         .ok_or_else(|| "Aggregate API does not exist".to_string())
 }
 
-pub(crate) fn member_profiles(
-    paths: &Paths,
-    aggregate: &AggregateApiConfig,
-) -> Result<Vec<ProviderProfile>, String> {
-    let profiles = aggregate
-        .member_provider_ids
-        .iter()
-        .map(|id| providers::read_provider(paths, id))
-        .collect::<Result<Vec<_>, _>>()?;
-    validate_members(&aggregate.model, &profiles)?;
-    Ok(profiles)
-}
-
-pub(crate) fn logical_profile(
-    aggregate: &AggregateApiConfig,
-    profiles: &[ProviderProfile],
-) -> Result<ProviderProfile, String> {
-    let mut profile = profiles
-        .first()
-        .cloned()
-        .ok_or_else(|| "Aggregate API does not contain any available APIs".to_string())?;
-    profile.id = active_id(&aggregate.id);
-    profile.kind = ProviderKind::Custom;
-    profile.name.clone_from(&aggregate.name);
-    profile.group.clear();
-    profile.model.clone_from(&aggregate.model);
-    profile.models = vec![aggregate.model.clone()];
-    profile.model_reasoning_efforts = common_reasoning_efforts(&aggregate.model, profiles);
-    profile.model_context_windows = common_context_window(&aggregate.model, profiles);
-    profile.image_input_models = common_image_input_models(aggregate, profiles);
-    profile.image_input_models_configured = true;
-    profile.model_selection_controlled_by_codex = true;
-    profile.fast_mode_enabled = profiles.iter().all(|provider| provider.fast_mode_enabled);
-    profile.balance_platform = None;
-    Ok(profile)
-}
-
-pub(crate) fn force_aggregate_model(provider: &ProviderProfile, model: &str) -> ProviderProfile {
-    let mut selected = provider.clone();
-    selected.model = model.to_string();
-    selected.models = vec![model.to_string()];
-    selected.model_selection_controlled_by_codex = false;
-    selected
-}
-
 pub(crate) fn remove_provider_membership(paths: &Paths, provider_id: &str) -> Result<(), String> {
-    let mut configs = read_configs(paths)?;
-    let mut changed = false;
-    for aggregate in &mut configs {
-        let previous_len = aggregate.member_provider_ids.len();
-        aggregate
-            .member_provider_ids
-            .retain(|member_id| member_id != provider_id);
-        if aggregate.member_provider_ids.len() != previous_len {
-            changed = true;
+    let changed = crate::aggregate_sync::update_configs(paths, |configs| {
+        let mut changed = Vec::new();
+        for aggregate in configs {
+            if !aggregate
+                .member_provider_ids
+                .iter()
+                .any(|id| id == provider_id)
+            {
+                continue;
+            }
+            aggregate.member_provider_ids.retain(|id| id != provider_id);
+            aggregate.member_models.remove(provider_id);
             aggregate.enabled &= aggregate.member_provider_ids.len() >= 2;
-            aggregate_scheduler::reset(&aggregate.id);
+            changed.push(aggregate.id.clone());
         }
-    }
-    if changed {
-        write_configs(paths, &configs)?;
+        Ok(changed)
+    })?;
+    for id in changed {
+        aggregate_scheduler::reset(&id);
     }
     Ok(())
 }
@@ -217,15 +187,19 @@ fn save_blocking<R: Runtime>(
     input: AggregateApiInput,
 ) -> Result<AggregateApiSummary, String> {
     let paths = resolve_paths(app)?;
-    let mut configs = read_configs(&paths)?;
-    let config = normalize_update(input, &paths, &configs)?;
+    let config = crate::aggregate_sync::update_configs(&paths, |configs| {
+        let config = normalize_update(input, &paths, configs)?;
+        if let Some(existing) = configs
+            .iter_mut()
+            .find(|aggregate| aggregate.id == config.id)
+        {
+            *existing = config.clone();
+        } else {
+            configs.push(config.clone());
+        }
+        Ok(config)
+    })?;
     let id = config.id.clone();
-    if let Some(existing) = configs.iter_mut().find(|aggregate| aggregate.id == id) {
-        *existing = config.clone();
-    } else {
-        configs.push(config.clone());
-    }
-    write_configs(&paths, &configs)?;
     aggregate_scheduler::reset(&id);
 
     let expected_active_id = active_id(&id);
@@ -246,15 +220,16 @@ fn save_blocking<R: Runtime>(
 fn delete_blocking<R: Runtime>(app: &tauri::AppHandle<R>, id: &str) -> Result<(), String> {
     validate_id(id)?;
     let paths = resolve_paths(app)?;
-    let mut configs = read_configs(&paths)?;
-    let previous_len = configs.len();
-    configs.retain(|aggregate| aggregate.id != id);
-    if configs.len() == previous_len {
-        return Err("Aggregate API does not exist".to_string());
-    }
     let expected_active_id = active_id(id);
     let was_active = read_state(&paths).active_provider_id.as_deref() == Some(&expected_active_id);
-    write_configs(&paths, &configs)?;
+    crate::aggregate_sync::update_configs(&paths, |configs| {
+        let previous_len = configs.len();
+        configs.retain(|aggregate| aggregate.id != id);
+        if configs.len() == previous_len {
+            return Err("Aggregate API does not exist".to_string());
+        }
+        Ok(())
+    })?;
     aggregate_scheduler::reset(id);
     if was_active {
         providers::disable_provider_blocking(app.clone())?;
@@ -262,7 +237,10 @@ fn delete_blocking<R: Runtime>(app: &tauri::AppHandle<R>, id: &str) -> Result<()
     emit_changed(app)
 }
 
-fn switch_blocking<R: Runtime>(app: &tauri::AppHandle<R>, id: &str) -> Result<(), String> {
+pub(crate) fn switch_blocking<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    id: &str,
+) -> Result<(), String> {
     let paths = resolve_paths(app)?;
     let config = read_config(&paths, id)?;
     if !config.enabled {
@@ -272,7 +250,7 @@ fn switch_blocking<R: Runtime>(app: &tauri::AppHandle<R>, id: &str) -> Result<()
     emit_changed(app)
 }
 
-fn activate_config<R: Runtime>(
+pub(crate) fn activate_config<R: Runtime>(
     app: &tauri::AppHandle<R>,
     paths: &Paths,
     config: &AggregateApiConfig,
@@ -301,6 +279,12 @@ fn normalize_update(
             .find(|config| config.id == id)
             .map(|config| config.failover_policy.clone());
     }
+    if input.member_models.is_none() {
+        input.member_models = configs
+            .iter()
+            .find(|config| config.id == id)
+            .map(|config| config.member_models.clone());
+    }
     normalize_input(id, input, paths)
 }
 
@@ -316,19 +300,27 @@ fn normalize_input(
         .iter()
         .map(|provider_id| providers::read_provider(paths, provider_id))
         .collect::<Result<Vec<_>, _>>()?;
-    validate_members(&model, &profiles)?;
+    let mut member_models = input.member_models.unwrap_or_default();
+    member_models.retain(|id, _| member_provider_ids.contains(id));
+    for model in member_models.values_mut() {
+        *model = require_value("Member model", model)?;
+    }
     let mut failover_policy = input.failover_policy.unwrap_or_default();
     failover_policy
         .normalize()
         .map_err(|error| error.to_string())?;
-    Ok(AggregateApiConfig {
+    let config = AggregateApiConfig {
         id,
         name,
         model,
         member_provider_ids,
+        member_models,
         enabled: input.enabled,
         failover_policy,
-    })
+    };
+    validate_imported_config(&config)?;
+    validate_members(&config, &profiles)?;
+    Ok(config)
 }
 
 fn unique_members(member_provider_ids: Vec<String>) -> Result<Vec<String>, String> {
@@ -342,75 +334,6 @@ fn unique_members(member_provider_ids: Vec<String>) -> Result<Vec<String>, Strin
         return Err("Select at least two APIs for the aggregate".to_string());
     }
     Ok(members)
-}
-
-fn validate_members(model: &str, profiles: &[ProviderProfile]) -> Result<(), String> {
-    if profiles.len() < 2 {
-        return Err("Aggregate API does not contain enough available APIs".to_string());
-    }
-    if profiles
-        .iter()
-        .any(|provider| !provider_supports_model(provider, model))
-    {
-        return Err("Every API in an aggregate must support the selected model".to_string());
-    }
-    Ok(())
-}
-
-fn provider_supports_model(provider: &ProviderProfile, model: &str) -> bool {
-    provider.model == model || provider.models.iter().any(|candidate| candidate == model)
-}
-
-fn common_reasoning_efforts(model: &str, profiles: &[ProviderProfile]) -> ModelReasoningEfforts {
-    let Some(first) = profiles
-        .first()
-        .and_then(|provider| provider.model_reasoning_efforts.get(model))
-        .cloned()
-    else {
-        return ModelReasoningEfforts::new();
-    };
-    let common = first
-        .into_iter()
-        .filter(|effort| {
-            profiles.iter().all(|provider| {
-                provider
-                    .model_reasoning_efforts
-                    .get(model)
-                    .is_some_and(|efforts| efforts.contains(effort))
-            })
-        })
-        .collect::<Vec<_>>();
-    if common.is_empty() {
-        ModelReasoningEfforts::new()
-    } else {
-        [(model.to_string(), common)].into()
-    }
-}
-
-fn common_context_window(model: &str, profiles: &[ProviderProfile]) -> ModelContextWindows {
-    profiles
-        .iter()
-        .filter_map(|provider| provider.model_context_windows.get(model).copied())
-        .min()
-        .map(|window| [(model.to_string(), window)].into())
-        .unwrap_or_default()
-}
-
-fn common_image_input_models(
-    aggregate: &AggregateApiConfig,
-    profiles: &[ProviderProfile],
-) -> Vec<String> {
-    let supported_by_all = profiles.iter().all(|provider| {
-        provider
-            .image_input_models
-            .iter()
-            .any(|model| model == &aggregate.model)
-    });
-    if supported_by_all {
-        vec![aggregate.model.clone()]
-    } else {
-        Vec::new()
-    }
 }
 
 fn summary(
@@ -432,6 +355,7 @@ fn summary(
         name: config.name,
         model: config.model,
         member_provider_ids: config.member_provider_ids,
+        member_models: config.member_models,
         enabled: config.enabled,
         member_conversation_counts,
         failover_policy: config.failover_policy,
@@ -439,7 +363,7 @@ fn summary(
     })
 }
 
-fn read_configs(paths: &Paths) -> Result<Vec<AggregateApiConfig>, String> {
+pub(crate) fn read_configs(paths: &Paths) -> Result<Vec<AggregateApiConfig>, String> {
     let path = store_path(paths)?;
     if !path.exists() {
         return Ok(Vec::new());
@@ -455,9 +379,41 @@ fn read_configs(paths: &Paths) -> Result<Vec<AggregateApiConfig>, String> {
     Ok(configs)
 }
 
-fn write_configs(paths: &Paths, configs: &[AggregateApiConfig]) -> Result<(), String> {
+pub(crate) fn write_configs(paths: &Paths, configs: &[AggregateApiConfig]) -> Result<(), String> {
     let value = serde_json::to_value(configs).map_err(|error| error.to_string())?;
     write_json_atomic(&store_path(paths)?, &value)
+}
+
+pub(crate) fn validate_imported_config(config: &AggregateApiConfig) -> Result<(), String> {
+    validate_id(&config.id)?;
+    require_value("Aggregate API name", &config.name)?;
+    require_value("Model", &config.model)?;
+    config
+        .failover_policy
+        .validate()
+        .map_err(|error| error.to_string())?;
+    if config.member_provider_ids.len() > 100
+        || (config.enabled && config.member_provider_ids.len() < 2)
+    {
+        return Err("Select between two and 100 APIs for the aggregate".into());
+    }
+    let mut members = HashSet::new();
+    for id in &config.member_provider_ids {
+        validate_id(id)?;
+        if !members.insert(id) {
+            return Err("Aggregate API members must be unique".into());
+        }
+    }
+    for (id, model) in &config.member_models {
+        if !members.contains(id)
+            || model.trim().is_empty()
+            || model.len() > 256
+            || model.chars().any(char::is_control)
+        {
+            return Err("An aggregate member model is invalid".into());
+        }
+    }
+    Ok(())
 }
 
 fn store_path(paths: &Paths) -> Result<PathBuf, String> {
@@ -472,6 +428,10 @@ fn require_value(label: &str, value: &str) -> Result<String, String> {
     let value = value.trim();
     if value.is_empty() {
         Err(format!("{label} is required"))
+    } else if value.len() > 256 || value.chars().any(char::is_control) {
+        Err(format!(
+            "{label} is too long or contains invalid characters"
+        ))
     } else {
         Ok(value.to_string())
     }
@@ -491,6 +451,8 @@ fn validate_id(id: &str) -> Result<(), String> {
 }
 
 fn emit_changed<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
+    crate::codex_gui::account_selection::refresh_aggregate_selection(app)
+        .map_err(|error| error.to_string())?;
     app.emit("aggregate-apis-changed", ())
         .map_err(|error| error.to_string())?;
     app.emit("providers-changed", ())

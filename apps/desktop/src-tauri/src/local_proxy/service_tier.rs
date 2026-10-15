@@ -23,10 +23,16 @@ fn snapshot_request_service_tier(
 struct ChatCompletionMetadata {
     usage: Option<Value>,
     service_tier: Option<String>,
+    annotations: Vec<Value>,
 }
 
 impl ChatCompletionMetadata {
     fn observe(&mut self, value: &Value) {
+        if let Some(message) = value.pointer("/choices/0/delta").or_else(||value.pointer("/choices/0/message")) {
+            for annotation in chat_annotations::extract(message) {
+                if !self.annotations.contains(&annotation) { self.annotations.push(annotation); }
+            }
+        }
         if let Some(usage) = value
             .get("usage")
             .filter(|usage| !usage.is_null())

@@ -37,6 +37,7 @@ export function RemoteAccountPicker({ active, ready, client, computers, privacyM
   const panel = (devicePicker: ReactNode) => <GuiAccountList choices={choices} devicePicker={devicePicker}
     disabled={disabled} loading={accounts.loading || Boolean(accounts.saving)}
     onSelectAccount={(id) => { void select('account', id); }}
+    onSelectAggregate={(id) => { void select('aggregate', id); }}
     onSelectProvider={(id) => { void select('provider', id); }} footer={<>
       {!ready && <p className={styles.hint}>{guiText("连接电脑后即可切换账户。")}</p>}
       {ready && accounts.snapshot && !accounts.snapshot.running

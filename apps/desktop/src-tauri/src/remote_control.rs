@@ -87,6 +87,18 @@ enum ServerMessage {
         #[serde(rename = "providerId")]
         provider_id: String,
     },
+    SwitchAggregate {
+        #[serde(rename = "commandId")]
+        command_id: String,
+        #[serde(rename = "aggregateId")]
+        aggregate_id: String,
+    },
+    SwitchGuiAggregate {
+        #[serde(rename = "commandId")]
+        command_id: String,
+        #[serde(rename = "aggregateId")]
+        aggregate_id: String,
+    },
 }
 
 pub(crate) fn start<R: Runtime>(app: tauri::AppHandle<R>) {
@@ -121,6 +133,8 @@ fn run_connection<R: Runtime>(
         "provider-group-switch",
         "restart-codex",
         "gui-model-switch",
+        "aggregate-switch",
+        "gui-aggregate-switch",
         "app-update",
     ];
     if remote_commands_enabled {
@@ -144,7 +158,9 @@ fn run_connection<R: Runtime>(
                     GuiAccountSelection::Account(id) => Some(id), _ => None,
                 },
                 "guiProviderId": match &config.gui_selection {
-                    GuiAccountSelection::Provider(id) => Some(id), _ => None,
+                    GuiAccountSelection::Provider(id) => Some(id.clone()),
+                    GuiAccountSelection::Aggregate(id) => Some(crate::aggregate_api::active_id(id)),
+                    _ => None,
                 },
                 "capabilities": capabilities,
             })
@@ -208,6 +224,22 @@ fn run_connection<R: Runtime>(
                         command_id,
                         provider_id,
                     } => handle_provider_switch(app, &mut socket, command_id, provider_id)?,
+                    ServerMessage::SwitchAggregate {
+                        command_id,
+                        aggregate_id,
+                    } => {
+                        let result = crate::aggregate_api::switch_blocking(app, &aggregate_id);
+                        send_command_result(&mut socket, command_id, result, "Aggregate switch")?;
+                    }
+                    ServerMessage::SwitchGuiAggregate {
+                        command_id,
+                        aggregate_id,
+                    } => handle_gui_switch(
+                        app,
+                        &mut socket,
+                        command_id,
+                        GuiAccountSelection::Aggregate(aggregate_id),
+                    )?,
                     ServerMessage::SwitchProviderGroup { command_id, group } => {
                         handle_provider_group_switch(app, &mut socket, command_id, group)?
                     }
@@ -401,6 +433,26 @@ mod tests {
             r#"{"type":"switch-gui-account","commandId":"gui-3","providerId":"wrong"}"#,
         )
         .is_err());
+    }
+
+    #[test]
+    fn aggregate_commands_keep_gui_and_proxy_targets_separate() {
+        let gui = serde_json::from_str::<ServerMessage>(
+            r#"{"type":"switch-gui-aggregate","commandId":"gui","aggregateId":"route"}"#,
+        )
+        .unwrap();
+        assert!(
+            matches!(gui, ServerMessage::SwitchGuiAggregate { command_id, aggregate_id }
+            if command_id == "gui" && aggregate_id == "route")
+        );
+        let proxy = serde_json::from_str::<ServerMessage>(
+            r#"{"type":"switch-aggregate","commandId":"proxy","aggregateId":"route"}"#,
+        )
+        .unwrap();
+        assert!(
+            matches!(proxy, ServerMessage::SwitchAggregate { command_id, aggregate_id }
+            if command_id == "proxy" && aggregate_id == "route")
+        );
     }
 
     #[test]

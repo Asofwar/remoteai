@@ -1,0 +1,133 @@
+use super::{continuation, response};
+use serde_json::{json, Value};
+use std::io::{self, BufRead, Read};
+
+const MAX_EVENT_BYTES: usize = 8 * 1024 * 1024;
+
+pub(super) struct GenerateContentReader<R> {
+    source: R,
+    pending: io::Cursor<Vec<u8>>,
+    data: String,
+    state: response::State,
+    scope: Option<continuation::Scope>,
+    history: Option<super::history::Pending>,
+    completed: bool,
+}
+
+impl<R: BufRead> GenerateContentReader<R> {
+    pub(super) fn new(source: R, scope: Option<continuation::Scope>) -> Self {
+        Self {
+            source,
+            pending: io::Cursor::new(Vec::new()),
+            data: String::new(),
+            state: response::State::default(),
+            scope,
+            history: None,
+            completed: false,
+        }
+    }
+
+    fn emit(&mut self, value: Value) {
+        self.pending = io::Cursor::new(format!("data: {value}\n\n").into_bytes());
+    }
+
+    pub(super) fn with_history(mut self, history: Option<super::history::Pending>) -> Self {
+        self.history = history;
+        self
+    }
+
+    fn event(&mut self) -> io::Result<()> {
+        if self.data.is_empty() {
+            return Ok(());
+        }
+        let value: Value =
+            serde_json::from_str(&std::mem::take(&mut self.data)).map_err(|_| invalid_event())?;
+        let delta = self.state.observe(&value).map_err(|_| invalid_event())?;
+        self.emit(json!({ "choices": [{ "index": 0, "delta": delta }], "usage": response::usage(&self.state.usage) }));
+        Ok(())
+    }
+
+    fn finish(&mut self) {
+        match self.state.finish_reason() {
+            Ok(reason) => {
+                self.state.capture(self.scope.as_ref());
+                if self.state.reason.as_deref() == Some("STOP") {
+                    if let Some(history) = &self.history {
+                        history.capture(&self.state.parts, &self.state.calls);
+                    }
+                }
+                self.emit(
+                    json!({ "choices": [{ "index": 0, "delta": {"annotations":self.state.annotations()}, "finish_reason": reason }],
+                    "usage": response::usage(&self.state.usage) }),
+                );
+            }
+            Err(_) => self.fail(),
+        }
+        self.completed = true;
+    }
+
+    fn fail(&mut self) {
+        self.emit(json!({ "error": { "type": "api_error", "message": "The service response was interrupted." } }));
+        self.completed = true;
+    }
+
+    fn read_line(&mut self) -> io::Result<bool> {
+        let mut line = String::new();
+        let count = self
+            .source
+            .by_ref()
+            .take((MAX_EVENT_BYTES + 1) as u64)
+            .read_line(&mut line)?;
+        if count > MAX_EVENT_BYTES {
+            return Err(invalid_event());
+        }
+        if count == 0 {
+            if !self.data.is_empty() {
+                self.event()?;
+                return Ok(true);
+            }
+            return Ok(false);
+        }
+        let line = line.trim_end_matches(['\r', '\n']);
+        if line.is_empty() {
+            self.event()?;
+            return Ok(true);
+        }
+        if let Some(data) = line.strip_prefix("data:") {
+            if self.data.len().saturating_add(data.len()) > MAX_EVENT_BYTES {
+                return Err(invalid_event());
+            }
+            if !self.data.is_empty() {
+                self.data.push('\n')
+            }
+            self.data.push_str(data.strip_prefix(' ').unwrap_or(data));
+        }
+        Ok(true)
+    }
+}
+
+impl<R: BufRead> Read for GenerateContentReader<R> {
+    fn read(&mut self, target: &mut [u8]) -> io::Result<usize> {
+        if target.is_empty() {
+            return Ok(0);
+        }
+        loop {
+            let count = self.pending.read(target)?;
+            if count > 0 || self.completed {
+                return Ok(count);
+            }
+            match self.read_line() {
+                Ok(true) => {}
+                Ok(false) => self.finish(),
+                Err(_) => self.fail(),
+            }
+        }
+    }
+}
+
+fn invalid_event() -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        "The service returned an invalid event",
+    )
+}

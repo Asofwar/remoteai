@@ -86,6 +86,7 @@ export function ModelReasoningEditor({
     { label: "Responses", value: "openaiResponses" },
     { label: "Chat Completions", value: "openaiChat" },
     { label: "Anthropic Messages", value: "anthropicMessages" },
+    { label: "Gemini GenerateContent", value: "geminiGenerateContent" },
   ];
 
   return <div className="provider-model-editor">

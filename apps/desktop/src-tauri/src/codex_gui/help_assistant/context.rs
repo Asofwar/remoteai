@@ -34,6 +34,14 @@ pub(super) fn prepare(app: &AppHandle) -> Result<PreparedContext> {
             }
             "provider"
         }
+        GuiAccountSelection::Aggregate(id) => {
+            let config = crate::aggregate_api::read_config(&paths, id)
+                .map_err(|_| HelpError::AccountRequired)?;
+            if !config.enabled || config.model != settings.model {
+                return Err(HelpError::ModelUnsupported);
+            }
+            "aggregate"
+        }
     };
     let model = settings.model;
     let effort = settings.effort;

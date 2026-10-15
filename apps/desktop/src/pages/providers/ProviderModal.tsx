@@ -140,7 +140,8 @@ export function ProviderModal({ provider, saving, onClose, onSave, t }: Provider
         <h2>{provider ? t("providers.modal.editTitle") : t("providers.modal.addTitle")}</h2>
         <p>{t("providers.modal.description")}</p>
         <ProviderFormFields apiKey={apiKey} baseUrl={baseUrl} supportsFastMode={supportsFastMode}
-          allowModelDiscovery={!requestOptions.useFullUrl}
+          allowModelDiscovery={!requestOptions.error}
+          discoveryOptions={{ apiFormat: modelApiFormats(modelConfigs)[activeModel] ?? provider?.apiFormat, requestOptions: requestOptions.value }}
           modelConfigs={modelConfigs} name={name}
           provider={provider} saving={saving} activeModel={activeModel}
           balanceSettings={{

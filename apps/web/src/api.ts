@@ -1,4 +1,4 @@
-import { remoteModelPath, type RemoteModelTarget } from '../../../shared/remote-chat/modelTarget';
+import { remoteProviderCommand, type RemoteModelTarget } from '../../../shared/remote-chat/modelTarget';
 import type {
   AccountSummary,
   AuthResponse,
@@ -178,7 +178,7 @@ export async function fetchDashboardData(refreshUsage = true) {
   const [{ accounts }, devicesPayload, { providers }, profile] = await Promise.all([
     apiJson<{ accounts: AccountSummary[] }>("/sync/accounts/web-summary"),
     apiJson<{ devices: RemoteDevice[] }>("/devices"),
-    apiJson<{ providers: RemoteProviderSummary[] }>("/devices/providers"),
+    apiJson<{ providers: RemoteProviderSummary[] }>("/devices/providers?includeAggregates=true"),
     apiJson<UserProfile>("/auth/me"),
   ]);
   const devices = devicesPayload.devices.map(normalizeRemoteDevice);
@@ -293,12 +293,13 @@ export async function consumeResetCredit(accountId: string) {
 export async function switchRemoteDeviceProvider(
   deviceId: string, providerId: string, target: RemoteModelTarget = 'proxy',
 ) {
+  const command = remoteProviderCommand(providerId, target);
   return apiJson<RemoteModelSwitchResult>(
-    `/devices/${encodeURIComponent(deviceId)}/${remoteModelPath('provider', target)}`,
+    `/devices/${encodeURIComponent(deviceId)}/${command.path}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ providerId }),
+      body: JSON.stringify(command.body),
     },
   );
 }
@@ -333,6 +334,8 @@ function normalizeRemoteDevice(device: RemoteDevice): RemoteDevice {
         || capability === "provider-group-switch"
         || capability === "restart-codex"
         || capability === "gui-model-switch"
+        || capability === "aggregate-switch"
+        || capability === "gui-aggregate-switch"
       ))
       : [],
   };

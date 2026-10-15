@@ -15,7 +15,8 @@ export function providerModels(providers: Provider[], aggregates: AggregateApi[]
   const aggregate = aggregates.find((entry) => entry.active);
   if (aggregate) {
     const members = providers.filter((entry) => aggregate.memberProviderIds.includes(entry.id));
-    const configured = members.map((entry) => entry.modelReasoningEfforts[aggregate.model] ?? []);
+    const configured = members.map((entry) => entry.modelReasoningEfforts[
+      aggregate.memberModels?.[entry.id] ?? aggregate.model] ?? []);
     const efforts = configured[0]?.filter((effort) => configured.every((levels) => levels.includes(effort))) ?? [];
     return normalizeModels(aggregate.model, []).map((model) =>
       modelOption(model, aggregate.model, efforts.length ? efforts : undefined));

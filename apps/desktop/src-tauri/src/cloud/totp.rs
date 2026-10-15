@@ -117,11 +117,23 @@ pub(super) fn put_remote_providers<R: Runtime>(
     settings: &mut AppSettings,
     credentials: &mut CloudCredentials,
 ) -> Result<usize, String> {
+    let providers = put_remote_provider_records(app, client, settings, credentials)?;
+    let aggregates = aggregates::sync_aggregates(app, client, settings, credentials)
+        .map_err(|error| error.to_string())?;
+    settings.cloud_last_sync_at = Some(Utc::now().to_rfc3339());
+    Ok(providers + aggregates)
+}
+
+pub(super) fn put_remote_provider_records<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    client: &Client,
+    settings: &mut AppSettings,
+    credentials: &mut CloudCredentials,
+) -> Result<usize, String> {
     let providers = collect_local_providers(app)?;
     for provider in &providers {
         upsert_remote_provider_payload(app, client, settings, credentials, provider)?;
     }
-    settings.cloud_last_sync_at = Some(Utc::now().to_rfc3339());
     Ok(providers.len())
 }
 

@@ -15,6 +15,7 @@ import {
 } from "./providerUtils";
 
 interface RelayModelPickerProps {
+  discoveryOptions?: Parameters<typeof fetchRelayModels>[3];
   baseUrl: string;
   apiKey: string;
   providerId?: string;
@@ -31,6 +32,7 @@ const AUTO_FETCH_DELAY_MS = 800;
 
 export function RelayModelPicker({
   baseUrl,
+  discoveryOptions,
   apiKey,
   providerId,
   enabled,
@@ -49,7 +51,8 @@ export function RelayModelPicker({
   const autoFetchTimer = useRef<number>();
   const selection = useRef({ modelConfigs, activeModel });
   selection.current = { modelConfigs, activeModel };
-  const canFetch = enabled && Boolean(baseUrl.trim() && (apiKey.trim() || providerId));
+  const optionsKey = JSON.stringify(discoveryOptions);
+  const canFetch = enabled && Boolean(baseUrl.trim());
 
   const loadModels = async () => {
     if (disabled || pendingRequest.current !== null) return;
@@ -63,7 +66,8 @@ export function RelayModelPicker({
     setLoading(true);
     setError("");
     try {
-      const latest = await fetchRelayModels(baseUrl, apiKey, providerId);
+      const latest = await (discoveryOptions ? fetchRelayModels(baseUrl, apiKey, providerId, discoveryOptions)
+        : fetchRelayModels(baseUrl, apiKey, providerId));
       if (currentRequestId !== requestId.current) return;
       const { modelConfigs, activeModel } = selection.current;
       onModelConfigsChange(modelReasoningConfigs(latest, {
@@ -104,7 +108,7 @@ export function RelayModelPicker({
     };
     // Fetch only when the connection fields change; selection callbacks must not retrigger discovery.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseUrl, apiKey, providerId, enabled, disabled]);
+  }, [baseUrl, apiKey, providerId, enabled, disabled, optionsKey]);
 
   const updateModels = (configs: ModelReasoningConfig[]) => {
     onModelConfigsChange(configs);

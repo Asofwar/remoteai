@@ -49,7 +49,8 @@ fn collect_accounts<R: Runtime>(
     accounts.sort_by(|left, right| left.id.cmp(&right.id));
     let providers = collect_providers(&paths)?;
     Ok(AccountArchivePayload {
-        format_version: 4,
+        format_version: 5,
+        aggregates: crate::aggregate_sync::collect(&paths)?.aggregates,
         exported_at: Utc::now().to_rfc3339(),
         active_account_id,
         active_provider_id,
@@ -62,16 +63,18 @@ fn apply_archive<R: Runtime>(
     app: &tauri::AppHandle<R>,
     payload: AccountArchivePayload,
 ) -> Result<AccountArchiveImportResult, String> {
-    if payload.format_version == 0 || payload.format_version > 4 {
+    if payload.format_version == 0 || payload.format_version > 5 {
         return Err(format!(
             "Unsupported account archive version: {}",
             payload.format_version
         ));
     }
-    if payload.accounts.is_empty() && payload.providers.is_empty() {
+    if payload.accounts.is_empty() && payload.providers.is_empty() && payload.aggregates.is_empty() {
         return Err("The selected archive does not contain any accounts or providers".to_string());
     }
 
+    let aggregate_payload = crate::aggregate_sync::AggregateSyncPayload { aggregates: payload.aggregates };
+    crate::aggregate_sync::validate(&aggregate_payload)?;
     let paths = resolve_paths(app)?;
     fs::create_dir_all(&paths.accounts)
         .map_err(|error| format!("Failed to create account store: {error}"))?;
@@ -193,8 +196,17 @@ fn apply_archive<R: Runtime>(
         }
     }
 
+    let aggregates_imported = crate::aggregate_sync::apply(&paths, aggregate_payload)?;
+    crate::aggregate_api::refresh_targets(app, &paths)?;
     let active_provider_id = if let Some(id) = payload.active_provider_id.as_deref() {
-        if provider_ids.iter().any(|provider_id| provider_id == id)
+        if let Some(aggregate_id) = crate::aggregate_api::config_id_from_active_id(id) {
+            let aggregate = crate::aggregate_api::read_config(&paths, aggregate_id).ok()
+                .filter(|c| c.enabled && crate::aggregate_api::member_profiles(&paths,c).is_ok());
+            if let Some(aggregate) = aggregate {
+                crate::aggregate_api::activate_config(app, &paths, &aggregate)?;
+                Some(id.to_owned())
+            } else { None }
+        } else if provider_ids.iter().any(|provider_id| provider_id == id)
             && crate::providers::activate_provider_for_sync(app, &paths, id)?
         {
             Some(id.to_string())
@@ -206,6 +218,7 @@ fn apply_archive<R: Runtime>(
     };
 
     Ok(AccountArchiveImportResult {
+        aggregates_imported,
         imported: account_ids.len(),
         account_ids,
         active_account_id,

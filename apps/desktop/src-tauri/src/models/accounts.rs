@@ -283,6 +283,7 @@ pub(crate) enum ProviderApiFormat {
     OpenaiResponses,
     OpenaiChat,
     AnthropicMessages,
+    GeminiGenerateContent,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

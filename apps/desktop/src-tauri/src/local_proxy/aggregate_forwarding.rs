@@ -87,12 +87,13 @@ fn send_aggregate_member(
         .iter()
         .find(|provider| provider.id == member_id)
         .ok_or_else(|| "Aggregate API member does not exist".to_string())?;
-    let provider = aggregate_api::force_aggregate_model(provider, &request.target.config.model);
+    let model = aggregate_api::member_model(&request.target.config, member_id);
+    let provider = aggregate_api::force_aggregate_model(provider, model);
     if is_anthropic_messages_endpoint(request_path(request.url)) {
         return forward_anthropic_provider_with_context(
             request.body.clone(),
             &provider,
-            &request.target.config.model,
+            model,
             AnthropicProviderContext {
                 headers: request.headers,
                 session_id: request.session_id,

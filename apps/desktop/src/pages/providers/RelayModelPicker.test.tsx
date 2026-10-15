@@ -70,9 +70,9 @@ it("refreshes with a saved key only on demand and preserves existing model setti
   expect(onActiveModelChange).toHaveBeenCalledWith("gpt-5.6-sol");
 });
 
-it("requires a key for a new connection and still automatically fetches after key entry", async () => {
+it("allows keyless model discovery and automatically fetches after key entry", async () => {
   await renderPicker();
-  expect(container.querySelector("button")!.disabled).toBe(true);
+  expect(container.querySelector("button")!.disabled).toBe(false);
   backend.fetchRelayModels.mockResolvedValue(["gpt-6-astra"]);
   await renderPicker({ apiKey: "sk-new-test" });
   await act(async () => vi.advanceTimersByTimeAsync(1000));

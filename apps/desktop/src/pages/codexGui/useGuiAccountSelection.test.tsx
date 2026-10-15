@@ -2,13 +2,15 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { invoke } from "../../api/backend";
+import { invoke, loadAggregateApis, subscribeToProviderEvents } from "../../api/backend";
 import { DEMO_ACCOUNTS } from "../../demo";
 import { subscribeGuiEvent } from "./webEvents";
 import { selectedGuiEntries, useGuiAccountSelection, type GuiAccountSelection } from "./useGuiAccountSelection";
 import { useUsageStatus } from "./useUsageStatus";
 
-vi.mock("../../api/backend", () => ({ invoke: vi.fn(), hasLocalBackend: true, isHostedWebApp: false }));
+vi.mock("../../api/backend", () => ({ invoke: vi.fn(), loadAggregateApis: vi.fn().mockResolvedValue([]),
+  subscribeToProviderEvents: vi.fn(() => () => {}),
+  hasLocalBackend: true, isHostedWebApp: false }));
 vi.mock("./webEvents", () => ({ subscribeGuiEvent: vi.fn() }));
 let root: Root;
 let container: HTMLDivElement;
@@ -31,6 +33,7 @@ beforeEach(() => {
   vi.mocked(invoke).mockReset().mockImplementation(async (command) =>
     command === "codex_gui_account_selection" ? { kind: "account", id: "first" } : { running: true });
   vi.mocked(subscribeGuiEvent).mockReset().mockResolvedValue(stop);
+  vi.mocked(loadAggregateApis).mockReset().mockResolvedValue([]);
   stop.mockClear();
   active = true;
   container = document.createElement("div");
@@ -100,4 +103,18 @@ it("does not let a slow initial read overwrite a newer GUI selection", async () 
   await act(async () => finish({ kind: "account", id: "first" }));
   expect(container.textContent).toBe("second");
   expect(selection.loading).toBe(false);
+});
+
+it("refreshes aggregate choices after provider changes with only one pending read", async () => {
+  await render();
+  let finish!: (items: Awaited<ReturnType<typeof loadAggregateApis>>) => void;
+  vi.mocked(loadAggregateApis).mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  const receive = vi.mocked(subscribeToProviderEvents).mock.calls.at(-1)![0];
+  let pending!: void | Promise<void>;
+  await act(async () => { pending = receive(); await receive(); });
+  expect(loadAggregateApis).toHaveBeenCalledTimes(2);
+  const aggregate = { id: "route", name: "Route", model: "shared", enabled: true, active: false,
+    memberProviderIds: ["one", "two"], memberConversationCounts: {} };
+  await act(async () => { finish([aggregate]); await pending; });
+  expect(selection.aggregateApis).toEqual([aggregate]);
 });

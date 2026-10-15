@@ -3,6 +3,7 @@ struct AggregateTestServer {
     calls: std::sync::Arc<AtomicUsize>,
     stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
     worker: Option<std::thread::JoinHandle<()>>,
+    requests: std::sync::Arc<std::sync::Mutex<Vec<(String, Value)>>>,
 }
 
 impl AggregateTestServer {
@@ -13,6 +14,8 @@ impl AggregateTestServer {
         let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let worker_calls = calls.clone();
         let worker_stop = stop.clone();
+        let requests = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let worker_requests = requests.clone();
         let body = body.to_string();
         let headers = headers
             .into_iter()
@@ -26,6 +29,10 @@ impl AggregateTestServer {
                 };
                 let mut input = Vec::new();
                 request.as_reader().read_to_end(&mut input).unwrap();
+                worker_requests.lock().unwrap().push((
+                    request.url().to_string(),
+                    serde_json::from_slice(&input).unwrap_or(Value::Null),
+                ));
                 worker_calls.fetch_add(1, AtomicOrdering::SeqCst);
                 let mut response = Response::from_string(body.clone()).with_status_code(status);
                 for header in &headers {
@@ -39,6 +46,7 @@ impl AggregateTestServer {
             calls,
             stop,
             worker: Some(worker),
+            requests,
         }
     }
 
@@ -76,6 +84,7 @@ fn aggregate_test_target(urls: &[&str]) -> AggregateTarget {
         .collect::<Vec<_>>();
     AggregateTarget {
         config: AggregateApiConfig {
+            member_models: Default::default(),
             id: uuid::Uuid::new_v4().to_string(),
             name: "Failover fixture".into(),
             model: "shared-model".into(),

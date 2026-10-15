@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, Empty, Form, Input, Modal, Popconfirm, Select, Space, Switch, Tag } from "antd";
+import { AutoComplete, Button, Empty, Form, Input, Modal, Popconfirm, Select, Space, Switch, Tag } from "antd";
 import { Edit3, Plus, Power, Trash2 } from "lucide-react";
 import type { Translate } from "../../../i18n";
 import type { AggregateApi, AggregateApiInput, AggregateFailoverPolicy, Provider } from "../../../types";
@@ -7,6 +7,7 @@ import { aggregateMemberNames } from "../aggregateApiPresentation";
 import { FailoverSettings } from "./FailoverSettings";
 import { MemberHealth } from "./MemberHealth";
 import { copyFailoverPolicy } from "./failoverPolicy";
+import { MemberModels } from "./MemberModels";
 import styles from "./index.module.less";
 
 interface AggregateApiManagerProps {
@@ -28,6 +29,7 @@ interface AggregateFormValues {
   name: string;
   model: string;
   memberProviderIds: string[];
+  memberModels: Record<string, string>;
   enabled: boolean;
   failoverPolicy: AggregateFailoverPolicy;
 }
@@ -42,7 +44,6 @@ function availableModels(providers: Provider[]) {
     for (const model of providerModels(provider)) counts.set(model, (counts.get(model) ?? 0) + 1);
   }
   return [...counts]
-    .filter(([, count]) => count >= 2)
     .map(([model]) => ({ label: model, value: model }))
     .sort((left, right) => left.label.localeCompare(right.label));
 }
@@ -52,11 +53,8 @@ export function AggregateApiManager(props: AggregateApiManagerProps) {
   const [form] = Form.useForm<AggregateFormValues>();
   const [editing, setEditing] = useState<AggregateApi | null>(null);
   const [showEditor, setShowEditor] = useState(false);
-  const selectedModel = Form.useWatch("model", form);
   const modelOptions = useMemo(() => availableModels(providers), [providers]);
-  const memberOptions = providers
-    .filter((provider) => selectedModel && providerModels(provider).includes(selectedModel))
-    .map((provider) => ({ label: provider.name, value: provider.id }));
+  const memberOptions = providers.map((provider) => ({ label: provider.name, value: provider.id }));
 
   useEffect(() => {
     if (!props.open) {
@@ -72,6 +70,7 @@ export function AggregateApiManager(props: AggregateApiManagerProps) {
       name: aggregate?.name ?? "",
       model: aggregate?.model,
       memberProviderIds: aggregate?.memberProviderIds ?? [],
+      memberModels: aggregate?.memberModels ?? {},
       enabled: aggregate?.enabled ?? true,
       failoverPolicy: copyFailoverPolicy(aggregate?.failoverPolicy),
     });
@@ -140,14 +139,16 @@ export function AggregateApiManager(props: AggregateApiManagerProps) {
         </Form.Item>
         <Form.Item name="model" label={t("providers.aggregate.model")}
           rules={[{ required: true, message: t("providers.aggregate.error.modelRequired") }] }>
-          <Select showSearch options={modelOptions} placeholder={t("providers.aggregate.modelPlaceholder")}
-            onChange={() => form.setFieldValue("memberProviderIds", [])} />
+          <AutoComplete options={modelOptions} placeholder={t("providers.aggregate.modelPlaceholder")}
+            filterOption={(input, option) => String(option?.value).toLowerCase().includes(input.toLowerCase())}
+            maxLength={256} />
         </Form.Item>
         <Form.Item name="memberProviderIds" label={t("providers.aggregate.members")}
           rules={[{ type: "array", min: 2, message: t("providers.aggregate.error.membersRequired") }] }>
           <Select mode="multiple" options={memberOptions}
             placeholder={t("providers.aggregate.membersPlaceholder")} />
         </Form.Item>
+        <MemberModels form={form} providers={providers} />
         <Form.Item name="enabled" label={t("providers.aggregate.enabled")} valuePropName="checked">
           <Switch />
         </Form.Item>

@@ -18,6 +18,7 @@ export type ProviderCatalogTranslationKey =
   `providers.catalog.${ProviderPresetId}.${"description" | "note"}`;
 
 export type ProviderEndpointTranslationKey = `providers.catalog.endpoint.${
+  | "native"
   | "global"
   | "china"
   | "international"
@@ -137,6 +138,13 @@ const KIMI_ENDPOINTS = [
 ] as const satisfies readonly ProviderEndpointDescriptor[];
 
 const GEMINI_ENDPOINTS = [
+  {
+    id: "native",
+    labelKey: "providers.catalog.endpoint.native",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    apiFormat: "geminiGenerateContent",
+    fallbackModels: ["gemini-3.7-flash"],
+  },
   {
     id: "global",
     labelKey: "providers.catalog.endpoint.global",

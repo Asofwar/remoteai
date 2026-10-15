@@ -1,7 +1,6 @@
 import { guiText } from "../../../i18n/guiText";
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Spin } from 'antd';
-import { RefreshCw, Server, UserRound } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import type { GuiAccountsClient, SelectableGuiAccount } from '../../../../../../shared/remote-chat/guiAccounts';
 import { useGuiAccounts } from '../../../../../../shared/remote-chat/client/useGuiAccounts';
 import { maskAccountEmail } from '../../../utils/accountPrivacy';
@@ -50,7 +49,6 @@ export function RemoteAccountPicker({ active, ready, client, computers, privacyM
   return <GuiAccountMenu active={active} open={open} trigger={trigger} name={name} computers={computers}
     busy={Boolean(accounts.saving)} accounts={panel}
     onOpenChange={(next) => { setOpen(next); if (next && ready) accounts.refresh(); }}
-    icon={accounts.saving ? <Spin size="small" /> : current?.kind === 'provider' ? <Server size={17} /> : <UserRound size={17} />}
     summary={<RemoteAccountSummary name={name} current={current} ready={ready}
       running={accounts.snapshot?.running} />} />;
 }

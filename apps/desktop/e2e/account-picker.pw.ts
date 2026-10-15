@@ -24,11 +24,10 @@ async function expectAligned(page: Page) {
   await expect.poll(async () => {
     const target = (await trigger.boundingBox())!;
     const panel = (await popup.boundingBox())!;
-    return Math.max(Math.abs(target.x - panel.x), Math.abs(target.width - panel.width),
-      Math.abs(target.x + target.width - panel.x - panel.width));
+    return Math.abs(target.x - panel.x);
   }).toBeLessThan(1);
   const bounds = (await popup.boundingBox())!;
-  expect(bounds.width).toBeLessThanOrEqual(400);
+  expect(bounds.width).toBeLessThanOrEqual(280);
   expect(bounds.x).toBeGreaterThanOrEqual(0);
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(page.viewportSize()!.width);
 }
@@ -71,10 +70,12 @@ test("appearance changes messages, composer and code immediately and survives re
   await expect(sample.getByRole("textbox")).toHaveCSS("font-size", "14px");
 });
 
-test("picker edges match the footer across sidebar and viewport resizing", async ({ page }) => {
+test("compact picker aligns with the footer across sidebar and viewport resizing", async ({ page }) => {
   await mockCommands(page);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/e2e/account-picker-harness.html");
+  await expect(triggerFor(page).locator('svg')).toHaveCount(0);
+  expect((await triggerFor(page).boundingBox())!.height).toBeLessThan(64);
   await triggerFor(page).click();
   await expectAligned(page);
   await page.screenshot({ path: "../../.codex-tmp/gui-account-picker-desktop.png", animations: "disabled" });

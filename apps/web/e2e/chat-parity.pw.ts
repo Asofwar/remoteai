@@ -181,7 +181,12 @@ test('changes context capacity and opens profile, account picker and token summa
     await page.keyboard.press('Escape');
   } else await closeSheet(page);
   await openChatList(page);
-  await page.getByRole('button', { name: '打开头像菜单' }).click();
+  const accountMenu = page.getByRole('button', { name: '账户与电脑', exact: true });
+  await expect(accountMenu).toHaveText('演示账户一');
+  await expect(accountMenu.locator('svg')).toHaveCount(0);
+  expect((await page.locator('.chat-drawer-footer:visible').boundingBox())!.height).toBeLessThan(70);
+  await screenshot(page, info, 'compact-account-footer');
+  await accountMenu.click();
   await page.getByRole('button', { name: '切换账户', exact: true }).click();
   await expect(page.getByRole('button', { name: '演示账户一', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: '演示账户二', exact: true }).click();

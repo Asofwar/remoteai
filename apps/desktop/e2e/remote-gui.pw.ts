@@ -100,7 +100,7 @@ async function accountSummaryRows(page: Page) {
   return page.getByRole('button', { name: /^切换 GUI 账户：/ }).evaluate(button => {
     const body = button.querySelector(':scope > span')!;
     const summary = body.querySelector(':scope > span')!;
-    const rows = [...summary.children, body.querySelector(':scope > small')!];
+    const rows = [...summary.children];
     const top = body.getBoundingClientRect().top;
     return rows.map(row => {
       const bounds = row.getBoundingClientRect();

@@ -57,7 +57,7 @@ afterEach(async () => {
   vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals();
 });
 
-it('shows the remote primary quota, plan and device using the local summary layout', async () => {
+it('shows the remote primary quota and plan using the compact local summary layout', async () => {
   privacyMode = true;
   await render();
   const progress = container.querySelector('[role="progressbar"]')!;
@@ -66,7 +66,8 @@ it('shows the remote primary quota, plan and device using the local summary layo
   expect(progress.querySelector('span')?.style.width).toBe('28%');
   expect(container.textContent).toContain('28%');
   expect(container.textContent).toContain('Plus');
-  expect(container.textContent).toContain('Work PC');
+  expect(container.textContent).not.toContain('Work PC');
+  expect(container.querySelector('button svg')).toBeNull();
   expect(container.textContent).not.toContain('次剩余');
   expect(container.innerHTML).not.toContain('remote@example.com');
 });
@@ -170,7 +171,6 @@ it('clears quota after disconnecting and hides it when the remote proxy stops', 
 
 it('opens the account list directly and switches the selected computer through its client', async () => {
   await render();
-  expect(container.textContent).toContain('Work PC');
   await accounts();
   const provider = Array.from(document.querySelectorAll<HTMLButtonElement>('section button'))
     .find(entry => entry.textContent?.includes('Remote Provider'))!;

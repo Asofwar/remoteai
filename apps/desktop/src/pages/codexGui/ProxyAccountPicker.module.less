@@ -2,10 +2,9 @@
   display: flex; align-items: center; gap: 9px; flex-shrink: 0; min-width: 0; box-sizing: border-box;
   width: calc(100% + 2 * var(--sidebar-inline-padding, 0px));
   margin: 0 calc(-1 * var(--sidebar-inline-padding, 0px)) calc(-1 * var(--sidebar-bottom-padding, 0px));
-  padding: 11px calc(6px + var(--sidebar-inline-padding, 0px)) calc(3px + var(--sidebar-bottom-padding, 0px));
+  padding: 8px calc(6px + var(--sidebar-inline-padding, 0px)) var(--sidebar-bottom-padding, 8px);
   border: 0; background: transparent; color: var(--ink);
   text-align: left; cursor: pointer;
-  > svg { flex-shrink: 0; color: var(--muted); }
   &:hover { background: color-mix(in srgb, var(--green) 8%, transparent); }
 }
 .trigger, .panel button {
@@ -89,12 +88,7 @@
 .error { color: var(--ant-color-error, #c43c3c); }
 .triggerBody {
   // Match the local desktop reset without inheriting the remote conversation's taller line height.
-  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; line-height: 1.15;
-}
-.computerName {
-  display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px;
-  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-  svg { flex-shrink: 0; }
+  flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15;
 }
 .devicePopup {
   max-width: min(280px, calc(100vw - 48px));

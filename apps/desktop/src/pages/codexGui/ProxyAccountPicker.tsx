@@ -1,7 +1,6 @@
 import { guiText } from "../../i18n/guiText";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Spin } from "antd";
-import { Server, Settings, UserRound } from "lucide-react";
+import { Settings } from "lucide-react";
 import type { Account, AggregateApi, Provider } from "../../types";
 import { maskAccountEmail } from "../../utils/accountPrivacy";
 import { GuiAccountList } from "./GuiAccountList";
@@ -78,7 +77,6 @@ export function ProxyAccountPicker(props: ProxyAccountPickerProps) {
     </>} />;
   return <><GuiAccountMenu active={props.active} open={open} name={name} trigger={trigger}
     computers={props.computers} busy={saving} accounts={panel}
-    icon={saving ? <Spin size="small" /> : thirdParty ? <Server size={17} /> : <UserRound size={17} />}
     summary={<ProxyAccountSummary name={name} account={account} provider={aggregate ? undefined : provider}
       thirdParty={thirdParty} active={props.active} />}
     onOpenChange={(next) => { setOpen(next); if (next) setError(""); }} />

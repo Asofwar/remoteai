@@ -12,7 +12,7 @@ export interface ChatConnectionProps {
   client: GuiAccountsClient; deviceName: string; chooseDevice: () => void;
 }
 type Props = ChatConnectionProps & { ready: boolean; active?: boolean } & (
-  { variant: 'settings' } | { variant?: 'avatar'; email: string; openTokenSummary: () => void;
+  { variant: 'settings' } | { variant?: 'profile'; email: string; openTokenSummary: () => void;
     guiTools: GuiToolsClient; running: boolean }
 );
 
@@ -44,9 +44,9 @@ export function ChatProfileMenu(props: Props) {
         <small>{current?.name || t("选择账户")}</small></span><span>›</span></button>
   </>;
   return <>
-    {settings ? connectionOptions : <button type="button" className="chat-profile-avatar"
-      aria-label={t("打开头像菜单")} aria-expanded={panel !== null} onClick={() => setPanel('profile')}>
-      {Array.from(current?.name.trim() || '').slice(0, 2).join('') || t("我")}</button>}
+    {settings ? connectionOptions : <button type="button" className="chat-profile-trigger"
+      aria-label={t("账户与电脑")} aria-expanded={panel !== null} onClick={() => setPanel('profile')}>
+      {current?.name.trim() || t("账户与电脑")}</button>}
     {panel === 'update' && active && props.variant !== 'settings' && <ChatGuiUpdateSheet client={props.guiTools}
       active={active} connected={ready} running={props.running} deviceName={deviceName}
       onClose={close} onBack={() => setPanel('profile')} />}

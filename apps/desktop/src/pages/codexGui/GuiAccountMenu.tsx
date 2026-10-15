@@ -1,7 +1,6 @@
 import { guiText } from "../../i18n/guiText";
 import { type ReactNode, type RefObject } from 'react';
-import { Popover } from 'antd';
-import { ChevronsUpDown, Monitor } from 'lucide-react';
+import { Popover, Spin } from 'antd';
 import type { GuiComputerNavigation } from './remote/types';
 import { GuiDevicePicker } from './GuiDevicePicker';
 import { MAX_ACCOUNT_PICKER_WIDTH, useAccountPickerWidth } from './useAccountPickerWidth';
@@ -9,7 +8,7 @@ import styles from './ProxyAccountPicker.module.less';
 
 interface Props {
   active: boolean; open: boolean; onOpenChange: (open: boolean) => void;
-  trigger: RefObject<HTMLButtonElement>; name: string; icon: ReactNode; summary: ReactNode;
+  trigger: RefObject<HTMLButtonElement>; name: string; summary: ReactNode;
   accounts: (devicePicker: ReactNode) => ReactNode;
   computers?: GuiComputerNavigation; busy?: boolean;
 }
@@ -29,12 +28,10 @@ export function GuiAccountMenu(props: Props) {
     arrow={false} align={{ offset: [0, -2] }} classNames={{ root: styles.popup }}
     styles={{ root: { width, maxWidth: MAX_ACCOUNT_PICKER_WIDTH } }} onOpenChange={props.onOpenChange}>
     <button ref={props.trigger} type="button" className={styles.trigger} aria-expanded={visible}
+      aria-busy={Boolean(props.busy)}
       aria-label={guiText("切换 GUI 账户：{value1}", { value1: props.name })}>
-      {props.icon}<span className={styles.triggerBody}>{props.summary}
-        {props.computers && <small className={styles.computerName}>
-          <Monitor size={11} />{props.computers.current?.name ?? guiText("本机")}
-        </small>}
-      </span><ChevronsUpDown size={14} />
+      {props.busy && <Spin size="small" />}
+      <span className={styles.triggerBody}>{props.summary}</span>
     </button>
   </Popover>;
 }

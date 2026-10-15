@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 async function openUpdate(page: Page, mode = '') {
   await page.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
   await page.goto(`./e2e/gui-update-harness.html?mode=${mode}`, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('button', { name: '打开头像菜单', exact: true }).click();
+  await page.getByRole('button', { name: '账户与电脑', exact: true }).click();
   await page.getByRole('button', { name: '更新 Codex GUI', exact: true }).click();
   await expect(page.getByText('我的电脑', { exact: true })).toBeVisible();
 }

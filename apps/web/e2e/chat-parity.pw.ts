@@ -84,7 +84,8 @@ test('renders rich replies, folded work, nested output, file previews and reply 
   await expect(page.getByRole('button', { name: '复制文件内容' })).toBeVisible();
   await expect(page.getByRole('button', { name: '下载', exact: true })).toBeVisible();
   await screenshot(page, info, 'file-preview-download');
-  await closeSheet(page);
+  if (desktop) await page.getByRole('button', { name: '关闭详情抽屉' }).click();
+  else await closeSheet(page);
   await page.getByRole('button', { name: '播放视频', exact: true }).click();
   await expect(page.locator('video')).toBeVisible();
   await expect.poll(() => page.locator('video').evaluate(video => video.readyState)).toBeGreaterThan(0);
@@ -95,8 +96,9 @@ test('renders rich replies, folded work, nested output, file previews and reply 
   const saved = await saving;
   expect(saved.suggestedFilename()).toBe('test.mp4');
   expect(await saved.failure()).toBeNull();
-  await expect(page.getByText('可在设置中的“下载管理”查看进度。')).toBeVisible();
-  await closeSheet(page);
+  await expect(page.getByText('下载会在后台继续，可在“下载管理”查看进度。')).toBeVisible();
+  if (desktop) await page.getByRole('button', { name: '关闭详情抽屉' }).click();
+  else await closeSheet(page);
   await page.locator('.chat-assistant-message').last().getByRole('button', { name: '引用回复' }).click();
   await expect(page.getByRole('button', { name: '移除引用' })).toBeVisible();
   await send(page, '继续检查引用内容');

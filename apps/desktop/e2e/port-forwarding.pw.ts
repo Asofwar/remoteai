@@ -35,6 +35,26 @@ test('maps a selected IP and restores it after reload', async ({ page }) => {
   await page.screenshot({ path: '../../.codex-tmp/port-forwarding-target-ip.png', animations: 'disabled' });
 });
 
+test('edits an active mapping, cancels drafts and retains the edited settings after reload', async ({ page }) => {
+  await add(page, 3000, 13000);
+  await entry(page, '127.0.0.1:3000 → 13000').getByRole('button', { name: /^编辑映射/ }).click();
+  await panel(page).getByRole('spinbutton', { name: '本地端口' }).fill('14000');
+  await panel(page).getByRole('button', { name: '取消', exact: true }).click();
+  await expect(entry(page, '127.0.0.1:3000 → 13000').getByRole('status')).toHaveText('映射中');
+  await entry(page, '127.0.0.1:3000 → 13000').getByRole('button', { name: /^编辑映射/ }).click();
+  await panel(page).getByRole('textbox', { name: '目标 IP' }).fill('172.16.200.85');
+  await panel(page).getByRole('spinbutton', { name: '远程端口' }).fill('8306');
+  await panel(page).getByRole('spinbutton', { name: '本地端口' }).fill('8306');
+  await page.screenshot({ path: '../../.codex-tmp/port-forwarding-edit.png' });
+  await panel(page).getByRole('button', { name: '保存修改' }).click();
+  await expect(panel(page).getByRole('article')).toHaveCount(1);
+  await expect(entry(page, '172.16.200.85:8306 → 8306').getByRole('status')).toHaveText('映射中');
+  await add(page, 3000, 13000); // The original listener was released and its port is reusable.
+  await expect(entry(page, '127.0.0.1:3000 → 13000').getByRole('status')).toHaveText('映射中');
+  await page.reload(); await page.getByRole('button', { name: '端口映射', exact: true }).click();
+  await expect(entry(page, '172.16.200.85:8306 → 8306').getByRole('status')).toHaveText('已停止');
+});
+
 test('multiple mappings, port conflicts, stop, copy and reconnect stay independent', async ({ page }) => {
   await add(page, 3000, 13000); await add(page, 5432, 15432);
   await expect(entry(page, '127.0.0.1:3000 → 13000').getByRole('status')).toHaveText('映射中');

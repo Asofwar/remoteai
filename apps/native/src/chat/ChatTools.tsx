@@ -10,18 +10,19 @@ import { ChatGit } from './git/ChatGit';
 import { RemoteDesktop } from './desktop/RemoteDesktop';
 import { ChatToolsPopover } from './ChatToolsPopover';
 import { PortMappings } from './portMapping/PortMappings';
+import type { AuthSession } from '../types';
 import { palette, useStyles } from './styles';
 
 interface Props {
   client: GuiToolsClient; cwd: string; active: boolean; connected: boolean; deviceName?: string;
-  scope: string;
+  scope: string; session?: AuthSession;
 }
 export function ChatTools(props: Props) {
   useLanguage();
   const [mapping, setMapping] = useState(false);
   return <>
     <ProjectTools key={props.cwd} {...props} openMappings={() => setMapping(true)} />
-    <PortMappings client={props.client.files} scope={props.scope} connected={props.connected}
+    <PortMappings client={props.client.files} scope={props.scope} connected={props.connected} session={props.session}
       active={props.active} deviceName={props.deviceName} open={mapping} close={() => setMapping(false)} />
   </>;
 }

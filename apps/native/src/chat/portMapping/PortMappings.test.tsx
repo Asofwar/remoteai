@@ -15,7 +15,9 @@ vi.mock('react', async original => ({ ...await original<typeof React>(), useEffe
   },
 }));
 vi.mock('react-native', () => ({ Text: 'Text', TextInput: 'TextInput', View: 'View', Pressable: 'Pressable',
-  Platform: { OS: 'android' } }));
+  Switch: 'Switch', Platform: { OS: 'android' } }));
+vi.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
+vi.mock('./mappingStyles', () => ({ useMappingStyles: () => ({}) }));
 vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
 vi.mock('../styles', () => ({ useStyles: () => ({}) }));
 vi.mock('../../i18n', () => ({ t: (value: string) => value }));
@@ -62,7 +64,7 @@ it('submits the selected target and local port and displays the complete destina
   submit();
   expect(client.openResource).toHaveBeenCalledWith('http://192.168.1.20:3000');
   expect(runtime.service!.snapshot()[0]).toMatchObject({ remoteHost: '192.168.1.20', localPort: 13000 });
-  expect(render().some(element => element.props.maxWidth === 400)).toBe(true);
+  expect(render().some(element => element.props.maxWidth === 540)).toBe(true);
   expect(render().some(element => Children.toArray(element.props.children).includes('192.168.1.20:3000'))).toBe(true);
 });
 
@@ -75,4 +77,23 @@ it('preserves invalid input for correction and defaults an empty IP to the remot
   expect(field('目标 IP').props.value).toBe('192.168.1.20:3000');
   field('目标 IP').props.onChangeText!(''); submit();
   expect(client.openResource).toHaveBeenCalledWith('http://127.0.0.1:3000');
+});
+
+it('opens the editing form from the card menu and updates the existing running mapping', async () => {
+  field('远程端口').props.onChangeText!('3000'); submit();
+  for (let count = 0; count < 10; count++) await Promise.resolve();
+  const id = runtime.service!.snapshot()[0].id;
+  field('更多操作').props.onPress!();
+  const button = (text: string) => render().find(element => element.props.accessibilityRole === 'button'
+    && elements(element.props.children).some(child => child.props.children === text))!;
+  button('编辑映射').props.onPress!();
+  expect(field('远程端口').props.value).toBe('3000');
+  field('目标 IP').props.onChangeText!('172.16.200.85');
+  field('远程端口').props.onChangeText!('8306');
+  field('本地端口').props.onChangeText!('18306');
+  button('保存修改').props.onPress!();
+  for (let count = 0; count < 30; count++) await Promise.resolve();
+  expect(runtime.service!.snapshot()).toHaveLength(1);
+  expect(runtime.service!.snapshot()[0]).toMatchObject({ id, remoteHost: '172.16.200.85',
+    remotePort: 8306, localPort: 18306, status: 'running' });
 });

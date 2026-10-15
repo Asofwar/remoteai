@@ -166,6 +166,7 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
       <View style={styles.headerTools}>
         <ChatTools client={controller.guiTools} active={active && foreground} connected={ready}
           scope={JSON.stringify([session.baseUrl, session.email, device?.deviceId ?? ''])}
+          session={session}
           deviceName={device?.name} cwd={state.selected?.cwd ?? state.draftProject?.cwd ?? ''} />
       </View>
     </View>

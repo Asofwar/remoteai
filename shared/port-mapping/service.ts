@@ -22,6 +22,10 @@ export class PortForwardingService {
   private entries: ForwardingEntry[];
   private readonly listeners = new Set<() => void>();
   private readonly running = new Map<string, RunningMapping>();
+  private readonly stopping = new Map<string, Promise<void>>();
+  private readonly changes = new Set<(id: string, value: PortMapping | null) => void>();
+  private readonly revisions = new Map<string, number>();
+  private readonly restarting = new Set<string>();
   // Bound active TCP work per computer, including the read RPCs used by compatibility peers.
   private readonly bridgeBudget = new StreamBudget();
 
@@ -36,26 +40,78 @@ export class PortForwardingService {
     return () => { this.listeners.delete(listener); };
   };
 
+  subscribeChanges = (listener: (id: string, value: PortMapping | null) => void) => {
+    this.changes.add(listener);
+    return () => { this.changes.delete(listener); };
+  };
+
   setConnected = (connected: boolean) => {
     this.connected = connected;
-    if (!connected) for (const id of this.running.keys()) void this.stop(id);
+    if (!connected) {
+      this.restarting.clear();
+      for (const id of this.running.keys()) void this.stop(id);
+    }
   };
 
   add = (remotePort: number, localPort: number, remoteHost = '') => {
-    if (!validPort(remotePort) || !validPort(localPort)) throw new Error('请输入 1–65535 之间的端口号。');
-    const target = { remoteHost: normalizeMappingHost(remoteHost), remotePort, localPort };
-    if (this.entries.some(entry => mappingConflicts(entry, target, this.platform.mode))) {
-      throw new Error(this.platform.mode === 'preview' ? '这个目标地址已有映射。' : '这个本地端口已有映射。');
-    }
+    const target = this.validate({ remoteHost, remotePort, localPort });
     if (this.entries.length >= MAX_PORT_MAPPINGS) throw new Error('最多添加 8 条映射，请先删除一条。');
-    const entry: ForwardingEntry = { id: this.platform.createId(), ...target, status: 'stopped' };
+    const entry: ForwardingEntry = { id: this.platform.createId(), ...target, updatedAt: Date.now(), status: 'stopped' };
     this.publish([...this.entries, entry]);
+    this.changed(entry.id, entry);
     void this.start(entry.id);
   };
 
+  edit = async (id: string, target: Pick<PortMapping, 'remoteHost' | 'remotePort' | 'localPort'>) => {
+    const previous = this.entries.find(entry => entry.id === id);
+    if (!previous) throw new Error('该映射已被删除，请重新添加。');
+    const entry = { id, ...this.validate(target, id), updatedAt: Date.now() };
+    const applied = this.replace(entry);
+    this.changed(id, entry);
+    await applied;
+  };
+
+  /** Cloud configuration never imports another device's listener state. */
+  applySaved = (saved: PortMapping[]) => {
+    for (const entry of this.entries) {
+      if (!saved.some(value => value.id === entry.id)) this.erase(entry.id);
+    }
+    for (const entry of saved) {
+      const previous = this.entries.find(value => value.id === entry.id);
+      if (previous && sameTarget(previous, entry) && previous.updatedAt === entry.updatedAt) continue;
+      void this.replace(entry);
+    }
+  };
+
+  private validate(target: Pick<PortMapping, 'remoteHost' | 'remotePort' | 'localPort'>, id?: string) {
+    if (!validPort(target.remotePort) || !validPort(target.localPort)) {
+      throw new Error('请输入 1–65535 之间的端口号。');
+    }
+    const normalized = { ...target, remoteHost: normalizeMappingHost(target.remoteHost) };
+    if (this.entries.some(entry => entry.id !== id && mappingConflicts(entry, normalized, this.platform.mode))) {
+      throw new Error(this.platform.mode === 'preview' ? '这个目标地址已有映射。' : '这个本地端口已有映射。');
+    }
+    return normalized;
+  }
+
+  private async replace(config: PortMapping) {
+    const previous = this.entries.find(entry => entry.id === config.id);
+    const restart = this.restarting.has(config.id) || !!previous && ['running', 'starting'].includes(previous.status);
+    const revision = (this.revisions.get(config.id) ?? 0) + 1;
+    this.revisions.set(config.id, revision);
+    const stopped = this.stop(config.id);
+    if (restart) this.restarting.add(config.id);
+    const entry: ForwardingEntry = { ...config, status: previous ? 'stopping' : 'stopped' };
+    this.publish(previous ? this.entries.map(value => value.id === config.id ? entry : value) : [...this.entries, entry]);
+    await stopped;
+    if (this.revisions.get(config.id) !== revision) return;
+    this.update(config.id, { status: 'stopped', error: undefined });
+    if (this.restarting.delete(config.id)) await this.start(config.id);
+  }
+
   start = async (id: string) => {
     const entry = this.entries.find(value => value.id === id);
-    if (!entry || !this.connected || this.running.has(id) || entry.status === 'stopping') return;
+    if (!entry || !this.connected || this.running.has(id) || this.stopping.has(id) || entry.status === 'stopping') return;
     const job: RunningMapping = { tunnels: this.platform.createTunnel(this.client, {
       mappingId: entry.id, localPort: entry.localPort, bridgeBudget: this.bridgeBudget,
       onClosed: () => { void this.fail(id, job, '映射已中断，请重新启动。'); },
@@ -77,27 +133,45 @@ export class PortForwardingService {
   };
 
   stop = async (id: string) => {
+    this.restarting.delete(id);
+    const pending = this.stopping.get(id);
+    if (pending) return pending;
     const job = this.running.get(id);
     if (!job) return;
     this.running.delete(id);
     this.update(id, { status: 'stopping', error: undefined });
-    await this.release(job);
-    this.update(id, { status: 'stopped' });
+    const stopped = this.release(job).finally(() => {
+      this.stopping.delete(id);
+      this.update(id, { status: 'stopped' });
+    });
+    this.stopping.set(id, stopped);
+    await stopped;
   };
 
   remove = async (id: string) => {
-    await this.stop(id);
-    this.publish(this.entries.filter(entry => entry.id !== id));
+    const stopped = this.erase(id);
+    this.changed(id, null);
+    await stopped;
   };
+
+  private erase(id: string) {
+    this.revisions.set(id, (this.revisions.get(id) ?? 0) + 1);
+    const stopped = this.stop(id);
+    this.publish(this.entries.filter(entry => entry.id !== id));
+    return stopped;
+  }
+
+  private changed(id: string, value: PortMapping | null) {
+    for (const listener of this.changes) listener(id, value);
+  }
 
   dispose = () => { this.setConnected(false); };
 
   private async fail(id: string, job: RunningMapping, error: string) {
     if (this.running.get(id) !== job) { await this.release(job); return; }
-    this.running.delete(id);
-    this.update(id, { status: 'stopping' });
-    await this.release(job);
-    this.update(id, { status: 'error', error });
+    const revision = this.revisions.get(id);
+    await this.stop(id);
+    if (this.revisions.get(id) === revision && !this.running.has(id)) this.update(id, { status: 'error', error });
   }
 
   private async release(job: RunningMapping) {
@@ -116,4 +190,9 @@ export class PortForwardingService {
     this.entries = entries;
     for (const listener of this.listeners) listener();
   }
+}
+
+function sameTarget(left: PortMapping, right: PortMapping) {
+  return normalizeMappingHost(left.remoteHost) === normalizeMappingHost(right.remoteHost)
+    && left.remotePort === right.remotePort && left.localPort === right.localPort;
 }

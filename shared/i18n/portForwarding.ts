@@ -1,4 +1,7 @@
+import { portMappingEditingEnglish, portMappingEditingRussian } from './portMappingEditing';
+
 export const portForwardingEnglish: Readonly<Record<string, string>> = {
+  ...portMappingEditingEnglish,
   '目标 IP': 'Target IP',
   '通过远程电脑访问目标 IP 和端口。留空 IP 可访问远程电脑本机。':
     'Access an IP and port through the remote computer. Leave the IP blank to access the remote computer itself.',
@@ -55,6 +58,7 @@ export const portForwardingEnglish: Readonly<Record<string, string>> = {
 };
 
 export const portForwardingRussian: Readonly<Record<string, string>> = {
+  ...portMappingEditingRussian,
   '目标 IP': 'Целевой IP',
   '通过远程电脑访问目标 IP 和端口。留空 IP 可访问远程电脑本机。':
     'Доступ к IP и порту через удалённый компьютер. Оставьте IP пустым для доступа к самому компьютеру.',

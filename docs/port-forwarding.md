@@ -15,8 +15,10 @@ Both actions open `http://127.0.0.1:<local port>` through the existing mapping. 
 shared details drawer and retains the local address in its navigation history. Stopped mappings
 cannot be opened. These actions are intended for HTTP services; copying remains available for other TCP clients.
 
-Each computer supports up to eight saved mappings. Mappings can be started, stopped, deleted and
-copied independently. Settings are stored locally and separated by server, account and remote device.
+Each computer supports up to eight saved mappings. Mappings can be started, stopped, edited, deleted and
+copied independently. Phone, Web and desktop automatically sync settings for the same signed-in account and
+remote computer. A local cache keeps settings available offline. Editing a running mapping closes its old
+listener before restarting with the new IP and ports; editing a stopped mapping leaves it stopped.
 Switching chat threads or projects keeps active mappings running. On desktop, switching computers also keeps them running.
 On mobile and Web, switching computers stops the previous computer's mappings. Disconnecting or signing out
 releases listeners and remote resources; saved mappings require a manual start after reconnection
@@ -35,6 +37,9 @@ Open **工具 → 端口映射**. Add a target IP, remote port and an optional l
 **在浏览器中打开**. Either option can be chosen directly from the mapping list. The in-app preview
 uses an isolated WebView with back, refresh and browser controls. Stopping a mapping releases its listener and connections.
 The TCP server adapter waits for native close acknowledgement before allowing the port to be reused.
+The sheet groups mappings into cards with an on/off switch, address/open controls, target details and last-edited time.
+Use a card's **更多操作 → 编辑映射** to change it in place, or **删除映射** to remove it. Cancel discards the form draft.
+The list can be sorted by last-edited time. Desktop exposes a pencil button beside each mapping.
 
 Android retains a foreground service while any mapping is active, with a **端口映射** notification.
 Mapping leases are independent of background chat. The service adds the `connectedDevice` type while
@@ -47,10 +52,31 @@ suspend the app in the background. The UI recommends the in-app preview for this
 
 ## Web preview
 
-Web exposes **工具 → 端口映射**, with add, start, stop and remove actions. It accepts a target IP and HTTP port;
+Web exposes **工具 → 端口映射**, with add, edit, start, stop and remove actions. It accepts a target IP and HTTP port;
 the displayed address identifies the service reached from that computer. Clicking it opens the internal preview.
 Different IPs can use the same port and remain independent, including after saved settings are restored.
 Web does not bind a local TCP port or present a browser-open/copy action that would target the viewer's machine.
+The local-port field is retained and synced for the phone and desktop apps; Web still previews the target address.
+
+## Configuration synchronization
+
+Deploy `apps/admin-go/sql/20261015-port-mappings.sql` before updating admin-go, then update the clients.
+Fresh databases include the identical `015_port_mappings.sql` migration. The authenticated
+`GET/PUT /devices/:deviceId/port-mappings` endpoint checks device ownership and is covered by the existing
+Kong `/devices` JWT route (`strip_path: false`). No public route or new mapping listener is needed.
+The configuration table is keyed by owner and remote device, and cascades when that device is removed.
+
+Clients sync immediately after configuration changes and poll every five seconds while that computer's
+workspace is mounted. Requests are single-flight and stop on unmount/sign-out. Offline edits and deletions
+are persisted and retried. Stable IDs and revision-checked writes merge unrelated concurrent changes without
+replacing the whole collection with stale local data. After a revision conflict the client fetches again and
+reapplies only its pending edits; for the same mapping, the last accepted edit wins. Unchanged old caches do
+not resurrect deleted mappings. Identical legacy local settings are imported once.
+
+Only IPs, ports, IDs and edit timestamps sync. Listener state remains local: a newly received mapping is stopped;
+an already-running mapping applies remote edits by restarting locally. Remote deletion stops its local listener.
+Unavailable/older servers show a retry notice while local mapping continues to work. Configuration sync needs
+the new server and client versions; this source change does not deploy the migration or install updated apps.
 
 The preview uses the authenticated resource protocol to fetch HTTP/1 responses and a bounded resource
 graph, including styles, images, JavaScript modules, fetch/XHR calls and WebSocket connections. HTTP

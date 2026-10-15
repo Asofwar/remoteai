@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 interface AdaptiveSheetProps {
   open: boolean;
   title: string;
+  titleIcon?: ReactNode;
   truncateTitle?: boolean;
   subtitle?: string;
   onClose: () => void;
@@ -20,6 +21,7 @@ interface AdaptiveSheetProps {
 export function AdaptiveSheet({
   open,
   title,
+  titleIcon,
   truncateTitle = false,
   subtitle,
   onClose,
@@ -38,8 +40,8 @@ export function AdaptiveSheet({
   const heading = <div className="modal-heading" style={{ minWidth: 0, flex: 1 }}>
     <strong className={titleClassName}>{title}</strong>
     {subtitle ? <span>{subtitle}</span> : null}</div>;
-  const titleContent = onBack
-    ? <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>{back}{heading}</div> : heading;
+  const titleContent = onBack || titleIcon
+    ? <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>{back}{titleIcon}{heading}</div> : heading;
   if (presentation === "drawer") {
     return <Drawer open={open} title={titleContent} placement="right" width={`min(${width}px, 100vw)`}
       afterOpenChange={afterOpenChange}
@@ -59,7 +61,7 @@ export function AdaptiveSheet({
   return <Popup visible={open} onMaskClick={onClose} destroyOnClose
     bodyClassName={['mobile-popup', className].filter(Boolean).join(' ')}>
     <div className="sheet-handle" />
-    <div className="sheet-header">{back}<div style={{ flex: 1, minWidth: 0 }}>
+    <div className="sheet-header">{back}{titleIcon}<div style={{ flex: 1, minWidth: 0 }}>
       <h2 className={titleClassName}>{title}</h2>{subtitle ? <p>{subtitle}</p> : null}</div>
       <button type="button" className="sheet-close" onClick={onClose} aria-label={t("关闭")}>×</button></div>
     <div className="adaptive-sheet-content">{children}</div>

@@ -32,6 +32,7 @@ export interface BottomSheetAction {
 interface BottomSheetProps {
   visible: boolean;
   title: string;
+  titleIcon?: ReactNode;
   truncateTitle?: boolean;
   subtitle?: string;
   onClose: () => void;
@@ -49,6 +50,7 @@ interface BottomSheetProps {
 export function BottomSheet({
   visible,
   title,
+  titleIcon,
   truncateTitle = false,
   subtitle,
   onClose,
@@ -142,6 +144,7 @@ export function BottomSheet({
               hitSlop={8} onPress={onBack} style={styles.closeButton}>
               <Text style={styles.closeText}>‹</Text>
             </Pressable>}
+            {titleIcon}
             <View style={[styles.heading, compactHeader && styles.compactHeading]}>
               <Text style={[styles.title, compactHeader && styles.compactTitle]}
                 numberOfLines={truncateTitle ? 1 : undefined} ellipsizeMode="tail">

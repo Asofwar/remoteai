@@ -1,0 +1,45 @@
+export const portMappingEditingEnglish: Readonly<Record<string, string>> = {
+  '通过远程电脑访问目标 IP 和端口': 'Access an IP and port through the remote computer',
+  '映射启动后，点击地址可选择应用内预览或浏览器打开。留空 IP 可访问远程电脑本机。':
+    'Start a mapping, then tap its address to open in the app or browser. Leave the IP blank for the remote computer.',
+  '留空 IP 可访问远程电脑本机。': 'Leave the IP blank to access the remote computer itself.',
+  '当前映射': 'Current mappings',
+  '按编辑时间排序': 'Sort by last edit',
+  '编辑映射': 'Edit mapping',
+  '添加映射': 'Add mapping',
+  '保存修改': 'Save changes',
+  '访问地址': 'Access address',
+  '编辑时间': 'Last edited',
+  '更多操作': 'More actions',
+  '映射未能保存，请重试。': 'Could not save the mapping. Please try again.',
+  '该映射已被删除，请重新添加。': 'This mapping was removed. Add it again to continue.',
+  '配置已自动同步': 'Configuration synced automatically',
+  '配置正在同步…': 'Syncing configuration…',
+  '配置暂未同步，联网后会自动重试。': 'Configuration has not synced yet. It will retry when connected.',
+  '配置未能保存到本机，请检查存储空间。': 'Could not save locally. Check the available storage.',
+  '本地端口供手机和电脑使用，网页仅预览目标地址。':
+    'The local port is used by phone and desktop apps. Web previews the target address.',
+};
+
+export const portMappingEditingRussian: Readonly<Record<string, string>> = {
+  '通过远程电脑访问目标 IP 和端口': 'Доступ к IP и порту через удалённый компьютер',
+  '映射启动后，点击地址可选择应用内预览或浏览器打开。留空 IP 可访问远程电脑本机。':
+    'Запустите проброс и нажмите адрес для открытия в приложении или браузере. Пустой IP означает удалённый компьютер.',
+  '留空 IP 可访问远程电脑本机。': 'Оставьте IP пустым для доступа к самому удалённому компьютеру.',
+  '当前映射': 'Текущие порты',
+  '按编辑时间排序': 'По времени изменения',
+  '编辑映射': 'Изменить проброс',
+  '添加映射': 'Добавить проброс',
+  '保存修改': 'Сохранить изменения',
+  '访问地址': 'Адрес доступа',
+  '编辑时间': 'Изменено',
+  '更多操作': 'Другие действия',
+  '映射未能保存，请重试。': 'Не удалось сохранить проброс. Повторите попытку.',
+  '该映射已被删除，请重新添加。': 'Этот проброс удалён. Добавьте его заново.',
+  '配置已自动同步': 'Настройки синхронизированы автоматически',
+  '配置正在同步…': 'Синхронизация настроек…',
+  '配置暂未同步，联网后会自动重试。': 'Настройки ещё не синхронизированы. Повторим при подключении.',
+  '配置未能保存到本机，请检查存储空间。': 'Не удалось сохранить настройки. Проверьте свободное место.',
+  '本地端口供手机和电脑使用，网页仅预览目标地址。':
+    'Локальный порт используется приложениями. Веб-версия показывает целевой адрес.',
+};

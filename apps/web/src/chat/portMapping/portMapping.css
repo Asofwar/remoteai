@@ -1,24 +1,68 @@
-.port-mappings { display: grid; gap: 14px; max-width: 400px; }
+.port-mappings { display: grid; gap: 14px; width: 100%; color: var(--ink, #17211b); }
 .port-mappings p { margin: 0; color: var(--muted, #718078); line-height: 1.6; overflow-wrap: anywhere; }
 .port-mappings [role=alert] { color: #c74e47; }
-.port-mapping-row { border: 1px solid var(--border, #dfe5df); border-radius: 12px; padding: 12px; min-width: 0; }
-.port-mapping-row > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.port-mapping-row { border: 1px solid var(--line, #e7edf2); border-radius: 14px; padding: 14px; min-width: 0; }
 .port-mapping-row [role=status] { font-size: 12px; color: var(--muted, #718078); }
 .port-mapping-row strong { min-width: 0; overflow-wrap: anywhere; }
 .port-mapping-row .ant-btn-link { padding-inline: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.port-mapping-row .port-mapping-address { display: flex; width: 100%; height: auto; min-height: 44px;
-  justify-content: space-between; white-space: normal; text-align: left; }
+.port-mapping-row .port-mapping-address { display: flex; flex: 1; min-width: 0; height: auto; min-height: 42px;
+  justify-content: flex-start; white-space: normal; text-align: left; color: var(--green, #008b73);
+  background: var(--canvas, #f3f6f8); border-radius: 10px; }
 .port-mapping-address > span:first-child { overflow-wrap: anywhere; min-width: 0; }
-.port-mapping-form { display: grid; gap: 10px; }
+.port-mapping-form { display: grid; gap: 12px; border: 1px dashed var(--line, #d7e0e9);
+  border-radius: 14px; padding: 16px; }
 .port-mapping-form label { display: grid; gap: 6px; }
 .port-mapping-form .ant-input-number { width: 100%; }
+.mapping-info { display: flex; gap: 10px; align-items: center; padding: 14px; border-radius: 13px;
+  background: var(--green-pale, #edf7f8); font-size: 13px; }
+.mapping-info svg { flex-shrink: 0; color: #008b73; }
+.mapping-list-heading, .mapping-card-heading, .mapping-access { display: flex; align-items: center; gap: 10px; }
+.mapping-list-heading { justify-content: space-between; color: var(--muted, #62768a); }
+.mapping-computer { display: flex; flex-shrink: 0; width: 44px; height: 46px; border-radius: 17px;
+  align-items: center; justify-content: center; background: var(--green-pale, #e7f6f1); color: #008b73; }
+.mapping-card-title { flex: 1; min-width: 0; display: grid; gap: 4px; font-size: 15px; }
+.mapping-status { justify-self: start; font-size: 11px; border-radius: 20px; padding: 1px 7px;
+  background: var(--green-pale, #e7f6f1); }
+.mapping-status::before { content: '●'; margin-right: 5px; }
+.port-mapping-row .mapping-status[data-running=true] { color: var(--green, #008b73); }
+.mapping-card-heading .ant-btn { padding-inline: 2px; flex-shrink: 0; }
+.mapping-address-label { margin-top: 12px; color: var(--muted, #62768a); font-size: 12px; }
+.mapping-open.ant-btn { min-height: 42px; border: 0; color: var(--green, #008b73);
+  background: var(--green-pale, #e7f6f1); border-radius: 10px; }
+.mapping-details { display: grid; grid-template-columns: 1.4fr .8fr .8fr 1fr; gap: 10px; margin: 12px 0 0; }
+.mapping-details > div { min-width: 0; }
+.mapping-details dt { color: var(--muted, #62768a); font-size: 11px; }
+.mapping-details dd { margin: 2px 0 0; overflow-wrap: anywhere; font-size: 12px; }
+.mapping-fields { display: grid; grid-template-columns: 1.4fr 1fr 1.2fr; gap: 10px; }
+.mapping-fields label { min-width: 0; font-size: 12px; color: var(--muted, #62768a); }
+.mapping-fields .ant-input, .mapping-fields .ant-input-number { border-radius: 9px; }
+.mapping-form-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.mapping-form-actions .ant-btn { min-height: 40px; border-radius: 10px; }
+.mapping-form-actions .ant-btn-primary { background: #008b73; }
+.mapping-footer, .mapping-empty, .mapping-sync { text-align: center; font-size: 12px; }
+.mapping-footer { padding-top: 12px; }
+.port-mappings .mapping-hint, .mapping-sync { font-size: 11px; }
+.mapping-sheet .ant-btn-icon { display: inline-flex; align-items: center; }
+.mapping-sheet .ant-switch-checked { background: #008b73; }
+.mapping-sheet .ant-btn:disabled { opacity: .45; }
+.mapping-hero-icon { display: flex; align-items: center; justify-content: center; width: 46px; height: 46px;
+  flex-shrink: 0; border-radius: 18px; color: #008b73; background: var(--green-pale); }
 .port-mapping-preview .ant-drawer-body { display: flex; flex-direction: column; gap: 12px; min-height: 0; padding: 16px; }
 .port-mapping-preview iframe { width: 100%; flex: 1; min-height: 200px; border: 1px solid #dfe5df; background: #fff; }
 .port-mapping-navigation { display: flex; gap: 8px; }
 .port-mapping-navigation input { min-width: 0; }
 .port-mapping-notice { max-width: 400px; overflow-wrap: anywhere; }
 @media (max-width: 480px) {
+  .mapping-card-heading { gap: 7px; }
+  .mapping-card-title { font-size: 13px; }
+  .mapping-computer { width: 36px; height: 39px; }
+  .port-mapping-row { padding: 11px; }
+  .port-mapping-form { padding: 12px; }
   .port-mapping-preview .ant-drawer-body { padding: 10px; }
   .port-mapping-navigation { gap: 4px; }
   .port-mapping-navigation .ant-btn { padding-inline: 8px; }
+}
+@media (max-width: 359px) {
+  .mapping-fields, .mapping-details { grid-template-columns: 1fr 1fr; }
+  .mapping-fields label:first-child { grid-column: 1 / -1; }
 }

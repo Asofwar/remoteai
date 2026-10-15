@@ -2,6 +2,9 @@ import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { PortForwardingService, type ForwardingClient } from '../../../../../shared/port-mapping/service';
 import { readPortMappings, savePortMappings } from '../../../../../shared/port-mapping/settings';
 import { WebMappingTunnel } from './httpTunnel';
+import { apiJson, getActiveSession } from '../../api';
+import { mappingSyncScope, type MappingDocument } from '../../../../../shared/port-mapping/sync';
+import { useMappingSync } from '../../../../../shared/port-mapping/useMappingSync';
 
 export function usePortMappings(options: { client: ForwardingClient; scope: string; connected: boolean }) {
   const { client, scope, connected } = options;
@@ -23,8 +26,21 @@ export function usePortMappings(options: { client: ForwardingClient; scope: stri
   }, [client, scope]);
   const { service } = manager;
   const entries = useSyncExternalStore(service.subscribe, service.snapshot);
+  const exchange = useMemo(() => {
+    const identity = mappingSyncScope(scope);
+    if (!identity) return;
+    return (document?: MappingDocument) => {
+      const session = getActiveSession();
+      if (session?.baseUrl !== identity.baseUrl || session.email !== identity.account) {
+        return Promise.reject(new Error('Session changed'));
+      }
+      return apiJson<MappingDocument>(`/devices/${encodeURIComponent(identity.deviceId)}/port-mappings`,
+        document ? { method: 'PUT', body: JSON.stringify(document) } : {});
+    };
+  }, [scope]);
+  const syncStatus = useMappingSync(service, { scope, storage: localStorage, exchange });
   useEffect(() => { service.setConnected(connected); }, [service, connected]);
   useEffect(() => service.dispose, [service]);
   useEffect(() => { savePortMappings(scope, entries); }, [scope, entries]);
-  return { ...manager, entries };
+  return { ...manager, entries, syncStatus };
 }

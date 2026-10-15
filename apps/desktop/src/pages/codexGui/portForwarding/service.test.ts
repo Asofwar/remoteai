@@ -60,6 +60,56 @@ it('rejects invalid IP input before opening a resource', () => {
   expect(client.openResource).not.toHaveBeenCalled();
 });
 
+it('edits a running mapping in place, releases the old port, and restarts with the new target', async () => {
+  service.add(3000, 13000); await flush();
+  const id = service.snapshot()[0].id;
+  await service.edit(id, { remoteHost: '192.168.1.20', remotePort: 8080, localPort: 18080 });
+  expect(service.snapshot()).toHaveLength(1);
+  expect(service.snapshot()[0]).toMatchObject({ id, remotePort: 8080, localPort: 18080,
+    remoteHost: '192.168.1.20', status: 'running', updatedAt: expect.any(Number) });
+  expect(client.closeResource).toHaveBeenCalledTimes(1);
+  expect(invoke).toHaveBeenCalledWith('codex_gui_terminal_link', { request: { type: 'stop', scope: 'local-13000' } });
+  expect(client.openResource).toHaveBeenLastCalledWith('http://192.168.1.20:8080');
+});
+
+it('validates edits before disrupting the running listener and keeps offline edits stopped', async () => {
+  service.add(3000, 13000); service.add(4000, 14000); await flush();
+  const id = service.snapshot()[0].id;
+  await expect(service.edit(id, { remotePort: 8080, localPort: 14000 })).rejects.toThrow('已有映射');
+  expect(service.snapshot()[0]).toMatchObject({ status: 'running', remotePort: 3000 });
+  expect(client.closeResource).not.toHaveBeenCalled();
+  service.setConnected(false); await flush();
+  await service.edit(id, { remotePort: 8080, localPort: 18080 });
+  expect(service.snapshot()[0]).toMatchObject({ status: 'stopped', remotePort: 8080 });
+});
+
+it('applies remote edits to active listeners but leaves newly synced mappings stopped', async () => {
+  service.add(3000, 13000); await flush();
+  const original = service.snapshot()[0];
+  service.applySaved([{ ...original, remotePort: 3001, localPort: 13001, updatedAt: Date.now() + 1 },
+    { id: 'new', remotePort: 5000, localPort: 15000 }]);
+  await flush();
+  expect(service.snapshot().map(entry => entry.status)).toEqual(['running', 'stopped']);
+  service.applySaved([]); await flush();
+  expect(service.snapshot()).toEqual([]);
+  expect(client.closeResource).toHaveBeenCalledTimes(2);
+});
+
+it('keeps only the latest edit when native listener cleanup is delayed', async () => {
+  let finish!: () => void;
+  const close = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
+  const manager = new SharedService(client, [], { createId: () => 'stable-id',
+    createTunnel: () => ({ resolve: async (_id, url) => url, close }) });
+  manager.setConnected(true); manager.add(3000, 13000); await flush();
+  const first = manager.edit('stable-id', { remotePort: 3001, localPort: 13001 });
+  const second = manager.edit('stable-id', { remotePort: 3002, localPort: 13002 });
+  expect(close).toHaveBeenCalledTimes(1);
+  finish(); await Promise.all([first, second]);
+  expect(manager.snapshot()[0]).toMatchObject({ remotePort: 3002, status: 'running' });
+  expect(client.openResource).not.toHaveBeenCalledWith('http://127.0.0.1:3001');
+  close.mockImplementation(async () => {}); manager.dispose(); await flush();
+});
+
 it('keeps preview mappings to different IPs on the same port independent', async () => {
   const preview = new SharedService(client, [], { mode: 'preview', createId: () => String(++nextId),
     createTunnel: () => ({ resolve: async (_id, url) => url, close: async () => {} }) });

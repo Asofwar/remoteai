@@ -24,8 +24,6 @@
   .chat-composer .chat-model:hover { background: var(--chat-pale); color: var(--chat-ink); }
   .chat-model span { direction: ltr; }
   .chat-model .chat-model-effort { flex-shrink: 0; }
-  .chat-composer-hint { display: flex; justify-content: space-between; padding: 7px 5px 0;
-    color: var(--chat-muted); font-size: 10px; }
   .chat-composer-status { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 10px;
     min-width: 0; font-size: 12px; line-height: 20px; }
   .chat-composer-usage { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }

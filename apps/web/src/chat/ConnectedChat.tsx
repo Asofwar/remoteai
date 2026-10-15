@@ -108,9 +108,7 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
         aria-expanded={listOpen} onClick={() => { if (desktop) setSidebar(!sidebar); else setDrawer(!drawer); }}>
         <ListToggleIcon size={21} /></button>
       <div className="chat-grow"><h2>{state.selected ? threadPresentation(state.selected, state.sidebar, t).title : t("新聊天")}</h2>
-        {headerConnectionActions}
-        <ChatConnectionInfo state={state} controller={controller} device={device} active={active}
-          chooseDevice={() => setPickingDevice(true)} /></div>
+        {headerConnectionActions}</div>
       {state.selected && state.selectedArchived && <button type="button" className="chat-button"
         disabled={!ready || running}
         onClick={() => { void controller.archive().then(() => setDrawer(true)); }}>
@@ -142,6 +140,8 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
         || state.compacting === state.selected?.id} answer={controller.answerAsyncQuestion} />
     {composerHeader}
     <ChatComposer suggestions={remotePromptSuggestion(state, controller.suggestNextPrompt, { scope })}
+      connectionInfo={<ChatConnectionInfo state={state} controller={controller} device={device} active={active}
+        chooseDevice={() => setPickingDevice(true)} />}
       projectPicker={!composerHeader && <ChatProjectSwitch state={state} controller={controller}
         active={active && foreground} />}
       queue={queueProps(state, controller)} readClipboardImages={readClipboardImages} nativeFileDrop={nativeFileDrop}

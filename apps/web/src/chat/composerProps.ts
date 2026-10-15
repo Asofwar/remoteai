@@ -23,6 +23,7 @@ export interface NativeFileDrop {
 
 export interface ComposerProps {
   projectPicker?: ReactNode;
+  connectionInfo?: ReactNode;
   suggestions?: PromptSuggestionSource;
   connection: ChatConnectionProps;
   readClipboardImages?: () => Promise<File[]>;

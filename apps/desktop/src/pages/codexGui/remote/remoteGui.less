@@ -16,8 +16,6 @@
       svg { width: 14px; height: 14px; } }
     > .chat-grow { display: flex; align-items: center; gap: 12px; }
     h2 { flex: 1; margin: 0; font-size: calc(var(--gui-font-size, 14px) - 1px); line-height: 1.4; }
-    .chat-connection-info { max-width: min(40%, 300px); }
-    .chat-connection { margin: 0; font-size: calc(var(--gui-font-size, 14px) - 2px); }
   }
   &:has(.chat-sidebar) .gui-remote-focus { display: none; }
   .chat-messages { padding: 0; }
@@ -84,7 +82,6 @@
 .chat-drawer .gui-remote-sidebar { width: 100%; }
 @media (max-width: 860px) {
   .gui-remote-workspace.chat-page {
-    .chat-header .chat-connection-info { max-width: 45%; }
     .chat-message-content { padding: 18px 14px; }
     .chat-composer-dock, .gui-remote-project { padding-inline: 10px; }
     .chat-composer-dock { padding-bottom: 10px; }

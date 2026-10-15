@@ -8,13 +8,12 @@ import { ArrowUp, ChevronDown, File, Folder, MessageSquare, Pause, Play, Plus,
 import { COMPOSER_ACTION_LABELS } from '../../../../shared/remote-chat/composerAction';
 import { composerLabel } from '../../../../shared/remote-chat/composer';
 import { requestSpeedSuffix } from '../../../../shared/remote-chat/requestSpeed';
-import { formatConversationTokens } from '../../../../shared/remote-chat/usage';
 import { useDesktopLayout } from '../useDesktopLayout';
 import { ComposerAccess, ComposerDesktopStatus } from './ComposerDesktopControls';
 import { ComposerModelPicker } from './ComposerModelPicker';
 import { ComposerSpeedIndicator } from './ComposerSpeedIndicator';
 import { ChatSettings } from './ChatSettings';
-import { ConversationPerformance } from './ConversationPerformance';
+import { ComposerFooter } from './ComposerFooter';
 import { ChatAttachmentPreviews } from './ChatAttachments';
 import { pickChatImages } from './pickChatImages';
 import { ChatImageEditor } from './ChatImageEditor';
@@ -209,13 +208,8 @@ export function ChatComposer(props: ComposerProps) {
         </div>
       </div>
     </form>
-    {desktop && <div className="chat-composer-hint"><span>{t('Enter 发送 · Shift + Enter 换行')}</span>
-      <span className="chat-conversation-metrics">
-        <ConversationPerformance read={props.readConversationMetrics} threadId={threadId} active={active && ready} />
-        <span aria-hidden="true"> · </span>
-        <span>{formatConversationTokens(tokenUsage?.total.totalTokens)} tokens</span>
-      </span>
-    </div>}
+    <ComposerFooter desktop={desktop} connectionInfo={props.connectionInfo} tokenUsage={tokenUsage}
+      readConversationMetrics={props.readConversationMetrics} threadId={threadId} active={active && ready} />
     {active && !busy && editing && <ChatImageEditor key={editing.id} image={editing}
       save={url => draft.replaceImage(editing, url)} close={() => setEditingId(null)} />}
     {projectFiles && <ComposerProjectFiles imagesOnly={projectFiles === 'photos'} threadId={threadId} cwd={cwd}

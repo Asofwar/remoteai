@@ -197,7 +197,8 @@ for (const blocked of [false, true]) {
     await expect(launcher).toBeVisible();
     const bounds = (await launcher.boundingBox())!;
     const connection = (await page.locator('.chat-connection-info').boundingBox())!;
-    expect(bounds.x + bounds.width).toBeLessThan(connection.x);
+    expect(connection.y).toBeGreaterThan(bounds.y + bounds.height);
+    await expect(page.locator('.chat-header .chat-connection-info')).toHaveCount(0);
     expect(bounds.y).toBeGreaterThanOrEqual((await page.locator('.chat-header').boundingBox())!.y);
     await launcher.click();
     const desktop = page.getByRole('dialog', { name: '远程桌面', exact: true });

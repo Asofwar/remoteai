@@ -1,6 +1,6 @@
 import type { GitCommit } from './gitTypes';
 
-export const GRAPH_ROW_HEIGHT = 76;
+export const GRAPH_ROW_HEIGHT = 48;
 export const GRAPH_LANE_WIDTH = 18;
 const COLORS = ['#0b8065', '#6274d7', '#c47728', '#b858a1', '#278ca1', '#bd5c54'];
 export interface GraphLine { x1: number; y1: number; x2: number; y2: number; color: string }

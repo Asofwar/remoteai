@@ -1,4 +1,5 @@
 export const shared = {
+  '停止': 'Stop',
   '引用位置：第 {line} 行': 'Referenced line: {line}', '下载': 'Download',
   '取消下载 · {percent}%': 'Cancel download · {percent}%', '下载已取消': 'Download cancelled',
   '下载失败，请检查连接和存储空间后重试。': 'Download failed. Check your connection and storage, then try again.',

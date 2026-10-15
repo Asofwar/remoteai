@@ -9,6 +9,9 @@ import { ChatTools } from '../src/chat/ChatTools';
 import { ChatOverlay } from '../src/chat/ChatOverlay';
 import { createGuiToolsClient } from '../../../shared/remote-chat/guiTools';
 import { createAsyncGitFixture } from '../../../shared/remote-chat/testing/gitFixture';
+import { setInterfaceLanguage } from '../../../shared/i18n/interfaceLanguage';
+
+setInterfaceLanguage('zh');
 
 function App() {
   const [fonts] = useFonts(Ionicons.font);

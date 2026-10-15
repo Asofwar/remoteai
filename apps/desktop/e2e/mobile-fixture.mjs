@@ -146,6 +146,7 @@ const httpServer = http.createServer((request, response) => {
     '/auth/refresh': { accessToken: 'renewed-test-token', refreshToken: 'renewed-test-refresh', user: profile },
     '/auth/me': profile,
     '/devices': { devices }, '/devices/providers': { providers: [] },
+    '/devices/providers?includeAggregates=true': { providers: [] },
     '/sync/accounts/summary': { accounts: [] },
     '/sync/accounts/web-summary': { accounts: [] },
   };

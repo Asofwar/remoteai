@@ -87,9 +87,7 @@ export async function downloadWithAppUpdateProgress(update: Update, report: AppU
   const publish = (details: AppUpdateDownloadProgress, force = false) => {
     const now = performance.now();
     // Small chunks should not rerender the dashboard for every network event.
-    if (!force && lastProgress?.percent === details.percent
-      && lastProgress.phase === details.phase
-      && lastProgress.bytesPerSecond === details.bytesPerSecond
+    if (!force && lastProgress?.phase === details.phase
       && now - lastReportTime < PROGRESS_REPORT_INTERVAL_MS) return;
     lastProgress = details;
     lastReportTime = now;

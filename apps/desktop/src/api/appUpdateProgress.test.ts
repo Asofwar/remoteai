@@ -84,6 +84,27 @@ it("keeps feedback alive before the first native event and clears it on connecti
   expect(vi.getTimerCount()).toBe(0);
 });
 
+it("limits renders during a burst of percentage changes without delaying phase changes", async () => {
+  vi.useFakeTimers();
+  const report = vi.fn();
+  const update = {
+    download: async (send: (event: DownloadEvent) => void) => {
+      send({ event: "Started", data: { contentLength: 100_000 } });
+      for (let chunk = 0; chunk < 90; chunk += 1) {
+        send({ event: "Progress", data: { chunkLength: 1_000 } });
+      }
+      expect(report).toHaveBeenCalledTimes(3);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(report).toHaveBeenLastCalledWith(90, expect.objectContaining({ downloadedBytes: 90_000 }));
+      send({ event: "Progress", data: { chunkLength: 10_000 } });
+      expect(report).toHaveBeenLastCalledWith(100, expect.objectContaining({ phase: "finishing" }));
+      send({ event: "Finished" });
+    },
+  } as Update;
+  await downloadWithAppUpdateProgress(update, report);
+  expect(report).toHaveBeenCalledTimes(6);
+});
+
 it("shows small transfers, detects a pause, and resumes without inventing progress", () => {
   const tracker = new AppUpdateProgressTracker();
   tracker.handleEvent({ event: "Started", data: { contentLength: 1_000_000 } }, 0);

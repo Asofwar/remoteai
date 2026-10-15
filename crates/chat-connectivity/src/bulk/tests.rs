@@ -101,6 +101,8 @@ async fn mesh_round_trip(host: &Arc<NativeCoreInstance>, client: &Arc<NativeCore
     assert_eq!(generation(&mut output).await, 1);
     assert_eq!(generation(&mut output).await, 1);
     transfer_with_chat(&source, &receiver, (host, client)).await;
+    receiver.send(1, batch(&[record(42)])).await.unwrap();
+    assert_eq!(source.receive().await.unwrap(), record(42));
     route.send_replace(RouteStatus::default());
     assert_eq!(generation(&mut output).await, 0);
     assert_eq!(generation(&mut output).await, 0);
@@ -111,6 +113,9 @@ async fn mesh_round_trip(host: &Arc<NativeCoreInstance>, client: &Arc<NativeCore
     assert!(source.send(1, batch(&[record(2)])).await.is_err());
     source.send(2, batch(&[record(9)])).await.unwrap();
     assert_eq!(receiver.receive().await.unwrap(), record(9));
+    assert!(receiver.send(1, batch(&[record(7)])).await.is_err());
+    receiver.send(2, batch(&[record(7)])).await.unwrap();
+    assert_eq!(source.receive().await.unwrap(), record(7));
     tasks.abort_all();
     while tasks.join_next().await.is_some() {}
 }

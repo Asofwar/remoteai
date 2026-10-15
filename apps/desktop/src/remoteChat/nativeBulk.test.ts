@@ -106,12 +106,12 @@ it('validates full receive batches and gives each worker record its own transfer
   expect(() => decodeNativeBulkBatch(oversized.buffer)).toThrow();
 });
 
-it('keeps a single native receive loop through idle replies and binary stream replacement', async () => {
+it.each([true, false])('keeps one native receive loop through idle replies and stream replacement (host=%s)', async desktop => {
   let event!: (value: NativePathEvent) => void;
   let reply!: (records: Uint8Array[]) => void;
   const bulkReceive = vi.fn(() => new Promise<Uint8Array[]>(resolve => { reply = resolve; }));
   const channels: NativeBulkChannel[] = [];
-  const path = new NativePath({ sessionId: 'session', desktop: false, config,
+  const path = new NativePath({ sessionId: 'session', desktop, config,
     bulkChannel: channel => channels.push(channel as NativeBulkChannel) }, {
     open: async (_options, callback) => { event = callback; return 'handle'; },
     bulkReceive, send: async () => {}, close: async () => {},

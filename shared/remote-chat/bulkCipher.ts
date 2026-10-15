@@ -9,6 +9,7 @@ export interface BulkCipherContext {
   transferId: string; manifestId: string; epoch: string; sessionId: string;
   desktopKey: string; clientKey: string; desktop: boolean;
 }
+const STREAM_REPLAY_WINDOW = 4096;
 
 /** Each authenticated transfer epoch has independent directional keys and nonce spaces. */
 export class BulkCipher {
@@ -17,6 +18,8 @@ export class BulkCipher {
   private sent = 0;
   private received = 0;
   private destroyed = false;
+  private streamSequences?: Uint32Array;
+  private streamHighest = 0;
 
   constructor(root: Uint8Array, private readonly context: BulkCipherContext) {
     const binding = utf8ToBytes(JSON.stringify(['remote-ai:file-bulk:v1', context.sessionId,
@@ -48,6 +51,20 @@ export class BulkCipher {
     bulkAssert(header.sequence > this.received, 'REPLAY');
     const bytes = chacha20poly1305(this.receiveKey, this.nonce(header.sequence), aad).decrypt(encrypted);
     this.received = header.sequence;
+    return { header, bytes };
+  }
+
+  /** Stream offsets handle ordering across live paths; this window still authenticates and rejects replay. */
+  decryptStream(record: Uint8Array) {
+    bulkAssert(!this.destroyed, 'EPOCH_EXPIRED');
+    const { header, aad, encrypted } = decodeBulkRecord(record);
+    bulkAssert(header.transferId === this.context.transferId && header.epoch === this.context.epoch, 'EPOCH_EXPIRED');
+    const sequences = this.streamSequences ??= new Uint32Array(STREAM_REPLAY_WINDOW);
+    const slot = header.sequence % sequences.length;
+    if (sequences[slot] === header.sequence || header.sequence <= this.streamHighest - sequences.length) return;
+    const bytes = chacha20poly1305(this.receiveKey, this.nonce(header.sequence), aad).decrypt(encrypted);
+    sequences[slot] = header.sequence;
+    this.streamHighest = Math.max(this.streamHighest, header.sequence);
     return { header, bytes };
   }
 

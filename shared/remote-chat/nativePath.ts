@@ -124,7 +124,7 @@ export class NativePath implements Channel {
   }
 
   private async receiveBulk() {
-    if (this.receivingBulk || this.options.desktop || !this.bridge.bulkReceive) return;
+    if (this.receivingBulk || !this.bridge.bulkReceive) return;
     this.receivingBulk = true;
     try {
       const id = await this.id;

@@ -1,10 +1,13 @@
 import { DeviceEventEmitter, NativeModules } from 'react-native';
 import { getRandomBytes } from 'expo-crypto';
+import { Buffer } from 'buffer';
+import { encodeNativeBulkBatch } from '../../../../shared/remote-chat/nativeBulkChannel';
 import type { ChatSocket } from '../../../../shared/remote-chat/client/socket';
 
 interface SocketNative {
   open: (id: string, url: string) => Promise<void>;
   send: (id: string, text: string) => Promise<void>; close: (id: string) => void;
+  sendBulk?(id: string, session: string, data: string): Promise<void>;
 }
 interface SocketEvent { id: string; type: string; data: string; code: number }
 
@@ -20,6 +23,14 @@ export function nativeDownloadSocket(url: string): ChatSocket {
       if (state !== 1) throw new Error('Disconnected');
       buffered += data.length;
       void native.send(id, data).catch(() => socket.onerror?.()).finally(() => { buffered -= data.length; });
+    },
+    sendBulk: async (session, records) => {
+      if (state !== 1 || !bulk || !native.sendBulk) throw new Error('Disconnected');
+      const bytes = encodeNativeBulkBatch(records);
+      if (buffered + bytes.length > 512 * 1024) throw new Error('Connection busy');
+      buffered += bytes.length;
+      try { await native.sendBulk(id, session, Buffer.from(bytes).toString('base64')); }
+      finally { buffered -= bytes.length; }
     },
     close: () => { if (state === 3) return; state = 3; subscription.remove(); native.close(id); },
   };

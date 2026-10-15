@@ -12,6 +12,7 @@ extern void csw_connectivity_free(char *response);
 @implementation ChatConnectivity
 RCT_EXPORT_MODULE();
 + (BOOL)requiresMainQueueSetup { return NO; }
+- (NSDictionary *)constantsToExport { return @{ @"bulkDuplexAvailable": @YES }; }
 - (instancetype)init {
     if ((self = [super init])) {
         _calls = dispatch_group_create();

@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { trustedHost, trustScope } from '../../../../shared/remote-chat/trustedHost';
 import { NativeModules, Platform } from 'react-native';
 import { nativeDownloadSocket } from './downloadSocket';
+import { registerMappingStream } from './portMapping/streamBridge';
 import { RTCPeerConnection as NativePeerConnection } from 'react-native-webrtc';
 import { fetchUserProfile, refreshSession } from '../api/client';
 import type { AuthSession } from '../types';
@@ -21,7 +22,12 @@ const rtc: PeerFactory = peer => new RtcPeer(peer, () => (
 export class MobileChatConnection extends ChatConnection {
   constructor({ session, ...options }: Options) {
     super({ ...options, randomBytes: getRandomBytes,
-      binaryBulk: Platform.OS === 'android' && NativeModules.FileDownloads?.bulkBinaryAvailable === true,
+      mappingStreamsEnabled: Platform.OS !== 'android' || !!registerMappingStream
+        && NativeModules.ChatConnectivity?.bulkDuplexAvailable === true
+        && typeof NativeModules.DownloadChatSocket?.sendBulk === 'function',
+      registerMappingStream,
+      binaryBulk: Platform.OS === 'ios'
+        || Platform.OS === 'android' && NativeModules.FileDownloads?.bulkBinaryAvailable === true,
       createSocket: Platform.OS === 'android' && NativeModules.DownloadChatSocket ? nativeDownloadSocket : undefined,
       bulkFailure: (id, epoch, code) => { void NativeModules.FileDownloads?.failBulk(id, epoch, code); },
       verifyHostKey: trustedHost({ read: SecureStore.getItemAsync, save: SecureStore.setItemAsync },

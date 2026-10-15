@@ -1,5 +1,5 @@
-import { LINK_CHUNK_BYTES } from '../terminal/linkChunks';
-import { concatBytes, decodeBase64, encodeBase64, mappingUrl } from './http';
+import { concatBytes, encodeBase64, mappingUrl } from './http';
+import { openMappingSocket, type MappingSocket } from './socket';
 import type { ForwardingClient } from './service';
 
 const MAX_FRAME_BYTES = 8 * 1024 * 1024;
@@ -73,7 +73,7 @@ export class WebSocketFrames {
 }
 
 export class MappingWebSocket {
-  private id?: string;
+  private socket?: MappingSocket;
   private closed = false;
   private writes = Promise.resolve();
   private queued = 0;
@@ -90,9 +90,7 @@ export class MappingWebSocket {
       url.protocol = 'http:';
       mappingUrl(url.href, this.options.origin);
       if (protocols.some(protocol => !/^[!#$%&'*+.^_`|~\w-]+$/.test(protocol))) throw new Error('Invalid protocol');
-      const opened = await this.options.client.link(this.options.resource, { type: 'connect', url: this.options.origin });
-      if (opened.type !== 'socket') throw new Error('Unexpected socket response');
-      this.id = opened.id;
+      this.socket = await openMappingSocket(this.options.client, this.options.resource, this.options.origin);
       if (this.closed) { this.release(); return; }
       await Promise.race([this.handshake(url, protocols).then(leftover => this.readFrames(leftover)), this.stopped]);
     } catch { this.fail(); }
@@ -115,11 +113,7 @@ export class MappingWebSocket {
     this.close(false);
   }
   private release() {
-    const id = this.id;
-    this.id = undefined;
-    if (id) void this.options.client.link(this.options.resource, { type: 'close', id }).catch(() => {
-      // The owning resource provides final cleanup after a disconnected RPC.
-    });
+    this.socket?.close(); this.socket = undefined;
   }
   private write(bytes: Uint8Array): Promise<void> {
     if (this.closed) return Promise.reject(new Error('Socket closed'));
@@ -128,11 +122,8 @@ export class MappingWebSocket {
     }
     this.queued += bytes.length;
     this.writes = this.writes.then(async () => {
-      for (let offset = 0; offset < bytes.length; offset += LINK_CHUNK_BYTES) {
-        if (this.closed || !this.id) throw new Error('Socket closed');
-        await this.options.client.link(this.options.resource, { type: 'write', id: this.id,
-          data: encodeBase64(bytes.subarray(offset, offset + LINK_CHUNK_BYTES)) });
-      }
+      if (this.closed || !this.socket) throw new Error('Socket closed');
+      await this.socket.write(bytes);
     }).catch(error => {
       // A partial write cannot be safely replayed. End the socket even if reads remain healthy.
       this.fail(); throw error;
@@ -147,9 +138,9 @@ export class MappingWebSocket {
       ...(protocols.length ? [`Sec-WebSocket-Protocol: ${protocols.join(', ')}`] : []), '', ''].join('\r\n')));
     let bytes: Uint8Array = new Uint8Array();
     for (;;) {
-      const reply = await this.options.client.link(this.options.resource, { type: 'read', id: this.id! });
-      if (this.closed || reply.type !== 'data' || reply.eof) throw new Error('Socket closed');
-      bytes = concatBytes(bytes, decodeBase64(reply.data));
+      const reply = await this.socket!.read();
+      if (this.closed || reply.eof) throw new Error('Socket closed');
+      bytes = concatBytes(bytes, reply.data);
       const text = decoder.decode(bytes);
       const end = text.indexOf('\r\n\r\n');
       if (end < 0) { if (bytes.length > HEADER_LIMIT) throw new Error('Headers too large'); continue; }
@@ -167,6 +158,7 @@ export class MappingWebSocket {
   private async readFrames(initial: Uint8Array) {
     const parser = new WebSocketFrames();
     let bytes = initial;
+    let eof = false;
     while (!this.closed) {
       for (const frame of parser.push(bytes)) {
         if (this.closed) return;
@@ -176,10 +168,9 @@ export class MappingWebSocket {
           this.options.emit({ type: 'message', data: frame.opcode === 1 ? decoder.decode(frame.data) : frame.data });
         }
       }
-      if (this.closed) return;
-      const reply = await this.options.client.link(this.options.resource, { type: 'read', id: this.id! });
-      if (reply.type !== 'data' || reply.eof) return;
-      bytes = decodeBase64(reply.data);
+      if (this.closed || eof) return;
+      const reply = await this.socket!.read();
+      bytes = reply.data; eof = reply.eof;
     }
   }
 }

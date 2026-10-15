@@ -4,7 +4,9 @@ import { MAX_PORT_MAPPINGS, mappingConflicts, validPort, type MappingMode, type 
 import { mappingOrigin, normalizeMappingHost } from './target';
 import { StreamBudget } from './streamBudget';
 
-export type ForwardingClient = Pick<GuiToolsClient['files'], 'openResource' | 'closeResource' | 'link'>;
+export type ForwardingClient = Pick<GuiToolsClient['files'], 'openResource' | 'closeResource' | 'link'> & {
+  stream?: import('./socket').MappingSocketFactory;
+};
 export interface ForwardingEntry extends PortMapping {
   status: 'stopped' | 'starting' | 'running' | 'stopping' | 'error';
   error?: string;
@@ -20,7 +22,7 @@ export class PortForwardingService {
   private entries: ForwardingEntry[];
   private readonly listeners = new Set<() => void>();
   private readonly running = new Map<string, RunningMapping>();
-  // Each stream keeps a remote read pending. Leave RPC capacity available for chat and other tools.
+  // Bound active TCP work per computer, including the read RPCs used by compatibility peers.
   private readonly bridgeBudget = new StreamBudget();
 
   constructor(private readonly client: ForwardingClient, saved: PortMapping[],

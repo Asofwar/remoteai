@@ -13,9 +13,9 @@ import { bulkScheduler } from '../../../../shared/remote-chat/bulkScheduler';
 import type { ChatLink } from '../../../../shared/remote-chat/link';
 
 type Batch = { sequence: number; events: HostTransportEvent[] };
-const mocks = vi.hoisted(() => ({ invoke: vi.fn(), request: vi.fn(), receive: (_batch: Batch) => {} }));
+const mocks = vi.hoisted(() => ({ invoke: vi.fn(), request: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: mocks.invoke, Channel: class {
-  set onmessage(callback: (batch: Batch) => void) { mocks.receive = callback; }
+  onmessage = (_batch: Batch) => {};
 } }));
 vi.mock('../pages/codexGui/api', () => ({ guiApi: { request: mocks.request } }));
 vi.mock('../api/backend', () => ({ isDesktopApp: true }));
@@ -74,7 +74,9 @@ it('sends 32 MiB through bounded raw IPC batches with ordered ciphertext and roo
   });
   const native = new NativeChatTransport(() => {}); cleanup.push(() => native.close());
   await Promise.resolve(); await Promise.resolve();
-  mocks.receive({ sequence: 1, events: [{ type: 'ready', generation: 1 }] });
+  const attach = mocks.invoke.mock.calls.find(([command]) => command === 'remote_chat_attach')!;
+  const { events } = attach[1] as unknown as { events: { onmessage: (batch: Batch) => void } };
+  events.onmessage({ sequence: 1, events: [{ type: 'ready', generation: 1 }] });
   const transport = new BulkTransport({ available: () => native.ready,
     send: record => native.sendBulk('phone', [record]), sendBatch: records => native.sendBulk('phone', records) });
   transport.setMode('relay');

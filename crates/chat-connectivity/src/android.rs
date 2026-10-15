@@ -1,8 +1,31 @@
 use jni::{
-    objects::{JClass, JString},
-    sys::{jbyteArray, jstring},
+    objects::{JByteArray, JClass, JString},
+    sys::{jboolean, jbyteArray, jlong, jstring},
     JNIEnv,
 };
+
+/// Only the owning module can transmit a bounded batch on its current authenticated stream.
+#[no_mangle]
+pub extern "system" fn Java_com_codexswitch_connectivity_NativeConnectivity_sendBulk(
+    mut env: JNIEnv,
+    _class: JClass,
+    owner: JString,
+    id: JString,
+    generation: jlong,
+    bytes: JByteArray,
+) -> jboolean {
+    let result = (|| {
+        let length = env.get_array_length(&bytes).ok()?;
+        if generation <= 0 || !(1..=262_213).contains(&length) {
+            return None;
+        }
+        let owner = env.get_string(&owner).ok()?.to_string_lossy().into_owned();
+        let id = env.get_string(&id).ok()?.to_string_lossy().into_owned();
+        let bytes = env.convert_byte_array(bytes).ok()?;
+        crate::ffi::bulk::send(&owner, &id, generation as u64, bytes).ok()
+    })();
+    u8::from(result.is_some())
+}
 
 #[no_mangle]
 pub extern "system" fn Java_com_codexswitch_connectivity_NativeConnectivity_call(

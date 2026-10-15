@@ -36,6 +36,17 @@ impl ClientBulk {
         self.enabled = enabled && self.channel.is_some();
     }
 
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn clear(&mut self) {
+        self.queue.clear();
+        self.buffered = 0;
+        self.pending = 0;
+        self.enabled = false;
+    }
+
     /// Leave room for one maximum record before reading another socket frame.
     pub fn has_capacity(&self) -> bool {
         self.buffered <= MAX_BUFFER_BYTES - MAX_FRAME_BYTES && self.queue.len() < MAX_QUEUED_RECORDS

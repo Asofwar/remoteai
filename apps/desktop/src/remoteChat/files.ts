@@ -1,6 +1,8 @@
 import { invoke } from '../api/backend';
 import { object } from '../../../../shared/remote-chat/protocol';
 import type { FilePreviewData } from '../../../../shared/remote-chat/files';
+import { RemoteMappingStreams } from './mappingStreams';
+import { STREAM_OPERATION, type MappingStreamLink } from '../../../../shared/port-mapping/streamMux';
 
 interface Resource { kind: 'preview' | 'resource'; id?: string }
 const MAX_RESOURCES = 16;
@@ -9,6 +11,10 @@ const unavailable = () => new Error('连接已断开，请重新打开预览。'
 /** Handles belong to the authenticated transport owner, never to an owner supplied in a request body. */
 export class RemoteFiles {
   private readonly owners = new Map<string, Set<Resource>>();
+  private readonly streams = new Map<string, RemoteMappingStreams>();
+  attach(owner: string, link: MappingStreamLink) {
+    this.streams.get(owner)?.close(); this.streams.set(owner, new RemoteMappingStreams(link));
+  }
 
   async request(body: Record<string, unknown>, owner: string): Promise<unknown> {
     if (body.operation === 'guiFileApplications') return invoke('codex_gui_file_applications');
@@ -20,14 +26,21 @@ export class RemoteFiles {
       return invoke('codex_gui_file_action', { request: { target: body.target, action: body.action } });
     }
     if (body.operation === 'guiFilePreviewOpen' || body.operation === 'guiResourceOpen') return this.open(body, owner);
-    const resource = [...(this.owners.get(owner) ?? [])].find(value => value.id === body.id);
+    const resourceId = body.operation === STREAM_OPERATION ? body.resource : body.id;
+    const resource = [...(this.owners.get(owner) ?? [])].find(value => value.id === resourceId);
     const closing = body.operation === 'guiFilePreviewClose' || body.operation === 'guiResourceClose';
     if (!resource) { if (closing) return; throw unavailable(); }
     const preview = String(body.operation).startsWith('guiFilePreview');
     if (preview !== (resource.kind === 'preview')) throw unavailable();
     if (closing) {
       this.owners.get(owner)?.delete(resource);
+      if (resource.id) this.streams.get(owner)?.closeResource(resource.id);
       return close(resource);
+    }
+    if (body.operation === STREAM_OPERATION) {
+      const streams = this.streams.get(owner);
+      if (!streams) throw unavailable();
+      return streams.request(body);
     }
     if (body.operation === 'guiFilePreviewHost') {
       return invoke('codex_gui_file_preview_host', { sessionId: resource.id, host: body.host });
@@ -56,6 +69,10 @@ export class RemoteFiles {
   }
 
   release(owner?: string) {
+    for (const [key, streams] of this.streams) {
+      if (owner !== undefined && key !== owner) continue;
+      this.streams.delete(key); streams.close();
+    }
     for (const [key, resources] of this.owners) {
       if (owner !== undefined && key !== owner) continue;
       this.owners.delete(key);

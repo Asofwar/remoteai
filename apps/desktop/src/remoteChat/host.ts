@@ -81,6 +81,9 @@ export class ChatHost {
   private transportEvent(event: HostTransportEvent) {
     if (this.closed) return;
     this.generation = event.generation;
+    if (event.type === 'bulk') {
+      this.links.get(event.sessionId)?.bulk?.receive(event.bytes, 'relay'); return;
+    }
     if (event.type === 'reset') { this.resetSessions(); return; }
     if (event.type === 'disconnected') {
       this.diagnosticsEnabled = false;
@@ -213,6 +216,7 @@ export class ChatHost {
     });
     keys.secret.fill(0);
     this.links.set(sessionId, link);
+    this.operations.attachMappingStreams(sessionId, link);
     this.bulkSources.set(sessionId, new BulkSource(link, sessionId));
     if (message.transportVersion === 2 && typeof message.resumeToken === 'string') {
       this.lease(sessionId, message.expiresAt);

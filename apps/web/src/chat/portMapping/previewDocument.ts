@@ -6,7 +6,8 @@ export interface PreviewScript { module: boolean; source: string }
 export interface PreviewDocument { html: string; scripts: PreviewScript[]; modules: PreviewModule[]; url: string }
 const decoder = new TextDecoder();
 
-export async function previewDocument(tunnel: WebMappingTunnel, input: MappingHttpRequest): Promise<PreviewDocument> {
+export async function previewDocument(tunnel: Pick<WebMappingTunnel, 'request'>,
+  input: MappingHttpRequest): Promise<PreviewDocument> {
   const origin = new URL(input.url).origin;
   const assets = new PreviewAssets(tunnel, origin);
   const reply = input.method && input.method !== 'GET'
@@ -15,9 +16,11 @@ export async function previewDocument(tunnel: WebMappingTunnel, input: MappingHt
   const base = assets.url(document.querySelector('base[href]')?.getAttribute('href') ?? reply.url, reply.url);
   document.querySelectorAll('base, meta[http-equiv], iframe, object, embed, link[rel=preload], link[rel=modulepreload]')
     .forEach(node => node.remove());
-  const scripts = await prepareScripts(document, assets, base);
-  await prepareStyles(document, assets, base);
-  await prepareImages(document, assets, base);
+  const [scripts] = await Promise.all([
+    prepareScripts(document, assets, base),
+    prepareStyles(document, assets, base),
+    prepareImages(document, assets, base),
+  ]);
   for (const node of document.querySelectorAll('a[href], form[action]')) {
     const attribute = node.tagName === 'A' ? 'href' : 'action';
     node.setAttribute(attribute, new URL(node.getAttribute(attribute)!, base).href);
@@ -27,43 +30,48 @@ export async function previewDocument(tunnel: WebMappingTunnel, input: MappingHt
 }
 
 async function prepareScripts(document: Document, assets: PreviewAssets, base: string) {
-  const scripts: PreviewScript[] = [];
-  for (const node of document.querySelectorAll('script')) {
-    const type = node.getAttribute('type') ?? '';
-    if (!['', 'module', 'text/javascript', 'application/javascript'].includes(type)) continue;
+  const nodes = [...document.querySelectorAll('script')].filter(node =>
+    ['', 'module', 'text/javascript', 'application/javascript'].includes(node.getAttribute('type') ?? ''));
+  // Fetch concurrently, but keep document order for the sandbox's script execution.
+  return Promise.all(nodes.map(async (node, index): Promise<PreviewScript> => {
     const src = node.getAttribute('src');
-    const module = type === 'module';
+    const module = node.getAttribute('type') === 'module';
     let source = node.textContent ?? '';
-    if (module) source = await assets.module(src ?? `#inline-module-${scripts.length}`, base, src ? undefined : source);
+    if (module) source = await assets.module(src ?? `#inline-module-${index}`, base, src ? undefined : source);
     else if (src) source = decoder.decode((await assets.load(src, base)).body);
-    scripts.push({ module, source });
     node.remove();
-  }
-  return scripts;
+    return { module, source };
+  }));
 }
 
 async function prepareStyles(document: Document, assets: PreviewAssets, base: string) {
-  for (const node of document.querySelectorAll('link[rel=stylesheet]')) {
+  // Snapshot inline styles before replacing links so resolved CSS is not processed twice.
+  const inline = [...document.querySelectorAll('style')];
+  const external = [...document.querySelectorAll('link[rel=stylesheet]')].map(async node => {
     const reply = await assets.load(node.getAttribute('href') ?? '', base);
     const style = document.createElement('style');
     style.textContent = await assets.css(decoder.decode(reply.body), reply.url);
     node.replaceWith(style);
-  }
-  for (const node of document.querySelectorAll('style')) {
+  });
+  const embedded = inline.map(async node => {
     node.textContent = await assets.css(node.textContent ?? '', base);
-  }
-  for (const node of document.querySelectorAll('[style]')) {
+  });
+  const attributes = [...document.querySelectorAll('[style]')].map(async node => {
     node.setAttribute('style', await assets.css(node.getAttribute('style') ?? '', base));
-  }
+  });
+  await Promise.all([...external, ...embedded, ...attributes]);
 }
 
 async function prepareImages(document: Document, assets: PreviewAssets, base: string) {
-  for (const node of document.querySelectorAll('img, source, video, audio, input[type=image]')) {
+  const nodes = [...document.querySelectorAll('img, source, video, audio, input[type=image]')];
+  await Promise.all(nodes.map(async node => {
     const source = node.getAttribute('src') ?? node.getAttribute('srcset')?.split(',')[0].trim().split(/\s/)[0];
     node.removeAttribute('srcset');
-    if (source) node.setAttribute('src', await assets.data(source, base));
     const poster = node.getAttribute('poster');
-    if (poster) node.setAttribute('poster', await assets.data(poster, base));
-  }
+    await Promise.all([
+      source && assets.data(source, base).then(value => node.setAttribute('src', value)),
+      poster && assets.data(poster, base).then(value => node.setAttribute('poster', value)),
+    ]);
+  }));
   document.querySelectorAll('link:not([rel=stylesheet])').forEach(node => node.remove());
 }

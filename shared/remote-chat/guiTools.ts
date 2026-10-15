@@ -31,9 +31,10 @@ export const GUI_TOOL_OPERATIONS = new Set([
 /** Requests use the selected computer's authenticated chat connection. */
 export function createGuiToolsClient(request: <T>(body: object) => Promise<T>,
   diagnostic?: import('./diagnostics').ConnectionDiagnostic,
-  nativeMedia?: import('../remote-desktop/nativeMedia').NativeMediaFactory) {
+  nativeMedia?: import('../remote-desktop/nativeMedia').NativeMediaFactory,
+  stream?: import('../port-mapping/socket').MappingSocketFactory) {
   return {
-    files: createGuiFilesClient(request),
+    files: createGuiFilesClient(request, stream),
     projects: {
       list: () => request<ChatProject[]>({ operation: PROJECT_LIST_OPERATION }),
       select: (input: ProjectSelection) => request<ChatProject>({ ...input, operation: PROJECT_SELECT_OPERATION }),

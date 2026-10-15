@@ -57,7 +57,12 @@ interface Cached {
   terminalLink?: { terminal: unknown; stream: unknown; action: unknown };
 }
 function terminalLinkRequest(request: RpcRequest): Cached['terminalLink'] {
-  const body = request.body as { operation?: unknown; id?: unknown; request?: unknown } | undefined;
+  const body = request.body as { operation?: unknown; id?: unknown; request?: unknown;
+    action?: unknown; resource?: unknown } | undefined;
+  if (request.method === 'request' && body?.operation === 'guiResourceStream') {
+    return { terminal: JSON.stringify([body.operation, body.resource]), stream: body.id,
+      action: body.action === 'open' ? 'connect' : 'close' };
+  }
   if (request.method !== 'request' || !body || !['guiTerminalLink', 'guiResourceLink'].includes(String(body.operation))
     || !body.request || typeof body.request !== 'object' || Array.isArray(body.request)) return;
   const stream = object(body.request);
@@ -100,6 +105,9 @@ function response(request: RpcRequest, data: unknown, mode: ConnectionMode): Rpc
 
 export class ChatOperations {
   private readonly files = new RemoteFiles();
+  attachMappingStreams(owner: string, link: import('../../../../shared/remote-chat/link').ChatLink) {
+    this.files.attach(owner, link);
+  }
   readonly desktop = new RemoteDesktopHost();
   constructor(private readonly terminals: RemoteTerminals = remoteTerminals) {}
   private readonly cache = new Map<string, Cached>();
@@ -285,7 +293,8 @@ export class ChatOperations {
     try {
       const approvals = await guiApi.connect({ reuseExisting: true });
       this.titles.refreshSettings();
-      return body === undefined ? approvals : { ...chatHandshake, approvals, fileBulkV1: true, filePreviewsV1: true };
+      return body === undefined ? approvals
+        : { ...chatHandshake, approvals, fileBulkV1: true, filePreviewsV1: true, portStreamsV1: true };
     } catch (error) { throw new Error(guiConnectionError(error)); }
   }
 

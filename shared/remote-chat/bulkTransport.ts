@@ -17,18 +17,22 @@ interface Receiver {
   recordBytes?: number;
   epoch: string; path: BulkPath; record: (bytes: Uint8Array) => void; failed: (error: BulkError) => void;
 }
+interface StreamReceiver {
+  epoch: string; record: (bytes: Uint8Array) => void; changed: () => void; closed: () => void;
+}
 export interface BulkRelay {
   available: () => boolean;
   send: (bytes: Uint8Array) => Promise<void>;
   sendBatch?: (records: readonly Uint8Array[]) => Promise<void>;
 }
 
-/** Bulk never enters LinkDelivery. A path change invalidates listeners instead of replaying old records. */
+/** Bulk bypasses chat delivery. Files renegotiate on path changes; port streams retain their byte offsets. */
 export class BulkTransport {
   private channel?: BinaryChannel;
   private readonly channels = new Map<'rtc' | 'native', BinaryChannel>();
   private mode: ConnectionMode = 'connecting';
   private readonly receivers = new Map<string, Receiver>();
+  private readonly streams = new Map<string, StreamReceiver>();
   private readonly invalidated = new Set<() => void>();
   private outgoing = Promise.resolve();
   private generation = 0;
@@ -66,23 +70,35 @@ export class BulkTransport {
     this.channel = selected;
     // Background RTC retries must not replace a healthy native or relay file channel.
     if (this.mode === 'direct') this.invalidate();
+    this.notifyStreams();
   }
   setMode(mode: ConnectionMode) {
-    if (this.mode !== mode) this.invalidate();
+    const changed = this.mode !== mode;
+    if (changed) this.invalidate();
     this.mode = mode;
+    if (changed) this.notifyStreams();
   }
   onInvalidated(callback: () => void) {
     this.invalidated.add(callback);
     return () => { this.invalidated.delete(callback); };
   }
   listen(transferId: string, receiver: Receiver) {
-    bulkAssert(this.path === receiver.path && !this.receivers.has(transferId)
+    bulkAssert(this.path === receiver.path && !this.receivers.has(transferId) && !this.streams.has(transferId)
       && this.receivers.size < BULK_LIMITS.activeFiles, 'PATH_UNAVAILABLE');
     this.receivers.set(transferId, receiver);
     return () => { this.receivers.delete(transferId); };
   }
+  /** One authenticated port multiplexer shares the binary path without invalidating sockets on a path change. */
+  listenStream(transferId: string, receiver: StreamReceiver) {
+    bulkAssert(!this.streams.size && !this.receivers.has(transferId), 'RESOURCE_LIMIT');
+    this.streams.set(transferId, receiver);
+    return () => { this.streams.delete(transferId); };
+  }
+  private notifyStreams() { for (const stream of this.streams.values()) stream.changed(); }
   receive(bytes: Uint8Array, path: BulkPath) {
     const { header } = decodeBulkRecord(bytes);
+    const stream = this.streams.get(header.transferId);
+    if (stream?.epoch === header.epoch) { stream.record(bytes); return; }
     const receiver = this.receivers.get(header.transferId);
     // Delayed packets from a fenced epoch are discarded before cipher or assembly allocation.
     if (!receiver || receiver.epoch !== header.epoch || receiver.path !== path || this.path !== path) return;
@@ -157,6 +173,8 @@ export class BulkTransport {
   }
   close() {
     this.invalidate(); this.mode = 'offline';
+    for (const stream of this.streams.values()) stream.closed();
+    this.streams.clear();
     for (const channel of this.channels.values()) channel.close();
     this.channels.clear(); this.channel = undefined;
   }

@@ -3,6 +3,7 @@ import { Channel, invoke } from '@tauri-apps/api/core';
 import type { ChatSocket } from '../../../../../../shared/remote-chat/client/socket';
 import type { GuiCloudIdentity } from './types';
 import { decodeGuiBulkBatch } from './nativeBulkSocket';
+import { encodeBulkIpc } from '../../../remoteChat/bulkIpc';
 
 type SocketEvent = { type: 'message'; data: string } | { type: 'closed'; code: number };
 interface Batch { sequence: number; events: SocketEvent[] }
@@ -99,6 +100,16 @@ export class NativeGuiSocket implements ChatSocket {
     if (this.readyState === 3) return;
     this.close();
     this.onclose?.({ code });
+  }
+
+  async sendBulk(sessionId: string, records: readonly Uint8Array[]) {
+    if (this.readyState !== 1 || !this.bulkAvailable) throw new Error('Connection unavailable');
+    const bytes = encodeBulkIpc(sessionId, records);
+    if (this.bufferedAmount + bytes.length > MAX_BUFFER_BYTES) throw new Error('Connection busy');
+    this.bufferedAmount += bytes.length;
+    try {
+      await invoke('gui_remote_bulk_send', bytes, { headers: { 'x-file-bulk-client': this.clientId } });
+    } finally { this.bufferedAmount -= bytes.length; }
   }
 
   close() {

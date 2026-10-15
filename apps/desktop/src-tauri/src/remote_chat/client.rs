@@ -86,6 +86,7 @@ pub(super) enum ClientCommand {
     Send(Outgoing),
     Ack(u64),
     BulkAck(u64),
+    Bulk(super::client_bulk_send::ClientBulkSend),
 }
 
 struct ConnectionHandle {
@@ -130,7 +131,7 @@ struct ClientState {
     configs: watch::Receiver<Option<Config>>,
 }
 
-fn require_main(window: &Webview) -> Result<(), String> {
+pub(super) fn require_main(window: &Webview) -> Result<(), String> {
     if window.label() != "main" {
         return Err("请在主窗口选择电脑。".into());
     }
@@ -178,7 +179,11 @@ pub(crate) async fn gui_remote_open(
     Ok(())
 }
 
-async fn submit(app: AppHandle, client_id: String, command: ClientCommand) -> Result<(), String> {
+pub(super) async fn submit(
+    app: AppHandle,
+    client_id: String,
+    command: ClientCommand,
+) -> Result<(), String> {
     let state = app.try_state::<ClientState>().ok_or(UNAVAILABLE)?;
     let sender = state.connections.lock().await.sender(&client_id);
     if let Some(sender) = sender {

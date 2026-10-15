@@ -1,8 +1,10 @@
 import { Channel, invoke } from '@tauri-apps/api/core';
 import { encodeBulkIpc } from './bulkIpc';
+import { decodeGuiBulkBatch } from '../../../../shared/remote-chat/nativeRelayBatch';
 
 export type HostTransportEvent = { generation: number } & (
   { type: 'ready' | 'reset' | 'disconnected' } | { type: 'message'; data: string }
+  | { type: 'bulk'; sessionId: string; bytes: Uint8Array }
 );
 interface Batch { sequence: number; events: HostTransportEvent[] }
 const MAX_BUFFER_BYTES = 4 * 1024 * 1024;
@@ -12,6 +14,7 @@ let lifecycle = Promise.resolve();
 export class NativeChatTransport {
   private readonly clientId = crypto.randomUUID();
   private readonly channel = new Channel<Batch>();
+  private readonly bulkChannel = new Channel<ArrayBuffer>();
   private readonly started: Promise<void>;
   private outgoing = Promise.resolve();
   private closed = false;
@@ -21,10 +24,11 @@ export class NativeChatTransport {
 
   constructor(private readonly receive: (event: HostTransportEvent) => void) {
     this.channel.onmessage = (batch) => this.deliver(batch);
+    this.bulkChannel.onmessage = data => this.deliverBulk(data);
     // StrictMode can mount/unmount before an IPC command resolves. Preserve lifecycle order.
     this.started = lifecycle.then(async () => {
       if (!this.closed) await invoke('remote_chat_attach', {
-        request: { clientId: this.clientId }, events: this.channel,
+        request: { clientId: this.clientId, bulkEvents: this.bulkChannel }, events: this.channel,
       });
     });
     lifecycle = this.started.catch(() => undefined);
@@ -35,6 +39,18 @@ export class NativeChatTransport {
 
   get ready() { return this.registered && !this.closed; }
   get bufferedAmount() { return this.buffered; }
+
+  private deliverBulk(data: ArrayBuffer) {
+    if (this.closed) return;
+    try {
+      const { sequence, records } = decodeGuiBulkBatch(data);
+      for (const { sessionId, record } of records) {
+        this.receive({ type: 'bulk', generation: this.generation, sessionId, bytes: record });
+      }
+      void invoke('remote_chat_bulk_ack', { request: { clientId: this.clientId, sequence } })
+        .catch(() => this.reconnect(true));
+    } catch { this.reconnect(true); }
+  }
 
   async sendBulk(sessionId: string, records: readonly Uint8Array[]) {
     if (!this.ready) throw new Error('Download connection unavailable');

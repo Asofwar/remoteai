@@ -11,7 +11,7 @@ const state = vi.hoisted(() => ({ options: undefined as LinkOptions | undefined,
 vi.mock('../pages/codexGui/api', () => ({ guiApi: { subscribe: vi.fn(async () => vi.fn()) } }));
 vi.mock('../pages/codexGui/webEvents', () => ({ subscribeGuiEvent: vi.fn(async () => vi.fn()) }));
 vi.mock('./operations', () => ({ ChatOperations: class {
-  release = vi.fn(); execute = state.execute;
+  release = vi.fn(); execute = state.execute; attachMappingStreams = vi.fn();
   desktop = { register: state.registerDesktop, diagnose: vi.fn(), nativeMedia: vi.fn() };
 } }));
 vi.mock('./nativeTransport', () => ({ NativeChatTransport: class {

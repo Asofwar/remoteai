@@ -13,7 +13,7 @@ export class PreviewAssets {
   private readonly resources = new Map<string, Promise<MappingHttpResponse>>();
   readonly modules = new Map<string, PreviewModule>();
   private bytes = 0;
-  constructor(private readonly tunnel: WebMappingTunnel, readonly origin: string) {}
+  constructor(private readonly tunnel: Pick<WebMappingTunnel, 'request'>, readonly origin: string) {}
 
   url(value: string, base: string) { return mappingUrl(new URL(value, base).href, this.origin).href; }
 
@@ -63,14 +63,16 @@ export class PreviewAssets {
     const url = this.url(value, base);
     if (this.modules.has(url)) return url;
     if (this.modules.size >= MAX_RESOURCES) throw new Error('Too many modules');
+    const module = { url, code: '' };
+    // Reserve before fetching: parallel parents may import the same module, including cycles.
+    this.modules.set(url, module);
     const source = inline ?? decoder.decode((await this.load(url, base)).body);
-    const module = { url, code: source };
-    this.modules.set(url, module); // Mark before traversing so cyclic imports terminate.
+    module.code = source;
     const [imports] = parse(source);
     const edits: { start: number; end: number; text: string }[] = [];
     const metaName = `__remoteMappingMeta${this.modules.size}`;
     let needsMeta = false;
-    for (const item of imports) {
+    await Promise.all(imports.map(async item => {
       if (item.type === 'import-meta') {
         needsMeta = true;
         edits.push({ start: item.start, end: item.end, text: metaName });
@@ -79,7 +81,7 @@ export class PreviewAssets {
         edits.push({ start: item.start, end: item.end,
           text: item.type === 'dynamic' ? JSON.stringify(target) : target });
       }
-    }
+    }));
     for (const edit of edits.sort((a, b) => b.start - a.start)) {
       module.code = module.code.slice(0, edit.start) + edit.text + module.code.slice(edit.end);
     }
@@ -89,10 +91,12 @@ export class PreviewAssets {
 }
 
 async function replaceAsync(source: string, pattern: RegExp, replace: (match: RegExpMatchArray) => Promise<string>) {
+  const matches = [...source.matchAll(pattern)];
+  const replacements = await Promise.all(matches.map(replace));
   let result = '';
   let offset = 0;
-  for (const match of source.matchAll(pattern)) {
-    result += source.slice(offset, match.index) + await replace(match);
+  for (const [index, match] of matches.entries()) {
+    result += source.slice(offset, match.index) + replacements[index];
     offset = match.index! + match[0].length;
   }
   return result + source.slice(offset);

@@ -12,9 +12,13 @@ import java.util.concurrent.TimeUnit
 
 /** Signalling remains JSON; authenticated binary file records are delivered directly to the native engine. */
 class DownloadSocketModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
-  private class Slot { @Volatile var socket: WebSocket? = null; @Volatile var closed = false }
+  private class Slot {
+    @Volatile var socket: WebSocket? = null; @Volatile var closed = false
+    @Volatile var session: String? = null; @Volatile var bulk = false
+  }
   private val client = OkHttpClient.Builder().readTimeout(0, TimeUnit.MILLISECONDS).build()
   private val sockets = ConcurrentHashMap<String, Slot>()
+  private val bulkSender = SocketBulkSender()
   override fun getName() = "DownloadChatSocket"
 
   private fun event(id: String, type: String, data: String = "", code: Int = 0) {
@@ -41,6 +45,11 @@ class DownloadSocketModule(private val context: ReactApplicationContext) : React
         }
         override fun onMessage(webSocket: WebSocket, text: String) {
           if (text.length > 65_536) { webSocket.cancel(); return }
+          try {
+            val frame = JSONObject(text)
+            if (frame.optString("type") == "chat-policy") slot.bulk = frame.optBoolean("fileBulkV1")
+            if (frame.optString("type") in listOf("paired", "resumed")) slot.session = frame.getString("sessionId")
+          } catch (_: Exception) { webSocket.cancel(); return }
           event(id, "message", text)
         }
         override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
@@ -71,6 +80,7 @@ class DownloadSocketModule(private val context: ReactApplicationContext) : React
     require(session.matches(Regex("[a-zA-Z0-9_-]+")))
     val magic = String(bytes, 0, 4, Charsets.US_ASCII)
     if (magic == "CSF1") {
+      val slot = requireNotNull(sockets[id]); check(slot.bulk && slot.session == session)
       require(bytes.size - 5 - length <= 16_384)
       DownloadBulkRouter.receiveRelay(ByteBuffer.wrap(bytes, 5 + length, bytes.size - 5 - length)); return
     }
@@ -91,8 +101,16 @@ class DownloadSocketModule(private val context: ReactApplicationContext) : React
   @ReactMethod fun close(id: String) {
     sockets.remove(id)?.let { it.closed = true; it.socket?.close(1000, "Closed") }
   }
+  @ReactMethod fun sendBulk(id: String, session: String, data: String, promise: Promise) {
+    bulkSender.send(session, data, {
+      val slot = requireNotNull(sockets[id])
+      check(!slot.closed && slot.bulk && slot.session == session)
+      requireNotNull(slot.socket)
+    }, promise)
+  }
   override fun invalidate() {
     sockets.values.forEach { it.closed = true; it.socket?.cancel() }; sockets.clear()
+    bulkSender.close()
     client.dispatcher.executorService.shutdown(); client.connectionPool.evictAll()
     super.invalidate()
   }

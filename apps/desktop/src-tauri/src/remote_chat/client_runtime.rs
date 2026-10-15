@@ -192,6 +192,7 @@ impl ClientRuntime {
             match commands.try_recv() {
                 Ok(ClientCommand::Ack(sequence)) => self.bridge.acknowledge(sequence),
                 Ok(ClientCommand::BulkAck(sequence)) => self.bulk.acknowledge(sequence),
+                Ok(ClientCommand::Bulk(request)) => self.send_bulk(request)?,
                 Ok(ClientCommand::Send(message)) => {
                     if self.session_id.as_deref() != Some(message.session_id()) {
                         return Err(ChatError::InvalidFrame);
@@ -246,6 +247,25 @@ impl ClientRuntime {
             Err(_) => return Err(ChatError::Transport),
         }
         Ok(None)
+    }
+
+    fn send_bulk(
+        &mut self,
+        request: super::client_bulk_send::ClientBulkSend,
+    ) -> Result<(), ChatError> {
+        if !self.bulk.enabled() || self.session_id.as_deref() != Some(&request.session) {
+            // Stale callers are rejected without disrupting the current authenticated session.
+            let _cancelled = request.completed.send(Err(ChatError::InvalidFrame));
+            return Ok(());
+        }
+        for frame in request.frames {
+            if self.socket.send(Message::Binary(frame.into())).is_err() {
+                let _cancelled = request.completed.send(Err(ChatError::Transport));
+                return Err(ChatError::Transport);
+            }
+        }
+        let _cancelled = request.completed.send(Ok(()));
+        Ok(())
     }
 
     fn message(&mut self, data: String) -> Result<(), ChatError> {

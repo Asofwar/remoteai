@@ -27,6 +27,7 @@ object DownloadBulkRouter {
   fun receive(input: ByteBuffer): Boolean = receiveOnPath(input, "direct")
   internal fun receiveRelay(input: ByteBuffer) = receiveOnPath(input, "relay")
   private fun receiveOnPath(input: ByteBuffer, path: String): Boolean {
+    if (PortStreamRecords.receive(input, path)) return true
     val buffer = input.duplicate()
     if (buffer.remaining() < 4 || buffer.int != 0x52414231) return false
     if (input.remaining() !in 89..16384) return true

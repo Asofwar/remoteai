@@ -12,6 +12,7 @@ import { authorizationError, CONNECTION_ERRORS, socketConnectionError } from '..
 import { SessionRenewal } from './sessionRenewal';
 import { PublicEndpointObserver } from '../publicEndpointObserver';
 import { downloadBulkClient } from './bulkClient';
+import { MappingStreamClient } from '../../port-mapping/streamClient';
 import { BULK_ERROR_EVENT } from '../bulkControl';
 import { BulkError, type BulkErrorCode } from '../bulkLimits';
 import {
@@ -32,6 +33,8 @@ export interface ConnectionEvents {
 }
 
 interface ConnectionOptions extends ConnectionEvents {
+  mappingStreamsEnabled?: boolean;
+  registerMappingStream?: import('../../port-mapping/streamClient').MappingStreamBridge;
   binaryBulk?: boolean;
   bulkFailure?: (transferId: string, epoch: string, code: string) => void;
   verifyHostKey?: HostKeyVerifier;
@@ -56,7 +59,15 @@ const MAX_RESUME_UNAVAILABLE_REPLIES = 2;
 
 export class ChatConnection {
   private bulkSupported = false;
+  private mappingStreamsSupported = false;
+  readonly mappingStreams = new MappingStreamClient({
+    link: () => this.link, supported: () => this.mappingStreamsSupported && this.options.mappingStreamsEnabled !== false,
+    random: length => this.options.randomBytes(length), request: body => this.request('request', body),
+    register: options => this.options.registerMappingStream?.(options) ?? Promise.resolve(() => {}),
+  });
   setBulkSupport(value: unknown) {
+    this.mappingStreamsSupported = !!value && typeof value === 'object'
+      && 'portStreamsV1' in value && value.portStreamsV1 === true;
     this.bulkSupported = !!value && typeof value === 'object'
       && 'fileBulkV1' in value && value.fileBulkV1 === true;
   }
@@ -296,7 +307,8 @@ export class ChatConnection {
     this.link = new ChatLink({
       binaryBulk: this.options.binaryBulk ?? typeof document !== 'undefined',
       bulkRelay: { available: () => this.socket?.bulkAvailable === true,
-        send: async () => { throw new BulkError('INVALID_RECORD'); } },
+        send: bytes => this.sendBulk(input.id, [bytes]),
+        sendBatch: records => this.sendBulk(input.id, records) },
       sessionId: input.id, desktop: false, secret: input.keys.secret, iceServers: input.iceServers, tcp: input.tcp,
       transportVersion: input.transportVersion, reconnectRelay: () => this.fail(CONNECTION_ERRORS.network, true),
       diagnosticsEnabled: () => this.diagnosticsEnabled,
@@ -356,7 +368,13 @@ export class ChatConnection {
     } : undefined);
   }
 
+  private sendBulk(sessionId: string, records: readonly Uint8Array[]) {
+    if (!this.socket?.sendBulk) return Promise.reject(new BulkError('PATH_UNAVAILABLE'));
+    return this.socket.sendBulk(sessionId, records);
+  }
+
   private disconnected() {
+    this.mappingStreams.close();
     clearTimeout(this.authRenewalTimer);
     this.generation += 1;
     clearTimeout(this.timer);

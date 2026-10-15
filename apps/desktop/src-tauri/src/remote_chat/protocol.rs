@@ -103,6 +103,7 @@ fn valid_diagnostic(payload: &Value) -> bool {
 
 pub(super) enum Command {
     Attach {
+        bulk: Option<tauri::ipc::Channel<tauri::ipc::Response>>,
         client_id: String,
         deliver: Box<dyn Fn(Batch) -> bool + Send>,
     },
@@ -111,6 +112,7 @@ pub(super) enum Command {
     Send(SendRequest),
     Bulk(super::bulk::BulkSend),
     Ack(AckRequest),
+    BulkAck(AckRequest),
 }
 
 #[derive(Clone, Serialize)]

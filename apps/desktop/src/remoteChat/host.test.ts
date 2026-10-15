@@ -25,6 +25,7 @@ vi.mock('../pages/codexGui/webEvents', () => ({ subscribeGuiEvent: vi.fn(async (
   native.accountChanged = callback; return vi.fn();
 }) }));
 vi.mock('./operations', () => ({ ChatOperations: class {
+  attachMappingStreams = vi.fn();
   release = native.release; execute = native.execute;
   desktop = { register: vi.fn(), diagnose: vi.fn(), nativeMedia: vi.fn() };
 } }));

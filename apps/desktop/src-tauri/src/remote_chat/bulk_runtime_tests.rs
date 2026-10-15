@@ -54,6 +54,37 @@ fn bulk_batches_reject_stale_generations_other_sessions_and_revoked_capabilities
     }
 }
 
+#[test]
+fn host_accepts_raw_records_only_for_negotiated_live_sessions_and_releases_them_on_reset() {
+    let mut runtime = tests::connected_identity();
+    let (sent, received) = std::sync::mpsc::channel();
+    let channel = tauri::ipc::Channel::new(move |body| {
+        sent.send(body).unwrap();
+        Ok(())
+    });
+    runtime.bulk = super::super::client_bulk::ClientBulk::new(Some(channel));
+    assert!(runtime.receive_bulk(wire_frame()).is_err());
+    runtime
+        .receive(
+            &json!({"type":"chat-policy", "binaryRelay":true,"fileBulkV1":true,"policy":{}})
+                .to_string(),
+        )
+        .unwrap();
+    runtime.receive_bulk(wire_frame()).unwrap();
+    runtime.bulk.flush().unwrap();
+    let tauri::ipc::InvokeResponseBody::Raw(bytes) = received.try_recv().unwrap() else {
+        panic!("raw IPC required");
+    };
+    assert_eq!(&bytes[13..], wire_frame());
+    let mut foreign = wire_frame();
+    foreign[5..10].copy_from_slice(b"other");
+    assert!(runtime.receive_bulk(foreign).is_err());
+    runtime.reset();
+    assert!(runtime.receive_bulk(wire_frame()).is_err());
+    runtime.bulk.flush().unwrap();
+    assert!(received.try_recv().is_err());
+}
+
 fn transfer(records_per_command: usize, records: usize) -> Duration {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();

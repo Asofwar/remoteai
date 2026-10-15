@@ -179,6 +179,7 @@ fn native_registration_and_pong_continue_without_frontend_callbacks_or_timers() 
     runtime.configure(Some(config(url)));
     // The WebView never acknowledges the initial reset batch. Rust still authenticates and responds to ping.
     runtime.command(Command::Attach {
+        bulk: None,
         client_id: "view".into(),
         deliver: Box::new(|_| true),
     });
@@ -220,6 +221,7 @@ fn native_reconnect_does_not_resume_a_pairing_the_paused_frontend_never_complete
     let mut runtime = Runtime::default();
     runtime.configure(Some(config(url)));
     runtime.command(Command::Attach {
+        bulk: None,
         client_id: "view".into(),
         deliver: Box::new(|_| true),
     });
@@ -231,10 +233,12 @@ fn stale_view_cleanup_does_not_detach_the_replacement() {
     let (sender, receiver) = mpsc::channel();
     let mut runtime = Runtime::default();
     runtime.command(Command::Attach {
+        bulk: None,
         client_id: "old".into(),
         deliver: Box::new(|_| true),
     });
     runtime.command(Command::Attach {
+        bulk: None,
         client_id: "new".into(),
         deliver: Box::new(move |batch| sender.send(batch).is_ok()),
     });
@@ -308,6 +312,7 @@ fn native_reconnect_preserves_a_session_after_its_key_was_sent() {
     let mut runtime = Runtime::default();
     runtime.configure(Some(config(url)));
     runtime.command(Command::Attach {
+        bulk: None,
         client_id: "view".into(),
         deliver: Box::new(move |batch| sender.send(batch).is_ok()),
     });

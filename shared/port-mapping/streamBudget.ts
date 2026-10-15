@@ -7,6 +7,7 @@ type Release = () => void;
 export class StreamBudget {
   private used = 0;
   private readonly waiting = new Set<(available: boolean) => void>();
+  private readonly cancellations = new Map<AbortSignal, { jobs: Set<() => void>; abort: () => void }>();
 
   constructor(readonly limit = MAX_ACTIVE_STREAMS) {}
 
@@ -19,15 +20,33 @@ export class StreamBudget {
     return new Promise(resolve => {
       const finish = (available: boolean) => {
         clearTimeout(timer);
-        signal.removeEventListener('abort', cancel);
+        this.unsubscribe(signal, cancel);
         this.waiting.delete(finish);
         resolve(available ? this.reserve() : undefined);
       };
       const cancel = () => finish(false);
       const timer = setTimeout(cancel, WAIT_TIMEOUT_MS);
       this.waiting.add(finish);
-      signal.addEventListener('abort', cancel, { once: true });
+      this.subscribe(signal, cancel);
     });
+  }
+
+  private subscribe(signal: AbortSignal, cancel: () => void) {
+    let entry = this.cancellations.get(signal);
+    if (!entry) {
+      const jobs = new Set<() => void>();
+      const abort = () => { for (const job of [...jobs]) job(); };
+      entry = { jobs, abort }; this.cancellations.set(signal, entry);
+      signal.addEventListener('abort', abort, { once: true });
+    }
+    entry.jobs.add(cancel);
+  }
+
+  private unsubscribe(signal: AbortSignal, cancel: () => void) {
+    const entry = this.cancellations.get(signal);
+    if (!entry) return;
+    entry.jobs.delete(cancel);
+    if (!entry.jobs.size) { signal.removeEventListener('abort', entry.abort); this.cancellations.delete(signal); }
   }
 
   private reserve(): Release {

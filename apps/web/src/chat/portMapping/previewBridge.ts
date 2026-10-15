@@ -23,15 +23,17 @@ export function attachPreview(options: {
 }) {
   const { frame, tunnel, input, navigate, status } = options;
   const channel = new MessageChannel();
+  const cancellation = new AbortController();
+  const requests = { request: (request: MappingHttpRequest) => tunnel.request(request, cancellation.signal) };
   const sockets = new Map<string, Promise<MappingWebSocket>>();
-  const assets = new PreviewAssets(tunnel, new URL(input.url).origin);
+  const assets = new PreviewAssets(requests, new URL(input.url).origin);
   let closed = false;
   let active = 0;
   const post = (message: object) => { if (!closed) channel.port1.postMessage(message); };
   async function handle(message: PreviewMessage): Promise<unknown> {
     switch (message.type) {
-      case 'document': return previewDocument(tunnel, input);
-      case 'fetch': return tunnel.request(validateRequest(message.input, input.url));
+      case 'document': return previewDocument(requests, input);
+      case 'fetch': return requests.request(validateRequest(message.input, input.url));
       case 'asset': return assets.data(String(message.url), input.url);
       case 'ws-open': {
         const id = message.socketId;
@@ -75,7 +77,7 @@ export function attachPreview(options: {
   };
   frame.contentWindow?.postMessage({ type: 'port-mapping-preview' }, '*', [channel.port2]);
   return () => {
-    closed = true; channel.port1.close();
+    closed = true; cancellation.abort(); channel.port1.close();
     for (const socket of sockets.values()) void socket.then(value => value.close()).catch(() => undefined);
   };
 }

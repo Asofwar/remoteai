@@ -194,7 +194,7 @@ impl Connection {
 
     /// The generation belongs to this native stream, independent of a file transfer's epoch.
     pub async fn send_bulk(&self, generation: u64, bytes: Vec<u8>) -> Result<()> {
-        if self.is_closed() || !self.desktop {
+        if self.is_closed() {
             return Err(Error::Closed);
         }
         self.bulk
@@ -204,9 +204,9 @@ impl Connection {
             .await
     }
 
-    /// Consumed by a native download worker, never the JSON event poller.
+    /// Consumed independently of chat events, with bounded receive backpressure.
     pub async fn receive_bulk(&self) -> Option<Vec<u8>> {
-        if self.is_closed() || self.desktop {
+        if self.is_closed() {
             return None;
         }
         let bulk = self.bulk.as_ref()?;

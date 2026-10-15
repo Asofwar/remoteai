@@ -16,6 +16,8 @@ it('binds previews and streams to the transport owner and overrides forged scope
     { sessionId: 'preview', host: '127.0.0.1:123' });
   vi.mocked(invoke).mockResolvedValueOnce('resource');
   await files.request({ operation: 'guiResourceOpen', url: 'http://localhost:3000' }, 'one');
+  for (const action of ['open', 'close']) await expect(files.request({ operation: 'guiResourceStream',
+    resource: 'resource', action, id: 'socket' }, 'two')).rejects.toThrow('连接已断开');
   await files.request({ operation: 'guiResourceLink', id: 'resource',
     request: { type: 'read', id: 'stream', scope: 'forged' } }, 'one');
   expect(invoke).toHaveBeenLastCalledWith('codex_gui_resource_link',

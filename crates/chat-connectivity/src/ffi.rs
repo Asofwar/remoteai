@@ -18,6 +18,9 @@ use crate::{Config, Connection, Error, Result};
 const MAX_HANDLES: usize = 8;
 const MAX_REQUEST: usize = 256 * 1024;
 
+#[path = "ffi_bulk.rs"]
+pub(crate) mod bulk;
+
 struct Hub {
     runtime: Runtime,
     handles: Mutex<HashMap<String, OwnedConnection>>,
@@ -77,6 +80,14 @@ enum Operation {
         id: String,
         text: String,
     },
+    BulkSend {
+        id: String,
+        generation: u64,
+        data: String,
+    },
+    BulkPoll {
+        id: String,
+    },
     Poll {
         id: String,
         wait_ms: Option<u64>,
@@ -125,6 +136,15 @@ fn dispatch(request: Request) -> Result<Value> {
             hub.runtime.block_on(connection(hub, &id)?.send(text))?;
             Ok(Value::Null)
         }
+        Operation::BulkSend {
+            id,
+            generation,
+            data,
+        } => {
+            bulk::send_encoded(&request.owner, &id, generation, &data)?;
+            Ok(Value::Null)
+        }
+        Operation::BulkPoll { id } => bulk::poll(&request.owner, &id),
         Operation::Renew { id, expires_at } => {
             connection(hub, &id)?.renew(expires_at)?;
             Ok(Value::Null)

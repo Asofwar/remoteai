@@ -4,6 +4,7 @@ import { NativeGuiSocket } from './nativeSocket';
 import { decodeGuiBulkBatch } from './nativeBulkSocket';
 import { BulkCipher } from '../../../../../../shared/remote-chat/bulkCipher';
 import { encodeBulkRelay } from '../../../../../../shared/remote-chat/bulkRelayWire';
+import { encodeBulkIpc } from '../../../remoteChat/bulkIpc';
 import { BulkTransport } from '../../../../../../shared/remote-chat/bulkTransport';
 import { downloadBulkClient } from '../../../../../../shared/remote-chat/client/bulkClient';
 import { DEFAULT_CHAT_POLICY, setChatPolicy } from '../../../../../../shared/remote-chat/policy';
@@ -86,6 +87,20 @@ it('keeps older coordinators in compatibility mode and rejects unnegotiated bina
   const fixture = encrypted();
   socket.onbulk = vi.fn(); deliver(batch([fixture.wire]));
   expect(socket.onbulk).not.toHaveBeenCalled(); expect(socket.readyState).toBe(3);
+  fixture.sender.destroy(); fixture.receiver.destroy();
+});
+
+it('writes viewer ciphertext through bounded raw IPC and releases its byte budget after rejection', async () => {
+  const { socket, negotiate } = await connect();
+  const fixture = encrypted();
+  await expect(socket.sendBulk('session', [fixture.record])).rejects.toThrow('unavailable');
+  negotiate(true);
+  await socket.sendBulk('session', [fixture.record]);
+  expect(invoke).toHaveBeenLastCalledWith('gui_remote_bulk_send', encodeBulkIpc('session', [fixture.record]),
+    { headers: { 'x-file-bulk-client': socket.clientId } });
+  vi.mocked(invoke).mockRejectedValueOnce(new Error('Socket closed'));
+  await expect(socket.sendBulk('session', [fixture.record])).rejects.toThrow('closed');
+  expect(socket.bufferedAmount).toBe(0);
   fixture.sender.destroy(); fixture.receiver.destroy();
 });
 

@@ -22,6 +22,8 @@ use super::{
 
 type Socket = WebSocket<MaybeTlsStream<TcpStream>>;
 type Dial = sync_mpsc::Receiver<Result<Socket, ChatError>>;
+#[path = "runtime_bulk.rs"]
+mod binary;
 #[cfg(test)]
 #[path = "bulk_runtime_tests.rs"]
 mod bulk_tests;
@@ -71,6 +73,7 @@ struct ConnectionTimes {
 }
 
 pub(super) struct Runtime {
+    bulk: super::client_bulk::ClientBulk,
     auth_renewal: super::auth_renewal::AuthRenewal,
     tcp_authority: Arc<super::tcp::Authority>,
     upload_policy: Arc<UploadPolicyStore>,
@@ -91,6 +94,7 @@ impl Default for Runtime {
     fn default() -> Self {
         let now = Instant::now();
         Self {
+            bulk: super::client_bulk::ClientBulk::new(None),
             auth_renewal: super::auth_renewal::AuthRenewal::default(),
             tcp_authority: Arc::default(),
             upload_policy: Arc::default(),
@@ -116,7 +120,12 @@ impl Default for Runtime {
 impl Runtime {
     pub(super) fn command(&mut self, command: Command) {
         match command {
-            Command::Attach { client_id, deliver } => {
+            Command::Attach {
+                client_id,
+                deliver,
+                bulk,
+            } => {
+                self.bulk = super::client_bulk::ClientBulk::new(bulk);
                 self.bridge = Some(Bridge::new(client_id, deliver));
                 self.reset();
                 self.retry_at = Instant::now();
@@ -138,6 +147,9 @@ impl Runtime {
                 if let Some(bridge) = self.bridge.as_mut() {
                     bridge.acknowledge(request.sequence);
                 }
+            }
+            Command::BulkAck(request) if self.is_client(&request.client_id) => {
+                self.bulk.acknowledge(request.sequence);
             }
             Command::Send(request) => self.send(request),
             Command::Bulk(request) => self.send_bulk(request),
@@ -219,6 +231,7 @@ impl Runtime {
     }
 
     fn reset(&mut self) {
+        self.bulk.clear();
         self.socket = None;
         self.generation += 1;
         self.registered = false;
@@ -240,6 +253,15 @@ impl Runtime {
         }
         self.start_dial();
         if self.socket.is_none() {
+            return;
+        }
+        if self.bulk.flush().is_err() {
+            self.disconnect();
+            return;
+        }
+        if !self.bulk.has_capacity() {
+            // Backpressure stays on the worker; IPC acknowledgements continue on the next tick.
+            thread::sleep(POLL_INTERVAL);
             return;
         }
         if self.read().is_err() {
@@ -357,7 +379,11 @@ impl Runtime {
                 if matches!(error.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut) => {}
             Ok(Message::Binary(bytes)) if self.binary_relay => {
                 self.times.received = Instant::now();
-                self.receive(&super::wire::decode(&bytes)?)?;
+                if bytes.starts_with(b"CSF1") {
+                    self.receive_bulk(bytes.to_vec())?;
+                } else {
+                    self.receive(&super::wire::decode(&bytes)?)?;
+                }
             }
             Err(_) | Ok(Message::Binary(_)) => return Err(ChatError::Transport),
             Ok(_) => {}
@@ -375,6 +401,7 @@ impl Runtime {
         if message["type"] == "chat-policy" {
             self.binary_relay |= message["binaryRelay"] == true;
             self.binary_bulk = message["fileBulkV1"] == true;
+            self.bulk.negotiate(self.binary_bulk);
             self.upload_policy
                 .update(&message["policy"])
                 .map_err(|_| ChatError::InvalidFrame)?;
@@ -429,30 +456,6 @@ impl Runtime {
         } else if matches!(&request.message, Outgoing::Signal { payload, .. } if payload["kind"] == "key")
         {
             self.sessions.key_sent(request.message.session_id());
-        }
-    }
-
-    fn send_bulk(&mut self, request: super::bulk::BulkSend) {
-        let valid = self.is_client(&request.client_id)
-            && request.generation == self.generation
-            && self.sessions.contains(&request.session_id)
-            && self.binary_bulk;
-        let result = if valid && !request.completed.is_closed() {
-            request.frames.into_iter().try_for_each(|frame| {
-                if request.completed.is_closed() {
-                    return Err(ChatError::InvalidFrame);
-                }
-                self.write(Message::Binary(frame.into()))
-            })
-        } else {
-            Err(ChatError::InvalidFrame)
-        };
-        if matches!(result, Err(ChatError::Transport)) {
-            self.disconnect();
-        }
-        // A cancelled frontend no longer needs its write result; the transport outcome is already known.
-        if request.completed.send(result).is_err() {
-            eprintln!("Download sender stopped before its socket write completed");
         }
     }
 

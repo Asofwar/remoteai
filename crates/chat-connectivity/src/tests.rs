@@ -80,6 +80,12 @@ fn replacing_a_mobile_bridge_never_resets_or_closes_its_successor() {
         )["error"]
             .is_string());
     }
+    assert!(call(json!({"operation":"bulk-poll","owner":"other","id":new}))["error"].is_string());
+    assert!(
+        call(json!({"operation":"bulk-send","owner":"other","id":new,
+        "generation":1,"data":"UkFOMQE="}))["error"]
+            .is_string()
+    );
     assert!(call(json!({"operation":"reset","owner":"old"}))["error"].is_null());
     assert!(call(json!({"operation":"close","id":old}))["error"].is_null());
     assert!(

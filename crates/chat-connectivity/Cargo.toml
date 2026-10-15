@@ -12,6 +12,7 @@ members = ["vendor/easytier-core"]
 resolver = "2"
 
 [dependencies]
+base64 = "0.22"
 easytier = { git = "https://github.com/EasyTier/EasyTier", rev = "ed73d318bb3bf19601e227ab83dd61d66ce4b9f8", default-features = false, features = ["aes-gcm", "smoltcp", "upnp", "tcp-hole-punch", "dns-resolver"] }
 easytier-core = { git = "https://github.com/EasyTier/EasyTier", rev = "ed73d318bb3bf19601e227ab83dd61d66ce4b9f8", default-features = false, features = ["aes-gcm", "proxy-smoltcp-stack", "tcp-hole-punch"] }
 serde = { version = "1", features = ["derive"] }

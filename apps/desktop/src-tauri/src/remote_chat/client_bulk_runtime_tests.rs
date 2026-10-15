@@ -132,3 +132,50 @@ fn relay_download_streams_eight_mib_over_raw_ipc_while_delivering_chat_events() 
     stop.send(()).unwrap();
     server.join().unwrap();
 }
+
+#[test]
+fn viewer_sends_raw_records_only_to_its_authenticated_session() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    let (stop, stopped) = sync_mpsc::channel();
+    let server = thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        let mut socket = tungstenite::accept(stream).unwrap();
+        socket.read().unwrap();
+        for frame in [
+            json!({"type":"chat-policy","binaryRelay":true,"fileBulkV1":true}),
+            json!({"type":"paired","sessionId":"paired-session"}),
+        ] {
+            socket
+                .send(Message::Text(frame.to_string().into()))
+                .unwrap();
+        }
+        assert_eq!(socket.read().unwrap().into_data().as_ref(), bulk_frame(7));
+        stopped.recv_timeout(Duration::from_secs(5)).unwrap();
+    });
+    let peer = start_peer_with_bulk(address, None, Some(Channel::new(|_| Ok(()))));
+    receive_native_frame(&peer, "paired");
+    for (session, valid) in [("other-session", false), ("paired-session", true)] {
+        let (completed, reply) = tokio::sync::oneshot::channel();
+        let frames = vec![bulk_frame(7)];
+        let memory = crate::remote_chat::bulk::reserve_bytes(frames[0].len()).unwrap();
+        peer.commands
+            .blocking_send(ClientCommand::Bulk(
+                crate::remote_chat::client_bulk_send::ClientBulkSend {
+                    session: session.into(),
+                    frames,
+                    completed,
+                    _memory: memory,
+                },
+            ))
+            .unwrap();
+        assert_eq!(reply.blocking_recv().unwrap().is_ok(), valid);
+    }
+    peer.configs.send_replace(None);
+    peer.worker.join().unwrap();
+    stop.send(()).unwrap();
+    server.join().unwrap();
+}

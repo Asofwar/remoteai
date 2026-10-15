@@ -1,9 +1,11 @@
-import { LINK_CHUNK_BYTES } from '../../../../../shared/terminal/linkChunks';
+import { openMappingSocket, type MappingSocket } from '../../../../../shared/port-mapping/socket';
 import type { ForwardingClient } from '../../../../../shared/port-mapping/service';
 import type { MappingTunnel, MappingTunnelOptions } from '../../../../../shared/port-mapping/types';
 import { MappingWebSocket, type MappingSocketEvent } from '../../../../../shared/port-mapping/websocket';
-import { decodeBase64, encodeBase64, httpRequest, HttpResponseReader, mappingUrl,
+import { httpRequest, HttpResponseReader, mappingUrl,
   type MappingHttpRequest, type MappingHttpResponse } from '../../../../../shared/port-mapping/http';
+import { httpConnections } from './httpConnections';
+import { decompressResponse } from './httpCompression';
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
@@ -15,8 +17,11 @@ export class WebMappingTunnel implements MappingTunnel {
   private readonly pending = new Set<AbortController>();
   private readonly cancellation = new AbortController();
   private readonly sockets = new Set<MappingWebSocket>();
+  private readonly connections;
 
-  constructor(private readonly client: ForwardingClient, private readonly options: MappingTunnelOptions) {}
+  constructor(private readonly client: ForwardingClient, private readonly options: MappingTunnelOptions) {
+    this.connections = httpConnections(options.bridgeBudget);
+  }
 
   resolve = async (resource: string, url: string) => {
     this.resource = resource; this.origin = url;
@@ -32,6 +37,7 @@ export class WebMappingTunnel implements MappingTunnel {
     this.cancellation.abort();
     for (const request of this.pending) request.abort();
     for (const socket of this.sockets) socket.close();
+    this.connections.clear(this);
   };
 
   openWebSocket = async (url: string, protocols: string[], emit: (event: MappingSocketEvent) => void) => {
@@ -44,15 +50,19 @@ export class WebMappingTunnel implements MappingTunnel {
     return socket;
   };
 
-  request = async (input: MappingHttpRequest): Promise<MappingHttpResponse> => {
+  request = async (input: MappingHttpRequest, cancelled?: AbortSignal): Promise<MappingHttpResponse> => {
     const url = mappingUrl(input.url, this.origin).href;
-    const release = this.requireReservation(await this.options.bridgeBudget.acquire(this.cancellation.signal));
     const abort = new AbortController();
+    const signal = AbortSignal.any([abort.signal, this.cancellation.signal, ...(cancelled ? [cancelled] : [])]);
     this.pending.add(abort);
     const timer = setTimeout(() => abort.abort(), REQUEST_TIMEOUT_MS);
-    try { return await this.exchange({ ...input, url }, abort.signal); }
+    let release: (() => void) | undefined;
+    try {
+      release = this.requireReservation(await this.options.bridgeBudget.acquire(signal));
+      return await this.exchange({ ...input, url }, signal);
+    }
     finally {
-      clearTimeout(timer); this.pending.delete(abort); release();
+      clearTimeout(timer); this.pending.delete(abort); release?.();
     }
   };
 
@@ -65,37 +75,55 @@ export class WebMappingTunnel implements MappingTunnel {
   }
 
   private async exchange(input: MappingHttpRequest, signal: AbortSignal): Promise<MappingHttpResponse> {
-    const request = httpRequest(input, this.origin);
-    let id: string | undefined;
-    const close = () => {
-      if (id) void this.client.link(this.resource, { type: 'close', id }).catch(() => {
-        // Releasing the mapping's resource also releases disconnected sockets.
-      });
-    };
-    signal.addEventListener('abort', close, { once: true });
-    try {
-      const opened = await this.client.link(this.resource, { type: 'connect', url: this.origin });
-      if (opened.type !== 'socket') throw new Error('Unexpected socket response');
-      id = opened.id;
-      signal.throwIfAborted();
-      for (let offset = 0; offset < request.length; offset += LINK_CHUNK_BYTES) {
-        signal.throwIfAborted();
-        await this.client.link(this.resource, { type: 'write', id,
-          data: encodeBase64(request.subarray(offset, offset + LINK_CHUNK_BYTES)) });
+    const reused = this.connections.take(this);
+    try { return await this.perform(input, signal, reused); }
+    catch (error) {
+      // A server may close an idle connection. Never replay POSTs or a partially received response.
+      if (!(error instanceof IdleConnectionClosed) || !reused || !['GET', 'HEAD'].includes(input.method ?? 'GET')) {
+        throw error;
       }
-      return await this.read({ id, input, signal });
-    } finally { signal.removeEventListener('abort', close); close(); }
+      signal.throwIfAborted();
+      return this.perform(input, signal);
+    }
   }
 
-  private async read({ id, input, signal }: { id: string; input: MappingHttpRequest; signal: AbortSignal }) {
+  private async perform(input: MappingHttpRequest, signal: AbortSignal, reused?: MappingSocket) {
+    const request = httpRequest(input, this.origin,
+      { keepAlive: true, compression: typeof DecompressionStream !== 'undefined' });
+    const socket = reused ?? await openMappingSocket(this.client, this.resource, this.origin, signal);
+    const close = () => socket.close();
     const reader = new HttpResponseReader(input.method);
+    signal.addEventListener('abort', close, { once: true });
+    let reusable = false;
+    try {
+      signal.throwIfAborted();
+      await socket.write(request);
+      const response = await this.read({ socket, reader, input, signal });
+      const decoded = await decompressResponse(response, signal);
+      reusable = reader.reusable && !this.closed && !signal.aborted;
+      return decoded;
+    } catch (error) {
+      if (reused && !reader.receivedBytes && !signal.aborted) throw new IdleConnectionClosed();
+      throw error;
+    } finally {
+      signal.removeEventListener('abort', close);
+      if (reusable) this.connections.put(this, socket); else close();
+    }
+  }
+
+  private async read({ socket, reader, input, signal }: {
+    socket: MappingSocket; reader: HttpResponseReader; input: MappingHttpRequest; signal: AbortSignal;
+  }) {
     for (;;) {
       signal.throwIfAborted();
-      const reply = await this.client.link(this.resource, { type: 'read', id });
+      const reply = await socket.read();
       signal.throwIfAborted();
-      if (reply.type !== 'data') throw new Error('Unexpected read response');
-      const result = reader.push(decodeBase64(reply.data), reply.eof);
+      const result = reader.push(reply.data, reply.eof);
       if (result) return { ...result, url: input.url };
     }
   }
+}
+
+class IdleConnectionClosed extends Error {
+  constructor() { super('Idle connection closed'); }
 }

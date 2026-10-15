@@ -66,11 +66,26 @@ limited to 20 MiB, and one document's resource graph to 128 resources / 50 MiB.
 
 ## Transport and lifecycle
 
-The viewers reuse `guiResourceOpen`, `guiResourceLink` and `guiResourceClose` over the selected
-computer's authenticated chat connection. P2P and Relay selection, encryption, retries and relay
-traffic accounting are shared with the existing transport. No additional public listener or backend
-route is needed. The resource URL identifies the remote TCP address; forwarding does not parse or
-rewrite HTTP, TLS or other application bytes.
+The viewers reuse `guiResourceOpen` and `guiResourceClose` over the selected computer's authenticated
+chat connection. New mobile/Web clients negotiate `portStreamsV1` with the host, then use
+`guiResourceStream` only to open/close a TCP socket. Bytes flow continuously on the existing encrypted
+binary channel (native direct stream, WebRTC data channel, or CSF1 server relay), independently of
+chat RPC framing. No additional public listener or backend route is needed. The resource URL identifies
+the permitted remote TCP address; the native TCP forwarding path preserves application bytes.
+
+Each socket has independent offsets, a 2 MiB window per direction, cumulative acknowledgements and
+bounded retry storage. Acknowledgements replenish credit only after the consumer reads the bytes.
+Late/out-of-order records are authenticated and deduplicated, and a P2P/relay switch retransmits only
+unacknowledged bytes without reopening TCP. Records are at most 16 KiB and adapt to smaller negotiated
+path limits. Stalled writes fail after 30 seconds. A link permits at most 24 stream handles, covering the
+eight active requests, bounded idle connections and sockets awaiting cleanup. Resource/session closure
+releases the remote sockets, ciphers, timers and native receive routes.
+
+Hosts without `portStreamsV1`, or clients without an available binary path, retain `guiResourceLink`
+compatibility forwarding. Android requires a rebuilt APK containing the duplex connectivity and
+port-stream modules; an older APK keeps RPC forwarding. iOS uses bounded native IPC batches for mesh
+transport and the shared binary implementation for RTC/relay. These changes require updating the host
+and the viewer to obtain streaming performance; the compatibility path continues to work during rollout.
 
 `TerminalLinkTunnels` accepts a fixed local port for manual mappings while retaining automatic port
 allocation for previews. The asynchronous Rust listener command validates the requested port and
@@ -82,14 +97,37 @@ Native sockets pause while waiting to preserve their initial request bytes. Web 
 use the same admission queue. Stopping a mapping cancels its queued connections without affecting other mappings.
 A failed listener or disconnected session requires restarting its mapping.
 
-Desktop, native and Web use a uniform 384 KiB read/write bound instead of paying a remote round trip for
-every 48 KiB. The host returns as soon as data is available and drains only immediately readable bytes;
-small replies and WebSockets never
-wait for the larger buffer to fill. There is no older-version negotiation or fallback: update both the
-viewing app and the remote host together. Stream admission, RPC single-flight ordering and retry
-deduplication remain unchanged.
+The host's local socket bridge and compatibility RPC use a uniform 384 KiB read/write bound. The
+desktop viewer's local `TerminalLinkTunnels` currently retains this compatibility path. The host returns
+as soon as data is available and drains only immediately readable bytes; small replies and WebSockets
+never wait for the larger buffer to fill.
+
+Web additionally fetches independent scripts/styles/images concurrently while preserving document
+execution/style order, reuses safe HTTP/1.1 connections (up to eight idle connections per computer,
+four-second expiry), and requests gzip/deflate where supported. Both wire and decoded responses are
+bounded. A stale reused socket is retried once only for GET/HEAD before any response bytes arrive;
+POST is never replayed. Closing/navigating a preview cancels its active and queued HTTP requests.
 
 ## Verification
+
+- `portForwarding/byteStream.test.ts`, `streamMux.test.ts`, `streamClient.test.ts` and
+  `streamIntegration.test.ts` cover bounded credit, cancellation, old-host fallback, encryption,
+  replay/forgery, shrinking path limits, concurrent upload/download, shared file/port transport and live P2P/relay switching.
+  Real loopback HTTP/TCP plus the encrypted stream implementation at simulated 60 ms RTT transfers
+  an 8 MiB HTTP body in roughly 0.9–1.2 seconds, with a path switch and one socket-open RPC. This is a
+  controlled transport benchmark, not a WAN or phone-browser timing guarantee.
+- `httpPerformance.test.ts` measures a document with 20 tiny images at 60 ms simulated RPC RTT:
+  the original serial/close-per-request implementation took about 4.1 seconds; concurrent loading and
+  connection reuse take about 0.7–1.0 seconds and use at most eight connections. This test also keeps
+  the compatibility path covered. Browser tests verify asset/module order and sandbox isolation.
+- Android `ANDROID_SERIAL=<device> node apps/native/scripts/test-port-streams.cjs` checks routing,
+  ownership, queue limits, overflow cleanup, close/poll races and the duplex JNI entrypoint on hardware,
+  without replacing the installed app. Build the arm64 APK/native library first. This is bridge-level
+  device verification; full app WAN browsing and iOS device performance require separate measurement.
+- For actual duplex JNI bytes, first run `cargo test --lib bulk::android_fixture::android_duplex_bridge_fixture
+  -- --ignored --nocapture` in `crates/chat-connectivity`, then run the Android script above with `--duplex`.
+  On 2026-10-15, the phone received and echoed 4 MiB in 1.24 seconds through an ADB loopback fixture;
+  the host verified every byte before the phone reported success. This is not a public-network benchmark.
 
 - Rust `gui_terminal::links` tests cover fixed-port conflicts and reuse, cancellation, independent
   listeners, scoped binary transfers and WebSocket forwarding.

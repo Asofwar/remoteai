@@ -13,11 +13,14 @@ export interface FilePreviewData extends FileReference {
 export const GUI_FILE_OPERATIONS = new Set([
   'guiFileApplications', 'guiFileAction', 'guiFilePreviewOpen', 'guiFilePreviewClose', 'guiFilePreviewHost',
   'guiResourceOpen', 'guiResourceClose', 'guiResourceLink',
+  'guiResourceStream',
 ]);
 
 /** Every request travels over the selected computer's authenticated connection. */
-export function createGuiFilesClient(request: <T>(body: object) => Promise<T>) {
+export function createGuiFilesClient(request: <T>(body: object) => Promise<T>,
+  stream?: import('../port-mapping/socket').MappingSocketFactory) {
   return {
+    ...stream && { stream },
     applications: () => request<FileApplication[]>({ operation: 'guiFileApplications' }),
     perform: (target: FileTarget, action: FileAction) =>
       request<FileActionResult>({ operation: 'guiFileAction', target, action }),

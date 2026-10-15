@@ -1,5 +1,6 @@
 package com.codexswitch.connectivity
 
+import android.util.Base64
 import com.facebook.react.bridge.*
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -10,10 +11,27 @@ import org.json.JSONObject
 /** Rust owns bounded sessions and networking. Poll calls stay off the React Native/UI threads. */
 class ChatConnectivityModule(context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
     private val workers = Executors.newFixedThreadPool(4)
+    private val bulkWrites = java.util.concurrent.ThreadPoolExecutor(2, 2, 0, TimeUnit.SECONDS,
+        java.util.concurrent.ArrayBlockingQueue<Runnable>(8))
     private val owner = UUID.randomUUID().toString()
     private val bulk = NativeBulkReceiver(owner)
     override fun getName() = "ChatConnectivity"
-    override fun getConstants(): Map<String, Any> = mapOf("bulkBinaryAvailable" to true)
+    override fun getConstants(): Map<String, Any> = mapOf("bulkBinaryAvailable" to true, "bulkDuplexAvailable" to true)
+
+    @ReactMethod
+    fun sendBulk(id: String, generation: Double, data: String, promise: Promise) {
+        if (data.length > 350_000 || !generation.isFinite() || generation <= 0 || generation % 1 != 0.0) {
+            promise.reject("CONNECTION_UNAVAILABLE", "连接请求无效，请重试。"); return
+        }
+        try {
+            bulkWrites.execute {
+                try {
+                    check(NativeConnectivity.sendBulk(owner, id, generation.toLong(), Base64.decode(data, Base64.NO_WRAP)))
+                    promise.resolve(null)
+                } catch (_: Exception) { promise.reject("CONNECTION_UNAVAILABLE", "连接已中断，请重试。") }
+            }
+        } catch (_: RejectedExecutionException) { promise.reject("CONNECTION_BUSY", "连接繁忙，请稍后重试。") }
+    }
 
     @ReactMethod
     fun call(request: String, promise: Promise) {
@@ -37,6 +55,7 @@ class ChatConnectivityModule(context: ReactApplicationContext) : ReactContextBas
 
     override fun invalidate() {
         workers.shutdown()
+        bulkWrites.shutdown()
         Thread {
             // All queued opens must finish before their owner's handles are released.
             while (!workers.awaitTermination(1, TimeUnit.SECONDS)) { /* waits off the UI thread */ }

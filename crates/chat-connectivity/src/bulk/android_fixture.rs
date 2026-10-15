@@ -6,6 +6,16 @@ use easytier::common::config::ConfigLoader;
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "run with NativeBulkDeviceTest and adb reverse tcp:18779 tcp:18779"]
 async fn android_binary_bridge_fixture() {
+    android_fixture(false).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "run with test-port-streams.cjs --duplex and an arm64 Android device"]
+async fn android_duplex_bridge_fixture() {
+    android_fixture(true).await;
+}
+
+async fn android_fixture(duplex: bool) {
     let core = local_core(true, "native-bulk-android");
     core.set_listeners(vec!["tcp://127.0.0.1:18779".parse().unwrap()]);
     let host = engine(core);
@@ -35,8 +45,22 @@ async fn android_binary_bridge_fixture() {
         for group in 0..16 {
             let records: Vec<_> = (1..=16).map(|n| fixture_record(group * 16 + n)).collect();
             source.send(1, super::tests::batch(&records)).await.unwrap();
+            if duplex {
+                for record in records {
+                    assert_eq!(source.receive().await.unwrap(), record);
+                }
+            }
         }
         println!("Android binary fixture sent 256 records (4 MiB)");
+        if duplex {
+            // JNI write completion only means queued locally; the phone must wait for peer verification.
+            source
+                .send(1, super::tests::batch(&[fixture_record(257)]))
+                .await
+                .unwrap();
+            println!("Android duplex fixture verified every echoed byte");
+            return;
+        }
         assert!(matches!(
             output.recv().await,
             Some(Event::Bulk { generation: 0 })

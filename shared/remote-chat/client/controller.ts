@@ -35,6 +35,7 @@ import { AsyncAnswers } from './asyncAnswers';
 import { createGuiAccountsClient } from './guiAccounts';
 import { createContextSettingsClient } from './contextSettings';
 import { createGuiToolsClient } from '../guiTools';
+import { openRpcMappingSocket, type MappingSocket } from '../../port-mapping/socket';
 import { canSelectProject } from '../projects';
 import type { UsageSummary } from '../usage';
 import { CONVERSATION_METRICS_OPERATION, type ReadConversationMetrics } from '../conversationMetrics';
@@ -68,7 +69,7 @@ export class ChatController {
   private readonly eventListeners = new Set<(event: GuiEvent) => void>();
   private readonly connection: Pick<ChatConnection, 'request' | 'start' | 'stop'>
     & Partial<Pick<ChatConnection, 'confirmHostIdentity' | 'reportDiagnostic' | 'retryNow' | 'openNativeMedia'
-      | 'downloadsBulk' | 'setBulkSupport'>>;
+      | 'downloadsBulk' | 'setBulkSupport' | 'mappingStreams'>>;
   private readonly queueConnection = new QueueConnection((body) => this.connection.request('request', body));
   private readonly asyncAnswers = new AsyncAnswers({ snapshot: () => this.state,
     request: (body) => this.connection.request('request', body), update: (patch) => this.update(patch),
@@ -78,7 +79,10 @@ export class ChatController {
   });
   readonly guiTools = createGuiToolsClient(<T>(body: object) => this.connection.request<T>('request', body),
     (event, fields) => this.connection.reportDiagnostic?.(event, fields),
-    viewId => this.connection.openNativeMedia?.(viewId) ?? Promise.resolve(undefined));
+    viewId => this.connection.openNativeMedia?.(viewId) ?? Promise.resolve(undefined),
+    (resource, url): Promise<MappingSocket> => this.connection.mappingStreams
+      ? this.connection.mappingStreams.open(resource, url)
+      : openRpcMappingSocket(this.guiTools.files, resource, url));
   private readonly listRequests = new ThreadListRequests(async () => {
     if (this.active && this.transportConnected) await this.list({ background: true });
   });

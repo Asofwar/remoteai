@@ -6,6 +6,7 @@ mod bridge;
 pub(crate) mod bulk;
 mod client;
 mod client_bulk;
+pub(crate) mod client_bulk_send;
 mod client_runtime;
 mod config;
 pub(crate) mod host_health;
@@ -34,6 +35,13 @@ struct ChatState(mpsc::Sender<Command>);
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ClientRequest {
     client_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AttachRequest {
+    client_id: String,
+    bulk_events: Option<tauri::ipc::JavaScriptChannelId>,
 }
 
 #[derive(Deserialize)]
@@ -78,14 +86,19 @@ async fn submit(app: AppHandle, window: Webview, command: Command) -> Result<(),
 pub(crate) async fn remote_chat_attach(
     app: AppHandle,
     window: Webview,
-    request: ClientRequest,
+    request: AttachRequest,
     events: Channel<Batch>,
 ) -> Result<(), String> {
     uuid::Uuid::parse_str(&request.client_id).map_err(|_| "请重新打开主窗口后重试。")?;
+    let bulk = request
+        .bulk_events
+        .as_ref()
+        .map(|id| id.channel_on(window.clone()));
     submit(
         app,
         window,
         Command::Attach {
+            bulk,
             client_id: request.client_id,
             deliver: Box::new(move |batch| events.send(batch).is_ok()),
         },
@@ -132,6 +145,15 @@ pub(crate) async fn remote_chat_ack(
     request: AckRequest,
 ) -> Result<(), String> {
     submit(app, window, Command::Ack(request)).await
+}
+
+#[tauri::command]
+pub(crate) async fn remote_chat_bulk_ack(
+    app: AppHandle,
+    window: Webview,
+    request: AckRequest,
+) -> Result<(), String> {
+    submit(app, window, Command::BulkAck(request)).await
 }
 
 #[tauri::command]

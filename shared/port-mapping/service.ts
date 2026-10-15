@@ -1,6 +1,7 @@
 import type { GuiToolsClient } from '../remote-chat/guiTools';
 import type { MappingTunnel, TunnelFactory } from './types';
-import { MAX_PORT_MAPPINGS, validPort, type PortMapping } from './settings';
+import { MAX_PORT_MAPPINGS, mappingConflicts, validPort, type MappingMode, type PortMapping } from './settings';
+import { mappingOrigin, normalizeMappingHost } from './target';
 import { StreamBudget } from './streamBudget';
 
 export type ForwardingClient = Pick<GuiToolsClient['files'], 'openResource' | 'closeResource' | 'link'>;
@@ -23,7 +24,7 @@ export class PortForwardingService {
   private readonly bridgeBudget = new StreamBudget();
 
   constructor(private readonly client: ForwardingClient, saved: PortMapping[],
-    private readonly platform: { createTunnel: TunnelFactory; createId: () => string }) {
+    private readonly platform: { createTunnel: TunnelFactory; createId: () => string; mode?: MappingMode }) {
     this.entries = saved.map(entry => ({ ...entry, status: 'stopped' }));
   }
 
@@ -38,11 +39,14 @@ export class PortForwardingService {
     if (!connected) for (const id of this.running.keys()) void this.stop(id);
   };
 
-  add = (remotePort: number, localPort: number) => {
+  add = (remotePort: number, localPort: number, remoteHost = '') => {
     if (!validPort(remotePort) || !validPort(localPort)) throw new Error('请输入 1–65535 之间的端口号。');
-    if (this.entries.some(entry => entry.localPort === localPort)) throw new Error('这个本地端口已有映射。');
+    const target = { remoteHost: normalizeMappingHost(remoteHost), remotePort, localPort };
+    if (this.entries.some(entry => mappingConflicts(entry, target, this.platform.mode))) {
+      throw new Error(this.platform.mode === 'preview' ? '这个目标地址已有映射。' : '这个本地端口已有映射。');
+    }
     if (this.entries.length >= MAX_PORT_MAPPINGS) throw new Error('最多添加 8 条映射，请先删除一条。');
-    const entry: ForwardingEntry = { id: this.platform.createId(), remotePort, localPort, status: 'stopped' };
+    const entry: ForwardingEntry = { id: this.platform.createId(), ...target, status: 'stopped' };
     this.publish([...this.entries, entry]);
     void this.start(entry.id);
   };
@@ -51,14 +55,14 @@ export class PortForwardingService {
     const entry = this.entries.find(value => value.id === id);
     if (!entry || !this.connected || this.running.has(id) || entry.status === 'stopping') return;
     const job: RunningMapping = { tunnels: this.platform.createTunnel(this.client, {
-      localPort: entry.localPort, bridgeBudget: this.bridgeBudget,
+      mappingId: entry.id, localPort: entry.localPort, bridgeBudget: this.bridgeBudget,
       onClosed: () => { void this.fail(id, job, '映射已中断，请重新启动。'); },
     }) };
     this.running.set(id, job);
     this.update(id, { status: 'starting', error: undefined });
     try {
       // The existing resource protocol uses a URL only to identify a TCP destination; bytes stay unchanged.
-      const url = `http://127.0.0.1:${entry.remotePort}`;
+      const url = mappingOrigin(entry);
       job.resource = await this.client.openResource(url);
       if (this.running.get(id) !== job) { await this.release(job); return; }
       await job.tunnels.resolve(job.resource, url);

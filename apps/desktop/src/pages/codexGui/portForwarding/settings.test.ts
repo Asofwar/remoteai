@@ -8,7 +8,7 @@ it('keeps configuration separate by account and device without restoring active 
   expect(readPortMappings('account/computer-two')).toEqual([]);
   expect(readPortMappings('another-account/computer-one')).toEqual([]);
   expect(readPortMappings('account/computer-one')).toEqual([
-    { id: expect.any(String), remotePort: 5432, localPort: 15432 },
+    { id: expect.any(String), remoteHost: '127.0.0.1', remotePort: 5432, localPort: 15432 },
   ]);
 });
 it('discards malformed, out-of-range and duplicate stored ports', () => {
@@ -17,5 +17,30 @@ it('discards malformed, out-of-range and duplicate stored ports', () => {
     { remotePort: 65536, localPort: 3000 }, { remotePort: 3000, localPort: 13000 },
     { remotePort: 4000, localPort: 13000 },
   ]));
-  expect(readPortMappings('scope')).toEqual([{ id: expect.any(String), remotePort: 3000, localPort: 13000 }]);
+  expect(readPortMappings('scope')).toEqual([
+    { id: expect.any(String), remoteHost: '127.0.0.1', remotePort: 3000, localPort: 13000 },
+  ]);
+});
+
+it('persists custom targets and discards invalid hosts without losing valid mappings', () => {
+  const mappings = [
+    { id: 'one', remoteHost: '192.168.1.20', remotePort: 3000, localPort: 13000 },
+    { id: 'two', remoteHost: '::1', remotePort: 3000, localPort: 13001 },
+  ];
+  savePortMappings('scope', mappings);
+  expect(readPortMappings('scope')).toEqual(mappings.map(entry => ({ ...entry, id: expect.any(String) })));
+  localStorage.setItem('codex-port-forwarding:scope', JSON.stringify([
+    { remoteHost: 'http://1.2.3.4', remotePort: 80, localPort: 80 },
+    { remoteHost: null, remotePort: 80, localPort: 80 }, ...mappings,
+  ]));
+  expect(readPortMappings('scope')).toHaveLength(2);
+});
+
+it('restores different IPs on the same preview port while rejecting duplicate targets', () => {
+  const entries = ['192.168.1.20', '192.168.1.21', '192.168.1.20']
+    .map(remoteHost => ({ id: remoteHost, remoteHost, remotePort: 3000, localPort: 3000 }));
+  savePortMappings('scope', entries);
+  expect(readPortMappings('scope', undefined, undefined, 'preview').map(entry => entry.remoteHost))
+    .toEqual(['192.168.1.20', '192.168.1.21']);
+  expect(readPortMappings('scope')).toHaveLength(1);
 });

@@ -6,13 +6,17 @@ import { WebMappingTunnel } from './httpTunnel';
 export function usePortMappings(options: { client: ForwardingClient; scope: string; connected: boolean }) {
   const { client, scope, connected } = options;
   const manager = useMemo(() => {
-    const tunnels = new Map<number, WebMappingTunnel>();
-    const service = new PortForwardingService(client, readPortMappings(scope), {
+    const tunnels = new Map<string, WebMappingTunnel>();
+    const service = new PortForwardingService(client, readPortMappings(scope, undefined, undefined, 'preview'), {
+      mode: 'preview',
       createId: () => crypto.randomUUID(),
       createTunnel: (connection, config) => {
         const tunnel = new WebMappingTunnel(connection, config);
-        tunnels.set(config.localPort, tunnel);
-        return tunnel;
+        tunnels.set(config.mappingId, tunnel);
+        return { resolve: tunnel.resolve, close: async () => {
+          await tunnel.close();
+          if (tunnels.get(config.mappingId) === tunnel) tunnels.delete(config.mappingId);
+        } };
       },
     });
     return { service, tunnels };

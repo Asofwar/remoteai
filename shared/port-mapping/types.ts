@@ -10,4 +10,5 @@ export interface MappingTunnelOptions {
   onClosed: () => void;
   bridgeBudget: StreamBudget;
 }
-export type TunnelFactory = (client: ForwardingClient, options: MappingTunnelOptions) => MappingTunnel;
+export type TunnelFactory = (client: ForwardingClient,
+  options: MappingTunnelOptions & { mappingId: string }) => MappingTunnel;

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
 import { PortForwardingService, type ForwardingClient } from './service';
+import { PortForwardingService as SharedService } from '../../../../../../shared/port-mapping/service';
 import type { TerminalLinkReply } from '../../../../../../shared/terminal/links';
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
@@ -39,6 +40,38 @@ it('maps multiple remote ports through authenticated resources and stops them in
   expect(service.snapshot()[0].status).toBe('running');
   await service.remove(second.id);
   expect(service.snapshot().map(entry => entry.id)).toEqual([first.id]);
+});
+
+it('connects to the selected IP and port, preserves it on restart, and keeps local port conflicts', async () => {
+  service.add(3000, 13000, '192.168.1.20');
+  service.add(3000, 13001, '[::1]');
+  await flush();
+  expect(client.openResource).toHaveBeenCalledWith('http://192.168.1.20:3000');
+  expect(client.link).toHaveBeenCalledWith(expect.any(String), { type: 'connect', url: 'http://[::1]:3000' });
+  expect(() => service.add(3000, 13000, '192.168.1.21')).toThrow('本地端口已有映射');
+  const first = service.snapshot()[0];
+  await service.stop(first.id); await service.start(first.id);
+  expect(client.openResource).toHaveBeenLastCalledWith('http://192.168.1.20:3000');
+});
+
+it('rejects invalid IP input before opening a resource', () => {
+  expect(() => service.add(3000, 13000, '192.168.1.20:3000')).toThrow('IPv4 或 IPv6');
+  expect(service.snapshot()).toEqual([]);
+  expect(client.openResource).not.toHaveBeenCalled();
+});
+
+it('keeps preview mappings to different IPs on the same port independent', async () => {
+  const preview = new SharedService(client, [], { mode: 'preview', createId: () => String(++nextId),
+    createTunnel: () => ({ resolve: async (_id, url) => url, close: async () => {} }) });
+  preview.setConnected(true);
+  try {
+    preview.add(3000, 3000, '192.168.1.20'); preview.add(3000, 3000, '192.168.1.21');
+    expect(() => preview.add(3000, 3000, '192.168.1.20')).toThrow('目标地址已有映射');
+    await flush();
+    expect(preview.snapshot().map(entry => entry.status)).toEqual(['running', 'running']);
+    await preview.stop(preview.snapshot()[0].id);
+    expect(preview.snapshot().map(entry => entry.status)).toEqual(['stopped', 'running']);
+  } finally { preview.dispose(); await flush(); }
 });
 
 it('reports occupied local ports and releases the remote resource before retry', async () => {

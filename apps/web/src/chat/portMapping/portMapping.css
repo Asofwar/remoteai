@@ -4,6 +4,7 @@
 .port-mapping-row { border: 1px solid var(--border, #dfe5df); border-radius: 12px; padding: 12px; min-width: 0; }
 .port-mapping-row > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .port-mapping-row [role=status] { font-size: 12px; color: var(--muted, #718078); }
+.port-mapping-row strong { min-width: 0; overflow-wrap: anywhere; }
 .port-mapping-row .ant-btn-link { padding-inline: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .port-mapping-row .port-mapping-address { display: flex; width: 100%; height: auto; min-height: 44px;
   justify-content: space-between; white-space: normal; text-align: left; }

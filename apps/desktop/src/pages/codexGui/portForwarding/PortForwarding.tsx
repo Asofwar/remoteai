@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, InputNumber, Popover, Tooltip, message } from 'antd';
+import { Alert, Button, Input, InputNumber, Popover, Tooltip, message } from 'antd';
 import { ArrowRight, Cable, Copy, Play, Plus, Square, Trash2 } from 'lucide-react';
 import { guiText as t } from '../../../i18n/guiText';
 import { copyText } from '../../../utils/clipboard';
 import { usePortForwarding } from './usePortForwarding';
 import { ForwardedAddress } from './ForwardedAddress';
 import { MAX_PORT, MAX_PORT_MAPPINGS } from './settings';
+import { DEFAULT_MAPPING_HOST, mappingAddress } from '../../../../../../shared/port-mapping/target';
 import type { ForwardingClient, ForwardingEntry, PortForwardingService } from './service';
 import launcherStyles from '../GuiRemoteDesktop.module.less';
 import styles from './portForwarding.module.less';
@@ -24,7 +25,7 @@ export function PortForwarding(props: {
     styles={{ root: { maxWidth: 400 } }} content={<section className={styles.panel}
       aria-hidden={!open || !props.active} aria-label={t('端口映射设置')}>
       <header><strong>{t('端口映射')}</strong><span>{entries.length}/{MAX_PORT_MAPPINGS}</span></header>
-      <p>{t('将远程电脑的端口映射到本机，方便在本机访问。')}</p>
+      <p>{t('通过远程电脑访问目标 IP 和端口。留空 IP 可访问远程电脑本机。')}</p>
       {!props.connected && <Alert type="info" message={t('连接已断开，重新连接后可再次启动。')} />}
       <div className={styles.list}>
         {entries.map(entry => <MappingRow key={entry.id} entry={entry} service={service}
@@ -42,6 +43,7 @@ export function PortForwarding(props: {
 }
 
 function MappingForm({ service, disabled }: { service: PortForwardingService; disabled: boolean }) {
+  const [remoteHost, setRemoteHost] = useState('');
   const [remotePort, setRemotePort] = useState<number | null>(null);
   const [localPort, setLocalPort] = useState<number | null>(null);
   const [error, setError] = useState('');
@@ -49,11 +51,16 @@ function MappingForm({ service, disabled }: { service: PortForwardingService; di
     event.preventDefault();
     if (disabled) return;
     try {
-      service.add(remotePort ?? 0, localPort ?? remotePort ?? 0);
-      setError(''); setRemotePort(null); setLocalPort(null);
+      service.add(remotePort ?? 0, localPort ?? remotePort ?? 0, remoteHost);
+      setError(''); setRemoteHost(''); setRemotePort(null); setLocalPort(null);
     }
     catch (reason) { setError(reason instanceof Error ? reason.message : '端口映射未能添加，请重试。'); }
   }}>
+    <div className={styles.fields}>
+      <label>{t('目标 IP')}<Input aria-label={t('目标 IP')} value={remoteHost}
+        onChange={event => setRemoteHost(event.target.value)} placeholder={DEFAULT_MAPPING_HOST} disabled={disabled}
+        autoComplete="off" spellCheck={false} /></label>
+    </div>
     <div className={styles.fields}>
       <label>{t('远程端口')}<InputNumber aria-label={t('远程端口')} min={1} max={MAX_PORT}
         value={remotePort} onChange={setRemotePort} placeholder="3000" disabled={disabled} /></label>
@@ -73,7 +80,7 @@ function MappingRow({ entry, service, connected, onOpen }: {
 }) {
   const busy = entry.status === 'starting' || entry.status === 'stopping';
   const running = entry.status === 'running';
-  const label = `${entry.remotePort} → ${entry.localPort}`;
+  const label = `${mappingAddress(entry)} → ${entry.localPort}`;
   const copy = async () => {
     try {
       await copyText(`127.0.0.1:${entry.localPort}`);

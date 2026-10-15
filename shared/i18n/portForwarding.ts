@@ -1,4 +1,9 @@
 export const portForwardingEnglish: Readonly<Record<string, string>> = {
+  '目标 IP': 'Target IP',
+  '通过远程电脑访问目标 IP 和端口。留空 IP 可访问远程电脑本机。':
+    'Access an IP and port through the remote computer. Leave the IP blank to access the remote computer itself.',
+  '请输入有效的 IPv4 或 IPv6 地址。': 'Enter a valid IPv4 or IPv6 address.',
+  '这个目标地址已有映射。': 'This target address already has a mapping.',
   '端口映射': 'Port mapping',
   '在 Remote AI 中预览': 'Preview in Remote AI',
   '端口映射设置': 'Port mapping settings',
@@ -50,6 +55,11 @@ export const portForwardingEnglish: Readonly<Record<string, string>> = {
 };
 
 export const portForwardingRussian: Readonly<Record<string, string>> = {
+  '目标 IP': 'Целевой IP',
+  '通过远程电脑访问目标 IP 和端口。留空 IP 可访问远程电脑本机。':
+    'Доступ к IP и порту через удалённый компьютер. Оставьте IP пустым для доступа к самому компьютеру.',
+  '请输入有效的 IPv4 或 IPv6 地址。': 'Введите корректный адрес IPv4 или IPv6.',
+  '这个目标地址已有映射。': 'Этот адрес уже добавлен.',
   '端口映射': 'Проброс портов',
   '在 Remote AI 中预览': 'Предпросмотр в Remote AI',
   '端口映射设置': 'Настройки проброса портов',

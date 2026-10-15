@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, InputNumber } from 'antd';
+import { Alert, Button, Input, InputNumber } from 'antd';
 import type { ForwardingClient, ForwardingEntry, PortForwardingService }
   from '../../../../../shared/port-mapping/service';
 import { MAX_PORT, MAX_PORT_MAPPINGS } from '../../../../../shared/port-mapping/settings';
+import { DEFAULT_MAPPING_HOST, mappingAddress, mappingOrigin } from '../../../../../shared/port-mapping/target';
 import { AdaptiveSheet } from '../../components/AdaptiveSheet';
 import { t } from '../../i18n';
 import { usePortMappings } from './usePortMappings';
@@ -20,12 +21,12 @@ export function PortMappings(props: {
   const [preview, setPreview] = useState<string>();
   const selected = entries.find(entry => entry.id === preview && entry.status === 'running');
   useEffect(() => { if (!props.active || !selected) setPreview(undefined); }, [props.active, selected]);
-  const tunnel = selected && tunnels.get(selected.localPort);
+  const tunnel = selected && tunnels.get(selected.id);
   return <>
     <AdaptiveSheet open={props.active && props.open && !selected} title={t('端口映射')}
       subtitle={props.deviceName} width={400} onClose={props.close}>
       <section className="port-mappings" aria-label={t('端口映射设置')}>
-        <p>{t('添加远程端口，点击地址即可在此预览网页。')}</p>
+        <p>{t('通过远程电脑访问目标 IP 和端口。留空 IP 可访问远程电脑本机。')}</p>
         {!props.connected && <Alert type="info" message={t('连接已断开，重新连接后可再次启动。')} />}
         {!entries.length && <p>{t('还没有端口映射')}</p>}
         {entries.map(entry => <MappingRow key={entry.id} entry={entry} service={service}
@@ -34,20 +35,24 @@ export function PortMappings(props: {
         <p>{t('网页映射仅在当前页面中使用。关闭页面或切换电脑后会停止。')}</p>
       </section>
     </AdaptiveSheet>
-    {selected && tunnel && props.active && <MappingPreview key={selected.id} port={selected.remotePort}
+    {selected && tunnel && props.active && <MappingPreview key={selected.id} origin={mappingOrigin(selected)}
       tunnel={tunnel} close={() => setPreview(undefined)} />}
   </>;
 }
 
 function MappingForm({ service, disabled }: { service: PortForwardingService; disabled: boolean }) {
+  const [remoteHost, setRemoteHost] = useState('');
   const [port, setPort] = useState<number | null>(null);
   const [error, setError] = useState('');
   return <form className="port-mapping-form" onSubmit={event => {
     event.preventDefault();
     if (disabled) return;
-    try { service.add(port ?? 0, port ?? 0); setPort(null); setError(''); }
+    try { service.add(port ?? 0, port ?? 0, remoteHost); setRemoteHost(''); setPort(null); setError(''); }
     catch (reason) { setError(reason instanceof Error ? reason.message : '端口映射未能添加，请重试。'); }
   }}>
+    <label>{t('目标 IP')}<Input aria-label={t('目标 IP')} value={remoteHost}
+      onChange={event => setRemoteHost(event.target.value)} placeholder={DEFAULT_MAPPING_HOST} disabled={disabled}
+      autoComplete="off" spellCheck={false} /></label>
     <label>{t('远程端口')}<InputNumber aria-label={t('远程端口')} min={1} max={MAX_PORT}
       value={port} onChange={setPort} placeholder="3000" disabled={disabled} /></label>
     {error && <p role="alert">{t(error)}</p>}
@@ -60,10 +65,10 @@ function MappingRow({ entry, service, connected, preview }: {
 }) {
   const running = entry.status === 'running';
   const busy = entry.status === 'starting' || entry.status === 'stopping';
-  return <article aria-label={String(entry.remotePort)} className="port-mapping-row">
-    <div><strong>{t('远程端口')} {entry.remotePort}</strong><span role="status">{t(STATUS[entry.status])}</span></div>
+  return <article aria-label={mappingAddress(entry)} className="port-mapping-row">
+    <div><strong>{mappingAddress(entry)}</strong><span role="status">{t(STATUS[entry.status])}</span></div>
     <Button type="link" className="port-mapping-address" disabled={!running} onClick={preview}>
-      <span>http://127.0.0.1:{entry.remotePort}</span><span aria-hidden="true">›</span></Button>
+      <span>{mappingOrigin(entry)}</span><span aria-hidden="true">›</span></Button>
     <div>
       <Button disabled={!running} onClick={preview}>{t('在 Remote AI 中预览')}</Button>
       <Button disabled={entry.status === 'stopping' || (!connected && !running && !busy)}

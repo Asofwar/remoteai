@@ -17,8 +17,11 @@ setGuiLanguage('zh');
 const listeners = new Map<string, () => void>();
 const resources = new Set<string>();
 const openedPorts = new Set<number>();
+const targetUrls: string[] = [];
 const client: ForwardingClient = {
-  openResource: async () => { const id = crypto.randomUUID(); resources.add(id); return id; },
+  openResource: async url => {
+    targetUrls.push(url); const id = crypto.randomUUID(); resources.add(id); return id;
+  },
   closeResource: async id => { resources.delete(id); },
   link: async (_id, request) => request.type === 'connect'
     ? { type: 'socket', id: crypto.randomUUID() } : { type: 'done' },
@@ -27,7 +30,8 @@ const clipboard: string[] = [];
 const browserUrls: string[] = [];
 const previewUrls: string[] = [];
 const resolvedUrls: string[] = [];
-const fixture = { resources, openedPorts, clipboard, browserUrls, previewUrls, resolvedUrls, failBrowser: false };
+const fixture = { resources, openedPorts, targetUrls, clipboard, browserUrls, previewUrls,
+  resolvedUrls, failBrowser: false };
 websitePreviewApi.sync = async request => { previewUrls.push(request.url); };
 websitePreviewApi.close = async () => {};
 const environment: FileEnvironment = { remote: true, actions: fileApi, previews: filePreviewApi,

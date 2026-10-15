@@ -7,8 +7,9 @@ import { mappingUrl } from '../../../../../shared/port-mapping/http';
 import type { WebMappingTunnel } from './httpTunnel';
 import { attachPreview, PREVIEW_DOCUMENT } from './previewBridge';
 
-export function MappingPreview({ tunnel, port, close }: { tunnel: WebMappingTunnel; port: number; close: () => void }) {
-  const origin = `http://127.0.0.1:${port}`;
+export function MappingPreview({ tunnel, origin, close }: {
+  tunnel: WebMappingTunnel; origin: string; close: () => void;
+}) {
   const [input, setInput] = useState<MappingHttpRequest>({ url: origin + '/' });
   const [path, setPath] = useState('/');
   const [history, setHistory] = useState<MappingHttpRequest[]>([]);

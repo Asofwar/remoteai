@@ -4,6 +4,7 @@ import * as Clipboard from 'expo-clipboard';
 import type { ForwardingClient, ForwardingEntry, PortForwardingService }
   from '../../../../../shared/port-mapping/service';
 import { MAX_PORT_MAPPINGS } from '../../../../../shared/port-mapping/settings';
+import { DEFAULT_MAPPING_HOST, mappingAddress } from '../../../../../shared/port-mapping/target';
 import { BottomSheet } from '../../components/BottomSheet';
 import { SheetScrollView } from '../../components/SheetScrollView';
 import { t } from '../../i18n';
@@ -36,6 +37,7 @@ export function PortMappings(props: {
       {selected ? <MappingOpenActions key={selected.id} port={selected.localPort}
         preview={() => setSelection({ id: selected.id, view: 'preview' })} opened={closeActions} /> :
       <SheetScrollView contentContainerStyle={{ gap: 12 }} keyboardShouldPersistTaps="handled">
+        <Text style={styles.subtitle}>{t('通过远程电脑访问目标 IP 和端口。留空 IP 可访问远程电脑本机。')}</Text>
         <Text style={styles.subtitle}>{t('映射启动后，点击地址可选择应用内预览或浏览器打开。')}</Text>
         {!props.connected && <Text style={styles.subtitle}>{t('连接已断开，重新连接后可再次启动。')}</Text>}
         {!entries.length && <Text style={styles.subtitle}>{t('还没有端口映射')}</Text>}
@@ -54,16 +56,23 @@ export function PortMappings(props: {
 
 function MappingForm({ service, disabled }: { service: PortForwardingService; disabled: boolean }) {
   const styles = useStyles();
+  const [remoteHost, setRemoteHost] = useState('');
   const [remote, setRemote] = useState('');
   const [local, setLocal] = useState('');
   const [error, setError] = useState('');
   const add = () => {
+    if (disabled) return;
     try {
-      service.add(Number(remote), Number(local || remote));
-      setRemote(''); setLocal(''); setError('');
+      service.add(Number(remote), Number(local || remote), remoteHost);
+      setRemoteHost(''); setRemote(''); setLocal(''); setError('');
     } catch (reason) { setError(reason instanceof Error ? reason.message : '端口映射未能添加，请重试。'); }
   };
   return <View style={{ gap: 10 }}>
+    <View><Text style={styles.subtitle}>{t('目标 IP')}</Text>
+      <TextInput accessibilityLabel={t('目标 IP')} value={remoteHost} onChangeText={setRemoteHost}
+        autoCapitalize="none" autoCorrect={false} placeholder={DEFAULT_MAPPING_HOST}
+        style={styles.search} editable={!disabled} />
+    </View>
     <View style={styles.row}>
       <View style={styles.fill}><Text style={styles.subtitle}>{t('远程端口')}</Text>
         <TextInput accessibilityLabel={t('远程端口')} value={remote} onChangeText={setRemote}
@@ -95,7 +104,7 @@ function MappingRow({ entry, service, connected, open }: {
   };
   return <View style={styles.card}>
     <View style={styles.row}>
-      <Text style={[styles.title, { flex: 1 }]}>{entry.remotePort} → {entry.localPort}</Text>
+      <Text style={[styles.title, { flex: 1 }]}>{mappingAddress(entry)} → {entry.localPort}</Text>
       <Text style={styles.subtitle}>{t(STATUS[entry.status])}</Text>
       <Pressable accessibilityRole="button" accessibilityLabel={t('删除映射')}
         style={[styles.button, { paddingHorizontal: 10 }]} disabled={entry.status === 'stopping'}

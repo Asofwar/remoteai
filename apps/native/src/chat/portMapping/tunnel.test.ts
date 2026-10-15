@@ -22,9 +22,9 @@ const buffers = new Map<string, Buffer[]>();
 const reads = new Map<string, () => void>();
 let sequence = 0;
 
-async function listen(server: net.Server) {
+async function listen(server: net.Server, host = '127.0.0.1') {
   listeners.push(server);
-  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  await new Promise<void>(resolve => server.listen(0, host, resolve));
   return (server.address() as net.AddressInfo).port;
 }
 async function unusedPort() {
@@ -35,7 +35,8 @@ const client: ForwardingClient = {
   openResource: async () => 'resource', closeResource: async () => undefined,
   link: async (_resource, request): Promise<TerminalLinkReply> => {
     if (request.type === 'connect') {
-      const socket = net.connect(Number(new URL(request.url).port), '127.0.0.1');
+      const target = new URL(request.url);
+      const socket = net.connect(Number(target.port), target.hostname.replace(/[\[\]]/g, ''));
       const id = String(++sequence); remoteSockets.set(id, socket); buffers.set(id, []);
       socket.on('data', data => { buffers.get(id)!.push(Buffer.from(data)); reads.get(id)?.(); });
       socket.on('close', () => reads.get(id)?.());
@@ -78,6 +79,13 @@ it('forwards real HTTP bytes, releases its background lease, and reuses the same
   await first.close(); expect(background.release).toHaveBeenCalled();
   const second = tunnel(local); await second.resolve('resource', `http://127.0.0.1:${remote}`);
   expect(await (await fetch(`http://127.0.0.1:${local}`)).text()).toBe('mobile mapping');
+});
+
+it('forwards an IPv6 target through the phone IPv4 listener', async () => {
+  const remote = await listen(http.createServer((_request, response) => response.end('IPv6 target')), '::1');
+  const local = await unusedPort();
+  await tunnel(local).resolve('resource', `http://[::1]:${remote}`);
+  expect(await (await fetch(`http://127.0.0.1:${local}`)).text()).toBe('IPv6 target');
 });
 
 it('rejects an occupied local port without disturbing the existing service', async () => {

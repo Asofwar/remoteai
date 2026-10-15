@@ -23,11 +23,11 @@ export function concatBytes(left: Uint8Array, right: Uint8Array): Uint8Array {
   return result;
 }
 
-/** Preview requests can only address the selected loopback service, including its localhost alias. */
+/** Preview requests stay on the selected IP and port; localhost is an alias only for IPv4 loopback. */
 export function mappingUrl(value: string, origin: string): URL {
   const url = new URL(value, origin);
   const target = new URL(origin);
-  if (url.hostname === 'localhost') url.hostname = '127.0.0.1';
+  if (url.hostname === 'localhost' && target.hostname === '127.0.0.1') url.hostname = '127.0.0.1';
   if (url.origin !== target.origin || url.username || url.password) throw new Error('Preview origin rejected');
   return url;
 }

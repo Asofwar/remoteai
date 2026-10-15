@@ -1,9 +1,14 @@
 # Remote port mapping
 
 In a remote computer's desktop chat workspace, **端口映射** appears immediately to the left of
-**远程桌面**. Add a remote port and a local port, then choose **添加并启动**. Leaving the local port blank
+**远程桌面**. Enter a **目标 IP**, remote port and local port, then choose **添加并启动**.
+The IP is reached from the remote computer; leaving it blank uses `127.0.0.1` on that computer.
+Both IPv4 and IPv6 literals are supported (IPv6 may be entered with or without brackets).
+Leaving the local port blank
 uses the remote port number. For example, remote port `3000` and local port `13000` make the remote
 service available at `127.0.0.1:13000` on the viewing computer.
+For a LAN service, target IP `192.168.1.20`, remote port `3000` and local port `13000` make
+`192.168.1.20:3000`, as reached by the remote computer, available at the same local address.
 
 Click a running mapping's local address to choose **在 Remote AI 中预览** or **在浏览器中打开**.
 Both actions open `http://127.0.0.1:<local port>` through the existing mapping. The preview uses the
@@ -17,13 +22,15 @@ On mobile and Web, switching computers stops the previous computer's mappings. D
 releases listeners and remote resources; saved mappings require a manual start after reconnection
 or application restart. A local port already used by another process or mapping cannot be reused.
 
-This feature supports TCP services listening on the remote computer's IPv4 loopback interface.
+This feature supports TCP services at IP addresses reachable from the remote computer.
 The viewer binds only `127.0.0.1`; it does not expose mapped ports to other devices. UDP and custom
-remote host addresses are outside the current scope.
+DNS hostnames are outside the current scope. Enter an IP only, without a URL scheme or port;
+unspecified addresses (`0.0.0.0` and `::`) are not connection targets. Older saved mappings keep
+their original `127.0.0.1` destination.
 
 ## Phone app
 
-Open **工具 → 端口映射**. Add a remote port and an optional local port. The phone binds only its own
+Open **工具 → 端口映射**. Add a target IP, remote port and an optional local port. The phone binds only its own
 `127.0.0.1`; tapping a running address or its **打开** label shows **在 Remote AI 中预览** and
 **在浏览器中打开**. Either option can be chosen directly from the mapping list. The in-app preview
 uses an isolated WebView with back, refresh and browser controls. Stopping a mapping releases its listener and connections.
@@ -40,14 +47,15 @@ suspend the app in the background. The UI recommends the in-app preview for this
 
 ## Web preview
 
-Web exposes **工具 → 端口映射**, with add, start, stop and remove actions. It accepts a remote HTTP port;
-the displayed address identifies the service on that computer. Clicking it opens the internal preview.
+Web exposes **工具 → 端口映射**, with add, start, stop and remove actions. It accepts a target IP and HTTP port;
+the displayed address identifies the service reached from that computer. Clicking it opens the internal preview.
+Different IPs can use the same port and remain independent, including after saved settings are restored.
 Web does not bind a local TCP port or present a browser-open/copy action that would target the viewer's machine.
 
 The preview uses the authenticated resource protocol to fetch HTTP/1 responses and a bounded resource
 graph, including styles, images, JavaScript modules, fetch/XHR calls and WebSocket connections. HTTP
 headers, content-length and chunked framing are parsed without sending the host page's cookies.
-Navigation, refresh and URL-encoded form submissions remain scoped to the mapped loopback origin.
+Navigation, refresh and URL-encoded form submissions remain scoped to the selected IP and port.
 The sandbox has an opaque origin, no access to account storage, and a CSP that blocks direct network
 requests; a private MessageChannel provides only the selected mapping's operations.
 

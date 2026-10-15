@@ -70,7 +70,7 @@ describe("automatic app updates", () => {
     const { backend } = await loadApp();
     const progress = vi.fn();
     await backend.downloadAvailableUpdate(progress);
-    expect(progress.mock.calls.map(([value]) => value)).toEqual([0, 60, 0, 20, 100]);
+    expect(progress.mock.calls.map(([value]) => value)).toEqual([null, 0, 60, 0, 20, 100]);
   });
 
   it("refuses a remote install when the downloaded version differs from the confirmation", async () => {
@@ -97,6 +97,7 @@ describe("automatic app updates", () => {
     const second = backend.downloadAvailableUpdate(secondProgress);
     expect(secondProgress).toHaveBeenLastCalledWith(50, {
       percent: 50, downloadedBytes: 512, totalBytes: 1_024, bytesPerSecond: 0,
+      phase: "downloading", elapsedSeconds: 0,
     });
     send({ event: "Finished" });
     downloading.resolve(undefined);

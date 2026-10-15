@@ -17,6 +17,21 @@
   > span { max-width: 400px; }
 }
 
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.spinner {
+  flex-shrink: 0;
+  animation: spinning 1s linear infinite;
+}
+
+@keyframes spinning {
+  to { transform: rotate(360deg); }
+}
+
 .heading {
   color: var(--ink);
 
@@ -56,5 +71,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .fill { transition: none; }
-  .indeterminate { animation: none; }
+  .indeterminate,
+  .spinner { animation: none; }
 }

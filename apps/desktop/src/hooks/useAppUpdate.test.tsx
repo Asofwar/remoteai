@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { checkForUpdate, downloadAvailableUpdate, installDownloadedUpdate } from "../api/backend";
 import { AppUpdateCheckTimeoutError } from "../api/appUpdateErrors";
+import type { AppUpdateDownloadProgress } from "../api/appUpdateProgress";
 import type { Translate } from "../i18n";
 import type { UpdateInfo } from "../types";
 import { useAppUpdate } from "./useAppUpdate";
@@ -88,7 +89,10 @@ it("installs the downloaded release when the fresh check returns the same versio
 
 it("keeps live download details when the prompt is closed and reopened", async () => {
   const downloading = deferred<void>();
-  const details = { percent: 41, downloadedBytes: 41_000, totalBytes: 100_000, bytesPerSecond: 2_048 };
+  const details: AppUpdateDownloadProgress = {
+    percent: 41, downloadedBytes: 41_000, totalBytes: 100_000, bytesPerSecond: 2_048,
+    phase: "downloading", elapsedSeconds: 20,
+  };
   vi.mocked(downloadAvailableUpdate).mockImplementationOnce((report) => {
     report?.(details.percent, details);
     return downloading.promise;

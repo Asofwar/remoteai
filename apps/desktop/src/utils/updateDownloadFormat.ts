@@ -10,3 +10,8 @@ export function formatUpdateDownloadBytes(bytes: number): string {
   }
   return `${size.toFixed(2)} ${DOWNLOAD_SIZE_UNITS[unit]}`;
 }
+
+export function formatUpdateDownloadTime(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
+}

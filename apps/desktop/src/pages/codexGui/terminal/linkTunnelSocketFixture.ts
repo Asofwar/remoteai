@@ -1,5 +1,6 @@
 import net from 'node:net';
 import type { TerminalLinkReply, TerminalLinkRequest } from '../../../../../../shared/terminal/links';
+import { LINK_CHUNK_BYTES } from '../../../../../../shared/terminal/linkChunks';
 
 type Request = TerminalLinkRequest | { type: 'listen'; port?: number }
   | { type: 'accept'; scope: string } | { type: 'stop'; scope: string };
@@ -7,6 +8,7 @@ interface SocketState { socket: net.Socket; chunks: Buffer[]; ended: boolean; wa
 
 /** Real loopback sockets behind the same byte-oriented interface as the native commands. */
 export class LinkSocketFixture {
+  constructor(private readonly chunkBytes = LINK_CHUNK_BYTES) {}
   private sequence = 0;
   private listener?: net.Server;
   private readonly sockets = new Map<string, SocketState>();
@@ -31,12 +33,19 @@ export class LinkSocketFixture {
     const state = this.sockets.get(request.id)!;
     if (request.type === 'close') { state?.socket.destroy(); return { type: 'done' }; }
     if (request.type === 'write') {
+      if (Buffer.byteLength(request.data, 'base64') > LINK_CHUNK_BYTES) {
+        throw new Error('Write too large');
+      }
       await new Promise<void>((resolve, reject) => state.socket.write(Buffer.from(request.data, 'base64'),
         error => error ? reject(error) : resolve()));
       return { type: 'done' };
     }
     if (!state.chunks.length && !state.ended) await new Promise<void>(resolve => { state.wake = resolve; });
-    return { type: 'data', data: Buffer.concat(state.chunks.splice(0)).toString('base64'), eof: state.ended };
+    const bytes = Buffer.concat(state.chunks.splice(0));
+    const limit = this.chunkBytes;
+    if (bytes.length > limit) state.chunks.push(bytes.subarray(limit));
+    return { type: 'data', data: bytes.subarray(0, limit).toString('base64'),
+      eof: state.ended && !state.chunks.length };
   };
 
   async close() {
@@ -47,6 +56,7 @@ export class LinkSocketFixture {
   }
 
   private register(socket: net.Socket) {
+    socket.setNoDelay(true);
     const id = String(++this.sequence);
     const state: SocketState = { socket, chunks: [], ended: false };
     socket.on('data', data => { state.chunks.push(data); state.wake?.(); state.wake = undefined; });

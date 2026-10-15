@@ -1,9 +1,9 @@
+import { LINK_CHUNK_BYTES } from '../../../../../shared/terminal/linkChunks';
 import { Buffer } from 'buffer';
 import type TcpSocket from 'react-native-tcp-socket';
 import type { ForwardingClient } from '../../../../../shared/port-mapping/service';
 
 type Socket = InstanceType<typeof TcpSocket.Socket>;
-const CHUNK_BYTES = 48 * 1024;
 const MAX_QUEUED_BYTES = 1024 * 1024;
 
 /** Preserve binary bytes and serialize writes; a slow peer must not accumulate unbounded data. */
@@ -58,10 +58,10 @@ function forwardLocalData({ socket, client, resource, opened, isClosed, close }:
     socket.pause();
     writes = writes.then(async () => {
       const id = await opened;
-      for (let offset = 0; offset < bytes.length && !isClosed(); offset += CHUNK_BYTES) {
+      for (let offset = 0; offset < bytes.length && !isClosed(); offset += LINK_CHUNK_BYTES) {
         await client.link(resource, { type: 'write', id,
           // React Native's Buffer.subarray returns Uint8Array, whose toString does not encode base64.
-          data: Buffer.from(bytes.subarray(offset, offset + CHUNK_BYTES)).toString('base64') });
+          data: Buffer.from(bytes.subarray(offset, offset + LINK_CHUNK_BYTES)).toString('base64') });
       }
       queued -= bytes.length;
       if (!isClosed() && queued === 0) socket.resume();

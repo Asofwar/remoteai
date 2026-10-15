@@ -1,5 +1,7 @@
 //! Byte streams for viewing a remote terminal's development server through its authenticated chat.
 #[cfg(test)]
+mod chunk_tests;
+#[cfg(test)]
 mod relay_tests;
 pub(crate) mod resources;
 mod sockets;

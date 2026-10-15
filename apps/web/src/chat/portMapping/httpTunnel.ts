@@ -1,3 +1,4 @@
+import { LINK_CHUNK_BYTES } from '../../../../../shared/terminal/linkChunks';
 import type { ForwardingClient } from '../../../../../shared/port-mapping/service';
 import type { MappingTunnel, MappingTunnelOptions } from '../../../../../shared/port-mapping/types';
 import { MappingWebSocket, type MappingSocketEvent } from '../../../../../shared/port-mapping/websocket';
@@ -5,7 +6,6 @@ import { decodeBase64, encodeBase64, httpRequest, HttpResponseReader, mappingUrl
   type MappingHttpRequest, type MappingHttpResponse } from '../../../../../shared/port-mapping/http';
 
 const REQUEST_TIMEOUT_MS = 30_000;
-const WRITE_CHUNK_BYTES = 48 * 1024;
 
 /** A browser mapping owns authenticated remote sockets; it never presents a fake local listener. */
 export class WebMappingTunnel implements MappingTunnel {
@@ -78,10 +78,10 @@ export class WebMappingTunnel implements MappingTunnel {
       if (opened.type !== 'socket') throw new Error('Unexpected socket response');
       id = opened.id;
       signal.throwIfAborted();
-      for (let offset = 0; offset < request.length; offset += WRITE_CHUNK_BYTES) {
+      for (let offset = 0; offset < request.length; offset += LINK_CHUNK_BYTES) {
         signal.throwIfAborted();
         await this.client.link(this.resource, { type: 'write', id,
-          data: encodeBase64(request.subarray(offset, offset + WRITE_CHUNK_BYTES)) });
+          data: encodeBase64(request.subarray(offset, offset + LINK_CHUNK_BYTES)) });
       }
       return await this.read({ id, input, signal });
     } finally { signal.removeEventListener('abort', close); close(); }

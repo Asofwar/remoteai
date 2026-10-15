@@ -6,6 +6,7 @@ import { createGuiFilesClient } from '../../../../../../shared/remote-chat/files
 import type { RpcMessage } from '../../../../../../shared/remote-chat/protocol';
 import type { TerminalLinkReply, TerminalLinkRequest } from '../../../../../../shared/terminal/links';
 import { PortForwardingService } from './service';
+import { LINK_CHUNK_BYTES } from '../../../../../../shared/terminal/linkChunks';
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 type Reply = (reply: TerminalLinkReply) => void;
@@ -62,7 +63,7 @@ function localFixture() {
 
 afterEach(() => { vi.clearAllMocks(); vi.useRealTimers(); });
 
-it('keeps two mapped byte streams alive as the existing encrypted connection switches from P2P to relay', async () => {
+it.each([8, LINK_CHUNK_BYTES])('keeps mapped bytes on P2P and relay (payload size %s)', async size => {
   vi.useFakeTimers();
   const local = localFixture();
   const transport = transportFixture();
@@ -79,7 +80,7 @@ it('keeps two mapped byte streams alive as the existing encrypted connection swi
       if (mode === 'relay') { transport.harness.paths.direct = false; await vi.advanceTimersByTimeAsync(4500); }
       expect(transport.harness.links.phone.connectionMode).toBe(mode);
       const start = transport.harness.packets.length;
-      const bytes = btoa(`\0\xff${mode}`);
+      const bytes = btoa(`\0\xff${mode}`.padEnd(size, 'x'));
       for (const id of ['browser', 'database']) local.reads.get(id)!({ type: 'data', data: bytes, eof: false });
       await vi.advanceTimersByTimeAsync(100);
       for (const id of ['browser', 'database']) expect(local.received.get(id)?.at(-1)).toBe(bytes);

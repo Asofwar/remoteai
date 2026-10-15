@@ -20,7 +20,7 @@ use tokio::{
 
 const MAX_SOCKETS: usize = 64;
 const MAX_LISTENERS: usize = 16;
-const CHUNK_BYTES: usize = 48 * 1024;
+const CHUNK_BYTES: usize = 384 * 1024;
 const READ_WAIT: Duration = Duration::from_secs(10);
 const IDLE_TIMEOUT: Duration = Duration::from_secs(90);
 
@@ -273,10 +273,25 @@ async fn read(socket: Arc<Socket>) -> Result<LinkReply> {
         Ok(Err(_)) => return Err(LinkError::Network),
         Ok(Ok(count)) => count,
     };
+    let count = drain_available(&reader, &mut buffer, count);
     Ok(LinkReply::Data {
         data: STANDARD.encode(&buffer[..count]),
         eof: count == 0,
     })
+}
+
+fn drain_available(reader: &OwnedReadHalf, buffer: &mut [u8], mut count: usize) -> usize {
+    // Drain only bytes already available. Waiting to fill a larger chunk delays small HTTP replies and WebSockets.
+    while count > 0 && count < buffer.len() {
+        match reader.try_read(&mut buffer[count..]) {
+            Ok(0) => break,
+            Ok(bytes) => count += bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => break,
+            // Deliver the bytes already read before surfacing a reset on the following request.
+            Err(_) => break,
+        }
+    }
+    count
 }
 
 async fn write(socket: Arc<Socket>, data: &str) -> Result<LinkReply> {

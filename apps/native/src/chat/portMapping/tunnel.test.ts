@@ -5,6 +5,7 @@ import { NativeMappingTunnel } from './tunnel';
 import type { ForwardingClient } from '../../../../../shared/port-mapping/service';
 import type { TerminalLinkReply } from '../../../../../shared/terminal/links';
 import { StreamBudget } from '../../../../../shared/port-mapping/streamBudget';
+import { LINK_CHUNK_BYTES } from '../../../../../shared/terminal/linkChunks';
 
 vi.mock('react-native-tcp-socket', () => ({ default: net }));
 vi.mock('buffer', async () => {
@@ -44,6 +45,7 @@ const client: ForwardingClient = {
     const socket = remoteSockets.get(request.id)!;
     if (request.type === 'close') { socket?.destroy(); return { type: 'done' }; }
     if (request.type === 'write') {
+      expect(Buffer.byteLength(request.data, 'base64')).toBeLessThanOrEqual(LINK_CHUNK_BYTES);
       await new Promise<void>((resolve, reject) => socket.write(Buffer.from(request.data, 'base64'),
         error => error ? reject(error) : resolve()));
       return { type: 'done' };
@@ -51,8 +53,10 @@ const client: ForwardingClient = {
     if (!buffers.get(request.id)?.length && !socket.destroyed) {
       await new Promise<void>(resolve => reads.set(request.id, resolve)); reads.delete(request.id);
     }
-    return { type: 'data', data: Buffer.concat(buffers.get(request.id)!.splice(0)).toString('base64'),
-      eof: socket.destroyed };
+    const bytes = Buffer.concat(buffers.get(request.id)!.splice(0));
+    if (bytes.length > LINK_CHUNK_BYTES) buffers.get(request.id)!.push(bytes.subarray(LINK_CHUNK_BYTES));
+    return { type: 'data', data: bytes.subarray(0, LINK_CHUNK_BYTES).toString('base64'),
+      eof: socket.destroyed && !buffers.get(request.id)!.length };
   },
 };
 function tunnel(port: number, budget = new StreamBudget()) {
@@ -87,7 +91,8 @@ it('preserves binary bytes and buffers queued connections until the shared budge
   const remote = await listen(net.createServer(socket => socket.pipe(socket)));
   const local = await unusedPort(); const budget = new StreamBudget(1);
   await tunnel(local, budget).resolve('resource', `http://127.0.0.1:${remote}`);
-  const input = Buffer.alloc(150_000); for (let index = 0; index < input.length; index++) input[index] = index % 256;
+  const input = Buffer.alloc(LINK_CHUNK_BYTES * 2 + 1);
+  for (let index = 0; index < input.length; index++) input[index] = index % 256;
   const socket = net.connect(local, '127.0.0.1');
   await new Promise<void>(resolve => socket.once('connect', resolve));
   const received = new Promise<Buffer>(resolve => {

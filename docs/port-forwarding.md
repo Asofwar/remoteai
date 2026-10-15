@@ -74,6 +74,13 @@ Native sockets pause while waiting to preserve their initial request bytes. Web 
 use the same admission queue. Stopping a mapping cancels its queued connections without affecting other mappings.
 A failed listener or disconnected session requires restarting its mapping.
 
+Desktop, native and Web use a uniform 384 KiB read/write bound instead of paying a remote round trip for
+every 48 KiB. The host returns as soon as data is available and drains only immediately readable bytes;
+small replies and WebSockets never
+wait for the larger buffer to fill. There is no older-version negotiation or fallback: update both the
+viewing app and the remote host together. Stream admission, RPC single-flight ordering and retry
+deduplication remain unchanged.
+
 ## Verification
 
 - Rust `gui_terminal::links` tests cover fixed-port conflicts and reuse, cancellation, independent
@@ -84,6 +91,10 @@ A failed listener or disconnected session requires restarting its mapping.
   while switching from P2P to Relay without restarting either mapping.
 - `terminal/linkTunnelConcurrency.test.ts` transfers 24 concurrent HTTP responses over real loopback sockets
   while keeping an upgraded connection and chat RPC available, and checks cancellation and immediate port reuse.
+- `terminal/linkTunnelLatency.test.ts` compares 48/384 KiB read sizes with a 1.5 MiB HTTP asset and 60 ms simulated
+  RPC RTT: 33 reads / about 2.3 s versus 5 reads / about 0.45 s. This measures tunnel overhead, not a live site's load time.
+  Rust chunk tests verify immediate small responses, large binary transfers and size validation;
+  transport tests carry the larger chunks through encryption and P2P/Relay switching.
 - `portForwarding/streamBudget.test.ts` covers FIFO admission, cancellation, bounded waiting and slot reuse.
 - `e2e/port-forwarding.pw.ts` covers form actions, preview/browser opening, copying, errors, reconnects, device switching,
   persistence and compact light/dark layouts; `e2e/remote-gui.pw.ts` verifies the real workspace entry.

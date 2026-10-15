@@ -1,3 +1,4 @@
+import { LINK_CHUNK_BYTES } from '../terminal/linkChunks';
 import { concatBytes, decodeBase64, encodeBase64, mappingUrl } from './http';
 import type { ForwardingClient } from './service';
 
@@ -114,10 +115,10 @@ export class MappingWebSocket {
     this.queued += bytes.length;
     if (this.queued > MAX_FRAME_BYTES) { this.close(); return Promise.reject(new Error('Socket queue full')); }
     this.writes = this.writes.then(async () => {
-      for (let offset = 0; offset < bytes.length; offset += 48 * 1024) {
+      for (let offset = 0; offset < bytes.length; offset += LINK_CHUNK_BYTES) {
         if (this.closed || !this.id) throw new Error('Socket closed');
         await this.options.client.link(this.options.resource, { type: 'write', id: this.id,
-          data: encodeBase64(bytes.subarray(offset, offset + 48 * 1024)) });
+          data: encodeBase64(bytes.subarray(offset, offset + LINK_CHUNK_BYTES)) });
       }
       this.queued -= bytes.length;
     });

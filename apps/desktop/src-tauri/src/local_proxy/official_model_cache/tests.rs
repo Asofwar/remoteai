@@ -3,6 +3,8 @@ use std::{cell::Cell, io::Cursor, thread};
 
 #[path = "deadline_tests.rs"]
 mod deadline_tests;
+#[path = "fallback_tests.rs"]
+mod fallback_tests;
 
 const CATALOG: &[u8] = br#"{"models":[{"slug":"gpt-test","context_window":123456,
     "input_modalities":["text","image"],"supported_reasoning_levels":[{"effort":"high"}]}],"extra":true}"#;
@@ -104,6 +106,7 @@ fn unsuccessful_empty_and_invalid_official_catalogs_fall_back_to_admin_once() {
     for (status, body) in [
         (401, "unauthorized"),
         (429, "rate limited"),
+        (502, "bad gateway"),
         (503, "unavailable"),
         (304, ""),
         (200, "{\"models\":[]}"),
@@ -164,7 +167,7 @@ fn unreadable_and_oversized_official_bodies_fall_back_to_admin() {
 }
 
 #[test]
-fn failed_or_invalid_admin_fallback_preserves_official_failure() {
+fn failed_or_invalid_admin_fallback_reports_model_discovery_failure() {
     for (status, body) in [
         (503, "unavailable"),
         (404, "missing"),
@@ -179,7 +182,7 @@ fn failed_or_invalid_admin_fallback_preserves_official_failure() {
             || Err("official unavailable".into()),
             || request_catalog(&client, url),
         );
-        assert_eq!(result.err().as_deref(), Some("official unavailable"));
+        assert_eq!(result.err().as_deref(), Some(UNAVAILABLE_MESSAGE));
         task.join().unwrap();
     }
 }
@@ -202,7 +205,7 @@ fn validates_addresses_and_rejects_duplicate_or_oversized_catalogs() {
 }
 
 #[test]
-fn admin_transport_failure_preserves_official_failure() {
+fn admin_transport_failure_reports_model_discovery_failure() {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let url = catalog_url(&format!("http://{}", listener.local_addr().unwrap())).unwrap();
     drop(listener);
@@ -211,5 +214,5 @@ fn admin_transport_failure_preserves_official_failure() {
         || Err("official unavailable".into()),
         || request_catalog(&client, url),
     );
-    assert_eq!(result.err().as_deref(), Some("official unavailable"));
+    assert_eq!(result.err().as_deref(), Some(UNAVAILABLE_MESSAGE));
 }

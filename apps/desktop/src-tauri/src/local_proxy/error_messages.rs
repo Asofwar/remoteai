@@ -98,6 +98,7 @@ pub(super) fn gui(error: &str) -> &str {
     // Only fixed, user-safe account messages may bypass the fallback. Internal errors can
     // contain filesystem paths or credentials and belong in the sanitized diagnostics.
     match error {
+        super::official_model_cache::UNAVAILABLE_MESSAGE => error,
         "请先选择 Codex GUI 账户。"
         | "暂时无法读取 Codex GUI 账户，请稍后重试。"
         | "此账户已不可用，请重新选择。"

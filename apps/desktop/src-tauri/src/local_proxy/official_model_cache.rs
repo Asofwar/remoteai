@@ -3,11 +3,12 @@ use super::{UpstreamBody, UpstreamPayload};
 use std::{collections::HashSet, io::Read, time::Duration};
 
 use reqwest::{blocking::Client, Url};
-use serde_json::Value;
+use serde_json::{json, Value};
 use tauri::{AppHandle, Runtime};
 
 const CACHE_TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_CATALOG_BYTES: u64 = 2 * 1024 * 1024;
+pub(super) const UNAVAILABLE_MESSAGE: &str = "模型列表暂时无法获取，请稍后重试。";
 
 #[derive(Debug, thiserror::Error)]
 enum CatalogError {
@@ -53,12 +54,35 @@ fn prefer_official(
     };
     match official {
         Ok(payload) => Ok(payload),
+        Err(error) => fallback_to_admin(&error, admin),
+    }
+}
+
+fn fallback_to_admin(
+    official_error: &str,
+    admin: impl FnOnce() -> Result<UpstreamPayload, CatalogError>,
+) -> Result<UpstreamPayload, String> {
+    let error = crate::error_logs::sanitize_diagnostic_message(official_error);
+    super::diagnostic_event(
+        json!({ "event": "model_catalog_admin_fallback_started", "officialError": error }),
+    );
+    eprintln!("Official model catalog failed: {error}; fetching models from Admin");
+    match admin() {
+        Ok(payload) => {
+            super::diagnostic_event(json!({
+                "event": "model_catalog_admin_fallback_succeeded", "status": payload.status
+            }));
+            Ok(payload)
+        }
         Err(error) => {
-            eprintln!("Official model catalog failed: {error}; fetching models from Admin");
-            admin().map_err(|admin_error| {
-                eprintln!("Admin model catalog fallback failed: {admin_error}");
-                error
-            })
+            super::diagnostic_event(json!({
+                "event": "model_catalog_admin_fallback_failed",
+                "error": crate::error_logs::sanitize_diagnostic_message(&error.to_string()),
+                "causes": super::diagnostic_error_causes(&error)
+            }));
+            eprintln!("Admin model catalog fallback failed: {error}");
+            // Both sources failed. Returning only the official error hides the failed fallback.
+            Err(UNAVAILABLE_MESSAGE.to_owned())
         }
     }
 }

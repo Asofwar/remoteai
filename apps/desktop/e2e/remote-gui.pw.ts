@@ -10,6 +10,7 @@ import './chat-harness-types';
 import { checkGitDiffReview } from './git-diff-checks';
 import { checkRemoteFileDrop } from './file-drop-checks';
 import { checkThreadSidebarResize } from './thread-sidebar-resize';
+import { checkRemoteTiming } from './remote-timing-checks';
 
 declare global { interface Window { desktopTest: typeof desktopTest } }
 
@@ -110,6 +111,9 @@ async function accountSummaryRows(page: Page) {
 }
 
 for (const blocked of [false, true]) {
+  test(`corrects remote conversation timing over ${blocked ? 'Relay' : 'P2P'}`, async ({ context, page }) => {
+    await checkRemoteTiming({ context, page, endpoint, blocked });
+  });
   test(`@ references the selected computer over ${blocked ? 'Relay' : 'P2P'}`, async ({ context, page }) => {
     test.setTimeout(90_000);
     const office = await context.newPage();

@@ -28,7 +28,9 @@ function mergeTurn(snapshot: Turn, live: Turn, before?: Turn, authoritative = fa
   }
   const terminal = live.status !== 'inProgress' ? live.status : snapshot.status;
   const order = mergeItemOrder(snapshotItems, liveItems.filter(item => items.has(item.id)));
-  return { ...snapshot, ...live, status: terminal, items: order.map(id => items.get(id)!) };
+  // Live events can carry an estimated start; the PC snapshot corrects it once timing is available.
+  return { ...snapshot, ...live, startedAt: snapshot.startedAt ?? live.startedAt,
+    status: terminal, items: order.map(id => items.get(id)!) };
 }
 
 /** A settled PC snapshot retires missing running turns, except events received during the read. */

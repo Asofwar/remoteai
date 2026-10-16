@@ -339,7 +339,7 @@ fn dispatch_extended_command(app: AppHandle, command: &str, args: Value) -> Resu
             app,
             argument(&args, "id")?,
         ))),
-        "delete_account" => serialize(crate::commands::delete_account(app, argument(&args, "id")?)),
+        "delete_account" => serialize(block_on(crate::commands::delete_account(app, argument(&args, "id")?))),
         "update_account_note" => serialize(block_on(crate::commands::update_account_note(
             app,
             argument(&args, "input")?,

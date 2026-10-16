@@ -27,6 +27,7 @@ import { findProviderPreset } from "../utils/providerCatalog";
 import { loadStoredModelTokenCosts, persistStoredModelTokenCosts } from "../pages/providers/providerUtils";
 import { retainedRequestOptions } from "../pages/providers/providerRequestOptions";
 import { copyFailoverPolicy, validFailoverPolicy } from "../pages/providers/AggregateApiManager/failoverPolicy";
+import { buildAggregateMembers } from "../utils/aggregateMembers";
 import { estimateTokenCost } from "../utils/tokenCost";
 import { summarizeProxyRequests } from "../utils/proxyConversationMetrics";
 import type { AccountQuotaHistory, DailyTokenUsageBreakdown } from "../types/tokenUsageAnalytics";
@@ -829,7 +830,8 @@ export async function loadAggregateApis(): Promise<AggregateApi[]> {
 
 export async function saveAggregateApiProfile(input: AggregateApiInput): Promise<AggregateApi> {
   if (!hasLocalBackend) {
-    const providers = readPreviewProviders();
+    const providers = buildAggregateMembers({ providers: readPreviewProviders(), accounts: DEMO_ACCOUNTS,
+      officialModels: [], officialLabel: "Official", privacyMode: false });
     const memberIds = [...new Set(input.memberProviderIds)];
     if (memberIds.length < 2) throw new Error("Select at least two APIs for the aggregate");
     const members = memberIds.map((id) => providers.find((provider) => provider.id === id));
@@ -839,8 +841,11 @@ export async function saveAggregateApiProfile(input: AggregateApiInput): Promise
     const previous = index >= 0 ? aggregates[index] : undefined;
     const memberModels = Object.fromEntries(Object.entries(input.memberModels ?? previous?.memberModels ?? {})
       .filter(([id]) => memberIds.includes(id)).map(([id, model]) => [id, model.trim()]));
-    if (members.some((provider) => !provider || ![provider.model, ...provider.models]
-      .includes(memberModels[provider.id] ?? input.model))) {
+    if (members.some((provider) => {
+      if (!provider) return true;
+      const model = (memberModels[provider.id] ?? input.model).trim();
+      return !model || (!provider.accountId && ![provider.model, ...provider.models].includes(model));
+    })) {
       throw new Error("Every API in an aggregate must support the selected model");
     }
     const failoverPolicy = copyFailoverPolicy(input.failoverPolicy ?? previous?.failoverPolicy);

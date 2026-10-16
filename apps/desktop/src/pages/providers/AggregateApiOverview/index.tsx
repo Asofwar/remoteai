@@ -1,13 +1,14 @@
 import { Button, Space, Tag } from "antd";
 import { Network, Power } from "lucide-react";
 import type { Translate } from "../../../i18n";
-import type { AggregateApi, Provider } from "../../../types";
+import type { AggregateApi } from "../../../types";
+import type { AggregateMemberOption } from "../../../utils/aggregateMembers";
 import { aggregateMemberNames } from "../aggregateApiPresentation";
 import styles from "./index.module.less";
 
 interface AggregateApiOverviewProps {
   aggregates: AggregateApi[];
-  providers: Provider[];
+  providers: AggregateMemberOption[];
   busyId: string | null;
   proxyRunning: boolean;
   onManage: () => void;

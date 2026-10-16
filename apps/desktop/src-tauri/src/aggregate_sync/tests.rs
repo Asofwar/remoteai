@@ -97,6 +97,26 @@ fn policy_aliases_and_order_roundtrip_and_deletion_rejects_stale_payloads() {
 }
 
 #[test]
+fn official_aggregate_references_sync_before_the_accounts_arrive() {
+    let source = Fixture::new();
+    let target = Fixture::new();
+    let mut aggregate = config("mixed");
+    aggregate.member_provider_ids = vec!["account:official-one".into(), "two".into()];
+    aggregate.member_models = [("account:official-one".into(), "official-model".into())].into();
+    update_configs(&source.paths, |configs| {
+        configs.push(aggregate.clone());
+        Ok(())
+    })
+    .unwrap();
+    let payload = collect(&source.paths).unwrap();
+    assert_eq!(apply(&target.paths, payload).unwrap(), 1);
+    assert_eq!(
+        aggregate_api::read_configs(&target.paths).unwrap(),
+        [aggregate]
+    );
+}
+
+#[test]
 fn local_edits_advance_only_changed_records_and_repair_interrupted_deletions() {
     let fixture = Fixture::new();
     fixture.insert("a");

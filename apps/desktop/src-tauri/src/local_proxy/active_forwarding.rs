@@ -64,7 +64,9 @@ fn forward_active_request<R: Runtime>(
     match target {
         ActiveTarget::Official { model } => {
             if is_anthropic_messages_endpoint(request_path(url)) {
-                return forward_anthropic_official(app, headers, body, session_id);
+                return forward_anthropic_official(app, headers, body, AnthropicOfficialContext {
+                    session_id, account_id_override, model_override: None,
+                });
             }
             forward_official(OfficialForwardRequest {
                 app,
@@ -98,7 +100,7 @@ fn forward_active_request<R: Runtime>(
             }
             forward_provider_request(method, url, headers, body, provider)
         }
-        ActiveTarget::Aggregate(target) => forward_aggregate_request(AggregateForwardRequest {
+        ActiveTarget::Aggregate(target) => forward_aggregate_request(app, AggregateForwardRequest {
             method,
             url,
             headers,
@@ -125,7 +127,11 @@ fn current_usage_payload<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<Upstre
             } else {
                 provider_id
             };
-        providers::query_provider_usage_blocking(app.clone(), provider_id)?
+        if let Some(account_id) = aggregate_api::member_account_id(&provider_id) {
+            crate::commands::refresh_usage_blocking(app.clone(), account_id.to_string())?
+        } else {
+            providers::query_provider_usage_blocking(app.clone(), provider_id)?
+        }
     } else if let Some(group) = state.active_provider_group.as_deref() {
         let provider = providers::provider_group_profiles(&paths, group)?
             .into_iter()

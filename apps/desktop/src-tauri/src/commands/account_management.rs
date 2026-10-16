@@ -1,8 +1,14 @@
 #[tauri::command]
-pub(crate) fn delete_account<R: Runtime>(
+pub(crate) async fn delete_account<R: Runtime + 'static>(
     app: tauri::AppHandle<R>,
     id: String,
 ) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || delete_account_blocking(app, id))
+        .await
+        .map_err(|_| "Unable to delete the account. Please try again.".to_string())?
+}
+
+fn delete_account_blocking<R: Runtime>(app: tauri::AppHandle<R>, id: String) -> Result<(), String> {
     let paths = resolve_paths(&app)?;
     let current_state = read_state(&paths);
     if current_state.active_account_id.as_deref() == Some(&id) {
@@ -18,6 +24,12 @@ pub(crate) fn delete_account<R: Runtime>(
     if target.exists() {
         fs::remove_dir_all(&target).map_err(|error| format!("删除账户失败：{error}"))?;
     }
+    crate::aggregate_api::remove_provider_membership(
+        &paths,
+        &format!("{}{id}", crate::aggregate_api::ACCOUNT_MEMBER_PREFIX),
+    )?;
+    crate::aggregate_api::refresh_targets(&app, &paths)?;
+    app.emit("aggregate-apis-changed", ()).map_err(|error| error.to_string())?;
     set_account_auto_switch_enabled_for_paths(&paths, &id, true)?;
     let cleared_concurrent_group = clear_empty_concurrent_account_group(&paths)?;
     let mut state = read_state(&paths);

@@ -36,6 +36,20 @@ it("rejects invalid settings without overwriting the last saved aggregate", asyn
   expect((await loadAggregateApis())[0].failoverPolicy).toEqual(defaultFailoverPolicy());
 });
 
+it("saves mixed and official-only members with explicit models and priority order", async () => {
+  for (const memberProviderIds of [["first", "account:demo-1"], ["account:demo-2", "account:demo-1"]]) {
+    const memberModels = { first: "model", "account:demo-1": "official-model", "account:demo-2": "another-model" };
+    const saved = await saveAggregateApiProfile({ ...input, memberProviderIds, memberModels });
+    const reloaded = (await loadAggregateApis()).find(aggregate => aggregate.id === saved.id)!;
+    expect(reloaded.memberProviderIds).toEqual(memberProviderIds);
+    expect(reloaded.memberModels?.["account:demo-1"]).toBe("official-model");
+  }
+  await expect(saveAggregateApiProfile({ ...input, memberProviderIds: ["first", "account:missing"] }))
+    .rejects.toThrow("Provider does not exist");
+  await expect(saveAggregateApiProfile({ ...input, memberProviderIds: ["first", "account:demo-1"],
+    memberModels: { "account:demo-1": " " } })).rejects.toThrow("must support the selected model");
+});
+
 it("persists member aliases and priority order across legacy updates", async () => {
   localStorage.setItem("codex-switch:providers", JSON.stringify([
     { id: "first", name: "First", baseUrl: "https://example.com", model: "deployment-one", models: ["deployment-one"] },

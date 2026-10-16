@@ -29,6 +29,7 @@ import { ProviderGroupManager } from "./providers/ProviderGroupManager";
 import { AggregateApiManager } from "./providers/AggregateApiManager";
 import { AggregateApiOverview } from "./providers/AggregateApiOverview";
 import { useProviderTokenUsage } from "./providers/useProviderTokenUsage";
+import { useAggregateMembers } from "./providers/useAggregateMembers";
 
 interface ProvidersPageProps {
   providers: Provider[];
@@ -111,6 +112,9 @@ export function ProvidersPage({
   const [showGrokModal, setShowGrokModal] = useState(false);
   const [showClaudeCodeModal, setShowClaudeCodeModal] = useState(false);
   const [showAggregateManager, setShowAggregateManager] = useState(false);
+  const aggregateMembers = useAggregateMembers({
+    providers, accounts, privacyMode, t, loadModels: showAggregateManager,
+  });
   const [catalogPresetId, setCatalogPresetId] = useState<ProviderPresetId | null>(null);
   const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>([]);
   const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false);
@@ -243,7 +247,7 @@ export function ProvidersPage({
       )}
       <div className={`provider-page${displayMode === "table" && providers.length ? " provider-table-page" : ""}`}>
 
-      <AggregateApiOverview aggregates={aggregateApis} providers={providers}
+      <AggregateApiOverview aggregates={aggregateApis} providers={aggregateMembers}
         busyId={busyProviderId} proxyRunning={proxyRunning}
         onManage={() => setShowAggregateManager(true)} onSwitch={onSwitchAggregateApi}
         onDeactivate={onDeactivate} t={t} />
@@ -286,7 +290,7 @@ export function ProvidersPage({
       {showClaudeCodeModal && <ClaudeCodeProviderModal provider={editingProvider} saving={saving}
         onClose={() => setShowClaudeCodeModal(false)} onSave={onSave} t={t} />}
       <AggregateApiManager open={showAggregateManager} aggregates={aggregateApis}
-        providers={providers} saving={saving} busyId={busyProviderId} proxyRunning={proxyRunning}
+        providers={aggregateMembers} saving={saving} busyId={busyProviderId} proxyRunning={proxyRunning}
         onClose={() => setShowAggregateManager(false)} onSave={onSaveAggregateApi}
         onSwitch={onSwitchAggregateApi} onDeactivate={onDeactivate}
         onDelete={onDeleteAggregateApi} t={t} />

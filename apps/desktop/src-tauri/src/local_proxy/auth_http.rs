@@ -300,6 +300,10 @@ fn base_url_ends_with_version_segment(base_url: &str) -> bool {
 fn official_url(endpoint: &str) -> String {
     let endpoint = endpoint.trim_start_matches('/');
     let endpoint = endpoint.strip_prefix("v1/").unwrap_or(endpoint);
+    #[cfg(test)]
+    if let Some(base) = tests::aggregate_official_test_upstream() {
+        return format!("{base}/{endpoint}");
+    }
     format!("{}/{}", OFFICIAL_CODEX_BASE_URL, endpoint)
 }
 

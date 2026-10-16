@@ -1,4 +1,5 @@
-fn forward_aggregate_request(
+fn forward_aggregate_request<R: Runtime>(
+    app: &tauri::AppHandle<R>,
     request: AggregateForwardRequest<'_>,
 ) -> Result<UpstreamPayload, String> {
     let policy = &request.target.config.failover_policy;
@@ -35,7 +36,7 @@ fn forward_aggregate_request(
             json!({ "event": "aggregate_attempt_started", "attempt": attempt,
             "aggregateId": request.target.config.id, "providerId": lease.member_id() }),
         );
-        let (result, retry) = send_aggregate_attempt(&request, lease);
+        let (result, retry) = send_aggregate_attempt(app, &request, lease);
         if !retry {
             return result;
         }
@@ -52,12 +53,13 @@ fn aggregate_request_can_fail_over(request: &AggregateForwardRequest<'_>) -> boo
             || is_anthropic_messages_endpoint(request_path(request.url)))
 }
 
-fn send_aggregate_attempt(
+fn send_aggregate_attempt<R: Runtime>(
+    app: &tauri::AppHandle<R>,
     request: &AggregateForwardRequest<'_>,
     lease: aggregate_scheduler::MemberLease,
 ) -> (Result<UpstreamPayload, String>, bool) {
     let (result, network) =
-        failover_transport::capture(|| send_aggregate_member(request, lease.member_id()));
+        failover_transport::capture(|| send_aggregate_member(app, request, lease.member_id()));
     if result
         .as_ref()
         .is_ok_and(|payload| status_ok(payload.status))
@@ -77,7 +79,8 @@ fn send_aggregate_attempt(
     (result, retry)
 }
 
-fn send_aggregate_member(
+fn send_aggregate_member<R: Runtime>(
+    app: &tauri::AppHandle<R>,
     request: &AggregateForwardRequest<'_>,
     member_id: &str,
 ) -> Result<UpstreamPayload, String> {
@@ -88,6 +91,9 @@ fn send_aggregate_member(
         .find(|provider| provider.id == member_id)
         .ok_or_else(|| "Aggregate API member does not exist".to_string())?;
     let model = aggregate_api::member_model(&request.target.config, member_id);
+    if let Some(account_id) = aggregate_api::member_account_id(member_id) {
+        return forward_aggregate_official(app, request, account_id, model);
+    }
     let provider = aggregate_api::force_aggregate_model(provider, model);
     if is_anthropic_messages_endpoint(request_path(request.url)) {
         return forward_anthropic_provider_with_context(

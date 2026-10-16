@@ -4,6 +4,7 @@ struct AggregateTestServer {
     stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
     worker: Option<std::thread::JoinHandle<()>>,
     requests: std::sync::Arc<std::sync::Mutex<Vec<(String, Value)>>>,
+    auth_headers: std::sync::Arc<std::sync::Mutex<Vec<HashMap<String, String>>>>,
 }
 
 impl AggregateTestServer {
@@ -16,6 +17,8 @@ impl AggregateTestServer {
         let worker_stop = stop.clone();
         let requests = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let worker_requests = requests.clone();
+        let auth_headers = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let worker_headers = auth_headers.clone();
         let body = body.to_string();
         let headers = headers
             .into_iter()
@@ -28,6 +31,9 @@ impl AggregateTestServer {
                     continue;
                 };
                 let mut input = Vec::new();
+                worker_headers.lock().unwrap().push(request.headers().iter().map(|header| (
+                    header.field.as_str().to_string().to_lowercase(), header.value.to_string(),
+                )).collect());
                 request.as_reader().read_to_end(&mut input).unwrap();
                 worker_requests.lock().unwrap().push((
                     request.url().to_string(),
@@ -47,6 +53,7 @@ impl AggregateTestServer {
             stop,
             worker: Some(worker),
             requests,
+            auth_headers,
         }
     }
 
@@ -100,7 +107,8 @@ fn aggregate_test_target(urls: &[&str]) -> AggregateTarget {
 }
 
 fn send_aggregate_fixture(target: &AggregateTarget) -> Result<UpstreamPayload, String> {
-    forward_aggregate_request(AggregateForwardRequest {
+    let app = breakdown_responsiveness_test_app();
+    forward_aggregate_request(app.handle(), AggregateForwardRequest {
         method: &Method::Post,
         url: "/v1/responses",
         headers: &[],
@@ -273,7 +281,8 @@ fn aggregate_native_messages_follow_the_same_failover_policy() {
         provider.api_format = ProviderApiFormat::AnthropicMessages;
         provider.model_api_formats.clear();
     }
-    let payload = forward_aggregate_request(AggregateForwardRequest {
+    let app = breakdown_responsiveness_test_app();
+    let payload = forward_aggregate_request(app.handle(), AggregateForwardRequest {
         method: &Method::Post,
         url: "/v1/messages",
         headers: &[],

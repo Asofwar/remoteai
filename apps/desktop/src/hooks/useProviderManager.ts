@@ -96,6 +96,9 @@ function providerErrorMessage(error: unknown, t: Translate) {
   if (message.includes("Provider name is required")) return t("providers.error.nameRequired");
   if (message.includes("Aggregate API name is required")) return t("providers.aggregate.error.nameRequired");
   if (message.includes("Select at least two APIs")) return t("providers.aggregate.error.membersRequired");
+  if (message.includes("An official account in this aggregate is unavailable")) {
+    return t("providers.aggregate.error.accountUnavailable");
+  }
   if (message.includes("Every API in an aggregate must support")) {
     return t("providers.aggregate.error.modelMismatch");
   }

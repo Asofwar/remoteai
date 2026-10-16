@@ -41,11 +41,17 @@ fn anthropic_token_probe_payload(body: &[u8]) -> UpstreamPayload {
     )
 }
 
+struct AnthropicOfficialContext<'a> {
+    session_id: Option<&'a str>,
+    account_id_override: Option<&'a str>,
+    model_override: Option<&'a str>,
+}
+
 fn forward_anthropic_official<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
     _headers: &[(String, String)],
     body: Vec<u8>,
-    session_id: Option<&str>,
+    context: AnthropicOfficialContext<'_>,
 ) -> Result<UpstreamPayload, String> {
     let client = http_client()?;
     let credentials = official_credentials(
@@ -53,8 +59,8 @@ fn forward_anthropic_official<R: tauri::Runtime>(
         &client,
         OfficialCredentialOptions {
             purpose: OfficialCredentialPurpose::Default,
-            session_id,
-            account_id_override: None,
+            session_id: context.session_id,
+            account_id_override: context.account_id_override,
         },
     )?;
     let request: Value = serde_json::from_slice(&body)
@@ -75,9 +81,12 @@ fn forward_anthropic_official<R: tauri::Runtime>(
     let mut responses_body = inject_system_prompt_value(filter_system_prompt_value(
         anthropic_to_responses(&request, &subagent_model),
     ));
+    if let Some(model) = context.model_override {
+        responses_body["model"] = Value::String(model.into());
+    }
     prepare_anthropic_official_request(&mut responses_body);
     update_proxy_session_target(
-        session_id,
+        context.session_id,
         None,
         "Official Codex",
         requested_model(&responses_body).unwrap_or_default(),

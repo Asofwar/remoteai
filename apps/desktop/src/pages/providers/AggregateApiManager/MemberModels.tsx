@@ -1,11 +1,11 @@
 import { useEffect } from "react";
-import { Button, Form, Select, Space, type FormInstance } from "antd";
+import { AutoComplete, Button, Form, Select, Space, type FormInstance } from "antd";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { guiText } from "../../../i18n/guiText";
-import type { Provider } from "../../../types";
+import type { AggregateMemberOption } from "../../../utils/aggregateMembers";
 import styles from "./index.module.less";
 
-export function MemberModels({ form, providers }: { form: FormInstance; providers: Provider[] }) {
+export function MemberModels({ form, providers }: { form: FormInstance; providers: AggregateMemberOption[] }) {
   const selected: string[] = Form.useWatch("memberProviderIds", form) ?? [];
   const model: string = Form.useWatch("model", form) ?? "";
   const strategy: string = Form.useWatch(["failoverPolicy", "routingStrategy"], form) ?? "balanced";
@@ -14,7 +14,7 @@ export function MemberModels({ form, providers }: { form: FormInstance; provider
       const provider = providers.find(entry => entry.id === id);
       if (!provider || form.getFieldValue(["memberModels", id])) continue;
       const models = [provider.model, ...provider.models];
-      form.setFieldValue(["memberModels", id], models.includes(model) ? model : provider.model);
+      form.setFieldValue(["memberModels", id], models.includes(model) ? model : provider.model || model);
     }
   }, [selected, model, providers, form]);
   const move = (index: number, direction: number) => {
@@ -38,10 +38,13 @@ export function MemberModels({ form, providers }: { form: FormInstance; provider
           <Button size="small" disabled={index === selected.length - 1} aria-label={guiText("降低服务优先级")}
             icon={<ArrowDown size={13} />} onClick={() => move(index, 1)} />
         </>}</Space>}>
-        <Form.Item name={["memberModels", id]} noStyle rules={[{ required: true,
+        <Form.Item name={["memberModels", id]} noStyle rules={[{ required: true, whitespace: true,
           message: guiText("请选择此服务的模型。") }]}>
-          <Select options={models.map(value => ({ label: value, value }))} showSearch
-            aria-label={`${provider.name} ${guiText("上游模型")}`} />
+          {provider.accountId ? <AutoComplete options={models.map(value => ({ label: value, value }))}
+            maxLength={256} aria-label={`${provider.name} ${guiText("上游模型")}`}
+            filterOption={(input, option) => String(option?.value).toLowerCase().includes(input.toLowerCase())} />
+            : <Select options={models.map(value => ({ label: value, value }))} showSearch
+              aria-label={`${provider.name} ${guiText("上游模型")}`} />}
         </Form.Item>
       </Form.Item>;
     })}

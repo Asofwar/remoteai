@@ -8,11 +8,16 @@ use tauri::{Emitter, Runtime};
 use uuid::Uuid;
 
 mod active_targets;
+mod members;
 mod models;
 pub(crate) use active_targets::refresh_targets;
+pub(crate) use members::{member_account_id, ACCOUNT_MEMBER_PREFIX};
+use members::{read_member_profile, validate_member_id};
 use models::validate_members;
 pub(crate) use models::{force_aggregate_model, logical_profile, member_model, member_profiles};
 
+#[cfg(test)]
+mod account_tests;
 #[cfg(test)]
 mod tests;
 
@@ -298,7 +303,7 @@ fn normalize_input(
     let member_provider_ids = unique_members(input.member_provider_ids)?;
     let profiles = member_provider_ids
         .iter()
-        .map(|provider_id| providers::read_provider(paths, provider_id))
+        .map(|provider_id| read_member_profile(paths, provider_id))
         .collect::<Result<Vec<_>, _>>()?;
     let mut member_models = input.member_models.unwrap_or_default();
     member_models.retain(|id, _| member_provider_ids.contains(id));
@@ -399,7 +404,7 @@ pub(crate) fn validate_imported_config(config: &AggregateApiConfig) -> Result<()
     }
     let mut members = HashSet::new();
     for id in &config.member_provider_ids {
-        validate_id(id)?;
+        validate_member_id(id)?;
         if !members.insert(id) {
             return Err("Aggregate API members must be unique".into());
         }

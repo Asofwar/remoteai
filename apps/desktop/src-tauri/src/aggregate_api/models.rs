@@ -7,7 +7,7 @@ pub(crate) fn member_profiles(
     let profiles = aggregate
         .member_provider_ids
         .iter()
-        .map(|id| providers::read_provider(paths, id))
+        .map(|id| read_member_profile(paths, id))
         .collect::<Result<Vec<_>, _>>()?;
     validate_members(aggregate, &profiles)?;
     Ok(profiles)
@@ -70,6 +70,10 @@ pub(crate) fn member_model<'a>(config: &'a AggregateApiConfig, provider_id: &str
 }
 
 fn provider_supports_model(provider: &ProviderProfile, model: &str) -> bool {
+    // The shared official catalog can lag account entitlements; allow explicit model names.
+    if member_account_id(&provider.id).is_some() {
+        return !model.trim().is_empty();
+    }
     provider.model == model || provider.models.iter().any(|candidate| candidate == model)
 }
 

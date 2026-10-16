@@ -1,9 +1,10 @@
 import type { Translate } from "../../i18n";
-import type { AggregateApi, Provider } from "../../types";
+import type { AggregateApi } from "../../types";
+import type { AggregateMemberOption } from "../../utils/aggregateMembers";
 
 export function aggregateMemberNames(
   aggregate: AggregateApi,
-  providers: Provider[],
+  providers: AggregateMemberOption[],
   t: Translate,
 ) {
   return aggregate.memberProviderIds.map((id) => {

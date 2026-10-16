@@ -1,13 +1,13 @@
 use super::*;
 use serde_json::{json, Value};
 
-struct Fixture {
+pub(super) struct Fixture {
     _directory: tempfile::TempDir,
-    paths: Paths,
+    pub(super) paths: Paths,
 }
 
 impl Fixture {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let directory = tempfile::tempdir().unwrap();
         let root = directory.path();
         let paths = Paths {

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { AutoComplete, Button, Empty, Form, Input, Modal, Popconfirm, Select, Space, Switch, Tag } from "antd";
 import { Edit3, Plus, Power, Trash2 } from "lucide-react";
 import type { Translate } from "../../../i18n";
-import type { AggregateApi, AggregateApiInput, AggregateFailoverPolicy, Provider } from "../../../types";
+import type { AggregateApi, AggregateApiInput, AggregateFailoverPolicy } from "../../../types";
+import type { AggregateMemberOption } from "../../../utils/aggregateMembers";
 import { aggregateMemberNames } from "../aggregateApiPresentation";
 import { FailoverSettings } from "./FailoverSettings";
 import { MemberHealth } from "./MemberHealth";
@@ -13,7 +14,7 @@ import styles from "./index.module.less";
 interface AggregateApiManagerProps {
   open: boolean;
   aggregates: AggregateApi[];
-  providers: Provider[];
+  providers: AggregateMemberOption[];
   saving: boolean;
   busyId: string | null;
   proxyRunning: boolean;
@@ -34,11 +35,11 @@ interface AggregateFormValues {
   failoverPolicy: AggregateFailoverPolicy;
 }
 
-function providerModels(provider: Provider) {
+function providerModels(provider: AggregateMemberOption) {
   return [...new Set([provider.model, ...provider.models].filter(Boolean))];
 }
 
-function availableModels(providers: Provider[]) {
+function availableModels(providers: AggregateMemberOption[]) {
   const counts = new Map<string, number>();
   for (const provider of providers) {
     for (const model of providerModels(provider)) counts.set(model, (counts.get(model) ?? 0) + 1);
@@ -145,7 +146,7 @@ export function AggregateApiManager(props: AggregateApiManagerProps) {
         </Form.Item>
         <Form.Item name="memberProviderIds" label={t("providers.aggregate.members")}
           rules={[{ type: "array", min: 2, message: t("providers.aggregate.error.membersRequired") }] }>
-          <Select mode="multiple" options={memberOptions}
+          <Select mode="multiple" options={memberOptions} showSearch optionFilterProp="label"
             placeholder={t("providers.aggregate.membersPlaceholder")} />
         </Form.Item>
         <MemberModels form={form} providers={providers} />

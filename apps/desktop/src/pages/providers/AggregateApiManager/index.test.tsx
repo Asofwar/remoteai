@@ -7,6 +7,8 @@ import { translate, type Translate } from "../../../i18n";
 import type { AggregateApi, AggregateApiInput, Provider } from "../../../types";
 import { AggregateApiManager } from ".";
 import { defaultFailoverPolicy } from "./failoverPolicy";
+import { buildAggregateMembers, type AggregateMemberOption } from "../../../utils/aggregateMembers";
+import { DEMO_ACCOUNTS } from "../../../demo";
 
 const t: Translate = (key, values) => translate("zh", key, values);
 const providers: Provider[] = ["first", "second"].map((id) => ({
@@ -18,13 +20,14 @@ const providers: Provider[] = ["first", "second"].map((id) => ({
   hasWalletQueryToken: false, hasWalletLoginCredentials: false,
 }));
 let aggregate: AggregateApi;
+let members: AggregateMemberOption[];
 let root: Root;
 let container: HTMLDivElement;
 const onSave = vi.fn<(input: AggregateApiInput) => Promise<AggregateApi | null>>();
 
 async function render() {
   await act(async () => root.render(<ConfigProvider theme={{ token: { motion: false } }}>
-    <AggregateApiManager open aggregates={[aggregate]} providers={providers} saving={false} busyId={null}
+    <AggregateApiManager open aggregates={[aggregate]} providers={members} saving={false} busyId={null}
       proxyRunning onClose={() => {}} onSave={onSave} onSwitch={async () => true}
       onDeactivate={() => {}} onDelete={() => {}} t={t} />
   </ConfigProvider>));
@@ -46,6 +49,7 @@ async function fill(name: string, value: string) {
 }
 
 beforeEach(() => {
+  members = providers;
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
   vi.stubGlobal("matchMedia", () => ({ matches: false, addListener() {}, removeListener() {} }));
@@ -122,4 +126,28 @@ it("updates member health from refreshed aggregates without creating a countdown
   aggregate.memberHealth.first = { state: "recovering", consecutiveFailures: 2, retryAfterSeconds: 0 };
   await render();
   expect(document.body.textContent).toContain("first · 恢复检查中");
+});
+
+it("shows official members and keeps their model edits during health refresh", async () => {
+  members = buildAggregateMembers({ providers, accounts: DEMO_ACCOUNTS, officialModels: ["official-model"],
+    officialLabel: "官方账户", privacyMode: false });
+  aggregate.memberProviderIds = ["first", "account:demo-1"];
+  aggregate.memberHealth = { "account:demo-1": { state: "healthy", consecutiveFailures: 0, retryAfterSeconds: 0 } };
+  await render();
+  expect(document.body.textContent).toContain("官方账户 · alex.chen@example.com · 可用");
+  await click('button[aria-label="编辑聚合 API"]');
+  const input = document.getElementById("memberModels_account:demo-1") as HTMLInputElement;
+  expect(input.value).toBe("official-model");
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "new-official-model");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  aggregate.memberHealth["account:demo-1"] = { state: "coolingDown", consecutiveFailures: 2, retryAfterSeconds: 25 };
+  await render();
+  expect(document.body.textContent).toContain("官方账户 · alex.chen@example.com · 已暂停 · 剩余 25 秒");
+  await click(".ant-modal-footer .ant-btn-primary");
+  expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+    memberProviderIds: ["first", "account:demo-1"],
+    memberModels: { first: "model", "account:demo-1": "new-official-model" },
+  }));
 });

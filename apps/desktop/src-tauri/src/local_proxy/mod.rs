@@ -103,6 +103,7 @@ include!("token_usage_db.rs");
 include!("token_usage_breakdown.rs");
 include!("forwarding.rs");
 include!("aggregate_forwarding.rs");
+include!("aggregate_official.rs");
 include!("provider_api_fallback.rs");
 include!("anthropic_bridge.rs");
 include!("anthropic_forwarding.rs");
@@ -125,6 +126,7 @@ include!("sse.rs");
 #[cfg(test)]
 mod tests {
     include!("tests/aggregate_failover.rs");
+    include!("tests/aggregate_official.rs");
     include!("tests/provider_request_options.rs");
     include!("tests/chat_reasoning_compatibility.rs");
     include!("tests/diagnostics.rs");

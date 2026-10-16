@@ -1,15 +1,19 @@
 (() => {
   const REQUEST_TIMEOUT_MS = 35000;
+  const GRAPH_TIMEOUT_MS = 120000;
   const pending = new Map();
   const sockets = new Map();
+  const modules = new Map();
   let port;
   let base;
   let sequence = 0;
   function request(type, input = {}) {
     return new Promise((resolve, reject) => {
       const id = ++sequence;
-      const timer = setTimeout(() => { pending.delete(id); reject(new Error('Preview request timed out')); },
-        REQUEST_TIMEOUT_MS);
+      const timer = setTimeout(() => {
+        pending.delete(id);
+        reject(Object.assign(new Error('Preview request timed out'), { previewFailure: 'load-error' }));
+      }, type === 'document' || type === 'module' ? GRAPH_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
       pending.set(id, { resolve, reject, timer });
       port.postMessage({ id, type, ...input });
     });
@@ -20,11 +24,12 @@
     const job = pending.get(reply.id);
     if (!job) return;
     pending.delete(reply.id); clearTimeout(job.timer);
-    if (reply.error) job.reject(new Error(reply.error)); else job.resolve(reply.value);
+    if (reply.error) job.reject(Object.assign(new Error(reply.error), { previewFailure: reply.failure }));
+    else job.resolve(reply.value);
   }
   function absolute(value) { return new URL(value, base).href; }
   function announceError(error) {
-    port.postMessage({ type: 'preview-error' });
+    port.postMessage({ type: 'preview-error', failure: error.previewFailure ?? 'script-error' });
     console.warn('Port mapping preview:', error.message);
   }
   window.fetch = async (value, options = {}) => {
@@ -121,16 +126,32 @@
     setTimeout(() => submitForm(event), 0);
   });
 
+  function installModules(incoming) {
+    const imports = {};
+    for (const module of incoming) {
+      if (modules.has(module.url)) continue;
+      const blob = URL.createObjectURL(new Blob([module.code], { type: 'text/javascript' }));
+      modules.set(module.url, blob); imports[module.url] = blob;
+    }
+    if (!Object.keys(imports).length) return;
+    const map = document.createElement('script'); map.type = 'importmap';
+    map.textContent = JSON.stringify({ imports }); document.head.prepend(map);
+  }
+  window.__importPreviewModule = async (value, importer, options) => {
+    const url = new URL(value, importer).href;
+    if (!modules.has(url)) {
+      const content = await request('module', { url });
+      installModules(content.modules);
+      return import(content.url, options);
+    }
+    return import(url, options);
+  };
+
   async function render() {
     const content = await request('document');
     base = content.url;
     document.documentElement.innerHTML = content.html;
-    const imports = {};
-    for (const module of content.modules) {
-      imports[module.url] = URL.createObjectURL(new Blob([module.code], { type: 'text/javascript' }));
-    }
-    const map = document.createElement('script'); map.type = 'importmap';
-    map.textContent = JSON.stringify({ imports }); document.head.prepend(map);
+    installModules(content.modules);
     for (const item of content.scripts) {
       const script = document.createElement('script');
       if (item.module) {

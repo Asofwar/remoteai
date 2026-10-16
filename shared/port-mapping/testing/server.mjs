@@ -2,6 +2,7 @@ import http from 'node:http';
 import net from 'node:net';
 import { randomUUID } from 'node:crypto';
 import WebSocket from 'ws';
+import { developmentServer } from './development.mjs';
 
 const RPC_PORT = 1496;
 const resources = new Map();
@@ -39,6 +40,8 @@ catch { document.body.dataset.isolation='passed'; }
   '/form-target': ['text/html', interceptedForm("document.querySelector('form')")],
   '/form-document': ['text/html', interceptedForm('document')],
   '/form-window': ['text/html', interceptedForm('window')],
+  '/broken-resource': ['text/html', '<script type="module" src="/not-found.js"></script>'],
+  '/broken-script': ['text/html', '<script type="module">throw new Error("Fixture script failed")</script>'],
 };
 const service = http.createServer(async (request, response) => {
   requests.push({ url: request.url, method: request.method });
@@ -56,10 +59,13 @@ const ws = new WebSocket.Server({ server: service, handleProtocols: protocols =>
 ws.on('connection', socket => socket.on('message', data => socket.send('Socket echo: ' + data.toString())));
 await new Promise(resolve => service.listen(0, '::', resolve));
 const servicePort = service.address().port;
+const developmentPort = await developmentServer();
+const targets = [servicePort, developmentPort].flatMap(port =>
+  ['127.0.0.1', '[::1]'].map(host => `http://${host}:${port}`));
 
 async function rpc(input) {
   if (input.operation === 'open') {
-    if (!['127.0.0.1', '[::1]'].some(host => input.url === `http://${host}:${servicePort}`)) {
+    if (!targets.includes(input.url)) {
       throw new Error('Unknown fixture target');
     }
     const id = randomUUID(); resources.set(id, input.url); return id;
@@ -73,7 +79,8 @@ async function rpc(input) {
   if (!resources.has(input.id)) throw new Error('Resource closed');
   if (request.type === 'connect') {
     if (request.url !== resources.get(input.id)) throw new Error('Scope mismatch');
-    const socket = net.connect(servicePort, new URL(request.url).hostname.replace(/[\[\]]/g, ''));
+    const target = new URL(request.url);
+    const socket = net.connect(Number(target.port), target.hostname.replace(/[\[\]]/g, ''));
     const id = randomUUID();
     const entry = { resource: input.id, socket, data: [], ended: false, wake: undefined };
     socket.on('data', bytes => { entry.data.push(bytes); entry.wake?.(); });
@@ -106,7 +113,8 @@ http.createServer(async (request, response) => {
   if (request.method === 'OPTIONS') { response.end(); return; }
   response.setHeader('Content-Type', 'application/json');
   if (request.url === '/state') {
-    response.end(JSON.stringify({ servicePort, resources: resources.size, sockets: sockets.size, requests })); return;
+    response.end(JSON.stringify({ servicePort, developmentPort,
+      resources: resources.size, sockets: sockets.size, requests })); return;
   }
   try {
     let body = ''; for await (const chunk of request) body += chunk;

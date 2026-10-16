@@ -5,6 +5,7 @@ import { previewDocument } from './previewDocument';
 import { PreviewAssets } from './previewAssets';
 import runtime from './previewRuntime.js?raw';
 import xhr from './previewXhr.js?raw';
+import { isPreviewFailure, previewFailure, type PreviewStatus } from './previewErrors';
 
 // The opaque sandbox cannot read app cookies/storage or reach app APIs, even if remote scripts are hostile.
 export const PREVIEW_DOCUMENT = '<!doctype html><meta charset="utf-8">'
@@ -15,11 +16,11 @@ export const PREVIEW_DOCUMENT = '<!doctype html><meta charset="utf-8">'
   + `<script>${xhr.replace(/<\/script/gi, '<\\/script')}\n${runtime.replace(/<\/script/gi, '<\\/script')}</script>`;
 
 type PreviewMessage = { id?: number; type?: string; input?: MappingHttpRequest; url?: string;
-  socketId?: string; protocols?: string[]; data?: string | Uint8Array };
+  socketId?: string; protocols?: string[]; data?: string | Uint8Array; failure?: unknown };
 
 export function attachPreview(options: {
   frame: HTMLIFrameElement; tunnel: WebMappingTunnel; input: MappingHttpRequest;
-  navigate: (input: MappingHttpRequest) => void; status: (value: 'ready' | 'error') => void;
+  navigate: (input: MappingHttpRequest) => void; status: (value: PreviewStatus) => void;
 }) {
   const { frame, tunnel, input, navigate, status } = options;
   const channel = new MessageChannel();
@@ -32,7 +33,8 @@ export function attachPreview(options: {
   const post = (message: object) => { if (!closed) channel.port1.postMessage(message); };
   async function handle(message: PreviewMessage): Promise<unknown> {
     switch (message.type) {
-      case 'document': return previewDocument(requests, input);
+      case 'document': return previewDocument(requests, input, assets);
+      case 'module': return assets.loadModule(String(message.url), input.url);
       case 'fetch': return requests.request(validateRequest(message.input, input.url));
       case 'asset': return assets.data(String(message.url), input.url);
       case 'ws-open': {
@@ -64,15 +66,21 @@ export function attachPreview(options: {
     const message: PreviewMessage = event.data;
     if (!message || typeof message !== 'object' || closed) return;
     if (message.type === 'preview-ready') { status('ready'); return; }
-    if (message.type === 'preview-error') { status('error'); return; }
+    if (message.type === 'preview-error') {
+      status(isPreviewFailure(message.failure) ? message.failure : 'script-error'); return;
+    }
     if (message.type === 'navigate') {
-      try { navigate(validateRequest(message.input, input.url)); } catch { status('error'); }
+      try { navigate(validateRequest(message.input, input.url)); } catch { status('address-error'); }
       return;
     }
     if (!Number.isSafeInteger(message.id) || active >= 128) return;
     active++;
     void handle(message).then(value => post({ id: message.id, value }))
-      .catch(() => post({ id: message.id, error: '网页未能加载，请确认服务已启动后刷新。' }))
+      .catch(error => {
+        const failure = previewFailure(error);
+        console.warn('Port mapping preview:', failure);
+        post({ id: message.id, error: 'Preview request failed', failure });
+      })
       .finally(() => { active--; });
   };
   frame.contentWindow?.postMessage({ type: 'port-mapping-preview' }, '*', [channel.port2]);

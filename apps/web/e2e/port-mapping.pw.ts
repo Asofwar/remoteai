@@ -2,10 +2,49 @@ import { expect, test } from '@playwright/test';
 import type { MappingDocument } from '../../../shared/port-mapping/sync';
 
 let servicePort: number;
+let developmentPort: number;
 test.beforeEach(async ({ request }) => {
   const state = await (await request.get('http://127.0.0.1:1496/state')).json();
   servicePort = state.servicePort;
+  developmentPort = state.developmentPort;
   expect(Number.isInteger(servicePort)).toBe(true);
+});
+
+test('previews a real Vite app with a large module graph, CSS and concurrent lazy routes', async ({ page }) => {
+  await page.goto('e2e/port-mapping-harness.html');
+  await page.getByRole('button', { name: '端口映射', exact: true }).click();
+  await page.getByRole('spinbutton', { name: '远程端口' }).fill(String(developmentPort));
+  await page.getByRole('button', { name: '添加并启动' }).click();
+  await page.getByRole('button', { name: '在 Remote AI 中预览' }).click();
+  const preview = page.frameLocator('iframe[title="端口映射预览"]');
+  await expect(preview.getByRole('heading', { name: 'Development app: 12720' })).toBeVisible({ timeout: 30_000 });
+  await expect(preview.locator('body')).toHaveCSS('background-color', 'rgb(238, 246, 242)');
+  await expect(page.locator('iframe[title="端口映射预览"]')).toHaveAttribute('data-ready', 'true');
+  await preview.getByRole('button', { name: 'Open lazy page' }).click();
+  await expect(preview.locator('#result')).toHaveText('Lazy page loaded / Lazy page loaded');
+  await page.screenshot({ path: `../../.codex-tmp/port-mapping-vite-${test.info().project.name}.png` });
+});
+
+test('distinguishes unavailable resources from script errors and recovers after navigation', async ({ page }) => {
+  await page.goto('e2e/port-mapping-harness.html');
+  await page.getByRole('button', { name: '端口映射', exact: true }).click();
+  await page.getByRole('spinbutton', { name: '远程端口' }).fill(String(servicePort));
+  await page.getByRole('button', { name: '添加并启动' }).click();
+  await page.getByRole('button', { name: '在 Remote AI 中预览' }).click();
+  for (const [path, message] of [
+    ['/broken-resource', '部分网页资源无法加载，请检查服务后刷新。'],
+    ['/broken-script', '网页运行出错，请检查网页后刷新。'],
+  ]) {
+    await page.getByRole('textbox', { name: '网页路径' }).fill(path);
+    await page.getByRole('button', { name: '打开', exact: true }).click();
+    await expect(page.getByRole('alert')).toHaveText(message);
+    expect((await page.getByRole('alert').boundingBox())!.width).toBeLessThanOrEqual(400);
+  }
+  await page.getByRole('textbox', { name: '网页路径' }).fill('/');
+  await page.getByRole('button', { name: '打开', exact: true }).click();
+  await expect(page.frameLocator('iframe[title="端口映射预览"]')
+    .getByRole('heading', { name: 'Port mapping works' })).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
 test('retains overflow mappings and shows how to resume sync without blocking remote updates', async ({ page, context }) => {

@@ -7,11 +7,11 @@ export interface PreviewDocument { html: string; scripts: PreviewScript[]; modul
 const decoder = new TextDecoder();
 
 export async function previewDocument(tunnel: Pick<WebMappingTunnel, 'request'>,
-  input: MappingHttpRequest): Promise<PreviewDocument> {
+  input: MappingHttpRequest,
+  assets = new PreviewAssets(tunnel, new URL(input.url).origin)): Promise<PreviewDocument> {
   const origin = new URL(input.url).origin;
-  const assets = new PreviewAssets(tunnel, origin);
   const reply = input.method && input.method !== 'GET'
-    ? await tunnel.request(input) : await assets.load(input.url, origin);
+    ? await tunnel.request(input) : await assets.load(input.url, origin, { accept: 'text/html' });
   const document = new DOMParser().parseFromString(decoder.decode(reply.body), 'text/html');
   const base = assets.url(document.querySelector('base[href]')?.getAttribute('href') ?? reply.url, reply.url);
   document.querySelectorAll('base, meta[http-equiv], iframe, object, embed, link[rel=preload], link[rel=modulepreload]')
@@ -48,7 +48,7 @@ async function prepareStyles(document: Document, assets: PreviewAssets, base: st
   // Snapshot inline styles before replacing links so resolved CSS is not processed twice.
   const inline = [...document.querySelectorAll('style')];
   const external = [...document.querySelectorAll('link[rel=stylesheet]')].map(async node => {
-    const reply = await assets.load(node.getAttribute('href') ?? '', base);
+    const reply = await assets.load(node.getAttribute('href') ?? '', base, { accept: 'text/css' });
     const style = document.createElement('style');
     style.textContent = await assets.css(decoder.decode(reply.body), reply.url);
     node.replaceWith(style);

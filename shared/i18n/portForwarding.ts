@@ -1,6 +1,11 @@
 import { portMappingEditingEnglish, portMappingEditingRussian } from './portMappingEditing';
 
 export const portForwardingEnglish: Readonly<Record<string, string>> = {
+  '网页未能加载，请刷新重试。': 'Could not load the page. Please refresh and try again.',
+  '部分网页资源无法加载，请检查服务后刷新。': 'Some page resources could not load. Check the service and refresh.',
+  '网页内容较多，暂时无法在此预览。': 'This page is too large to preview here.',
+  '网页需要访问其他地址，暂时无法在此预览。': 'This page needs another address and cannot be previewed here.',
+  '网页运行出错，请检查网页后刷新。': 'The page encountered an error. Check the page and refresh.',
   ...portMappingEditingEnglish,
   '目标 IP': 'Target IP',
   '通过远程电脑访问目标 IP 和端口。留空 IP 可访问远程电脑本机。':
@@ -58,6 +63,11 @@ export const portForwardingEnglish: Readonly<Record<string, string>> = {
 };
 
 export const portForwardingRussian: Readonly<Record<string, string>> = {
+  '网页未能加载，请刷新重试。': 'Не удалось загрузить страницу. Обновите её и попробуйте снова.',
+  '部分网页资源无法加载，请检查服务后刷新。': 'Часть ресурсов не загрузилась. Проверьте сервис и обновите страницу.',
+  '网页内容较多，暂时无法在此预览。': 'Страница слишком велика для предпросмотра здесь.',
+  '网页需要访问其他地址，暂时无法在此预览。': 'Странице нужен доступ к другому адресу. Предпросмотр здесь недоступен.',
+  '网页运行出错，请检查网页后刷新。': 'На странице произошла ошибка. Проверьте её и обновите.',
   ...portMappingEditingRussian,
   '目标 IP': 'Целевой IP',
   '通过远程电脑访问目标 IP 和端口。留空 IP 可访问远程电脑本机。':

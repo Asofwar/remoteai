@@ -16,11 +16,11 @@ shared details drawer and retains the local address in its navigation history. S
 cannot be opened. These actions are intended for HTTP services; copying remains available for other TCP clients.
 
 Each computer supports up to eight saved mappings. Mappings can be started, stopped, edited, deleted and
-copied independently. Phone, Web and desktop automatically sync settings for the same signed-in account and
+copied independently. Phone and desktop automatically sync settings for the same signed-in account and
 remote computer. A local cache keeps settings available offline. Editing a running mapping closes its old
 listener before restarting with the new IP and ports; editing a stopped mapping leaves it stopped.
 Switching chat threads or projects keeps active mappings running. On desktop, switching computers also keeps them running.
-On mobile and Web, switching computers stops the previous computer's mappings. Disconnecting or signing out
+On mobile, switching computers stops the previous computer's mappings. Disconnecting or signing out
 releases listeners and remote resources; saved mappings require a manual start after reconnection
 or application restart. A local port already used by another process or mapping cannot be reused.
 
@@ -50,13 +50,10 @@ Force-stopping the app, signing out, or losing the remote connection stops mappi
 iOS supports the same listener and in-app preview. An external browser can be opened, but iOS may
 suspend the app in the background. The UI recommends the in-app preview for this reason.
 
-## Web preview
+## Web
 
-Web exposes **工具 → 端口映射**, with add, edit, start, stop and remove actions. It accepts a target IP and HTTP port;
-the displayed address identifies the service reached from that computer. Clicking it opens the internal preview.
-Different IPs can use the same port and remain independent, including after saved settings are restored.
-Web does not bind a local TCP port or present a browser-open/copy action that would target the viewer's machine.
-The local-port field is retained and synced for the phone and desktop apps; Web still previews the target address.
+Port mapping is available in the desktop and phone apps. The Web client does not expose port mapping
+or embedded mapping previews. Existing saved settings remain available to the desktop and phone apps.
 
 ## Configuration synchronization
 
@@ -78,22 +75,10 @@ an already-running mapping applies remote edits by restarting locally. Remote de
 Unavailable/older servers show a retry notice while local mapping continues to work. Configuration sync needs
 the new server and client versions; this source change does not deploy the migration or install updated apps.
 
-The preview uses the authenticated resource protocol to fetch HTTP/1 responses and a bounded resource
-graph, including styles, images, JavaScript modules, fetch/XHR calls and WebSocket connections. HTTP
-headers, content-length and chunked framing are parsed without sending the host page's cookies.
-Navigation, refresh and URL-encoded form submissions remain scoped to the selected IP and port.
-The sandbox has an opaque origin, no access to account storage, and a CSP that blocks direct network
-requests; a private MessageChannel provides only the selected mapping's operations.
-
-This is an embedded preview, not a full browser proxy: other origins, service workers, browser storage,
-streaming HTTP responses, computed module imports and browser-location-dependent routing are not emulated.
-Use the native app's TCP mapping for pages that require those browser capabilities. Each response is
-limited to 20 MiB, and one document's resource graph to 128 resources / 50 MiB.
-
 ## Transport and lifecycle
 
 The viewers reuse `guiResourceOpen` and `guiResourceClose` over the selected computer's authenticated
-chat connection. New mobile/Web clients negotiate `portStreamsV1` with the host, then use
+chat connection. New mobile clients negotiate `portStreamsV1` with the host, then use
 `guiResourceStream` only to open/close a TCP socket. Bytes flow continuously on the existing encrypted
 binary channel (native direct stream, WebRTC data channel, or CSF1 server relay), independently of
 chat RPC framing. No additional public listener or backend route is needed. The resource URL identifies
@@ -119,8 +104,8 @@ releases its bound socket before completing a stop, even with a pending accept. 
 share an eight-stream concurrency budget per computer to retain chat RPC and cleanup capacity. Additional
 connections wait in FIFO order for up to 30 seconds instead of being closed as soon as the budget is full.
 The desktop accepts at most one waiting socket per listener and leaves further connections in the TCP backlog.
-Native sockets pause while waiting to preserve their initial request bytes. Web HTTP requests and WebSockets
-use the same admission queue. Stopping a mapping cancels its queued connections without affecting other mappings.
+Native sockets pause while waiting to preserve their initial request bytes. Stopping a mapping cancels
+its queued connections without affecting other mappings.
 A failed listener or disconnected session requires restarting its mapping.
 
 The host's local socket bridge and compatibility RPC use a uniform 384 KiB read/write bound. The
@@ -128,24 +113,11 @@ desktop viewer's local `TerminalLinkTunnels` currently retains this compatibilit
 as soon as data is available and drains only immediately readable bytes; small replies and WebSockets
 never wait for the larger buffer to fill.
 
-Web additionally fetches independent scripts/styles/images concurrently while preserving document
-execution/style order, reuses safe HTTP/1.1 connections (up to eight idle connections per computer,
-four-second expiry), and requests gzip/deflate where supported. Both wire and decoded responses are
-bounded. A stale reused socket is retried once only for GET/HEAD before any response bytes arrive;
-POST is never replayed. Closing/navigating a preview cancels its active and queued HTTP requests.
-
 ## Verification
 
 - `portForwarding/byteStream.test.ts`, `streamMux.test.ts`, `streamClient.test.ts` and
   `streamIntegration.test.ts` cover bounded credit, cancellation, old-host fallback, encryption,
   replay/forgery, shrinking path limits, concurrent upload/download, shared file/port transport and live P2P/relay switching.
-  Real loopback HTTP/TCP plus the encrypted stream implementation at simulated 60 ms RTT transfers
-  an 8 MiB HTTP body in roughly 0.9–1.2 seconds, with a path switch and one socket-open RPC. This is a
-  controlled transport benchmark, not a WAN or phone-browser timing guarantee.
-- `httpPerformance.test.ts` measures a document with 20 tiny images at 60 ms simulated RPC RTT:
-  the original serial/close-per-request implementation took about 4.1 seconds; concurrent loading and
-  connection reuse take about 0.7–1.0 seconds and use at most eight connections. This test also keeps
-  the compatibility path covered. Browser tests verify asset/module order and sandbox isolation.
 - Android `ANDROID_SERIAL=<device> node apps/native/scripts/test-port-streams.cjs` checks routing,
   ownership, queue limits, overflow cleanup, close/poll races and the duplex JNI entrypoint on hardware,
   without replacing the installed app. Build the arm64 APK/native library first. This is bridge-level
@@ -171,8 +143,6 @@ POST is never replayed. Closing/navigating a preview cancels its active and queu
 - `e2e/port-forwarding.pw.ts` covers form actions, preview/browser opening, copying, errors, reconnects, device switching,
   persistence and compact light/dark layouts; `e2e/remote-gui.pw.ts` verifies the real workspace entry.
 - Native `portMapping` tests cover real TCP/HTTP transfer, binary bytes, port conflicts, reuse and background leases.
-- Web `playwright.port-mapping.config.ts` tests a real HTTP/WebSocket fixture on mobile and desktop viewports,
-  including resource loading, module imports, API requests, navigation, forms and account-storage isolation.
 - Android hardware verification (2026-10-15): over P2P to a paired Windows 11 VM, remote loopback `17631`
   mapped to phone loopback `17632`. In-app preview, external Mi Browser opening and background refresh,
   copying, stopping and immediately restarting the same port passed. Foreground service type changed from

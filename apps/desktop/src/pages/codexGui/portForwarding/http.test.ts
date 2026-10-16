@@ -41,3 +41,14 @@ it('reassembles fragmented WebSocket frames around ping control messages and mas
   expect(encoded[0]).toBe(0x81); expect(encoded[1]).toBe(0x85);
   expect(Uint8Array.from(encoded.slice(6), (value, index) => value ^ encoded[2 + index % 4])).toEqual(bytes('hello'));
 });
+
+it('consumes complete chunk trailers before allowing connection reuse', () => {
+  const reader = new HttpResponseReader();
+  expect(reader.push(bytes('HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nx\r\n0\r\n'), false))
+    .toBeUndefined();
+  expect(reader.reusable).toBe(false);
+  expect([...reader.push(bytes('X-Checksum: value\r\n\r\n'), false)!.body]).toEqual([120]);
+  expect(reader.reusable).toBe(true);
+  expect(() => new HttpResponseReader().push(bytes(
+    'HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Length: 1\r\n\r\n'), false)).toThrow('Ambiguous');
+});

@@ -1,28 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Popover } from 'antd';
-import { Cable, GitBranch, Monitor, SquareTerminal, Wrench } from 'lucide-react';
+import { GitBranch, Monitor, SquareTerminal, Wrench } from 'lucide-react';
 import type { GuiToolsClient } from '../../../../shared/remote-chat/guiTools';
 import { ChatTerminal } from './ChatTerminal';
 import { ChatGit } from './git/ChatGit';
 import { RemoteDesktop } from './desktop/RemoteDesktop';
-import { PortMappings } from './portMapping/PortMappings';
 import { t } from '../i18n';
 import './git/git.css';
 
 interface Props {
   client: GuiToolsClient; cwd: string; active: boolean; connected: boolean; deviceName?: string;
-  scope: string;
 }
 export function ChatTools(props: Props) {
-  const [mapping, setMapping] = useState(false);
-  return <>
-    <ProjectTools key={props.cwd} {...props} openMappings={() => setMapping(true)} />
-    <PortMappings client={props.client.files} scope={props.scope} connected={props.connected}
-      active={props.active} deviceName={props.deviceName} open={mapping} close={() => setMapping(false)} />
-  </>;
+  return <ProjectTools key={props.cwd} {...props} />;
 }
 
-function ProjectTools({ client, ...props }: Props & { openMappings: () => void }) {
+function ProjectTools({ client, ...props }: Props) {
   const [menu, setMenu] = useState(false);
   const [launchId, setLaunchId] = useState(0);
   const [git, setGit] = useState(false);
@@ -31,8 +24,6 @@ function ProjectTools({ client, ...props }: Props & { openMappings: () => void }
   return <>
     <Popover trigger="click" placement="bottomRight" arrow={false} open={menu && props.active} onOpenChange={setMenu}
       content={<div className="chat-tools-menu">
-        <button type="button" onClick={() => { setMenu(false); props.openMappings(); }}>
-          <Cable size={20} />{t('端口映射')}</button>
         <button type="button" disabled={!props.connected}
           onClick={() => { setMenu(false); setDesktop(true); }}>
           <Monitor size={20} />{t('远程桌面')}</button>

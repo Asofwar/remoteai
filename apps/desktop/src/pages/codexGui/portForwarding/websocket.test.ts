@@ -1,8 +1,6 @@
 import { createHash } from 'node:crypto';
 import { expect, it, vi } from 'vitest';
 import { MappingWebSocket, type MappingSocketEvent } from '../../../../../../shared/port-mapping/websocket';
-import { WebMappingTunnel } from '../../../../../web/src/chat/portMapping/httpTunnel';
-import { StreamBudget } from '../../../../../../shared/port-mapping/streamBudget';
 import type { ForwardingClient } from '../../../../../../shared/port-mapping/service';
 
 function fixture() {
@@ -46,18 +44,4 @@ it('ends a socket exactly once after a write failure while the reader stays open
   expect(client.link.mock.calls.filter(([, request]) => request.type === 'write')).toHaveLength(2);
   expect(client.link.mock.calls.filter(([, request]) => request.type === 'close')).toHaveLength(1);
   finishRead();
-});
-
-it('releases the tunnel stream reservation even when a failed socket read never returns', async () => {
-  const { client, finishRead } = fixture();
-  const bridgeBudget = new StreamBudget(1);
-  const tunnel = new WebMappingTunnel(client, { bridgeBudget, localPort: 8080, onClosed: vi.fn() });
-  await tunnel.resolve('resource', 'http://localhost:8080');
-  const events: MappingSocketEvent[] = [];
-  const socket = await tunnel.openWebSocket('ws://localhost:8080/', [], event => events.push(event));
-  await vi.waitFor(() => expect(events[0]?.type).toBe('open'));
-  await expect(socket.send('first')).rejects.toThrow('Write failed');
-  const release = await bridgeBudget.acquire(new AbortController().signal);
-  expect(release).toBeTypeOf('function');
-  release?.(); finishRead(); await tunnel.close();
 });

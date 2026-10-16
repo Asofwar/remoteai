@@ -16,9 +16,9 @@ const NETWORK_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum SharingScope {
+    #[default]
     Off,
     Own,
-    #[default]
     Everyone,
 }
 
@@ -34,11 +34,12 @@ pub(crate) struct Preferences {
 
 impl Default for Preferences {
     fn default() -> Self {
+        // A restarted client must not share or prefetch before its server policy arrives.
         Self {
-            scope: SharingScope::Everyone,
-            upload_kib_per_second: 0,
-            unmetered_only: false,
-            prepare_android: true,
+            scope: SharingScope::Off,
+            upload_kib_per_second: MIN_UPLOAD_KIB_PER_SECOND,
+            unmetered_only: true,
+            prepare_android: false,
         }
     }
 }
@@ -65,16 +66,22 @@ pub(super) struct Metrics {
 }
 
 pub(super) struct Policy {
-    settings: watch::Sender<Preferences>,
+    settings: watch::Sender<ServerSettings>,
     unmetered: AtomicBool,
     next_upload: Mutex<tokio::time::Instant>,
     pub metrics: Metrics,
 }
 
+#[derive(Default)]
+struct ServerSettings {
+    server: Option<String>,
+    preferences: Preferences,
+}
+
 impl Policy {
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
-            settings: watch::channel(Preferences::default()).0,
+            settings: watch::channel(ServerSettings::default()).0,
             unmetered: AtomicBool::new(false),
             next_upload: Mutex::new(tokio::time::Instant::now()),
             metrics: Metrics::default(),
@@ -82,7 +89,21 @@ impl Policy {
     }
 
     pub fn preferences(&self) -> Preferences {
-        self.settings.borrow().clone()
+        self.settings.borrow().preferences.clone()
+    }
+
+    /// Invalidate the old server's settings before any work can use a different server.
+    pub fn select_server(&self, server: Option<String>) {
+        self.settings.send_if_modified(|current| {
+            if current.server == server {
+                return false;
+            }
+            *current = ServerSettings {
+                server,
+                preferences: Preferences::default(),
+            };
+            true
+        });
     }
 
     pub fn allows_network(&self) -> bool {
@@ -100,7 +121,7 @@ impl Policy {
     /// Transfers observe scope changes independently of the signaling connection.
     pub async fn scope_changed(&self, initial: SharingScope) {
         let mut settings = self.settings.subscribe();
-        while settings.borrow_and_update().scope == initial {
+        while settings.borrow_and_update().preferences.scope == initial {
             if settings.changed().await.is_err() {
                 return;
             }
@@ -110,7 +131,7 @@ impl Policy {
     pub async fn throttle(&self, bytes: usize) -> Result<()> {
         let mut settings = self.settings.subscribe();
         loop {
-            let preferences = settings.borrow_and_update().clone();
+            let preferences = settings.borrow_and_update().preferences.clone();
             if !self.allows_upload() {
                 return Err(Error::Unavailable);
             }
@@ -149,24 +170,42 @@ impl Policy {
     }
 
     /// Only the configured administration server can replace the running policy.
-    pub async fn apply(&self, settings: Preferences) -> Result<()> {
+    pub async fn apply(&self, server: &str, settings: Preferences) -> Result<()> {
         settings.validate()?;
         let mut next = self.next_upload.lock().await;
+        let mut accepted = false;
         self.settings.send_if_modified(|current| {
-            if *current == settings {
+            if current.server.as_deref() != Some(server) {
                 return false;
             }
-            *current = settings;
+            accepted = true;
+            if current.preferences == settings {
+                return false;
+            }
+            current.preferences = settings;
             *next = tokio::time::Instant::now();
             true
         });
-        Ok(())
+        if accepted {
+            Ok(())
+        } else {
+            Err(Error::Unavailable)
+        }
     }
 
     #[cfg(test)]
     pub fn testing() -> Arc<Self> {
         let policy = Self::new();
         policy.unmetered.store(true, Ordering::Relaxed);
+        policy.settings.send_replace(ServerSettings {
+            server: Some("test-server".into()),
+            preferences: Preferences {
+                scope: SharingScope::Everyone,
+                upload_kib_per_second: 0,
+                unmetered_only: false,
+                prepare_android: true,
+            },
+        });
         policy
     }
 }

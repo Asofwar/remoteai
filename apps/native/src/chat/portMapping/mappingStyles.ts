@@ -43,5 +43,6 @@ export const useMappingStyles = createThemedStyles(color => ({
   error: { color: color('#c74e47', 'danger'), fontSize: 12, lineHeight: 18, maxWidth: 400 },
   empty: { color: color('#62768a', 'muted'), textAlign: 'center', padding: 12 },
   footer: { color: color('#62768a', 'muted'), fontSize: 12, textAlign: 'center', paddingTop: 12 },
-  sync: { color: color('#62768a', 'muted'), fontSize: 11, textAlign: 'center' },
+  sync: { color: color('#62768a', 'muted'), fontSize: 11, lineHeight: 18, textAlign: 'center',
+    maxWidth: 400, alignSelf: 'center' },
 }));

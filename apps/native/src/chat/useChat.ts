@@ -4,12 +4,14 @@ import type { AuthSession } from '../types';
 import { ChatController } from './controller';
 import { CHAT_SERVICE_STOPPED } from './backgroundConnection';
 import { useChatCatalog } from './useChatCatalog';
+import { useActiveChatPolicy } from '../../../../shared/remote-chat/useActiveChatPolicy';
 
 const HISTORY_REFRESH_MS = 15_000;
 
 export function useChat(session: AuthSession, deviceId: string, active: boolean) {
   const controller = useMemo(() => new ChatController(session, deviceId), [session, deviceId]);
   const state = useSyncExternalStore(controller.subscribe, controller.snapshot);
+  useActiveChatPolicy(active, state.mode);
   const catalog = useChatCatalog({ session, deviceId, controller, state });
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   useEffect(() => {

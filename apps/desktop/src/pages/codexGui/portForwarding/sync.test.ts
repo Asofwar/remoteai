@@ -1,19 +1,21 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { MappingSync, type MappingDocument } from '../../../../../../shared/port-mapping/sync';
 import { PortForwardingService } from '../../../../../../shared/port-mapping/service';
-import type { MappingStorage, PortMapping } from '../../../../../../shared/port-mapping/settings';
+import { MAX_PORT_MAPPINGS, readPortMappings, savePortMappings,
+  type MappingStorage, type PortMapping } from '../../../../../../shared/port-mapping/settings';
 
 const cleanup: (() => void)[] = [];
-afterEach(() => { cleanup.splice(0).forEach(dispose => dispose()); });
+afterEach(() => { cleanup.splice(0).forEach(dispose => dispose()); vi.useRealTimers(); });
 const flush = async () => { for (let count = 0; count < 40; count++) await Promise.resolve(); };
 const storage = (): MappingStorage => {
   const values = new Map<string, string>();
   return { getItem: key => values.get(key) ?? null, setItem: (key, value) => { values.set(key, value); } };
 };
-function server() {
-  let doc: MappingDocument = { revision: 0, mappings: [] };
+function server(mappings: PortMapping[] = []) {
+  let doc: MappingDocument = { revision: 0, mappings };
   const exchange = vi.fn(async (input?: MappingDocument) => {
     if (!input) return structuredClone(doc);
+    if (input.mappings.length > MAX_PORT_MAPPINGS) throw new Error('Invalid port mapping configuration');
     if (input.revision !== doc.revision) return { ...structuredClone(doc), accepted: false };
     doc = { revision: doc.revision + 1, mappings: structuredClone(input.mappings) };
     return { ...structuredClone(doc), accepted: true };
@@ -48,6 +50,78 @@ it('syncs additions, stable IDs, edits and removals between phone, desktop and W
   await web.service.remove(original.id); await flush(); await phone.sync.refresh(); await desktop.sync.refresh();
   expect(phone.service.snapshot()).toEqual([]);
   expect(desktop.service.snapshot()).toEqual([]);
+});
+
+const sevenMappings = () => Array.from({ length: 7 }, (_, index) => ({
+  id: `base-${index}`, remoteHost: '127.0.0.1', remotePort: 3000 + index, localPort: 13000 + index,
+}));
+
+it('keeps both simultaneous eighth mappings, avoids invalid retries and still syncs unrelated edits', async () => {
+  vi.useFakeTimers();
+  const cloud = server(sevenMappings()), first = device(cloud), second = device(cloud);
+  await flush();
+  first.service.add(4000, 14000); second.service.add(5000, 15000); await flush();
+  await second.sync.refresh();
+  expect(cloud.document().mappings).toHaveLength(MAX_PORT_MAPPINGS);
+  expect(second.service.snapshot()).toHaveLength(9);
+  expect(second.sync.snapshot()).toContain('多出的映射已保留在本机');
+  const uploads = () => cloud.exchange.mock.calls.filter(([input]) => input !== undefined);
+  const uploadCount = uploads().length;
+  await vi.advanceTimersByTimeAsync(15_000);
+  expect(uploads()).toHaveLength(uploadCount);
+  expect(uploads().every(([input]) => input!.mappings.length <= MAX_PORT_MAPPINGS)).toBe(true);
+  await first.service.edit('base-0', { remotePort: 6000, localPort: 16000 }); await flush();
+  await second.sync.refresh();
+  expect(second.service.snapshot().find(entry => entry.id === 'base-0')?.remotePort).toBe(6000);
+  await second.service.edit('base-1', { remotePort: 7000, localPort: 17000 }); await flush();
+  expect(cloud.document().mappings.find(entry => entry.id === 'base-1')?.remotePort).toBe(7000);
+  expect(second.service.snapshot()).toHaveLength(9);
+  expect(second.sync.snapshot()).toContain('多出的映射已保留在本机');
+  await second.service.remove('base-2'); await flush(); await first.sync.refresh();
+  expect(second.sync.snapshot()).toBe('配置已自动同步');
+  expect(cloud.document().mappings.map(entry => entry.remotePort)).toContain(5000);
+  expect(first.service.snapshot().map(entry => entry.id).sort())
+    .toEqual(second.service.snapshot().map(entry => entry.id).sort());
+});
+
+it('preserves overflow across an offline restart and resumes when another client frees capacity', async () => {
+  const cloud = server(sevenMappings()), cache = storage();
+  let offline = false;
+  const exchange = vi.fn(async (input?: MappingDocument) => {
+    if (offline) throw new Error('offline');
+    return cloud.exchange(input);
+  });
+  const first = device(cloud), second = device({ exchange, cache }); await flush();
+  first.service.add(4000, 14000); second.service.add(5000, 15000); await flush();
+  await second.sync.refresh();
+  savePortMappings('account/computer', second.service.snapshot(), cache);
+  second.stop(); offline = true;
+  const restarted = device({ exchange, cache, saved: readPortMappings('account/computer', cache) });
+  await flush();
+  expect(restarted.service.snapshot()).toHaveLength(9);
+  expect(restarted.service.snapshot().map(entry => entry.remotePort)).toEqual(expect.arrayContaining([4000, 5000]));
+  await first.service.remove('base-0'); await flush();
+  offline = false; await restarted.sync.refresh();
+  expect(restarted.sync.snapshot()).toBe('配置已自动同步');
+  expect(restarted.service.snapshot()).toHaveLength(MAX_PORT_MAPPINGS);
+  expect(cloud.document().mappings.map(entry => entry.remotePort)).toContain(5000);
+  expect(JSON.parse(cache.getItem('codex-port-mapping-sync:account/computer')!)).toEqual({});
+});
+
+it('applies newly fetched remote entries even if an otherwise valid local write fails', async () => {
+  const cloud = server(sevenMappings()), first = device(cloud), second = device({
+    exchange: vi.fn(async (input?: MappingDocument) => {
+      if (input) throw new Error('write unavailable');
+      return cloud.exchange();
+    }),
+  });
+  await flush();
+  first.service.add(4000, 14000); await flush();
+  second.service.add(5000, 15000);
+  await second.service.edit('base-0', { remotePort: 6000, localPort: 16000 }); await flush();
+  expect(second.sync.snapshot()).toContain('暂未同步');
+  expect(second.service.snapshot()).toHaveLength(9);
+  expect(second.service.snapshot().map(entry => entry.remotePort)).toEqual(expect.arrayContaining([4000, 5000, 6000]));
 });
 
 it('merges concurrent additions without losing unrelated records and retries a stale revision', async () => {

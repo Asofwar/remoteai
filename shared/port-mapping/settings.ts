@@ -21,10 +21,10 @@ export function readPortMappings(scope: string, storage: MappingStorage = localS
     const saved: unknown = JSON.parse(storage.getItem(STORAGE_PREFIX + scope) ?? '[]');
     if (!Array.isArray(saved)) return [];
     const mappings: PortMapping[] = [];
+    // Sync conflicts can retain more than the cloud limit locally until the user removes an entry.
     for (const value of saved) {
       const mapping = readMapping(value, createId);
       if (mapping && !mappings.some(saved => mappingConflicts(saved, mapping, mode))) mappings.push(mapping);
-      if (mappings.length === MAX_PORT_MAPPINGS) break;
     }
     return mappings;
   } catch { return []; } // Unavailable storage must not prevent a temporary mapping.

@@ -1,10 +1,11 @@
-import { mappingConfig, readMapping, type MappingStorage, type PortMapping } from './settings';
+import { MAX_PORT_MAPPINGS, mappingConfig, readMapping, type MappingStorage, type PortMapping } from './settings';
 import type { PortForwardingService } from './service';
 
 export interface MappingDocument { revision: number; mappings: PortMapping[]; accepted?: boolean }
 export type MappingExchange = (document?: MappingDocument) => Promise<MappingDocument>;
 const INTERVAL_MS = 5_000;
 const SYNC_ERROR = '配置暂未同步，联网后会自动重试。';
+const CAPACITY_CONFLICT = '最多同步 8 条映射，多出的映射已保留在本机。请删除不需要的映射后继续同步。';
 type Pending = Record<string, PortMapping | null>;
 
 /** Pending per-record edits survive restarts; compare-and-swap preserves unrelated concurrent edits. */
@@ -55,11 +56,13 @@ export class MappingSync {
     try {
       let remote = readMappingDocument(await this.options.exchange());
       if (this.disposed) return;
+      // A failed write must not prevent valid remote changes from reaching this device.
+      this.service.applySaved(mergeMappings(remote.mappings, this.pending));
       // A conflicting device may win the CAS; fetch/merge again on the next bounded poll.
-      const sent = { ...this.pending };
+      const { sent, mappings } = planMappingUpload(remote.mappings, this.pending);
       if (Object.keys(sent).length) {
         remote = readMappingDocument(await this.options.exchange({ revision: remote.revision,
-          mappings: mergeMappings(remote.mappings, sent) }));
+          mappings }));
         if (this.disposed) return;
         if (remote.accepted) {
           for (const [id, value] of Object.entries(sent)) {
@@ -68,8 +71,9 @@ export class MappingSync {
         }
       }
       const persisted = this.persist();
-      this.service.applySaved(mergeMappings(remote.mappings, this.pending));
-      if (persisted) this.setStatus(Object.keys(this.pending).length ? '配置正在同步…' : '配置已自动同步');
+      const visible = mergeMappings(remote.mappings, this.pending);
+      this.service.applySaved(visible);
+      if (persisted) this.updateStatus(visible);
     } catch { if (!this.disposed) this.setStatus(SYNC_ERROR); }
     finally { this.busy = false; }
   };
@@ -91,6 +95,14 @@ export class MappingSync {
     return Object.fromEntries(this.service.snapshot().map(entry => [entry.id, mappingConfig(entry)]));
   }
 
+  private updateStatus(visible: PortMapping[]) {
+    if (visible.length > MAX_PORT_MAPPINGS) {
+      this.setStatus(CAPACITY_CONFLICT);
+      return;
+    }
+    this.setStatus(Object.keys(this.pending).length ? '配置正在同步…' : '配置已自动同步');
+  }
+
   private persist() {
     try { this.options.storage.setItem(this.key, JSON.stringify(this.pending)); return true; }
     catch { this.setStatus('配置未能保存到本机，请检查存储空间。'); return false; }
@@ -104,7 +116,9 @@ export class MappingSync {
 
 function readMappingDocument(value: MappingDocument): MappingDocument {
   if (!value || !Number.isSafeInteger(value.revision) || value.revision < 0
-    || !Array.isArray(value.mappings) || value.mappings.length > 8) throw new Error('Invalid mapping document');
+    || !Array.isArray(value.mappings) || value.mappings.length > MAX_PORT_MAPPINGS) {
+    throw new Error('Invalid mapping document');
+  }
   const ids = new Set<string>();
   const mappings = value.mappings.map(entry => {
     if (!entry || typeof entry.id !== 'string' || !/^[\w-]{1,64}$/.test(entry.id) || ids.has(entry.id)) {
@@ -116,6 +130,22 @@ function readMappingDocument(value: MappingDocument): MappingDocument {
     return parsed;
   });
   return { revision: value.revision, mappings, accepted: value.accepted === true };
+}
+
+/** Apply edits/deletions first, then fill available slots; overflow remains in the durable pending queue. */
+function planMappingUpload(remote: PortMapping[], pending: Pending): { sent: Pending; mappings: PortMapping[] } {
+  const remoteIds = new Set(remote.map(entry => entry.id));
+  const changes = Object.entries(pending);
+  const sent = Object.fromEntries(changes.filter(([id, value]) => !value || remoteIds.has(id)));
+  let mappings = mergeMappings(remote, sent);
+  for (const [id, value] of changes) {
+    if (!value || remoteIds.has(id)) continue;
+    const candidate = mergeMappings(mappings, { [id]: value });
+    if (candidate.length > MAX_PORT_MAPPINGS) continue;
+    sent[id] = value;
+    mappings = candidate;
+  }
+  return { sent, mappings };
 }
 
 export function mergeMappings(remote: PortMapping[], pending: Pending): PortMapping[] {

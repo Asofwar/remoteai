@@ -2,10 +2,15 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ChatController } from '../../../../shared/remote-chat/client/controller';
 import type { ConnectionEvents } from '../../../../shared/remote-chat/client/connection';
 import { useChat } from './useChat';
+import { checkFileUploadSize, DEFAULT_CHAT_POLICY, MIB, setChatConnectionMode, setChatPolicy }
+  from '../../../../shared/remote-chat/policy';
+
+interface Effect { dependencies: unknown[]; cleanup?: () => void }
 
 const runtime = vi.hoisted(() => ({
   controller: undefined as ChatController | undefined,
-  effects: [] as Array<{ dependencies: unknown[]; cleanup?: () => void }>,
+  effects: [] as Effect[],
+  roots: [] as Effect[][],
   pending: [] as Array<() => void>,
   cursor: 0,
   listeners: new Set<(state: string) => void>(),
@@ -39,12 +44,17 @@ vi.mock('./controller', () => ({ ChatController: function Controller() { return 
 vi.mock('./backgroundConnection', () => ({ CHAT_SERVICE_STOPPED: 'chat-service-stopped' }));
 vi.mock('./useChatCatalog', () => ({ useChatCatalog: () => ({}) }));
 
-beforeEach(() => { vi.useFakeTimers(); runtime.state = 'active'; });
+beforeEach(() => {
+  vi.useFakeTimers(); runtime.state = 'active';
+  setChatPolicy(DEFAULT_CHAT_POLICY); setChatConnectionMode('offline');
+});
 afterEach(() => {
-  for (const effect of runtime.effects.splice(0)) effect.cleanup?.();
+  for (const root of runtime.roots.splice(0)) for (const effect of root) effect.cleanup?.();
+  runtime.effects = [];
   runtime.pending = []; runtime.cursor = 0;
   runtime.controller = undefined;
   runtime.listeners.clear();
+  setChatPolicy(DEFAULT_CHAT_POLICY); setChatConnectionMode('offline');
   vi.useRealTimers();
 });
 
@@ -60,7 +70,7 @@ function mount(healthy = false) {
   const stop = vi.fn(() => { active = false; events.mode('offline'); });
   const retryNow = vi.fn();
   const request = vi.fn(async (method: string) => method === 'connect' ? [] : { data: [], nextCursor: null });
-  runtime.controller = new ChatController(callbacks => {
+  const controller = new ChatController(callbacks => {
     events = callbacks;
     return {
       start: () => {
@@ -77,14 +87,18 @@ function mount(healthy = false) {
   });
   const session = { baseUrl: 'https://example.test', email: 'test@example.test',
     accessToken: 'access', refreshToken: 'refresh' };
+  const effects: Effect[] = [];
+  runtime.roots.push(effects);
   const render = (visible = true) => {
+    runtime.controller = controller;
+    runtime.effects = effects;
     runtime.cursor = 0;
     const result = useChat(session, 'device', visible);
     runtime.pending.splice(0).forEach(effect => effect());
     return result;
   };
   render();
-  return { controller: runtime.controller, events, attempts: () => attempts, stop, request, retryNow, render };
+  return { controller, events, attempts: () => attempts, stop, request, retryNow, render };
 }
 
 it('retries immediately on foreground return while the transport is waiting for automatic retry', () => {
@@ -158,4 +172,43 @@ it('resumes a retained device without polling its history while another device i
   expect(client.controller.snapshot().ready).toBe(true);
   expect(client.stop).not.toHaveBeenCalled();
   expect(refresh).not.toHaveBeenCalled();
+});
+
+it('restores upload limits when switching from direct A to relay B and back to retained A', async () => {
+  setChatPolicy({ ...DEFAULT_CHAT_POLICY, fileUploadMaxMb: 1 });
+  const direct = mount(true);
+  await vi.advanceTimersByTimeAsync(0);
+  direct.render();
+  expect(() => checkFileUploadSize(2 * MIB)).not.toThrow();
+  direct.render(false);
+  const relay = mount(true);
+  relay.events.mode('relay');
+  relay.render();
+  expect(() => checkFileUploadSize(2 * MIB)).toThrow('1 MB');
+  relay.render(false);
+  direct.render();
+  expect(() => checkFileUploadSize(2 * MIB)).not.toThrow();
+  expect(direct.attempts()).toBe(1);
+  expect(direct.stop).not.toHaveBeenCalled();
+});
+
+it('ignores hidden reconnects in both directions and resets limits when leaving chat', async () => {
+  setChatPolicy({ ...DEFAULT_CHAT_POLICY, fileUploadMaxMb: 1 });
+  const direct = mount(true);
+  await vi.advanceTimersByTimeAsync(0);
+  direct.render(false);
+  const relay = mount(true);
+  relay.events.mode('relay');
+  relay.render();
+  for (const mode of ['offline', 'connecting', 'direct'] as const) {
+    direct.events.mode(mode); direct.render(false);
+    expect(() => checkFileUploadSize(2 * MIB)).toThrow('1 MB');
+  }
+  relay.render(false); direct.render();
+  for (const mode of ['offline', 'connecting', 'relay'] as const) {
+    relay.events.mode(mode); relay.render(false);
+    expect(() => checkFileUploadSize(2 * MIB)).not.toThrow();
+  }
+  direct.render(false);
+  expect(() => checkFileUploadSize(2 * MIB)).toThrow('1 MB');
 });

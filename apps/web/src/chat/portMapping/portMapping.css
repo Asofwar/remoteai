@@ -38,6 +38,7 @@
 .mapping-footer, .mapping-empty, .mapping-sync { text-align: center; font-size: 12px; }
 .mapping-footer { padding-top: 12px; }
 .port-mappings .mapping-hint, .mapping-sync { font-size: 11px; }
+.port-mappings .mapping-sync { max-width: 400px; margin-inline: auto; overflow-wrap: anywhere; }
 .mapping-sheet .ant-btn-icon { display: inline-flex; align-items: center; }
 .mapping-sheet .ant-switch-checked { background: #008b73; }
 .mapping-sheet .ant-btn:disabled { opacity: .45; }

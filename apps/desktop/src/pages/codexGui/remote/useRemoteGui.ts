@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { ChatController } from '../../../../../../shared/remote-chat/client/controller';
 import { ChatConnection } from '../../../../../../shared/remote-chat/client/connection';
-import { setChatConnectionMode } from '../../../../../../shared/remote-chat/policy';
+import { useActiveChatPolicy } from '../../../../../../shared/remote-chat/useActiveChatPolicy';
 import { createDesktopPeer } from '../../../remoteChat/peer';
 import { createDesktopNativePath } from '../../../remoteChat/nativePath';
 import { NativeGuiSocket } from './nativeSocket';
@@ -21,12 +21,8 @@ export function useRemoteGui(identity: GuiCloudIdentity, deviceId: string, activ
     createNativePath: createDesktopNativePath,
   })), [identity.baseUrl, identity.userId, deviceId]);
   const state = useSyncExternalStore(controller.subscribe, controller.snapshot);
+  useActiveChatPolicy(active, state.mode);
   useEffect(() => { controller.start(); return () => controller.stop(); }, [controller]);
-  useEffect(() => {
-    if (!active) return;
-    setChatConnectionMode(state.mode);
-    return () => setChatConnectionMode('offline');
-  }, [active, state.mode]);
   useEffect(() => {
     if (!active || !state.ready) return;
     const refresh = () => { void controller.refreshSelected(); };

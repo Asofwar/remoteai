@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { MobileChatConnection } from './connection';
 import type { AuthSession } from '../types';
+import { getChatPolicy, setChatConnectionMode } from '../../../../shared/remote-chat/policy';
 
 const platform = vi.hoisted(() => ({ OS: 'ios', constants: { Model: 'Test phone' } }));
 vi.mock('react-native', () => ({ Platform: platform, NativeModules: {} }));
@@ -17,7 +18,7 @@ class Socket {
   close = vi.fn();
   constructor() { Socket.latest = this; }
 }
-afterEach(() => { Socket.latest = undefined; vi.unstubAllGlobals(); });
+afterEach(() => { Socket.latest = undefined; setChatConnectionMode('offline'); vi.unstubAllGlobals(); });
 
 it.each(['android', 'ios'])('advertises native TCP support in the authenticated %s wire handshake', async os => {
   platform.OS = os;
@@ -26,7 +27,9 @@ it.each(['android', 'ios'])('advertises native TCP support in the authenticated 
   const connection = new MobileChatConnection({ session, deviceId: 'target-pc',
     mode: vi.fn(), ready: vi.fn(), event: vi.fn(), error: vi.fn() });
   try {
+    setChatConnectionMode('direct');
     connection.start();
+    expect(getChatPolicy().fileUploadMaxMb).toBe(Number.MAX_SAFE_INTEGER);
     await vi.waitFor(() => expect(Socket.latest?.onopen).toBeTypeOf('function'));
     const socket = Socket.latest!;
     socket.onopen?.();
@@ -35,4 +38,5 @@ it.each(['android', 'ios'])('advertises native TCP support in the authenticated 
       clientInfo: { platform: os === 'ios' ? 'iOS' : 'Android' },
     });
   } finally { connection.stop(); }
+  expect(getChatPolicy().fileUploadMaxMb).toBe(Number.MAX_SAFE_INTEGER);
 });

@@ -64,7 +64,7 @@ export function PortMappings(props: {
         {!editing && <MappingForm service={service} disabled={entries.length >= MAX_PORT_MAPPINGS}
           connected={props.connected} />}
         <Text style={styles.footer}>{t('支持 TCP，仅本机可访问。')}</Text>
-        {!!syncStatus && <Text style={styles.sync}>{t(syncStatus)}</Text>}
+        {!!syncStatus && <Text style={styles.sync} accessibilityLiveRegion="polite">{t(syncStatus)}</Text>}
         {Platform.OS === 'ios' && <Text style={styles.muted}>
           {t('切到其他应用后，映射可能中断，建议在此预览。')}</Text>}
       </SheetScrollView>}

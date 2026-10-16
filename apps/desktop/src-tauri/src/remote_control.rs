@@ -111,7 +111,7 @@ pub(crate) fn start<R: Runtime>(app: tauri::AppHandle<R>) {
                         eprintln!("remote account control disconnected: {error}");
                     }
                 }
-                Ok(None) => update_peers.shutdown(),
+                Ok(None) => update_peers.signed_out(),
                 Err(error) => eprintln!("remote account control is unavailable: {error}"),
             }
             update_peers.disconnected();
@@ -125,6 +125,7 @@ fn run_connection<R: Runtime>(
     config: RemoteControlConfig,
     update_peers: &mut crate::update_peers::Bridge,
 ) -> Result<(), String> {
+    update_peers.server(&config.websocket_url);
     let (mut socket, _) = connect_remote_websocket(&config.websocket_url)?;
     set_read_timeout(socket.get_mut(), Some(Duration::from_secs(2)))?;
     let remote_commands_enabled = crate::remote_command::host::enabled();
@@ -172,7 +173,6 @@ fn run_connection<R: Runtime>(
     let mut last_ping = Instant::now();
     let mut updates = app_update::UpdateBridge::new(app);
     let mut commands = crate::remote_command::host::CommandHost::new();
-    update_peers.server(&config.websocket_url);
     update_peers.connected();
     loop {
         for response in updates
@@ -299,6 +299,10 @@ fn run_connection<R: Runtime>(
                     || next.gui_selection != config.gui_selection
             })
         {
+            match next.as_ref() {
+                Some(next) => update_peers.server(&next.websocket_url),
+                None => update_peers.signed_out(),
+            }
             let _ = socket.close(None);
             return Ok(());
         }

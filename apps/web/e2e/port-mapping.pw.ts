@@ -8,6 +8,51 @@ test.beforeEach(async ({ request }) => {
   expect(Number.isInteger(servicePort)).toBe(true);
 });
 
+test('retains overflow mappings and shows how to resume sync without blocking remote updates', async ({ page, context }) => {
+  const base = Array.from({ length: 7 }, (_, index) => ({ id: `base-${index}`, remoteHost: '127.0.0.1',
+    remotePort: 3000 + index, localPort: 13000 + index }));
+  const extra = { id: 'local-extra', remoteHost: '127.0.0.1', remotePort: 5000, localPort: 15000 };
+  let doc: MappingDocument = { revision: 1, mappings: [...base,
+    { id: 'remote-extra', remoteHost: '127.0.0.1', remotePort: 4000, localPort: 14000 }] };
+  let writes = 0;
+  await context.addInitScript(({ base, extra }) => {
+    const scope = JSON.stringify([location.origin, 'capacity', 'fixture-device']);
+    localStorage.setItem('codex-port-forwarding:' + scope, JSON.stringify([...base, extra]));
+    localStorage.setItem('codex-port-mapping-sync:' + scope, JSON.stringify({ [extra.id]: extra }));
+  }, { base, extra });
+  await context.route('**/devices/fixture-device/port-mappings', async route => {
+    if (route.request().method() !== 'PUT') { await route.fulfill({ json: doc }); return; }
+    writes++;
+    const incoming = route.request().postDataJSON() as MappingDocument;
+    expect(incoming.mappings.length).toBeLessThanOrEqual(8);
+    const accepted = incoming.revision === doc.revision;
+    if (accepted) doc = { revision: doc.revision + 1, mappings: incoming.mappings };
+    await route.fulfill({ json: { ...doc, accepted } });
+  });
+  await page.goto('e2e/port-mapping-harness.html?sync=capacity');
+  await page.getByRole('button', { name: '端口映射', exact: true }).click();
+  const notice = page.locator('.mapping-sync');
+  await expect(notice).toContainText('多出的映射已保留在本机');
+  await expect(page.getByRole('article')).toHaveCount(9);
+  await notice.scrollIntoViewIfNeeded();
+  const bounds = await notice.boundingBox();
+  expect(bounds!.width).toBeLessThanOrEqual(400);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await page.screenshot({ path: `../../.codex-tmp/port-mapping-capacity-${test.info().project.name}.png` });
+  doc = { revision: doc.revision + 1, mappings: doc.mappings.map(entry => entry.id === 'base-0'
+    ? { ...entry, remotePort: 6000 } : entry) };
+  await page.getByRole('button', { name: '按编辑时间排序' }).click();
+  await expect(page.getByRole('article', { name: '127.0.0.1:6000', exact: true })).toBeVisible({ timeout: 12_000 });
+  expect(writes).toBe(0);
+  await expect(notice).toContainText('请删除不需要的映射后继续同步');
+  await page.getByRole('article', { name: '127.0.0.1:6000', exact: true })
+    .getByRole('button', { name: '更多操作' }).click();
+  await page.getByRole('menuitem', { name: '删除映射' }).click();
+  await expect(notice).toHaveText('配置已自动同步');
+  await expect(page.getByRole('article')).toHaveCount(8);
+  expect(doc.mappings.some(entry => entry.id === extra.id)).toBe(true);
+});
+
 test('automatically syncs edits and deletions between clients and isolates accounts', async ({ page, context }) => {
   const documents = new Map<string, MappingDocument>();
   await context.route('**/devices/fixture-device/port-mappings', async route => {

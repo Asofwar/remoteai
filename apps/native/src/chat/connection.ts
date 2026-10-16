@@ -21,7 +21,7 @@ const rtc: PeerFactory = peer => new RtcPeer(peer, () => (
 
 export class MobileChatConnection extends ChatConnection {
   constructor({ session, ...options }: Options) {
-    super({ ...options, randomBytes: getRandomBytes,
+    super({ ...options, randomBytes: getRandomBytes, managePolicyMode: false,
       mappingStreamsEnabled: Platform.OS !== 'android' || !!registerMappingStream
         && NativeModules.ChatConnectivity?.bulkDuplexAvailable === true
         && typeof NativeModules.DownloadChatSocket?.sendBulk === 'function',

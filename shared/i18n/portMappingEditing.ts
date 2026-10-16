@@ -15,6 +15,8 @@ export const portMappingEditingEnglish: Readonly<Record<string, string>> = {
   '该映射已被删除，请重新添加。': 'This mapping was removed. Add it again to continue.',
   '配置已自动同步': 'Configuration synced automatically',
   '配置正在同步…': 'Syncing configuration…',
+  '最多同步 8 条映射，多出的映射已保留在本机。请删除不需要的映射后继续同步。':
+    'Up to 8 mappings can sync. Extra mappings are saved on this device. Remove an unneeded mapping to resume syncing.',
   '配置暂未同步，联网后会自动重试。': 'Configuration has not synced yet. It will retry when connected.',
   '配置未能保存到本机，请检查存储空间。': 'Could not save locally. Check the available storage.',
   '本地端口供手机和电脑使用，网页仅预览目标地址。':
@@ -38,6 +40,8 @@ export const portMappingEditingRussian: Readonly<Record<string, string>> = {
   '该映射已被删除，请重新添加。': 'Этот проброс удалён. Добавьте его заново.',
   '配置已自动同步': 'Настройки синхронизированы автоматически',
   '配置正在同步…': 'Синхронизация настроек…',
+  '最多同步 8 条映射，多出的映射已保留在本机。请删除不需要的映射后继续同步。':
+    'Можно синхронизировать до 8 пробросов. Остальные сохранены на этом устройстве. Удалите ненужные для синхронизации.',
   '配置暂未同步，联网后会自动重试。': 'Настройки ещё не синхронизированы. Повторим при подключении.',
   '配置未能保存到本机，请检查存储空间。': 'Не удалось сохранить настройки. Проверьте свободное место.',
   '本地端口供手机和电脑使用，网页仅预览目标地址。':

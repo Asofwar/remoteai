@@ -41,7 +41,7 @@ export function PortForwarding(props: {
       {!editing && <MappingForm service={service} disabled={entries.length >= MAX_PORT_MAPPINGS}
         connected={props.connected} />}
       <footer>{t('支持 TCP，仅本机可访问。')}</footer>
-      {syncStatus && <footer>{t(syncStatus)}</footer>}
+      {syncStatus && <footer role="status">{t(syncStatus)}</footer>}
     </section>}>
     <button type="button" className={launcherStyles.launcher} aria-label={t('端口映射')} aria-expanded={open}>
       <Cable size={14} aria-hidden="true" /><span>{t('端口映射')}</span>

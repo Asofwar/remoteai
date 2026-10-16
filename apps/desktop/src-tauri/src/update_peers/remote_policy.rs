@@ -18,7 +18,7 @@ pub(super) async fn run(service: Arc<Service>) {
     loop {
         let base = server.borrow_and_update().clone();
         if let Some(base) = base {
-            // Failure keeps the last valid policy; an unconfigured client uses the new defaults.
+            // Failure keeps this run's last valid policy; a fresh client stays disabled.
             tokio::select! {
                 result = refresh(&client, &service.policy, &base) => {
                     if let Err(error) = result {
@@ -57,7 +57,7 @@ async fn refresh(client: &reqwest::Client, policy: &Policy, base: &str) -> Resul
         bytes.extend_from_slice(&chunk);
     }
     let settings: Preferences = serde_json::from_slice(&bytes).map_err(|_| Error::Invalid)?;
-    policy.apply(settings).await
+    policy.apply(base, settings).await
 }
 
 #[cfg(test)]

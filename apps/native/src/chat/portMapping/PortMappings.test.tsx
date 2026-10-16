@@ -1,10 +1,11 @@
 import React, { Children, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { PortForwardingService, type ForwardingClient } from '../../../../../shared/port-mapping/service';
+import { MappingSync } from '../../../../../shared/port-mapping/sync';
 import { PortMappings } from './PortMappings';
 
 const runtime = vi.hoisted(() => ({ cursor: 0, component: '', states: new Map<string, unknown[]>(),
-  service: undefined as PortForwardingService | undefined }));
+  service: undefined as PortForwardingService | undefined, syncStatus: '' }));
 vi.mock('react', async original => ({ ...await original<typeof React>(), useEffect: vi.fn(),
   useState: (initial: unknown) => {
     const state = runtime.states.get(runtime.component) ?? [];
@@ -26,10 +27,11 @@ vi.mock('../../components/SheetScrollView', () => ({ SheetScrollView: 'SheetScro
 vi.mock('./MappingPreview', () => ({ MappingPreview: 'MappingPreview' }));
 vi.mock('./MappingOpenActions', () => ({ MappingOpenActions: 'MappingOpenActions' }));
 vi.mock('./usePortMappings', () => ({ usePortMappings: () => ({ service: runtime.service,
-  entries: runtime.service!.snapshot() }) }));
+  entries: runtime.service!.snapshot(), syncStatus: runtime.syncStatus }) }));
 
 interface Props {
   children?: ReactNode; accessibilityLabel?: string; accessibilityRole?: string; maxWidth?: number;
+  accessibilityLiveRegion?: string;
   value?: string; onChangeText?: (value: string) => void; onPress?: () => void;
 }
 function elements(node: ReactNode): ReactElement<Props>[] {
@@ -50,10 +52,34 @@ const submit = () => render().find(element => element.props.accessibilityRole ==
   && elements(element.props.children).some(child => child.props.children === '添加并启动'))!.props.onPress!();
 
 beforeEach(() => {
-  vi.stubGlobal('React', React); vi.clearAllMocks(); runtime.states.clear();
+  vi.stubGlobal('React', React); vi.clearAllMocks(); runtime.states.clear(); runtime.syncStatus = '';
   runtime.service = new PortForwardingService(client, [], { createId: () => 'mapping',
     createTunnel: () => ({ resolve: async (_id, url) => url, close: async () => {} }) });
   runtime.service.setConnected(true);
+});
+
+it('displays retained overflow with actionable sync guidance and removes it after capacity is freed', async () => {
+  const extra = { id: 'local-extra', remotePort: 5000, localPort: 15000 };
+  const saved = new Map([['codex-port-mapping-sync:test', JSON.stringify({ [extra.id]: extra })]]);
+  const sync = new MappingSync(runtime.service!, { scope: 'test', storage: {
+    getItem: key => saved.get(key) ?? null, setItem: (key, value) => { saved.set(key, value); },
+  }, exchange: async input => ({ revision: 1, mappings: input?.mappings ??
+    Array.from({ length: 8 }, (_, index) => ({ id: `remote-${index}`, remotePort: 3000 + index,
+      localPort: 13000 + index })), accepted: !!input }) });
+  const stop = sync.start();
+  try {
+    for (let count = 0; count < 40; count++) await Promise.resolve();
+    runtime.syncStatus = sync.snapshot();
+    expect(runtime.service!.snapshot()).toHaveLength(9);
+    expect(render().find(element => element.props.accessibilityLiveRegion === 'polite')?.props.children)
+      .toBe('最多同步 8 条映射，多出的映射已保留在本机。请删除不需要的映射后继续同步。');
+    await runtime.service!.remove('remote-0');
+    for (let count = 0; count < 40; count++) await Promise.resolve();
+    runtime.syncStatus = sync.snapshot();
+    expect(runtime.service!.snapshot()).toHaveLength(8);
+    expect(render().find(element => element.props.accessibilityLiveRegion === 'polite')?.props.children)
+      .toBe('配置已自动同步');
+  } finally { stop(); }
 });
 afterEach(() => { runtime.service?.dispose(); vi.unstubAllGlobals(); });
 

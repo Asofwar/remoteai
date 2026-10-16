@@ -161,9 +161,15 @@ pub(crate) struct Bridge {
 
 impl Bridge {
     pub fn server(&self, websocket_url: &str) {
-        self.service
-            .mirror_base
-            .send_replace(super::mirror::base_from_socket(websocket_url));
+        let base = super::mirror::base_from_socket(websocket_url);
+        self.service.policy.select_server(base.clone());
+        self.service.mirror_base.send_if_modified(|current| {
+            if *current == base {
+                return false;
+            }
+            *current = base;
+            true
+        });
     }
 
     pub fn new<R: Runtime>(app: &tauri::AppHandle<R>) -> Self {
@@ -449,6 +455,12 @@ impl Bridge {
         // Native transfers keep their original short-lived grants through signaling reconnects.
     }
 
+    pub fn signed_out(&mut self) {
+        self.service.policy.select_server(None);
+        self.service.mirror_base.send_replace(None);
+        self.shutdown();
+    }
+
     pub fn shutdown(&mut self) {
         self.disconnected();
         for connection in self.active.values() {
@@ -463,6 +475,10 @@ impl Bridge {
 
 impl Drop for Bridge {
     fn drop(&mut self) {
-        self.shutdown();
+        self.signed_out();
     }
 }
+
+#[cfg(test)]
+#[path = "signaling_policy_tests.rs"]
+mod policy_tests;

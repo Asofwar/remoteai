@@ -48,7 +48,7 @@ export function PortMappings(props: {
         {!editing && <MappingForm service={service} disabled={entries.length >= MAX_PORT_MAPPINGS}
           connected={props.connected} />}
         <p className="mapping-footer">{t('网页映射仅在当前页面中使用。关闭页面或切换电脑后会停止。')}</p>
-        {syncStatus && <p className="mapping-sync">{t(syncStatus)}</p>}
+        {syncStatus && <p className="mapping-sync" role="status">{t(syncStatus)}</p>}
       </section>
     </AdaptiveSheet>
     {selected && tunnel && props.active && props.open && <MappingPreview

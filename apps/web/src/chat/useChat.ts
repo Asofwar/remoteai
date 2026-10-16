@@ -7,11 +7,12 @@ import { RtcPeer } from '../../../../shared/remote-chat/rtcPeer';
 import { browserTrustStore, trustedHost, trustScope } from '../../../../shared/remote-chat/trustedHost';
 import { createPreviewDownloads } from '../downloads/previews';
 import { downloadOwner } from '../downloads/manager';
+import { useActiveChatPolicy } from '../../../../shared/remote-chat/useActiveChatPolicy';
 
 const HISTORY_REFRESH_MS = 15_000;
 
 function createController(session: AuthSession, deviceId: string) {
-  const controller = new ChatController((events) => new ChatConnection({ ...events, deviceId,
+  const controller = new ChatController((events) => new ChatConnection({ ...events, deviceId, managePolicyMode: false,
     verifyHostKey: trustedHost(browserTrustStore, trustScope(session.baseUrl, deviceId)),
     randomBytes: (length) => crypto.getRandomValues(new Uint8Array(length)),
     renewAuthorization: async () => {
@@ -39,6 +40,7 @@ export function useChat(session: AuthSession, deviceId: string, active: boolean)
   // Token refresh keeps the same conversation; reconnect reads the renewed account credentials.
   const controller = useMemo(() => createController(session, deviceId), [session.baseUrl, session.email, deviceId]);
   const state = useSyncExternalStore(controller.subscribe, controller.snapshot);
+  useActiveChatPolicy(active, state.mode);
   const [foreground, setForeground] = useState(document.visibilityState === 'visible');
   useEffect(() => {
     const update = () => setForeground(document.visibilityState === 'visible');

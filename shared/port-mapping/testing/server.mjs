@@ -3,6 +3,7 @@ import net from 'node:net';
 import { randomUUID } from 'node:crypto';
 import WebSocket from 'ws';
 import { developmentServer } from './development.mjs';
+import { browserStateFiles } from './browserState.mjs';
 
 const RPC_PORT = 1496;
 const resources = new Map();
@@ -22,6 +23,7 @@ ${handler}.addEventListener('submit', async event => {
   document.querySelector('#sent').textContent = 'Sent once';
 });</script>`;
 const files = {
+  ...browserStateFiles,
   '/': ['text/html', page],
   '/style.css': ['text/css', 'body{font:16px system-ui;background:#eef6f2;color:#12382a;padding:24px}img{width:48px}'],
   '/image.svg': ['image/svg+xml', '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><circle cx="24" cy="24" r="22" fill="#0b8065"/></svg>'],

@@ -9,6 +9,15 @@ export const PREVIEW_ERRORS = {
 export type PreviewFailure = keyof typeof PREVIEW_ERRORS;
 export type PreviewStatus = 'loading' | 'ready' | PreviewFailure;
 
+const PREVIEW_DIAGNOSTICS = new Set([
+  'storage-access', 'cookie-access', 'history-access', 'dynamic-code', 'module-import', 'invalid-url', 'script-exception',
+]);
+
+/** Reject arbitrary strings supplied by a remote page before logging its diagnostic category. */
+export function previewDiagnostic(value: unknown) {
+  return typeof value === 'string' && PREVIEW_DIAGNOSTICS.has(value) ? value : 'script-exception';
+}
+
 export function isPreviewFailure(value: unknown): value is PreviewFailure {
   return typeof value === 'string' && Object.hasOwn(PREVIEW_ERRORS, value);
 }

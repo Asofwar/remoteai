@@ -7,6 +7,9 @@
   let port;
   let base;
   let sequence = 0;
+  let failed = false;
+  const diagnostic = window.__previewDiagnostic;
+  delete window.__previewDiagnostic;
   function request(type, input = {}) {
     return new Promise((resolve, reject) => {
       const id = ++sequence;
@@ -29,9 +32,13 @@
   }
   function absolute(value) { return new URL(value, base).href; }
   function announceError(error) {
-    port.postMessage({ type: 'preview-error', failure: error.previewFailure ?? 'script-error' });
-    console.warn('Port mapping preview:', error.message);
+    failed = true;
+    port?.postMessage({ type: 'preview-error', failure: error?.previewFailure ?? 'script-error',
+      diagnostic: diagnostic(error) });
+    console.warn('Port mapping preview:', error?.message ?? 'Script failed');
   }
+  window.addEventListener('error', event => { if (event.error) announceError(event.error); });
+  window.addEventListener('unhandledrejection', event => announceError(event.reason));
   window.fetch = async (value, options = {}) => {
     const original = value instanceof Request ? value : undefined;
     const url = absolute(original ? original.url : String(value));
@@ -150,6 +157,8 @@
   async function render() {
     const content = await request('document');
     base = content.url;
+    window.__installPreviewStorage(content.storage, message => port.postMessage(message));
+    delete window.__installPreviewStorage;
     document.documentElement.innerHTML = content.html;
     installModules(content.modules);
     for (const item of content.scripts) {
@@ -160,7 +169,7 @@
     }
     document.dispatchEvent(new Event('DOMContentLoaded'));
     window.dispatchEvent(new Event('load'));
-    port.postMessage({ type: 'preview-ready' });
+    if (!failed) port.postMessage({ type: 'preview-ready' });
   }
   window.addEventListener('message', event => {
     if (event.source !== parent || port || event.data?.type !== 'port-mapping-preview' || !event.ports[0]) return;

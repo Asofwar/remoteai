@@ -5,7 +5,10 @@ import { previewDocument } from './previewDocument';
 import { PreviewAssets } from './previewAssets';
 import runtime from './previewRuntime.js?raw';
 import xhr from './previewXhr.js?raw';
-import { isPreviewFailure, previewFailure, type PreviewStatus } from './previewErrors';
+import storageRuntime from './previewStorageRuntime.js?raw';
+import diagnostics from './previewDiagnostics.js?raw';
+import type { PreviewStorage } from './previewStorage';
+import { isPreviewFailure, previewDiagnostic, previewFailure, type PreviewStatus } from './previewErrors';
 
 // The opaque sandbox cannot read app cookies/storage or reach app APIs, even if remote scripts are hostile.
 export const PREVIEW_DOCUMENT = '<!doctype html><meta charset="utf-8">'
@@ -13,13 +16,14 @@ export const PREVIEW_DOCUMENT = '<!doctype html><meta charset="utf-8">'
   + 'script-src \'unsafe-inline\' blob:; style-src \'unsafe-inline\' data: blob:; '
   + 'img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src \'none\'; '
   + 'form-action \'none\'; base-uri \'none\'">'
-  + `<script>${xhr.replace(/<\/script/gi, '<\\/script')}\n${runtime.replace(/<\/script/gi, '<\\/script')}</script>`;
+  + `<script>${[xhr, storageRuntime, diagnostics, runtime].join('\n').replace(/<\/script/gi, '<\\/script')}</script>`;
 
 type PreviewMessage = { id?: number; type?: string; input?: MappingHttpRequest; url?: string;
-  socketId?: string; protocols?: string[]; data?: string | Uint8Array; failure?: unknown };
+  socketId?: string; protocols?: string[]; data?: string | Uint8Array; failure?: unknown;
+  area?: unknown; operation?: unknown; key?: unknown; value?: unknown; diagnostic?: unknown };
 
 export function attachPreview(options: {
-  frame: HTMLIFrameElement; tunnel: WebMappingTunnel; input: MappingHttpRequest;
+  frame: HTMLIFrameElement; tunnel: WebMappingTunnel; input: MappingHttpRequest; storage: PreviewStorage;
   navigate: (input: MappingHttpRequest) => void; status: (value: PreviewStatus) => void;
 }) {
   const { frame, tunnel, input, navigate, status } = options;
@@ -33,7 +37,7 @@ export function attachPreview(options: {
   const post = (message: object) => { if (!closed) channel.port1.postMessage(message); };
   async function handle(message: PreviewMessage): Promise<unknown> {
     switch (message.type) {
-      case 'document': return previewDocument(requests, input, assets);
+      case 'document': return { ...await previewDocument(requests, input, assets), storage: options.storage.snapshot() };
       case 'module': return assets.loadModule(String(message.url), input.url);
       case 'fetch': return requests.request(validateRequest(message.input, input.url));
       case 'asset': return assets.data(String(message.url), input.url);
@@ -65,9 +69,12 @@ export function attachPreview(options: {
   channel.port1.onmessage = event => {
     const message: PreviewMessage = event.data;
     if (!message || typeof message !== 'object' || closed) return;
+    if (message.type === 'storage') { options.storage.apply(message); return; }
     if (message.type === 'preview-ready') { status('ready'); return; }
     if (message.type === 'preview-error') {
-      status(isPreviewFailure(message.failure) ? message.failure : 'script-error'); return;
+      const failure = isPreviewFailure(message.failure) ? message.failure : 'script-error';
+      console.warn('Port mapping preview:', failure, previewDiagnostic(message.diagnostic));
+      status(failure); return;
     }
     if (message.type === 'navigate') {
       try { navigate(validateRequest(message.input, input.url)); } catch { status('address-error'); }

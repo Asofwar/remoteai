@@ -7,6 +7,7 @@ import { mappingUrl } from '../../../../../shared/port-mapping/http';
 import type { WebMappingTunnel } from './httpTunnel';
 import { attachPreview, PREVIEW_DOCUMENT } from './previewBridge';
 import { isPreviewFailure, PREVIEW_ERRORS, type PreviewStatus } from './previewErrors';
+import { PreviewStorage } from './previewStorage';
 
 export function MappingPreview({ tunnel, origin, close }: {
   tunnel: WebMappingTunnel; origin: string; close: () => void;
@@ -19,6 +20,7 @@ export function MappingPreview({ tunnel, origin, close }: {
   const [status, setStatus] = useState<PreviewStatus>('loading');
   const frame = useRef<HTMLIFrameElement>(null);
   const cleanup = useRef<() => void>();
+  const [storage] = useState(() => new PreviewStorage());
   const navigate = (next: MappingHttpRequest) => {
     const url = mappingUrl(next.url, origin);
     setHistory(value => [...value, input]); setInput(next); setPath(url.pathname + url.search + url.hash);
@@ -53,7 +55,7 @@ export function MappingPreview({ tunnel, origin, close }: {
         if (!frame.current || frame.current.dataset.attached) return;
         frame.current.dataset.attached = 'true';
         cleanup.current?.();
-        cleanup.current = attachPreview({ frame: frame.current, tunnel, input, navigate, status: setStatus });
+        cleanup.current = attachPreview({ frame: frame.current, tunnel, input, storage, navigate, status: setStatus });
       }} />}
   </AdaptiveSheet>;
 }

@@ -1,4 +1,11 @@
 export const browserStateFiles = {
+  '/classic-history': ['text/html', '<h1>Classic history</h1><p id="result"></p><button id="back">Go back</button>'
+    + '<script>var classicSharedState = "shared";</script><script>"use strict";'
+    + 'history.replaceState({index:0},"",window.location.href);'
+    + 'window.history.pushState({index:1},"","/classic-next");'
+    + 'document.querySelector("#result").textContent=classicSharedState+":"+history.state.index;'
+    + 'window.addEventListener("popstate",()=>document.querySelector("#result").textContent="back:"+history.state.index);'
+    + 'document.querySelector("#back").onclick=()=>history.back();</script>'],
   '/missing-media': ['text/html', '<h1>Missing media app</h1><img alt="Missing logo" src="/missing.png">'
     + '<style>@font-face{font-family:missing;src:url(/missing.woff2)}h1{color:rgb(18,56,42)}</style>'
     + '<button id="action">Continue using page</button><p id="result"></p>'

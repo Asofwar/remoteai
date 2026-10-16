@@ -1,6 +1,8 @@
 window.__installPreviewBrowser = (url, events) => {
   const navigation = window.__createPreviewNavigation(url, events);
   delete window.__createPreviewNavigation;
+  // Server-rendered pages also use History from classic scripts, which retain their global scope.
+  Object.defineProperty(window, 'history', { configurable: true, value: navigation.history });
   let previewWindow;
   function facade(target, overrides) {
     const bound = new Map();

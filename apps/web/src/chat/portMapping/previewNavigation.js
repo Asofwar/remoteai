@@ -1,11 +1,16 @@
 window.__createPreviewNavigation = (initialUrl, events) => {
   const MAX_HISTORY_ENTRIES = 128;
   const origin = new URL(initialUrl).origin;
+  const nativeDocument = new URL(window.location.href);
   let entries = [{ url: initialUrl, state: null }];
   let index = 0;
   let current = new URL(initialUrl);
   function resolve(value) {
     const url = new URL(value == null ? current.href : String(value), current);
+    // Classic scripts may pass the sandbox's own URL when updating only history state.
+    if (url.href.split('#')[0] === nativeDocument.href.split('#')[0]) {
+      const mapped = new URL(current); mapped.hash = url.hash; return mapped;
+    }
     if (url.origin !== origin || url.username || url.password) {
       throw new DOMException('History state must stay within the preview', 'SecurityError');
     }

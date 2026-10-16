@@ -76,6 +76,24 @@ test('keeps mapped pages interactive when optional images and fonts return 404',
   await expect(page.locator('iframe[title="端口映射预览"]')).toHaveAttribute('data-ready', 'true');
 });
 
+test('supports history in classic scripts while preserving globals shared across script tags', async ({ page }) => {
+  await page.goto('e2e/port-mapping-harness.html');
+  await page.getByRole('button', { name: '端口映射', exact: true }).click();
+  await page.getByRole('spinbutton', { name: '远程端口' }).fill(String(servicePort));
+  await page.getByRole('button', { name: '添加并启动' }).click();
+  await page.getByRole('button', { name: '在 Remote AI 中预览' }).click();
+  await page.getByRole('textbox', { name: '网页路径' }).fill('/classic-history');
+  await page.getByRole('button', { name: '打开', exact: true }).click();
+  const preview = page.frameLocator('iframe[title="端口映射预览"]');
+  await expect(preview.locator('#result')).toHaveText('shared:1');
+  await expect(page.getByRole('textbox', { name: '网页路径' })).toHaveValue('/classic-next');
+  await preview.getByRole('button', { name: 'Go back' }).click();
+  await expect(preview.locator('#result')).toHaveText('back:0');
+  await expect(page.getByRole('textbox', { name: '网页路径' })).toHaveValue('/classic-history');
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  expect(page.url()).toContain('/web/e2e/port-mapping-harness.html');
+});
+
 test('previews a real Vite app with a large module graph, CSS and concurrent lazy routes', async ({ page }) => {
   await page.goto('e2e/port-mapping-harness.html');
   await page.getByRole('button', { name: '端口映射', exact: true }).click();

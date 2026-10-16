@@ -119,6 +119,11 @@ pub fn run() {
             std::process::exit(2);
         }
     };
+    #[cfg(target_os = "linux")]
+    if let Err(error) = platform::linux::initialize_desktop() {
+        eprintln!("failed to start Remote AI: {error}");
+        std::process::exit(1);
+    }
     let mut context = tauri::generate_context!();
     if launch_options.headless {
         context.config_mut().app.windows.clear();

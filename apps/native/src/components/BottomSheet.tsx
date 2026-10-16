@@ -43,6 +43,7 @@ interface BottomSheetProps {
   tall?: boolean;
   dragFromHeaderOnly?: boolean;
   fullWidthContent?: boolean;
+  horizontalPadding?: number;
   maxWidth?: number;
   compactHeader?: boolean;
 }
@@ -61,11 +62,13 @@ export function BottomSheet({
   tall = false,
   dragFromHeaderOnly = false,
   fullWidthContent = false,
+  horizontalPadding = SHEET_HORIZONTAL_PADDING,
   maxWidth,
   compactHeader = false,
 }: BottomSheetProps) {
   const resolveThemeColor = useThemeColor();
   const styles = useStyles();
+  const insetStyle = { paddingHorizontal: horizontalPadding };
   useLanguage();
   const translateY = useRef(new Animated.Value(0)).current;
 
@@ -137,7 +140,7 @@ export function BottomSheet({
         ]}
         {...(!dragFromHeaderOnly ? dragResponder.panHandlers : {})}
       >
-        <View style={styles.inset} {...(dragFromHeaderOnly ? dragResponder.panHandlers : {})}>
+        <View style={insetStyle} {...(dragFromHeaderOnly ? dragResponder.panHandlers : {})}>
           <View style={[styles.handle, compactHeader && styles.compactHandle]} />
           <View style={[styles.header, compactHeader && styles.compactHeader]}>
             {onBack && <Pressable accessibilityRole="button" accessibilityLabel={t("返回上一层")}
@@ -164,8 +167,8 @@ export function BottomSheet({
           </View>
         </View>
         {children ? <View style={[styles.content, compactHeader && styles.compactContent,
-          !fullWidthContent && styles.inset]}>{children}</View> : null}
-        {actions.length ? <View style={[styles.actions, styles.inset]}>
+          !fullWidthContent && insetStyle]}>{children}</View> : null}
+        {actions.length ? <View style={[styles.actions, insetStyle]}>
           {actions.map((action) => {
             const tone = action.tone ?? 'neutral';
             return <Pressable
@@ -213,7 +216,6 @@ const useStyles = createThemedStyles((color) => ({
     elevation: 24,
   },
   sheetTall: { maxHeight: '92%' },
-  inset: { paddingHorizontal: SHEET_HORIZONTAL_PADDING },
   handle: { width: 44, height: 5, borderRadius: 3, alignSelf: 'center', backgroundColor: color('#d5dfd9', 'elevated'), marginBottom: 17 },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
   heading: { flex: 1, minWidth: 0 },

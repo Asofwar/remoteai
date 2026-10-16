@@ -28,13 +28,13 @@ test('automatically syncs edits and deletions between clients and isolates accou
   const second = await context.newPage();
   await second.goto('e2e/port-mapping-harness.html?sync=first');
   await second.getByRole('button', { name: '端口映射', exact: true }).click();
-  await expect(second.getByRole('status')).toHaveText('已停止');
+  await expect(second.getByRole('button', { name: '在 Remote AI 中预览' })).toBeDisabled();
   await second.getByRole('button', { name: '更多操作' }).click();
   await second.getByRole('menuitem', { name: '编辑映射' }).click();
   await second.getByRole('spinbutton', { name: '本地端口' }).fill('18306');
   await second.getByRole('button', { name: '保存修改' }).click();
   await expect(page.getByRole('article')).toContainText('18306', { timeout: 12_000 });
-  await expect(page.getByRole('status')).toHaveText('映射中');
+  await expect(page.getByRole('button', { name: '在 Remote AI 中预览' })).toBeEnabled();
   const other = await context.newPage();
   await other.goto('e2e/port-mapping-harness.html?sync=second');
   await other.getByRole('button', { name: '端口映射', exact: true }).click();
@@ -50,7 +50,7 @@ test('edits mapping settings, cancels drafts and persists the local port for oth
   await page.getByRole('button', { name: '端口映射', exact: true }).click();
   await page.getByRole('spinbutton', { name: '远程端口' }).fill(String(servicePort));
   await page.getByRole('button', { name: '添加并启动' }).click();
-  await expect(page.getByRole('status')).toHaveText('映射中');
+  await expect(page.getByRole('button', { name: '在 Remote AI 中预览' })).toBeEnabled();
   await page.getByRole('button', { name: '更多操作' }).click();
   await page.getByRole('menuitem', { name: '编辑映射' }).click();
   await page.getByRole('textbox', { name: '目标 IP' }).fill('::1');
@@ -58,16 +58,20 @@ test('edits mapping settings, cancels drafts and persists the local port for oth
   await page.screenshot({ path: `../../.codex-tmp/port-mapping-edit-${test.info().project.name}.png` });
   await page.getByRole('button', { name: '保存修改' }).click();
   await expect(page.getByRole('article')).toHaveCount(1);
-  await expect(page.getByRole('article')).toContainText(`[::1]:${servicePort} → 18306`);
-  await expect(page.getByRole('status')).toHaveText('映射中');
+  await expect(page.getByRole('article').locator('.mapping-details dd')).toHaveText([
+    '::1', String(servicePort), '18306', /.+/,
+  ]);
+  await expect(page.getByRole('button', { name: '在 Remote AI 中预览' })).toBeEnabled();
   await page.getByRole('button', { name: '更多操作' }).click();
   await page.getByRole('menuitem', { name: '编辑映射' }).click();
   await page.getByRole('spinbutton', { name: '本地端口' }).fill('18307');
   await page.getByRole('button', { name: '取消', exact: true }).click();
   await expect(page.getByRole('article')).toContainText('18306');
   await page.reload(); await page.getByRole('button', { name: '端口映射', exact: true }).click();
-  await expect(page.getByRole('article')).toContainText(`[::1]:${servicePort} → 18306`);
-  await expect(page.getByRole('status')).toHaveText('已停止');
+  await expect(page.getByRole('article').locator('.mapping-details dd')).toHaveText([
+    '::1', String(servicePort), '18306', /.+/,
+  ]);
+  await expect(page.getByRole('button', { name: '在 Remote AI 中预览' })).toBeDisabled();
   await page.getByRole('button', { name: '更多操作' }).click();
   await page.getByRole('menuitem', { name: '删除映射' }).click();
   await expect(page.getByRole('article')).toHaveCount(0);
@@ -104,7 +108,10 @@ test('previews different IPs on the same port and restores their targets', async
     await page.getByRole('spinbutton', { name: '远程端口' }).fill(String(servicePort));
     await page.getByRole('button', { name: '添加并启动' }).click();
   }
-  await expect(page.getByRole('status')).toHaveText(['映射中', '映射中']);
+  await expect(page.getByRole('article')).toHaveCount(2);
+  for (const button of await page.getByRole('button', { name: '在 Remote AI 中预览' }).all()) {
+    await expect(button).toBeEnabled();
+  }
   const bounds = await page.getByRole('region', { name: '端口映射设置' }).boundingBox();
   expect(bounds!.width).toBeLessThanOrEqual(540);
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
@@ -119,10 +126,10 @@ test('previews different IPs on the same port and restores their targets', async
     await page.getByRole('button', { name: '关闭', exact: true }).click();
   }
   await page.reload(); await page.getByRole('button', { name: '端口映射', exact: true }).click();
-  await expect(page.getByRole('status')).toHaveText(['已停止', '已停止']);
+  await expect(page.getByRole('switch', { name: '启动映射' })).toHaveCount(2);
   const ipv6 = page.getByRole('article', { name: `[::1]:${servicePort}`, exact: true });
   await ipv6.getByRole('switch', { name: '启动映射' }).click();
-  await expect(ipv6.getByRole('status')).toHaveText('映射中');
+  await expect(ipv6.getByRole('button', { name: '在 Remote AI 中预览' })).toBeEnabled();
   await ipv6.getByRole('button', { name: `http://[::1]:${servicePort}`, exact: true }).click();
   await expect(page.frameLocator('iframe[title="端口映射预览"]')
     .getByRole('heading', { name: 'Port mapping works' })).toBeVisible();
@@ -134,7 +141,7 @@ test('maps a real HTTP service with assets, modules, API calls, WebSocket and is
   await page.getByRole('button', { name: '端口映射', exact: true }).click();
   await page.getByRole('spinbutton', { name: '远程端口' }).fill(String(servicePort));
   await page.getByRole('button', { name: '添加并启动' }).click();
-  await expect(page.getByRole('status')).toHaveText('映射中');
+  await expect(page.getByRole('button', { name: '在 Remote AI 中预览' })).toBeEnabled();
   await page.getByRole('button', { name: `http://127.0.0.1:${servicePort}`, exact: true }).click();
   const preview = page.frameLocator('iframe[title="端口映射预览"]');
   await expect(preview.getByRole('heading', { name: 'Port mapping works' })).toBeVisible();
@@ -155,11 +162,10 @@ test('maps a real HTTP service with assets, modules, API calls, WebSocket and is
   await expect(preview.getByRole('heading', { name: 'Received message=mapping' })).toBeVisible();
   await page.getByRole('button', { name: '关闭', exact: true }).click();
   await page.getByRole('switch', { name: '停止映射' }).click();
-  await expect(page.getByRole('status')).toHaveText('已停止');
   await expect(page.getByRole('button', { name: '在 Remote AI 中预览' })).toBeDisabled();
   await page.getByRole('switch', { name: '启动映射' }).click();
-  await expect(page.getByRole('status')).toHaveText('映射中');
+  await expect(page.getByRole('button', { name: '在 Remote AI 中预览' })).toBeEnabled();
   await page.reload();
   await page.getByRole('button', { name: '端口映射', exact: true }).click();
-  await expect(page.getByRole('status')).toHaveText('已停止');
+  await expect(page.getByRole('button', { name: '在 Remote AI 中预览' })).toBeDisabled();
 });

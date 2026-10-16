@@ -3,12 +3,9 @@ import { Pressable, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import type { ForwardingEntry, PortForwardingService } from '../../../../../shared/port-mapping/service';
-import { DEFAULT_MAPPING_HOST, mappingAddress } from '../../../../../shared/port-mapping/target';
+import { DEFAULT_MAPPING_HOST } from '../../../../../shared/port-mapping/target';
 import { t } from '../../i18n';
 import { useMappingStyles } from './mappingStyles';
-
-const STATUS = { stopped: '已停止', starting: '正在启动…', running: '映射中',
-  stopping: '正在停止…', error: '启动失败' } as const;
 
 export function MappingRow({ entry, service, connected, open, edit }: {
   entry: ForwardingEntry; service: PortForwardingService; connected: boolean; open: () => void; edit: () => void;
@@ -27,38 +24,38 @@ export function MappingRow({ entry, service, connected, open, edit }: {
       ? new Date(entry.updatedAt).toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit',
         minute: '2-digit' }) : '—']];
   return <View style={styles.card}>
-    <View style={styles.row}>
-      <View style={styles.computerIcon}><Ionicons name="desktop-outline" size={24} color="#008b73" /></View>
-      <View style={styles.fill}><Text style={styles.title}>{mappingAddress(entry)} → {entry.localPort}</Text>
-        <View style={styles.status}><Text style={styles.statusText}>● {t(STATUS[entry.status])}</Text></View></View>
-      <Switch accessibilityLabel={t(running || busy ? '停止映射' : '启动映射')} value={running || busy}
-        disabled={entry.status === 'stopping' || (!connected && !running && !busy)}
-        trackColor={{ false: '#ccd5dc', true: '#008b73' }} thumbColor="#fff"
-        onValueChange={() => { void (running || busy ? service.stop(entry.id) : service.start(entry.id)); }} />
-      <Pressable accessibilityRole="button" accessibilityLabel={t('更多操作')} accessibilityState={{ expanded: menu }}
-        style={styles.iconButton} onPress={() => setMenu(!menu)}>
-        <Ionicons name="ellipsis-vertical" size={20} color="#718078" /></Pressable>
-    </View>
-    {menu && <View style={styles.menu}>
-      <Pressable accessibilityRole="button" style={styles.button} disabled={busy}
-        onPress={() => { setMenu(false); edit(); }}><Text style={styles.buttonText}>{t('编辑映射')}</Text></Pressable>
-      <Pressable accessibilityRole="button" style={styles.button} disabled={entry.status === 'stopping'}
-        onPress={() => { void service.remove(entry.id); }}><Text style={styles.error}>{t('删除映射')}</Text></Pressable>
-    </View>}
-    <View><Text style={styles.muted}>{t('访问地址')}</Text><View style={styles.row}>
-      <View style={styles.addressBox}>
-        <Pressable accessibilityRole="button" accessibilityLabel={`127.0.0.1:${entry.localPort}`}
-          disabled={!running} onPress={open} style={[styles.fill, !running && styles.disabled]}>
-          <Text style={styles.addressText}>127.0.0.1:{entry.localPort}</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel={t('复制本地地址')}
-          style={styles.iconButton} onPress={() => { void copy(); }}>
-          <Ionicons name="copy-outline" size={19} color="#62768a" /></Pressable>
+    <View style={styles.accessSection}>
+      <View style={styles.row}>
+        <Text style={styles.addressLabel}>{t('访问地址')}</Text>
+        <Switch accessibilityLabel={t(running || busy ? '停止映射' : '启动映射')} value={running || busy}
+          disabled={entry.status === 'stopping' || (!connected && !running && !busy)}
+          trackColor={{ false: '#ccd5dc', true: '#008b73' }} thumbColor="#fff"
+          onValueChange={() => { void (running || busy ? service.stop(entry.id) : service.start(entry.id)); }} />
+        <Pressable accessibilityRole="button" accessibilityLabel={t('更多操作')} accessibilityState={{ expanded: menu }}
+          style={styles.iconButton} onPress={() => setMenu(!menu)}>
+          <Ionicons name="ellipsis-vertical" size={20} color="#718078" /></Pressable>
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel={t('打开')} disabled={!running}
-        style={[styles.open, !running && styles.disabled]} onPress={open}>
-        <Ionicons name="open-outline" size={19} color="#008b73" /><Text style={styles.openText}>{t('打开')}</Text>
-      </Pressable>
-    </View></View>
+      {menu && <View style={styles.menu}>
+        <Pressable accessibilityRole="button" style={styles.button} disabled={busy}
+          onPress={() => { setMenu(false); edit(); }}><Text style={styles.buttonText}>{t('编辑映射')}</Text></Pressable>
+        <Pressable accessibilityRole="button" style={styles.button} disabled={entry.status === 'stopping'}
+          onPress={() => { void service.remove(entry.id); }}><Text style={styles.error}>{t('删除映射')}</Text></Pressable>
+      </View>}
+      <View style={styles.row}>
+        <View style={styles.addressBox}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`127.0.0.1:${entry.localPort}`}
+            disabled={!running} onPress={open} style={[styles.fill, !running && styles.disabled]}>
+            <Text style={styles.addressText}>127.0.0.1:{entry.localPort}</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('复制本地地址')}
+            style={styles.iconButton} onPress={() => { void copy(); }}>
+            <Ionicons name="copy-outline" size={19} color="#62768a" /></Pressable>
+        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('打开')} disabled={!running}
+          style={[styles.open, !running && styles.disabled]} onPress={open}>
+          <Ionicons name="open-outline" size={19} color="#008b73" /><Text style={styles.openText}>{t('打开')}</Text>
+        </Pressable>
+      </View>
+    </View>
     <View style={styles.metadata}>{details.map(([label, value]) => <View key={label} style={styles.detail}>
       <Text style={styles.muted}>{t(String(label))}</Text><Text style={styles.value}>{value}</Text></View>)}</View>
     {!!entry.error && <Text accessibilityRole="alert" style={styles.error}>{t(entry.error)}</Text>}

@@ -1,9 +1,11 @@
+.mapping-sheet.mobile-popup, .mapping-sheet .ant-modal-content { padding-inline: 16px; }
+.mapping-sheet .adaptive-sheet-content, .mapping-sheet .ant-modal-body { scrollbar-width: none; }
+.mapping-sheet .adaptive-sheet-content::-webkit-scrollbar,
+.mapping-sheet .ant-modal-body::-webkit-scrollbar { display: none; }
 .port-mappings { display: grid; gap: 14px; width: 100%; color: var(--ink, #17211b); }
 .port-mappings p { margin: 0; color: var(--muted, #718078); line-height: 1.6; overflow-wrap: anywhere; }
 .port-mappings [role=alert] { color: #c74e47; }
 .port-mapping-row { border: 1px solid var(--line, #e7edf2); border-radius: 14px; padding: 14px; min-width: 0; }
-.port-mapping-row [role=status] { font-size: 12px; color: var(--muted, #718078); }
-.port-mapping-row strong { min-width: 0; overflow-wrap: anywhere; }
 .port-mapping-row .ant-btn-link { padding-inline: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .port-mapping-row .port-mapping-address { display: flex; flex: 1; min-width: 0; height: auto; min-height: 42px;
   justify-content: flex-start; white-space: normal; text-align: left; color: var(--green, #008b73);
@@ -18,15 +20,9 @@
 .mapping-info svg { flex-shrink: 0; color: #008b73; }
 .mapping-list-heading, .mapping-card-heading, .mapping-access { display: flex; align-items: center; gap: 10px; }
 .mapping-list-heading { justify-content: space-between; color: var(--muted, #62768a); }
-.mapping-computer { display: flex; flex-shrink: 0; width: 44px; height: 46px; border-radius: 17px;
-  align-items: center; justify-content: center; background: var(--green-pale, #e7f6f1); color: #008b73; }
-.mapping-card-title { flex: 1; min-width: 0; display: grid; gap: 4px; font-size: 15px; }
-.mapping-status { justify-self: start; font-size: 11px; border-radius: 20px; padding: 1px 7px;
-  background: var(--green-pale, #e7f6f1); }
-.mapping-status::before { content: '●'; margin-right: 5px; }
-.port-mapping-row .mapping-status[data-running=true] { color: var(--green, #008b73); }
 .mapping-card-heading .ant-btn { padding-inline: 2px; flex-shrink: 0; }
-.mapping-address-label { margin-top: 12px; color: var(--muted, #62768a); font-size: 12px; }
+.mapping-card-heading { margin-bottom: 4px; }
+.mapping-address-label { flex: 1; color: var(--muted, #62768a); font-size: 14px; line-height: 22px; }
 .mapping-open.ant-btn { min-height: 42px; border: 0; color: var(--green, #008b73);
   background: var(--green-pale, #e7f6f1); border-radius: 10px; }
 .mapping-details { display: grid; grid-template-columns: 1.4fr .8fr .8fr 1fr; gap: 10px; margin: 12px 0 0; }
@@ -54,8 +50,6 @@
 .port-mapping-notice { max-width: 400px; overflow-wrap: anywhere; }
 @media (max-width: 480px) {
   .mapping-card-heading { gap: 7px; }
-  .mapping-card-title { font-size: 13px; }
-  .mapping-computer { width: 36px; height: 39px; }
   .port-mapping-row { padding: 11px; }
   .port-mapping-form { padding: 12px; }
   .port-mapping-preview .ant-drawer-body { padding: 10px; }

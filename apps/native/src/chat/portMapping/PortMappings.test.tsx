@@ -65,7 +65,9 @@ it('submits the selected target and local port and displays the complete destina
   expect(client.openResource).toHaveBeenCalledWith('http://192.168.1.20:3000');
   expect(runtime.service!.snapshot()[0]).toMatchObject({ remoteHost: '192.168.1.20', localPort: 13000 });
   expect(render().some(element => element.props.maxWidth === 540)).toBe(true);
-  expect(render().some(element => Children.toArray(element.props.children).includes('192.168.1.20:3000'))).toBe(true);
+  for (const value of ['192.168.1.20', 3000, 13000]) {
+    expect(render().some(element => element.props.children === value)).toBe(true);
+  }
 });
 
 it('preserves invalid input for correction and defaults an empty IP to the remote computer', () => {

@@ -37,10 +37,12 @@ export function PortMappings(props: {
       titleIcon={!selected && <View style={styles.heroIcon}>
         <Ionicons name="swap-horizontal-outline" size={26} color="#008b73" /></View>}
       subtitle={selected ? `http://127.0.0.1:${selected.localPort}` : t('通过远程电脑访问目标 IP 和端口')}
-      onClose={selected ? closeActions : props.close} onBack={selected ? closeActions : undefined} maxWidth={540}>
+      onClose={selected ? closeActions : props.close} onBack={selected ? closeActions : undefined}
+      maxWidth={540} horizontalPadding={16} fullWidthContent={!selected}>
       {selected ? <MappingOpenActions key={selected.id} port={selected.localPort}
         preview={() => setSelection({ id: selected.id, view: 'preview' })} opened={closeActions} /> :
-      <SheetScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <SheetScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}>
         <View style={styles.notice}><Ionicons name="information-circle" size={21} color="#008b73" />
           <Text style={[styles.muted, styles.fill]}>
             {t('映射启动后，点击地址可选择应用内预览或浏览器打开。留空 IP 可访问远程电脑本机。')}</Text></View>

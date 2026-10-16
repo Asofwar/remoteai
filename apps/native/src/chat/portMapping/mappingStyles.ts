@@ -1,7 +1,7 @@
 import { createThemedStyles } from '../../theme/styles';
 
 export const useMappingStyles = createThemedStyles(color => ({
-  content: { gap: 12, paddingBottom: 20 },
+  content: { gap: 12, paddingHorizontal: 16, paddingBottom: 20 },
   fill: { flex: 1, minWidth: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   heroIcon: { width: 46, height: 46, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
@@ -13,11 +13,8 @@ export const useMappingStyles = createThemedStyles(color => ({
   title: { color: color('#111827', 'ink'), fontSize: 15, lineHeight: 22, fontWeight: '600' },
   card: { padding: 12, borderWidth: 1, borderColor: color('#e9edf2', 'border'), borderRadius: 14,
     backgroundColor: color('#fff', 'surface'), gap: 10 },
-  computerIcon: { width: 40, height: 42, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: color('#e7f6f1', 'accentSoft') },
-  status: { alignSelf: 'flex-start', borderRadius: 12, paddingHorizontal: 7, paddingVertical: 2,
-    backgroundColor: color('#e6f5f1', 'accentSoft'), marginTop: 3 },
-  statusText: { color: color('#008b73', 'accent'), fontSize: 10, lineHeight: 15 },
+  addressLabel: { flex: 1, color: color('#62768a', 'muted'), fontSize: 14, lineHeight: 22 },
+  accessSection: { gap: 4 },
   iconButton: { minWidth: 32, minHeight: 40, alignItems: 'center', justifyContent: 'center' },
   addressBox: { flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0, borderRadius: 11,
     backgroundColor: color('#f3f6f8', 'canvas'), paddingLeft: 11 },

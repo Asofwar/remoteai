@@ -29,7 +29,8 @@ export function TotpQrScanner({ onClose, onScan, visible }: TotpQrScannerProps) 
     onScan(value);
   };
 
-  return <Modal visible={visible} animationType="fade" onRequestClose={onClose}>
+  return <Modal visible={visible} animationType="fade" onRequestClose={onClose}
+    supportedOrientations={['portrait', 'landscape-left', 'landscape-right']}>
     {!permission ? <View style={styles.permissionBox}><ActivityIndicator color={color("#18af8c", 'accent')} /></View>
       : !permission.granted ? <View style={styles.permissionBox}>
         <Text style={styles.permissionTitle}>{t("需要相机权限")}</Text>

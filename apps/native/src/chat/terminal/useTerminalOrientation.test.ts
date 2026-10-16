@@ -12,7 +12,7 @@ vi.mock('react', () => ({
 vi.mock('react-native', () => ({ Keyboard: { dismiss: vi.fn() } }));
 vi.mock('expo-screen-orientation', () => ({
   Orientation: { PORTRAIT_UP: 1, LANDSCAPE_LEFT: 3, LANDSCAPE_RIGHT: 4 },
-  OrientationLock: { PORTRAIT_UP: 3, LANDSCAPE: 5 },
+  OrientationLock: { DEFAULT: 0, PORTRAIT_UP: 3, LANDSCAPE: 5 },
   lockAsync: vi.fn(async () => {}),
   getOrientationAsync: vi.fn(async () => 1),
   addOrientationChangeListener: vi.fn(() => ({ remove: observed.remove })),
@@ -32,39 +32,39 @@ it('waits for the iOS modal to finish presenting before requesting landscape, on
   orientation.onShow(); orientation.onShow(); await flush();
   expect(ScreenOrientation.lockAsync).toHaveBeenCalledExactlyOnceWith(ScreenOrientation.OrientationLock.LANDSCAPE);
   orientation.cleanup(); await flush();
-  expect(ScreenOrientation.lockAsync).toHaveBeenLastCalledWith(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+  expect(ScreenOrientation.lockAsync).toHaveBeenLastCalledWith(ScreenOrientation.OrientationLock.DEFAULT);
 });
 
 it('ignores a late iOS presentation callback after the desktop is closed', async () => {
   const orientation = open(true, true); await flush();
   orientation.cleanup(); orientation.onShow(); await flush();
-  expect(ScreenOrientation.lockAsync).toHaveBeenCalledExactlyOnceWith(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+  expect(ScreenOrientation.lockAsync).toHaveBeenCalledExactlyOnceWith(ScreenOrientation.OrientationLock.DEFAULT);
 });
 
 it('cancels landscape if the iOS modal is closed immediately after presentation', async () => {
   const orientation = open(true, true); await flush();
   orientation.onShow(); orientation.cleanup(); await flush();
-  expect(ScreenOrientation.lockAsync).toHaveBeenCalledExactlyOnceWith(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+  expect(ScreenOrientation.lockAsync).toHaveBeenCalledExactlyOnceWith(ScreenOrientation.OrientationLock.DEFAULT);
 });
 
-it('opens the desktop in landscape before any input panel is used, then restores portrait', async () => {
+it('opens the desktop in landscape before any input panel is used, then restores automatic orientation', async () => {
   const orientation = open(true); await flush();
   expect(ScreenOrientation.lockAsync).toHaveBeenCalledExactlyOnceWith(ScreenOrientation.OrientationLock.LANDSCAPE);
   orientation.cleanup(); await flush();
-  expect(ScreenOrientation.lockAsync).toHaveBeenLastCalledWith(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+  expect(ScreenOrientation.lockAsync).toHaveBeenLastCalledWith(ScreenOrientation.OrientationLock.DEFAULT);
 });
 
-it('restores portrait when closed while the initial landscape request is in flight', async () => {
+it('restores automatic orientation when closed while the initial landscape request is in flight', async () => {
   let finish!: () => void;
   vi.mocked(ScreenOrientation.lockAsync).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
   const orientation = open(true); await flush();
   orientation.cleanup(); finish(); await flush();
   expect(vi.mocked(ScreenOrientation.lockAsync).mock.calls.map(([lock]) => lock)).toEqual([
-    ScreenOrientation.OrientationLock.LANDSCAPE, ScreenOrientation.OrientationLock.PORTRAIT_UP,
+    ScreenOrientation.OrientationLock.LANDSCAPE, ScreenOrientation.OrientationLock.DEFAULT,
   ]);
 });
 
-it('ignores repeated presses and restores portrait after an in-flight rotation finishes', async () => {
+it('ignores repeated presses and restores automatic orientation after an in-flight rotation finishes', async () => {
   let finish!: () => void;
   vi.mocked(ScreenOrientation.lockAsync).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
   const orientation = open();
@@ -75,13 +75,13 @@ it('ignores repeated presses and restores portrait after an in-flight rotation f
   expect(observed.remove).toHaveBeenCalledOnce();
   expect(ScreenOrientation.lockAsync).toHaveBeenCalledTimes(1);
   finish(); await flush();
-  expect(ScreenOrientation.lockAsync).toHaveBeenLastCalledWith(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+  expect(ScreenOrientation.lockAsync).toHaveBeenLastCalledWith(ScreenOrientation.OrientationLock.DEFAULT);
 });
 
 it('cancels a queued rotation when the terminal is hidden immediately', async () => {
   const orientation = open();
   orientation.rotate(); orientation.cleanup(); await flush();
-  expect(ScreenOrientation.lockAsync).toHaveBeenCalledExactlyOnceWith(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+  expect(ScreenOrientation.lockAsync).toHaveBeenCalledExactlyOnceWith(ScreenOrientation.OrientationLock.DEFAULT);
 });
 
 it('allows retry after rotation fails and shows a concise error', async () => {

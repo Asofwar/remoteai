@@ -121,6 +121,7 @@ export function BottomSheet({
     transparent
     animationType="slide"
     statusBarTranslucent
+    supportedOrientations={['portrait', 'landscape-left', 'landscape-right']}
     onRequestClose={() => { if (dismissible) (onBack ?? onClose)(); }}
   >
     {/* Measure the modal window, not the animated sheet: fractional insets can otherwise feed back into its height. */}

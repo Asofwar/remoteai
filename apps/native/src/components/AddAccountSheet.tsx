@@ -189,7 +189,8 @@ export function AddAccountSheet({ session, visible, onAdded, onClose }: {
     } catch (cause) { Toast.fail(messageOf(cause)); }
   };
 
-  return <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={close}>
+  return <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={close}
+    supportedOrientations={['portrait', 'landscape-left', 'landscape-right']}>
     <SafeAreaView style={styles.root}>
       <View style={styles.header}><View style={styles.heading}><Text style={styles.title}>{t("添加账户")}</Text><Text style={styles.subtitle}>{mode === 'import' ? t("导入已有账号凭据") : t("选择一种安全的添加方式")}</Text></View><Pressable disabled={busy} onPress={close} style={styles.closeButton}><Text style={styles.closeText}>×</Text></Pressable></View>
       <View style={styles.browser}>

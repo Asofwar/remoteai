@@ -23,7 +23,8 @@ export function DeviceOptionsMenu(props: DeviceOptionsMenuProps) {
   if (!device) return null;
   const deleteDisabled = device.online || Boolean(deletingDeviceId);
   const authDisabled = !device.online || Boolean(switchingAuthDeviceId);
-  return <Modal transparent visible animationType="fade" onRequestClose={onClose}>
+  return <Modal transparent visible animationType="fade" onRequestClose={onClose}
+    supportedOrientations={['portrait', 'landscape-left', 'landscape-right']}>
     <View style={styles.overlay}>
       <Pressable accessibilityLabel={t("关闭菜单")} accessibilityRole="button"
         style={StyleSheet.absoluteFill} onPress={onClose} />

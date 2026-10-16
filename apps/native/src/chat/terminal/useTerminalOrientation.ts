@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Keyboard } from 'react-native';
 import * as ScreenOrientation from 'expo-screen-orientation';
 
-/** Serialize rotation and cleanup so hiding during a pending rotation still restores portrait. */
+/** Serialize rotation and cleanup so closing a viewer restores the app's automatic orientation. */
 export function useTerminalOrientation(visible: boolean, {
   initialLandscape = false, waitForShow = false,
 } = {}) {
@@ -36,9 +36,8 @@ export function useTerminalOrientation(visible: boolean, {
       subscription.remove();
       active.current = false;
       generation.current += 1;
-      const portrait = ScreenOrientation.OrientationLock.PORTRAIT_UP;
-      pending.current = pending.current.then(() => ScreenOrientation.lockAsync(portrait))
-        .catch(() => console.warn('Unable to restore terminal portrait orientation'));
+      pending.current = pending.current.then(() => ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.DEFAULT))
+        .catch(() => console.warn('Unable to restore automatic orientation'));
     };
   }, [visible, initialLandscape, waitForShow]);
 

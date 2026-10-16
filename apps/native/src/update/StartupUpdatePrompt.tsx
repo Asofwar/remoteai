@@ -25,7 +25,8 @@ export function StartupUpdatePrompt() {
     beginAppUpdateDownload(release);
   };
 
-  return <Modal transparent visible animationType="fade" onRequestClose={update.dismiss}>
+  return <Modal transparent visible animationType="fade" onRequestClose={update.dismiss}
+    supportedOrientations={['portrait', 'landscape-left', 'landscape-right']}>
     <View style={styles.backdrop}>
       <View accessibilityViewIsModal style={styles.dialog}>
         <Text accessibilityRole="header" style={styles.title}>{t("发现新版本")}</Text>

@@ -13,6 +13,12 @@ const LOCKS = {
   'landscape-left': ScreenOrientation.OrientationLock.LANDSCAPE_LEFT,
   'landscape-right': ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT,
 } satisfies Record<ImageOrientation, ScreenOrientation.OrientationLock>;
+const DISPLAYED_ORIENTATIONS: Partial<Record<ScreenOrientation.Orientation, ImageOrientation>> = {
+  [ScreenOrientation.Orientation.PORTRAIT_UP]: 'portrait',
+  [ScreenOrientation.Orientation.PORTRAIT_DOWN]: 'portrait-down',
+  [ScreenOrientation.Orientation.LANDSCAPE_LEFT]: 'landscape-left',
+  [ScreenOrientation.Orientation.LANDSCAPE_RIGHT]: 'landscape-right',
+};
 
 export function useImageOrientation() {
   const [displayed, setDisplayed] = useState<ImageOrientation>('portrait');
@@ -22,6 +28,20 @@ export function useImageOrientation() {
   const busy = useRef(false);
   const mounted = useRef(true);
   const pending = useRef(Promise.resolve());
+
+  useEffect(() => {
+    let active = true;
+    const update = (value: ScreenOrientation.Orientation) => {
+      const orientation = DISPLAYED_ORIENTATIONS[value];
+      if (active && orientation) setDisplayed(orientation);
+    };
+    const subscription = ScreenOrientation.addOrientationChangeListener(event => {
+      update(event.orientationInfo.orientation);
+    });
+    void ScreenOrientation.getOrientationAsync().then(update)
+      .catch(() => console.warn('Unable to read preview orientation'));
+    return () => { active = false; subscription.remove(); };
+  }, []);
 
   useEffect(() => {
     mounted.current = true;
@@ -43,9 +63,9 @@ export function useImageOrientation() {
       active = false;
       mounted.current = false;
       subscription?.remove();
-      // Wait for an in-flight rotation before restoring the chat's portrait lock.
-      void pending.current.then(() => ScreenOrientation.lockAsync(LOCKS.portrait))
-        .catch(() => console.warn('Unable to restore portrait orientation'));
+      // Finish any requested rotation before allowing the chat to follow the device again.
+      void pending.current.then(() => ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.DEFAULT))
+        .catch(() => console.warn('Unable to restore automatic orientation'));
     };
   }, []);
 

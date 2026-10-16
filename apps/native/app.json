@@ -4,7 +4,7 @@
     "slug": "codex-switch",
     "version": "1.7.43",
     "icon": "./assets/icon.png",
-    "orientation": "portrait",
+    "orientation": "default",
     "userInterfaceStyle": "automatic",
     "splash": {
       "resizeMode": "contain",
@@ -87,7 +87,7 @@
       [
         "expo-screen-orientation",
         {
-          "initialOrientation": "PORTRAIT_UP"
+          "initialOrientation": "DEFAULT"
         }
       ],
       [

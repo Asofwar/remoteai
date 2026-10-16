@@ -24,6 +24,7 @@ export function ChatSearch({ state, controller, onClose, select }: Props) {
   const search = useChatSearch({ controller, query, archived: state.archived, ready: state.ready });
   const emptyMessage = !state.ready ? t("连接电脑后即可搜索聊天") : query.trim() ? t("没有找到相关聊天") : t("输入关键词，查找聊天");
   return <Modal visible animationType="slide" statusBarTranslucent
+    supportedOrientations={['portrait', 'landscape-left', 'landscape-right']}
     onRequestClose={onClose} onShow={() => input.current?.focus()}>
     <SafeAreaView style={searchStyles.page}>
       <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

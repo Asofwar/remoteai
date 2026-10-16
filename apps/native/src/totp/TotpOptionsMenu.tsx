@@ -23,7 +23,8 @@ export function TotpOptionsMenu({ title, visible, onClose, options }: {
   const styles = useStyles();
   const color = useThemeColor();
   useLanguage();
-  return <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+  return <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}
+    supportedOrientations={['portrait', 'landscape-left', 'landscape-right']}>
     <View style={styles.overlay}>
       <Pressable accessibilityLabel={t("关闭菜单")} accessibilityRole="button"
         style={StyleSheet.absoluteFill} onPress={onClose} />

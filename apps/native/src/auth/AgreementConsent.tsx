@@ -30,6 +30,7 @@ export function AgreementConsent({ consent, disabled }: { consent: Consent; disa
       </Pressable>
     </View>
     <Modal transparent visible={reading || consent.pendingAction !== null} animationType="fade"
+      supportedOrientations={['portrait', 'landscape-left', 'landscape-right']}
       onShow={Keyboard.dismiss} onRequestClose={close}>
       <SafeAreaView style={styles.overlay}>
         <View accessibilityViewIsModal style={[styles.card, reading && styles.reader]}>

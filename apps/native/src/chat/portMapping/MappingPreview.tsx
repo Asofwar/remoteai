@@ -11,7 +11,8 @@ export function MappingPreview({ port, close }: { port: number; close: () => voi
   const [error, setError] = useState('');
   const [canGoBack, setCanGoBack] = useState(false);
   const url = `http://127.0.0.1:${port}`;
-  return <Modal visible animationType="slide" onRequestClose={close}>
+  return <Modal visible animationType="slide" onRequestClose={close}
+    supportedOrientations={['portrait', 'landscape-left', 'landscape-right']}>
     <SafeAreaProvider><SafeAreaView style={styles.page}>
       <View style={styles.header}>
         <Pressable accessibilityRole="button" onPress={close} style={styles.button}>

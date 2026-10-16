@@ -51,10 +51,11 @@ export function MappingPreview({ tunnel, origin, close }: {
     <div className="port-mapping-notice" style={{ minHeight: 32 }}>
       {status === 'loading' && <><Spin size="small" /> {t('正在加载网页…')}</>}
       {isPreviewFailure(status) && <Alert type="warning" message={t(PREVIEW_ERRORS[status])} />}
+      {status === 'resource-warning' && <Alert type="warning" message={t('部分图片或字体未能加载，网页仍可继续使用。')} />}
     </div>
     {presented && <iframe ref={frame} key={generation} title={t('端口映射预览')} sandbox="allow-scripts allow-forms"
       allow="camera 'none'; microphone 'none'; geolocation 'none'"
-      data-ready={status === 'ready'}
+      data-ready={status === 'ready' || status === 'resource-warning'}
       referrerPolicy="no-referrer" srcDoc={PREVIEW_DOCUMENT} onLoad={() => {
         if (!frame.current || frame.current.dataset.attached) return;
         frame.current.dataset.attached = 'true';

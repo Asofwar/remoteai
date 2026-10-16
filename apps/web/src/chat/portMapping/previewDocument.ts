@@ -69,8 +69,8 @@ async function prepareImages(document: Document, assets: PreviewAssets, base: st
     node.removeAttribute('srcset');
     const poster = node.getAttribute('poster');
     await Promise.all([
-      source && assets.data(source, base).then(value => node.setAttribute('src', value)),
-      poster && assets.data(poster, base).then(value => node.setAttribute('poster', value)),
+      source && assets.data(source, base, { optional: true }).then(value => node.setAttribute('src', value)),
+      poster && assets.data(poster, base, { optional: true }).then(value => node.setAttribute('poster', value)),
     ]);
   }));
   document.querySelectorAll('link:not([rel=stylesheet])').forEach(node => node.remove());

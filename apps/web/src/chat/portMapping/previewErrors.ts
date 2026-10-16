@@ -7,7 +7,7 @@ export const PREVIEW_ERRORS = {
 } as const;
 
 export type PreviewFailure = keyof typeof PREVIEW_ERRORS;
-export type PreviewStatus = 'loading' | 'ready' | PreviewFailure;
+export type PreviewStatus = 'loading' | 'ready' | 'resource-warning' | PreviewFailure;
 
 const PREVIEW_DIAGNOSTICS = new Set([
   'storage-access', 'cookie-access', 'history-access', 'dynamic-code', 'module-import', 'invalid-url', 'script-exception',

@@ -98,10 +98,11 @@
   function installResourceSetter(prototype, attribute) {
     const original = Object.getOwnPropertyDescriptor(prototype, attribute);
     if (!original?.set) return;
+    const optional = prototype === HTMLImageElement.prototype || prototype === HTMLMediaElement.prototype;
     Object.defineProperty(prototype, attribute, { ...original, set(value) {
       if (/^(data:|blob:|#)/i.test(value)) { original.set.call(this, value); return; }
       const node = this;
-      request('asset', { url: absolute(value) }).then(data => original.set.call(node, data)).catch(announceError);
+      request('asset', { url: absolute(value), optional }).then(data => original.set.call(node, data)).catch(announceError);
     } });
   }
   for (const [prototype, attribute] of [[HTMLImageElement.prototype, 'src'], [HTMLScriptElement.prototype, 'src'],

@@ -19,7 +19,8 @@ export class PreviewAssets {
   private activeRequests = 0;
   private readonly waiting: (() => void)[] = [];
   private moduleQueue = Promise.resolve();
-  constructor(private readonly tunnel: Pick<WebMappingTunnel, 'request'>, readonly origin: string) {}
+  constructor(private readonly tunnel: Pick<WebMappingTunnel, 'request'>, readonly origin: string,
+    private readonly warn?: (diagnostic: string) => void) {}
 
   url(value: string, base: string) {
     try { return mappingUrl(new URL(value, base).href, this.origin).href; }
@@ -67,11 +68,18 @@ export class PreviewAssets {
     }
   }
 
-  async data(value: string, base: string): Promise<string> {
+  async data(value: string, base: string, options: { optional?: boolean } = {}): Promise<string> {
     if (/^(data:|#)/i.test(value)) return value;
-    const reply = await this.load(value, base);
-    const type = new Headers(reply.headers).get('content-type') ?? 'application/octet-stream';
-    return `data:${type.split(';')[0]};base64,${encodeBase64(reply.body)}`;
+    try {
+      const reply = await this.load(value, base);
+      const type = new Headers(reply.headers).get('content-type') ?? 'application/octet-stream';
+      return `data:${type.split(';')[0]};base64,${encodeBase64(reply.body)}`;
+    } catch (error) {
+      if (!options.optional || !(error instanceof PreviewError) || error.failure !== 'resource-error') throw error;
+      // Missing media should behave like a broken browser image/font, without blocking the entire document.
+      this.warn?.(error.diagnostic ?? 'script-exception');
+      return 'data:,';
+    }
   }
 
   async css(source: string, base: string, depth = 0): Promise<string> {
@@ -82,7 +90,7 @@ export class PreviewAssets {
         return this.css(decoder.decode(reply.body), reply.url, depth + 1);
       });
     result = await replaceAsync(result, /url\(\s*(["']?)(.*?)\1\s*\)/gi,
-      async match => `url("${await this.data(match[2], base)}")`);
+      async match => `url("${await this.data(match[2], base, { optional: true })}")`);
     return result;
   }
 

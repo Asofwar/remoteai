@@ -1,4 +1,10 @@
 export const browserStateFiles = {
+  '/missing-media': ['text/html', '<h1>Missing media app</h1><img alt="Missing logo" src="/missing.png">'
+    + '<style>@font-face{font-family:missing;src:url(/missing.woff2)}h1{color:rgb(18,56,42)}</style>'
+    + '<button id="action">Continue using page</button><p id="result"></p>'
+    + '<script type="module">document.querySelector("#action").onclick=()=>{'
+    + 'const image=new Image();image.src="/missing-late.png";document.body.append(image);'
+    + 'document.querySelector("#result").textContent="Still working";};</script>'],
   '/browser-state': ['text/html', '<h1>Browser state</h1><p id="state"></p>'
     + '<script type="module" src="/browser-state.js"></script>'],
   '/browser-state.js': ['text/javascript', `

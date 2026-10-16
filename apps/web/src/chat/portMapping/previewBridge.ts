@@ -23,7 +23,7 @@ export const PREVIEW_DOCUMENT = '<!doctype html><meta charset="utf-8">'
 
 type PreviewMessage = { id?: number; type?: string; input?: MappingHttpRequest; url?: string;
   socketId?: string; protocols?: string[]; data?: string | Uint8Array; failure?: unknown;
-  area?: unknown; operation?: unknown; key?: unknown; value?: unknown; diagnostic?: unknown };
+  area?: unknown; operation?: unknown; key?: unknown; value?: unknown; diagnostic?: unknown; optional?: unknown };
 
 export function attachPreview(options: {
   frame: HTMLIFrameElement; tunnel: WebMappingTunnel; input: MappingHttpRequest; storage: PreviewStorage;
@@ -35,7 +35,15 @@ export function attachPreview(options: {
   const cancellation = new AbortController();
   const requests = { request: (request: MappingHttpRequest) => tunnel.request(request, cancellation.signal) };
   const sockets = new Map<string, Promise<MappingWebSocket>>();
-  const assets = new PreviewAssets(requests, new URL(input.url).origin);
+  let ready = false;
+  let failed = false;
+  let resourceWarning = false;
+  const assets = new PreviewAssets(requests, new URL(input.url).origin, diagnostic => {
+    if (closed) return;
+    resourceWarning = true;
+    console.warn('Port mapping preview: resource-warning', previewDiagnostic(diagnostic));
+    if (ready && !failed) status('resource-warning');
+  });
   let closed = false;
   let active = 0;
   const post = (message: object) => { if (!closed) channel.port1.postMessage(message); };
@@ -44,7 +52,7 @@ export function attachPreview(options: {
       case 'document': return { ...await previewDocument(requests, input, assets), storage: options.storage.snapshot() };
       case 'module': return assets.loadModule(String(message.url), input.url);
       case 'fetch': return requests.request(validateRequest(message.input, input.url));
-      case 'asset': return assets.data(String(message.url), input.url);
+      case 'asset': return assets.data(String(message.url), input.url, { optional: message.optional === true });
       case 'ws-open': {
         const id = message.socketId;
         if (typeof id !== 'string' || sockets.has(id) || sockets.size >= 4) throw new Error('Socket limit');
@@ -74,8 +82,13 @@ export function attachPreview(options: {
     const message: PreviewMessage = event.data;
     if (!message || typeof message !== 'object' || closed) return;
     if (message.type === 'storage') { options.storage.apply(message); return; }
-    if (message.type === 'preview-ready') { status('ready'); return; }
+    if (message.type === 'preview-ready') {
+      ready = true;
+      if (!failed) status(resourceWarning ? 'resource-warning' : 'ready');
+      return;
+    }
     if (message.type === 'preview-error') {
+      failed = true;
       const failure = isPreviewFailure(message.failure) ? message.failure : 'script-error';
       console.warn('Port mapping preview:', failure, previewDiagnostic(message.diagnostic));
       status(failure); return;

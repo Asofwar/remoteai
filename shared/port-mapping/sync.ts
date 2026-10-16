@@ -5,6 +5,7 @@ export interface MappingDocument { revision: number; mappings: PortMapping[]; ac
 export type MappingExchange = (document?: MappingDocument) => Promise<MappingDocument>;
 const INTERVAL_MS = 5_000;
 const SYNC_ERROR = '配置暂未同步，联网后会自动重试。';
+const PROTOCOL_SYNC_ERROR = '协议设置暂未同步，本机映射仍可使用。';
 const CAPACITY_CONFLICT = '最多同步 8 条映射，多出的映射已保留在本机。请删除不需要的映射后继续同步。';
 type Pending = Record<string, PortMapping | null>;
 
@@ -65,6 +66,11 @@ export class MappingSync {
           mappings }));
         if (this.disposed) return;
         if (remote.accepted) {
+          // Older servers accept unknown fields but omit them from stored JSON; never silently downgrade UDP.
+          if (mappings.some(entry => entry.protocol && entry.protocol !== 'tcp'
+            && remote.mappings.find(saved => saved.id === entry.id)?.protocol !== entry.protocol)) {
+            throw new Error(PROTOCOL_SYNC_ERROR);
+          }
           for (const [id, value] of Object.entries(sent)) {
             if (this.pending[id] === value) delete this.pending[id];
           }
@@ -74,7 +80,10 @@ export class MappingSync {
       const visible = mergeMappings(remote.mappings, this.pending);
       this.service.applySaved(visible);
       if (persisted) this.updateStatus(visible);
-    } catch { if (!this.disposed) this.setStatus(SYNC_ERROR); }
+    } catch (error) {
+      if (!this.disposed) this.setStatus(error instanceof Error && error.message === PROTOCOL_SYNC_ERROR
+        ? PROTOCOL_SYNC_ERROR : SYNC_ERROR);
+    }
     finally { this.busy = false; }
   };
 
@@ -154,7 +163,8 @@ export function mergeMappings(remote: PortMapping[], pending: Pending): PortMapp
     if (!entry) { merged.delete(id); continue; }
     // Import identical legacy local settings only once across installations.
     const duplicate = !merged.has(id) && [...merged.values()].some(value =>
-      value.remoteHost === entry.remoteHost && value.remotePort === entry.remotePort && value.localPort === entry.localPort);
+      value.remoteHost === entry.remoteHost && value.remotePort === entry.remotePort && value.localPort === entry.localPort
+      && (value.protocol ?? 'tcp') === (entry.protocol ?? 'tcp'));
     if (!duplicate) merged.set(id, entry);
   }
   return [...merged.values()];

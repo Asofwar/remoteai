@@ -9,7 +9,17 @@ pub(crate) struct PortMapping {
     remote_host: String,
     remote_port: u16,
     local_port: u16,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    protocol: Option<MappingProtocol>,
     updated_at: Option<u64>,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum MappingProtocol {
+    Tcp,
+    Udp,
+    Both,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -110,6 +120,22 @@ pub(crate) async fn sync_port_mappings(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn protocol_survives_ipc_and_legacy_mappings_remain_valid() {
+        let entry = serde_json::json!({ "id": "one", "remoteHost": "127.0.0.1",
+            "remotePort": 53, "localPort": 1053 });
+        assert!(serde_json::from_value::<PortMapping>(entry.clone()).is_ok());
+        for protocol in ["tcp", "udp", "both"] {
+            let mut value = entry.clone();
+            value["protocol"] = protocol.into();
+            let mapping: PortMapping = serde_json::from_value(value).unwrap();
+            assert_eq!(serde_json::to_value(mapping).unwrap()["protocol"], protocol);
+        }
+        let mut invalid = entry;
+        invalid["protocol"] = "icmp".into();
+        assert!(serde_json::from_value::<PortMapping>(invalid).is_err());
+    }
     #[test]
     fn rejects_paths_and_invalid_targets() {
         for id in ["", "../other", "a/b", "a?b", "a%2fb"] {
@@ -124,6 +150,7 @@ mod tests {
                 remote_host: "::1".into(),
                 remote_port: 3000,
                 local_port: 13000,
+                protocol: None,
                 updated_at: None,
             }],
         };

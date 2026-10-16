@@ -22,7 +22,15 @@ it('binds previews and streams to the transport owner and overrides forged scope
     request: { type: 'read', id: 'stream', scope: 'forged' } }, 'one');
   expect(invoke).toHaveBeenLastCalledWith('codex_gui_resource_link',
     { request: { type: 'read', id: 'stream', scope: 'resource' } });
-  for (const type of ['listen', 'accept', 'stop']) await expect(files.request({ operation: 'guiResourceLink',
+  for (const type of ['udpConnect', 'udpRead', 'udpWrite', 'udpClose']) {
+    await expect(files.request({ operation: 'guiResourceLink', id: 'resource', request: { type } }, 'two'))
+      .rejects.toThrow();
+    await files.request({ operation: 'guiResourceLink', id: 'resource',
+      request: { type, id: 'udp', scope: 'forged' } }, 'one');
+    expect(invoke).toHaveBeenLastCalledWith('codex_gui_resource_link',
+      { request: { type, id: 'udp', scope: 'resource' } });
+  }
+  for (const type of ['listen', 'udpListen', 'accept', 'stop']) await expect(files.request({ operation: 'guiResourceLink',
     id: 'resource', request: { type } }, 'one')).rejects.toThrow();
   files.release('two');
   expect(invoke).not.toHaveBeenCalledWith('codex_gui_close_file_preview', expect.anything());

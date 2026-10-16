@@ -7,6 +7,7 @@ declare global {
     portForwardingFixture: {
       targetUrls: string[]; clipboard: string[]; browserUrls: string[]; previewUrls: string[];
       resolvedUrls: string[]; failBrowser: boolean;
+      openedPorts: Set<number>; openedUdpPorts: Set<number>;
     };
   }
 }
@@ -18,6 +19,28 @@ async function add(page: Page, remotePort: number, localPort: number) {
 test.beforeEach(async ({ page }) => {
   await page.goto('/e2e/port-forwarding-harness.html');
   await page.getByRole('button', { name: '端口映射', exact: true }).click();
+});
+
+test('selects UDP or both, persists edits, and keeps protocol controls within a narrow panel', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await panel(page).getByRole('radio', { name: 'UDP', exact: true }).check();
+  await add(page, 53, 1053);
+  const mapping = entry(page, '127.0.0.1:53 → 1053');
+  await expect(mapping.getByRole('status')).toHaveText('映射中');
+  await expect(mapping.getByRole('button', { name: '127.0.0.1:1053', exact: true })).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => window.portForwardingFixture.openedUdpPorts.has(1053))).toBe(true);
+  await mapping.getByRole('button', { name: /^编辑映射/ }).click();
+  await panel(page).getByRole('radio', { name: '全部（TCP + UDP）' }).check();
+  await panel(page).getByRole('button', { name: '保存修改' }).click();
+  await expect(mapping.getByRole('status')).toHaveText('映射中');
+  await expect(mapping.getByRole('button', { name: '127.0.0.1:1053', exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.portForwardingFixture.openedPorts.has(1053))).toBe(true);
+  expect(await panel(page).evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: '../../.codex-tmp/port-forwarding-udp-narrow.png' });
+  await page.reload();
+  await page.getByRole('button', { name: '端口映射', exact: true }).click();
+  await expect(mapping.getByText('TCP + UDP', { exact: true })).toBeVisible();
+  await expect(mapping.getByRole('status')).toHaveText('已停止');
 });
 
 test('maps a selected IP and restores it after reload', async ({ page }) => {

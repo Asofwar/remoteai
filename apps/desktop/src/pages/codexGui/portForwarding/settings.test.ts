@@ -1,8 +1,20 @@
 // @vitest-environment jsdom
 import { beforeEach, expect, it } from 'vitest';
 import { readPortMappings, savePortMappings } from './settings';
+import { mappingConflicts } from '../../../../../../shared/port-mapping/settings';
 
 beforeEach(() => localStorage.clear());
+it('preserves protocols, accepts separate TCP/UDP on one port, and rejects overlapping or invalid protocols', () => {
+  const tcp = { id: 'tcp', remotePort: 53, localPort: 1053, protocol: 'tcp' as const };
+  const udp = { ...tcp, id: 'udp', protocol: 'udp' as const };
+  savePortMappings('scope', [tcp, udp]);
+  expect(readPortMappings('scope').map(value => value.protocol)).toEqual(['tcp', 'udp']);
+  expect(mappingConflicts(tcp, udp)).toBe(false);
+  expect(mappingConflicts(tcp, { ...udp, protocol: 'both' })).toBe(true);
+  expect(mappingConflicts({ ...tcp, protocol: undefined }, tcp)).toBe(true);
+  localStorage.setItem('codex-port-forwarding:bad', JSON.stringify([{ ...tcp, protocol: 'icmp' }]));
+  expect(readPortMappings('bad')).toEqual([]);
+});
 it('keeps configuration separate by account and device without restoring active connections', () => {
   savePortMappings('account/computer-one', [{ id: 'one', remotePort: 5432, localPort: 15432 }]);
   expect(readPortMappings('account/computer-two')).toEqual([]);

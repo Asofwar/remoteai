@@ -66,7 +66,10 @@ function terminalLinkRequest(request: RpcRequest): Cached['terminalLink'] {
   if (request.method !== 'request' || !body || !['guiTerminalLink', 'guiResourceLink'].includes(String(body.operation))
     || !body.request || typeof body.request !== 'object' || Array.isArray(body.request)) return;
   const stream = object(body.request);
-  return { terminal: JSON.stringify([body.operation, body.id]), stream: stream.id, action: stream.type };
+  const udpActions: Record<string, string> = { udpConnect: 'connect', udpRead: 'read',
+    udpWrite: 'write', udpClose: 'close' };
+  return { terminal: JSON.stringify([body.operation, body.id]), stream: stream.id,
+    action: udpActions[String(stream.type)] ?? stream.type };
 }
 const READ_OPERATIONS = new Set([
   'guiFileApplications', 'guiFilePreviewClose', 'guiFilePreviewHost', 'guiResourceClose',

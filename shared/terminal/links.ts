@@ -1,6 +1,11 @@
 export type TerminalLinkRequest = { type: 'connect'; url: string }
+  | { type: 'udpConnect'; url: string }
+  | { type: 'udpRead' | 'udpClose'; id: string }
+  | { type: 'udpWrite'; id: string; packets: UdpPacket[] }
   | { type: 'read' | 'close'; id: string } | { type: 'write'; id: string; data: string };
+export interface UdpPacket { peer: string; data: string }
 export type TerminalLinkReply = { type: 'listener'; id: string; port: number }
+  | { type: 'datagrams'; packets: UdpPacket[] }
   | { type: 'socket'; id: string } | { type: 'data'; data: string; eof: boolean } | { type: 'done' };
 export type ResolveTerminalLink = (id: string, url: string) => Promise<string>;
 

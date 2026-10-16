@@ -65,6 +65,7 @@ struct Listener {
 /// Handles are scoped to one terminal or one loopback listener and expire when their client leaves.
 #[derive(Default)]
 pub(crate) struct LinkState {
+    udp: super::udp::Sessions,
     pub(super) resources: Mutex<HashMap<String, String>>,
     sockets: Mutex<HashMap<String, Arc<Socket>>>,
     listeners: Mutex<HashMap<String, Arc<Listener>>>,
@@ -76,6 +77,13 @@ impl LinkState {
         request: LinkRequest,
     ) -> Result<LinkReply> {
         match request {
+            LinkRequest::UdpListen { port } => self.udp.listen(port).await,
+            LinkRequest::UdpConnect { scope, url } => self.udp.connect(scope, url).await,
+            LinkRequest::UdpRead { scope, id } => self.udp.read(&scope, &id).await,
+            LinkRequest::UdpWrite { scope, id, packets } => {
+                self.udp.write(&scope, &id, packets).await
+            }
+            LinkRequest::UdpClose { scope, id } => self.udp.close(&scope, &id).await,
             LinkRequest::Listen { port } => self.listen(port).await,
             LinkRequest::Accept { scope } => self.accept(&scope).await,
             LinkRequest::Connect { scope, url } => {
@@ -202,6 +210,7 @@ impl LinkState {
     }
 
     async fn stop(&self, scope: &str) {
+        self.udp.stop(scope).await;
         let listener = self.listeners.lock().await.remove(scope);
         if let Some(listener) = listener {
             listener.life.cancel.send_replace(true);

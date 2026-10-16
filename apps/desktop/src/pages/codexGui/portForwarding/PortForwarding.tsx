@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Input, InputNumber, Popover, Tooltip, message } from 'antd';
+import { Alert, Button, Input, InputNumber, Popover, Radio, Tooltip, message } from 'antd';
 import { ArrowRight, Cable, Copy, Pencil, Play, Plus, Square, Trash2 } from 'lucide-react';
 import { guiText as t } from '../../../i18n/guiText';
 import { copyText } from '../../../utils/clipboard';
 import { usePortForwarding } from './usePortForwarding';
 import { ForwardedAddress } from './ForwardedAddress';
 import { MAX_PORT, MAX_PORT_MAPPINGS } from './settings';
+import { protocolLabel, type MappingProtocol } from '../../../../../../shared/port-mapping/settings';
 import { DEFAULT_MAPPING_HOST, mappingAddress } from '../../../../../../shared/port-mapping/target';
 import type { ForwardingClient, ForwardingEntry, PortForwardingService } from './service';
 import launcherStyles from '../GuiRemoteDesktop.module.less';
@@ -40,7 +41,7 @@ export function PortForwarding(props: {
         {t('该映射已被删除，请重新添加。')}</Button>}
       {!editing && <MappingForm service={service} disabled={entries.length >= MAX_PORT_MAPPINGS}
         connected={props.connected} />}
-      <footer>{t('支持 TCP，仅本机可访问。')}</footer>
+      <footer>{t('支持 TCP 和 UDP，仅本机可访问。')}</footer>
       {syncStatus && <footer role="status">{t(syncStatus)}</footer>}
     </section>}>
     <button type="button" className={launcherStyles.launcher} aria-label={t('端口映射')} aria-expanded={open}>
@@ -54,6 +55,7 @@ function MappingForm({ service, disabled, entry, done, connected = true }: {
   service: PortForwardingService; disabled?: boolean; entry?: ForwardingEntry; done?: () => void; connected?: boolean;
 }) {
   const [remoteHost, setRemoteHost] = useState(entry?.remoteHost ?? '');
+  const [protocol, setProtocol] = useState<MappingProtocol>(entry?.protocol ?? 'tcp');
   const [remotePort, setRemotePort] = useState<number | null>(entry?.remotePort ?? null);
   const [localPort, setLocalPort] = useState<number | null>(entry?.localPort ?? null);
   const [error, setError] = useState('');
@@ -63,16 +65,21 @@ function MappingForm({ service, disabled, entry, done, connected = true }: {
     if (disabled || saving) return;
     setSaving(true);
     try {
-      const target = { remoteHost, remotePort: remotePort ?? 0, localPort: localPort ?? remotePort ?? 0 };
+      const target = { remoteHost, remotePort: remotePort ?? 0, localPort: localPort ?? remotePort ?? 0, protocol };
       if (entry) await service.edit(entry.id, target);
-      else service.add(target.remotePort, target.localPort, target.remoteHost);
-      setError(''); setRemoteHost(''); setRemotePort(null); setLocalPort(null);
+      else service.add(target.remotePort, target.localPort, target.remoteHost, protocol);
+      setError(''); setRemoteHost(''); setRemotePort(null); setLocalPort(null); setProtocol('tcp');
       done?.();
     }
     catch (reason) { setError(reason instanceof Error ? reason.message : '映射未能保存，请重试。'); }
     finally { setSaving(false); }
   }}>
     {entry && <strong>{t('编辑映射')}</strong>}
+    <div><span>{t('协议')} </span><Radio.Group aria-label={t('协议')} value={protocol}
+      disabled={disabled || saving} onChange={event => setProtocol(event.target.value as MappingProtocol)}>
+      <Radio value="tcp">TCP</Radio><Radio value="udp">UDP</Radio>
+      <Radio value="both">{t('全部（TCP + UDP）')}</Radio>
+    </Radio.Group></div>
     <div className={styles.fields}>
       <label>{t('目标 IP')}<Input aria-label={t('目标 IP')} value={remoteHost}
         onChange={event => setRemoteHost(event.target.value)} placeholder={DEFAULT_MAPPING_HOST} disabled={disabled || saving}
@@ -110,7 +117,7 @@ function MappingRow({ entry, service, connected, onOpen, edit }: {
   };
   return <article className={styles.mapping} aria-label={label}>
     <div className={styles.row}>
-      <strong>{label}</strong>
+      <strong>{label}</strong><span className={styles.status}>{protocolLabel(entry.protocol)}</span>
       <span className={styles.status} data-running={running} role="status">{t(STATUS_TEXT[entry.status])}</span>
       <Tooltip title={t('编辑映射')} styles={{ root: { maxWidth: 400 } }}>
         <Button type="text" size="small" aria-label={`${t('编辑映射')} ${label}`} icon={<Pencil size={14} />}
@@ -122,7 +129,8 @@ function MappingRow({ entry, service, connected, onOpen, edit }: {
       </Tooltip>
     </div>
     <div className={styles.row}>
-      <ForwardedAddress port={entry.localPort} running={running} onOpen={onOpen} />
+      {entry.protocol === 'udp' ? <code className={styles.address}>127.0.0.1:{entry.localPort}</code>
+        : <ForwardedAddress port={entry.localPort} running={running} onOpen={onOpen} />}
       <Tooltip title={t('复制本地地址')} styles={{ root: { maxWidth: 400 } }}>
         <Button type="text" size="small" disabled={!running} aria-label={`${t('复制本地地址')} ${label}`}
           icon={<Copy size={14} />} onClick={() => { void copy(); }} />

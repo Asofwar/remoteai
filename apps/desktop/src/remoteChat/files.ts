@@ -47,7 +47,8 @@ export class RemoteFiles {
     }
     if (body.operation !== 'guiResourceLink') throw unavailable();
     const request = object(body.request);
-    if (!['connect', 'read', 'write', 'close'].includes(String(request.type))) throw unavailable();
+    if (!['connect', 'read', 'write', 'close', 'udpConnect', 'udpRead', 'udpWrite', 'udpClose']
+      .includes(String(request.type))) throw unavailable();
     return invoke('codex_gui_resource_link', { request: { ...request, scope: resource.id } });
   }
 

@@ -3,24 +3,26 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 import type { ForwardingEntry, PortForwardingService } from '../../../../../shared/port-mapping/service';
 import { t } from '../../i18n';
 import { useMappingStyles } from './mappingStyles';
+import { MAPPING_PROTOCOLS, type MappingProtocol } from '../../../../../shared/port-mapping/settings';
 
 export function MappingForm({ service, disabled, connected = true, entry, done }: {
   service: PortForwardingService; disabled?: boolean; connected?: boolean; entry?: ForwardingEntry; done?: () => void;
 }) {
   const styles = useMappingStyles();
   const [remoteHost, setRemoteHost] = useState(entry?.remoteHost ?? '');
+  const [protocol, setProtocol] = useState<MappingProtocol>(entry?.protocol ?? 'tcp');
   const [remote, setRemote] = useState(entry ? String(entry.remotePort) : '');
   const [local, setLocal] = useState(entry ? String(entry.localPort) : '');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const reset = () => { setRemoteHost(''); setRemote(''); setLocal(''); setError(''); done?.(); };
+  const reset = () => { setRemoteHost(''); setRemote(''); setLocal(''); setProtocol('tcp'); setError(''); done?.(); };
   const submit = async () => {
     if (disabled || saving) return;
     setSaving(true);
     try {
-      const target = { remoteHost, remotePort: Number(remote), localPort: Number(local || remote) };
+      const target = { remoteHost, remotePort: Number(remote), localPort: Number(local || remote), protocol };
       if (entry) await service.edit(entry.id, target);
-      else service.add(target.remotePort, target.localPort, target.remoteHost);
+      else service.add(target.remotePort, target.localPort, target.remoteHost, protocol);
       reset();
     } catch (reason) { setError(reason instanceof Error ? reason.message : '映射未能保存，请重试。'); }
     finally { setSaving(false); }
@@ -28,6 +30,14 @@ export function MappingForm({ service, disabled, connected = true, entry, done }
   const locked = disabled || saving;
   return <View style={styles.form}>
     <Text style={styles.title}>{t(entry ? '编辑映射' : '添加映射')}</Text>
+    <View style={styles.fields} accessibilityRole="radiogroup" accessibilityLabel={t('协议')}>
+      {MAPPING_PROTOCOLS.map(value => <Pressable key={value} accessibilityRole="radio"
+        accessibilityLabel={value === 'both' ? t('全部（TCP + UDP）') : value.toUpperCase()}
+        accessibilityState={{ checked: protocol === value, disabled: !!locked }} disabled={locked}
+        onPress={() => setProtocol(value)} style={[styles.button, protocol === value && styles.primary]}>
+        <Text style={protocol === value ? styles.primaryText : styles.buttonText}>
+          {value === 'both' ? t('全部（TCP + UDP）') : value.toUpperCase()}</Text></Pressable>)}
+    </View>
     <View style={styles.fields}>
       <View style={styles.hostField}><Text style={styles.muted}>{t('目标 IP')}</Text>
         <TextInput accessibilityLabel={t('目标 IP')} value={remoteHost} onChangeText={setRemoteHost}

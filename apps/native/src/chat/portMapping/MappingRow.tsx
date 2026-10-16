@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import type { ForwardingEntry, PortForwardingService } from '../../../../../shared/port-mapping/service';
 import { DEFAULT_MAPPING_HOST } from '../../../../../shared/port-mapping/target';
+import { protocolLabel } from '../../../../../shared/port-mapping/settings';
 import { t } from '../../i18n';
 import { useMappingStyles } from './mappingStyles';
 
@@ -14,12 +15,14 @@ export function MappingRow({ entry, service, connected, open, edit }: {
   const [notice, setNotice] = useState('');
   const [menu, setMenu] = useState(false);
   const running = entry.status === 'running';
+  const canOpen = running && entry.protocol !== 'udp';
   const busy = entry.status === 'starting' || entry.status === 'stopping';
   const copy = async () => {
     try { await Clipboard.setStringAsync(`127.0.0.1:${entry.localPort}`); setNotice('本地地址已复制'); }
     catch { setNotice('复制失败，请重试。'); }
   };
-  const details = [['目标 IP', entry.remoteHost || DEFAULT_MAPPING_HOST], ['远程端口', entry.remotePort],
+  const details = [['协议', protocolLabel(entry.protocol)], ['目标 IP', entry.remoteHost || DEFAULT_MAPPING_HOST],
+    ['远程端口', entry.remotePort],
     ['本地端口', entry.localPort], ['编辑时间', entry.updatedAt
       ? new Date(entry.updatedAt).toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit',
         minute: '2-digit' }) : '—']];
@@ -44,16 +47,16 @@ export function MappingRow({ entry, service, connected, open, edit }: {
       <View style={styles.row}>
         <View style={styles.addressBox}>
           <Pressable accessibilityRole="button" accessibilityLabel={`127.0.0.1:${entry.localPort}`}
-            disabled={!running} onPress={open} style={[styles.fill, !running && styles.disabled]}>
+            disabled={!canOpen} onPress={open} style={[styles.fill, !running && styles.disabled]}>
             <Text style={styles.addressText}>127.0.0.1:{entry.localPort}</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={t('复制本地地址')}
             style={styles.iconButton} onPress={() => { void copy(); }}>
             <Ionicons name="copy-outline" size={19} color="#62768a" /></Pressable>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel={t('打开')} disabled={!running}
+        {entry.protocol !== 'udp' && <Pressable accessibilityRole="button" accessibilityLabel={t('打开')} disabled={!running}
           style={[styles.open, !running && styles.disabled]} onPress={open}>
           <Ionicons name="open-outline" size={19} color="#008b73" /><Text style={styles.openText}>{t('打开')}</Text>
-        </Pressable>
+        </Pressable>}
       </View>
     </View>
     <View style={styles.metadata}>{details.map(([label, value]) => <View key={label} style={styles.detail}>

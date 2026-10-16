@@ -7,6 +7,7 @@ pub(crate) mod resources;
 mod sockets;
 #[cfg(test)]
 mod tests;
+mod udp;
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -61,6 +62,26 @@ pub(crate) enum LinkRequest {
     Stop {
         scope: String,
     },
+    UdpListen {
+        port: u16,
+    },
+    UdpConnect {
+        scope: String,
+        url: String,
+    },
+    UdpRead {
+        scope: String,
+        id: String,
+    },
+    UdpWrite {
+        scope: String,
+        id: String,
+        packets: Vec<udp::Packet>,
+    },
+    UdpClose {
+        scope: String,
+        id: String,
+    },
 }
 
 #[derive(Debug, Serialize)]
@@ -70,6 +91,7 @@ pub(crate) enum LinkReply {
     Socket { id: String },
     Data { data: String, eof: bool },
     Done,
+    Datagrams { packets: Vec<udp::Packet> },
 }
 
 #[tauri::command]
@@ -79,6 +101,10 @@ pub(crate) async fn codex_gui_terminal_link(
     request: LinkRequest,
 ) -> std::result::Result<LinkReply, String> {
     super::authorize(&window).map_err(|error| error.to_string())?;
+    // Remote UDP destinations are authorized only through origin-bound resources.
+    if matches!(&request, LinkRequest::UdpConnect { .. }) {
+        return Err(LinkError::Invalid.to_string());
+    }
     if let LinkRequest::Connect { scope, .. } = &request {
         let terminals = app.state::<Arc<super::TerminalState>>().inner().clone();
         let id = scope.clone();

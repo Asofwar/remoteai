@@ -34,22 +34,45 @@ function device(options: { exchange: ReturnType<typeof server>['exchange']; cach
   return { service, sync, stop };
 }
 
-it('syncs additions, stable IDs, edits and removals between phone, desktop and Web', async () => {
+it('syncs additions, protocols, stable IDs, edits and removals between phone, desktop and Web', async () => {
   const cloud = server();
   const phone = device(cloud), desktop = device(cloud), web = device(cloud);
   await flush();
   phone.service.setConnected(true);
-  phone.service.add(3000, 13000, '192.168.1.20'); await flush();
+  phone.service.add(3000, 13000, '192.168.1.20', 'udp'); await flush();
   await desktop.sync.refresh(); await web.sync.refresh();
   const original = phone.service.snapshot()[0];
+  expect(desktop.service.snapshot()[0].protocol).toBe('udp');
+  expect(web.service.snapshot()[0].protocol).toBe('udp');
   expect(desktop.service.snapshot()[0]).toMatchObject({ id: original.id, status: 'stopped', remoteHost: '192.168.1.20' });
-  await desktop.service.edit(original.id, { remoteHost: '::1', remotePort: 8080, localPort: 18080 });
+  await desktop.service.edit(original.id, { remoteHost: '::1', remotePort: 8080, localPort: 18080, protocol: 'both' });
   await flush(); await phone.sync.refresh(); await web.sync.refresh(); await flush();
   expect(phone.service.snapshot()[0]).toMatchObject({ id: original.id, status: 'running', remotePort: 8080 });
   expect(web.service.snapshot()[0]).toMatchObject({ id: original.id, status: 'stopped', remoteHost: '::1' });
+  expect(phone.service.snapshot()[0].protocol).toBe('both');
   await web.service.remove(original.id); await flush(); await phone.sync.refresh(); await desktop.sync.refresh();
   expect(phone.service.snapshot()).toEqual([]);
   expect(desktop.service.snapshot()).toEqual([]);
+});
+
+it('retains UDP locally and retries when an older server silently drops the protocol field', async () => {
+  const cloud = server();
+  const cache = storage();
+  let legacy = true;
+  const exchange = vi.fn(async (input?: MappingDocument) => cloud.exchange(input && legacy
+    ? { ...input, mappings: input.mappings.map(({ protocol: _protocol, ...entry }) => entry) } : input));
+  const phone = device({ exchange, cache });
+  await flush();
+  phone.service.setConnected(true); phone.service.add(53, 1053, '', 'udp'); await flush();
+  expect(phone.service.snapshot()[0]).toMatchObject({ protocol: 'udp', status: 'running' });
+  expect(phone.sync.snapshot()).toContain('协议设置暂未同步');
+  phone.stop();
+  const restarted = device({ exchange, cache, saved: phone.service.snapshot() });
+  await flush();
+  expect(restarted.service.snapshot()[0].protocol).toBe('udp');
+  legacy = false; await restarted.sync.refresh();
+  expect(restarted.sync.snapshot()).toBe('配置已自动同步');
+  expect((await cloud.exchange()).mappings[0].protocol).toBe('udp');
 });
 
 const sevenMappings = () => Array.from({ length: 7 }, (_, index) => ({

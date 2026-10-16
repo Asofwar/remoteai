@@ -1,7 +1,8 @@
 # Remote port mapping
 
 In a remote computer's desktop chat workspace, **端口映射** appears immediately to the left of
-**远程桌面**. Enter a **目标 IP**, remote port and local port, then choose **添加并启动**.
+**远程桌面**. Choose **TCP**, **UDP** or **全部（TCP + UDP）**, enter a **目标 IP**, remote port and local port,
+then choose **添加并启动**. Existing mappings default to TCP. Editing a mapping can also change its protocol.
 The IP is reached from the remote computer; leaving it blank uses `127.0.0.1` on that computer.
 Both IPv4 and IPv6 literals are supported (IPv6 may be entered with or without brackets).
 Leaving the local port blank
@@ -14,6 +15,7 @@ Click a running mapping's local address to choose **在 Remote AI 中预览** or
 Both actions open `http://127.0.0.1:<local port>` through the existing mapping. The preview uses the
 shared details drawer and retains the local address in its navigation history. Stopped mappings
 cannot be opened. These actions are intended for HTTP services; copying remains available for other TCP clients.
+UDP-only mappings show a copyable address without browser/preview actions.
 
 Each computer supports up to eight saved mappings. Mappings can be started, stopped, edited, deleted and
 copied independently. Phone and desktop automatically sync settings for the same signed-in account and
@@ -22,17 +24,19 @@ listener before restarting with the new IP and ports; editing a stopped mapping 
 Switching chat threads or projects keeps active mappings running. On desktop, switching computers also keeps them running.
 On mobile, switching computers stops the previous computer's mappings. Disconnecting or signing out
 releases listeners and remote resources; saved mappings require a manual start after reconnection
-or application restart. A local port already used by another process or mapping cannot be reused.
+or application restart. A local port already used by the same protocol cannot be reused. Separate TCP and UDP
+mappings may share a port number. **全部** reserves both protocols and rolls back both if either fails to start.
 
-This feature supports TCP services at IP addresses reachable from the remote computer.
-The viewer binds only `127.0.0.1`; it does not expose mapped ports to other devices. UDP and custom
-DNS hostnames are outside the current scope. Enter an IP only, without a URL scheme or port;
+This feature supports TCP and unicast UDP services at IP addresses reachable from the remote computer.
+The viewer binds only `127.0.0.1`; it does not expose mapped ports to other devices. Custom DNS hostnames,
+broadcast and multicast forwarding are outside the current scope. Enter an IP only, without a URL scheme or port;
 unspecified addresses (`0.0.0.0` and `::`) are not connection targets. Older saved mappings keep
 their original `127.0.0.1` destination.
 
 ## Phone app
 
-Open **工具 → 端口映射**. Add a target IP, remote port and an optional local port. The phone binds only its own
+Open **工具 → 端口映射**. Select TCP, UDP or both, then add a target IP, remote port and an optional local port.
+The phone binds only its own
 `127.0.0.1`; tapping a running address or its **打开** label shows **在 Remote AI 中预览** and
 **在浏览器中打开**. Either option can be chosen directly from the mapping list. The in-app preview
 uses an isolated WebView with back, refresh and browser controls. Stopping a mapping releases its listener and connections.
@@ -70,10 +74,31 @@ replacing the whole collection with stale local data. After a revision conflict 
 reapplies only its pending edits; for the same mapping, the last accepted edit wins. Unchanged old caches do
 not resurrect deleted mappings. Identical legacy local settings are imported once.
 
-Only IPs, ports, IDs and edit timestamps sync. Listener state remains local: a newly received mapping is stopped;
+Only IPs, ports, protocols, IDs and edit timestamps sync. Listener state remains local: a newly received mapping is stopped;
 an already-running mapping applies remote edits by restarting locally. Remote deletion stops its local listener.
 Unavailable/older servers show a retry notice while local mapping continues to work. Configuration sync needs
 the new server and client versions; this source change does not deploy the migration or install updated apps.
+UDP configuration uses the existing JSON column, with no new migration or Kong route. Update admin-go to retain
+the optional `protocol` value (`tcp`, `udp`, `both`). If an older server drops this field, the client retains the
+local protocol and pending edit, and shows that protocol settings have not synced instead of downgrading to TCP.
+
+## UDP transport
+
+Both endpoints must be updated for UDP; the phone app needs a rebuilt native binary. UDP uses origin-bound
+`guiResourceLink` sessions over the existing encrypted chat transport. Each datagram retains its boundary and
+an opaque client ID. The remote host creates a separate connected UDP socket for each local client, accepts
+replies only from the configured destination, and routes them back to that client. IPv4 and IPv6 targets work.
+UDP startup confirms the mapping is ready, not that the remote service is listening: UDP has no connection handshake.
+
+Sessions accept up to 64 clients and 65,507 bytes per datagram, including empty datagrams. RPC batches contain
+at most four datagrams; receive queues hold 32 datagrams and send queues hold 32 batches. Excess traffic is dropped.
+Peer associations expire after 60 seconds without traffic in either direction. Sessions expire after 90 seconds
+without client polling/writes, and disconnect/stop cancels pending reads and releases listeners before returning.
+UDP shares the selected P2P/relay transport, which may be reliable and ordered; it does not promise the latency or
+loss behavior of a direct UDP network path.
+
+The phone adapter uses `react-native-udp`. `scripts/patch-udp.cjs` adds the Android namespace, resets reused receive
+packet lengths, and enforces exclusive port binding on Android/iOS. Keep these patches when upgrading the dependency.
 
 ## Transport and lifecycle
 
@@ -114,6 +139,17 @@ as soon as data is available and drains only immediately readable bytes; small r
 never wait for the larger buffer to fill.
 
 ## Verification
+
+- UDP Rust tests cover real binary/empty/maximum-size datagrams, client isolation, origin/owner authorization,
+  TCP/UDP coexistence, port conflicts, cancellation and immediate reuse. TypeScript tests cover combined-mode rollback,
+  late startup cleanup, protocol edits/sync, old-server protection, and datagrams over encrypted P2P/relay switching.
+- Native tests exercise actual loopback UDP sockets behind the mobile adapter plus protocol selection and copy-only UDP UI.
+  Android module compilation and Android/iOS Metro exports pass; iOS native compilation and device testing require macOS.
+- `ANDROID_SERIAL=<device> node apps/native/scripts/test-udp-sockets.cjs` runs the compiled production UDP adapter
+  on Android without replacing the installed app (compile `:react-native-udp:compileReleaseJavaWithJavac` first).
+  Android hardware verification on 2026-10-17 passed empty/binary/65,507-byte datagrams, changing packet lengths,
+  exclusive binding and immediate reuse. This checks the socket adapter, not a full app WAN session.
+- Playwright checks protocol selection, editing, persistence and the compact narrow-screen layout alongside TCP regressions.
 
 - `portForwarding/byteStream.test.ts`, `streamMux.test.ts`, `streamClient.test.ts` and
   `streamIntegration.test.ts` cover bounded credit, cancellation, old-host fallback, encryption,

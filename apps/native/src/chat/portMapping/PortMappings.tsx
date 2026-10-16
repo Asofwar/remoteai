@@ -23,7 +23,8 @@ export function PortMappings(props: {
   const [selection, setSelection] = useState<{ id: string; view: 'actions' | 'preview' }>();
   const [editing, setEditing] = useState<ForwardingEntry>();
   const [newestFirst, setNewestFirst] = useState(false);
-  const selected = entries.find(entry => entry.id === selection?.id && entry.status === 'running');
+  const selected = entries.find(entry => entry.id === selection?.id && entry.status === 'running'
+    && entry.protocol !== 'udp');
   const previewing = !!selected && selection?.view === 'preview';
   const closeActions = () => setSelection(undefined);
   useEffect(() => {
@@ -45,7 +46,7 @@ export function PortMappings(props: {
         showsVerticalScrollIndicator={false}>
         <View style={styles.notice}><Ionicons name="information-circle" size={21} color="#008b73" />
           <Text style={[styles.muted, styles.fill]}>
-            {t('映射启动后，点击地址可选择应用内预览或浏览器打开。留空 IP 可访问远程电脑本机。')}</Text></View>
+            {t('选择协议后添加映射。TCP 网页服务可点击地址打开；UDP 地址可复制到对应应用。')}</Text></View>
         {!props.connected && <Text style={styles.muted}>{t('连接已断开，重新连接后可再次启动。')}</Text>}
         <View style={styles.row}><Text style={[styles.sectionTitle, styles.fill]}>
           {t('当前映射')} ({entries.length})</Text>
@@ -63,7 +64,7 @@ export function PortMappings(props: {
           {t('该映射已被删除，请重新添加。')}</Text></Pressable>}
         {!editing && <MappingForm service={service} disabled={entries.length >= MAX_PORT_MAPPINGS}
           connected={props.connected} />}
-        <Text style={styles.footer}>{t('支持 TCP，仅本机可访问。')}</Text>
+        <Text style={styles.footer}>{t('支持 TCP 和 UDP，仅本机可访问。')}</Text>
         {!!syncStatus && <Text style={styles.sync} accessibilityLiveRegion="polite">{t(syncStatus)}</Text>}
         {Platform.OS === 'ios' && <Text style={styles.muted}>
           {t('切到其他应用后，映射可能中断，建议在此预览。')}</Text>}

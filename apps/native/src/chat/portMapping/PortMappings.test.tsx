@@ -58,6 +58,26 @@ beforeEach(() => {
   runtime.service.setConnected(true);
 });
 
+it('adds and edits UDP mappings and shows copy without browser actions', async () => {
+  field('UDP').props.onPress!();
+  field('远程端口').props.onChangeText!('53');
+  field('本地端口').props.onChangeText!('1053');
+  submit();
+  for (let count = 0; count < 30; count++) await Promise.resolve();
+  expect(runtime.service!.snapshot()[0]).toMatchObject({ protocol: 'udp', status: 'running' });
+  expect(render().some(element => element.props.accessibilityLabel === '打开')).toBe(false);
+  expect(render().some(element => element.props.accessibilityLabel === '复制本地地址')).toBe(true);
+  field('更多操作').props.onPress!();
+  render().find(element => element.props.accessibilityRole === 'button'
+    && elements(element.props.children).some(child => child.props.children === '编辑映射'))!.props.onPress!();
+  field('全部（TCP + UDP）').props.onPress!();
+  render().find(element => element.props.accessibilityRole === 'button'
+    && elements(element.props.children).some(child => child.props.children === '保存修改'))!.props.onPress!();
+  for (let count = 0; count < 30; count++) await Promise.resolve();
+  expect(runtime.service!.snapshot()[0]).toMatchObject({ protocol: 'both', status: 'running' });
+  expect(render().some(element => element.props.accessibilityLabel === '打开')).toBe(true);
+});
+
 it('displays retained overflow with actionable sync guidance and removes it after capacity is freed', async () => {
   const extra = { id: 'local-extra', remotePort: 5000, localPort: 15000 };
   const saved = new Map([['codex-port-mapping-sync:test', JSON.stringify({ [extra.id]: extra })]]);

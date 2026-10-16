@@ -4,7 +4,7 @@ import { hotLinkHarness } from '../../../remoteChat/hotLinkHarness';
 import { ChatRpc } from '../../../../../../shared/remote-chat/rpc';
 import { createGuiFilesClient } from '../../../../../../shared/remote-chat/files';
 import type { RpcMessage } from '../../../../../../shared/remote-chat/protocol';
-import type { TerminalLinkReply, TerminalLinkRequest } from '../../../../../../shared/terminal/links';
+import type { TerminalLinkReply, TerminalLinkRequest, UdpPacket } from '../../../../../../shared/terminal/links';
 import { PortForwardingService } from './service';
 import { LINK_CHUNK_BYTES } from '../../../../../../shared/terminal/linkChunks';
 
@@ -26,10 +26,13 @@ function transportFixture() {
     }
     if (body.operation === 'guiResourceClose') { resources.delete(body.id); reply(null); return; }
     const request = body.request;
-    if (request.type === 'connect') { reply({ type: 'socket', id: `socket-${++sequence}` }); return; }
-    if (request.type === 'read') { remoteReads.set(request.id, reply); return; }
+    if (request.type === 'connect' || request.type === 'udpConnect') {
+      reply({ type: 'socket', id: `socket-${++sequence}` }); return;
+    }
+    if (request.type === 'read' || request.type === 'udpRead') { remoteReads.set(request.id, reply); return; }
+    if (request.type === 'udpWrite') remoteReads.get(request.id)?.({ type: 'datagrams', packets: request.packets });
     if (request.type === 'write') remoteReads.get(request.id)?.({ type: 'data', data: request.data, eof: false });
-    if (request.type === 'close') {
+    if (request.type === 'close' || request.type === 'udpClose') {
       remoteReads.get(request.id)?.({ type: 'data', data: '', eof: true }); remoteReads.delete(request.id);
     }
     reply({ type: 'done' });
@@ -44,21 +47,25 @@ function localFixture() {
   const accepts = new Map<string, Reply>();
   const reads = new Map<string, Reply>();
   const received = new Map<string, string[]>();
+  const datagrams: UdpPacket[][] = [];
   vi.mocked(invoke).mockImplementation(async (_command, args) => {
     const request = (args as {
-      request: { type: string; port: number; scope: string; id: string; data: string };
+      request: { type: string; port: number; scope: string; id: string; data: string; packets: UdpPacket[] };
     }).request;
-    if (request.type === 'listen') return { type: 'listener', id: String(request.port), port: request.port };
+    if (request.type === 'listen' || request.type === 'udpListen') {
+      return { type: 'listener', id: String(request.port), port: request.port };
+    }
     if (request.type === 'accept') return new Promise(resolve => accepts.set(request.scope, resolve));
-    if (request.type === 'read') return new Promise(resolve => reads.set(request.id, resolve));
+    if (request.type === 'read' || request.type === 'udpRead') return new Promise(resolve => reads.set(request.id, resolve));
+    if (request.type === 'udpWrite') datagrams.push(request.packets);
     if (request.type === 'write') received.set(request.id, [...received.get(request.id) ?? [], request.data]);
-    if (request.type === 'close') {
+    if (request.type === 'close' || request.type === 'udpClose') {
       reads.get(request.id)?.({ type: 'data', data: '', eof: true }); reads.delete(request.id);
     }
     if (request.type === 'stop') accepts.get(request.scope)?.({ type: 'done' });
     return { type: 'done' };
   });
-  return { accepts, reads, received };
+  return { accepts, reads, received, datagrams };
 }
 
 afterEach(() => { vi.clearAllMocks(); vi.useRealTimers(); });
@@ -92,6 +99,33 @@ it.each([8, LINK_CHUNK_BYTES])('keeps mapped bytes on P2P and relay (payload siz
     service.dispose(); await vi.advanceTimersByTimeAsync(100);
     expect(transport.resources.size).toBe(0);
     expect(service.snapshot().map(entry => entry.status)).toEqual(['stopped', 'stopped']);
+    expect(transport.harness.error).not.toHaveBeenCalled();
+  } finally { service.dispose(); transport.rpc.close(); transport.harness.close(); }
+});
+
+
+it('preserves UDP datagram boundaries and peer IDs through encrypted P2P and relay switching', async () => {
+  vi.useFakeTimers();
+  const local = localFixture();
+  const transport = transportFixture();
+  const service = new PortForwardingService(transport.client);
+  try {
+    await vi.advanceTimersByTimeAsync(4500);
+    service.setConnected(true); service.add(53, 1053, '', 'udp');
+    await vi.advanceTimersByTimeAsync(100);
+    expect(service.snapshot()[0].status).toBe('running');
+    for (const mode of ['direct', 'relay'] as const) {
+      if (mode === 'relay') { transport.harness.paths.direct = false; await vi.advanceTimersByTimeAsync(4500); }
+      expect(transport.harness.links.phone.connectionMode).toBe(mode);
+      const packets = [{ peer: 'one', data: '' }, { peer: 'two', data: btoa('x'.repeat(65507)) },
+        { peer: 'one', data: btoa('binary') }];
+      local.reads.get('1053')!({ type: 'datagrams', packets });
+      await vi.advanceTimersByTimeAsync(100);
+      expect(local.datagrams.at(-1)).toEqual(packets);
+      expect(service.snapshot()[0].status).toBe('running');
+    }
+    service.dispose(); await vi.advanceTimersByTimeAsync(100);
+    expect(transport.resources.size).toBe(0);
     expect(transport.harness.error).not.toHaveBeenCalled();
   } finally { service.dispose(); transport.rpc.close(); transport.harness.close(); }
 });

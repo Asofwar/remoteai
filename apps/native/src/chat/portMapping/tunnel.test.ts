@@ -43,6 +43,7 @@ const client: ForwardingClient = {
       await new Promise<void>((resolve, reject) => { socket.once('connect', resolve); socket.once('error', reject); });
       return { type: 'socket', id };
     }
+    if (!('id' in request)) throw new Error('Unsupported fixture request');
     const socket = remoteSockets.get(request.id)!;
     if (request.type === 'close') { socket?.destroy(); return { type: 'done' }; }
     if (request.type === 'write') {

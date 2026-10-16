@@ -17,20 +17,27 @@ setGuiLanguage('zh');
 const listeners = new Map<string, () => void>();
 const resources = new Set<string>();
 const openedPorts = new Set<number>();
+const openedUdpPorts = new Set<number>();
 const targetUrls: string[] = [];
 const client: ForwardingClient = {
   openResource: async url => {
     targetUrls.push(url); const id = crypto.randomUUID(); resources.add(id); return id;
   },
   closeResource: async id => { resources.delete(id); },
-  link: async (_id, request) => request.type === 'connect'
-    ? { type: 'socket', id: crypto.randomUUID() } : { type: 'done' },
+  link: async (_id, request) => {
+    if (request.type === 'connect' || request.type === 'udpConnect') return { type: 'socket', id: crypto.randomUUID() };
+    if (request.type === 'udpRead') return new Promise((_resolve, reject) => {
+      listeners.set(request.id, () => reject(new Error('Closed')));
+    });
+    if (request.type === 'udpClose') { listeners.get(request.id)?.(); listeners.delete(request.id); }
+    return { type: 'done' };
+  },
 };
 const clipboard: string[] = [];
 const browserUrls: string[] = [];
 const previewUrls: string[] = [];
 const resolvedUrls: string[] = [];
-const fixture = { resources, openedPorts, targetUrls, clipboard, browserUrls, previewUrls,
+const fixture = { resources, openedPorts, openedUdpPorts, targetUrls, clipboard, browserUrls, previewUrls,
   resolvedUrls, failBrowser: false };
 websitePreviewApi.sync = async request => { previewUrls.push(request.url); };
 websitePreviewApi.close = async () => {};
@@ -47,16 +54,18 @@ Object.assign(window, { isTauri: true, __TAURI_INTERNALS__: {
     }
     if (command !== 'codex_gui_terminal_link') return;
     const request = args.request;
-    if (request.type === 'listen') {
-      if (request.port === 9999 || openedPorts.has(request.port)) throw '本地端口已被占用，请换一个端口。';
-      openedPorts.add(request.port);
-      return { type: 'listener', id: `local-${request.port}`, port: request.port };
+    if (request.type === 'listen' || request.type === 'udpListen') {
+      const ports = request.type === 'listen' ? openedPorts : openedUdpPorts;
+      if (request.port === 9999 || ports.has(request.port)) throw '本地端口已被占用，请换一个端口。';
+      ports.add(request.port);
+      return { type: 'listener', id: `${request.type === 'listen' ? 'local' : 'udp'}-${request.port}`, port: request.port };
     }
-    if (request.type === 'accept') return new Promise<TerminalLinkReply>((_resolve, reject) => {
+    if (request.type === 'accept' || request.type === 'udpRead') return new Promise<TerminalLinkReply>((_resolve, reject) => {
       listeners.set(request.scope, () => reject(new Error('Closed')));
     });
-    if (request.type === 'stop') {
-      openedPorts.delete(Number(request.scope.replace('local-', '')));
+    if (request.type === 'stop' || request.type === 'udpClose') {
+      const ports = request.type === 'stop' ? openedPorts : openedUdpPorts;
+      ports.delete(Number(request.scope.replace(/^(local|udp)-/, '')));
       listeners.get(request.scope)?.(); listeners.delete(request.scope);
     }
     return { type: 'done' };

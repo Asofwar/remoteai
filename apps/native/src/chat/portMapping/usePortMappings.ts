@@ -4,6 +4,9 @@ import Storage from 'expo-sqlite/kv-store';
 import { PortForwardingService, type ForwardingClient } from '../../../../../shared/port-mapping/service';
 import { readPortMappings, savePortMappings } from '../../../../../shared/port-mapping/settings';
 import { NativeMappingTunnel } from './tunnel';
+import { protocolTunnel } from '../../../../../shared/port-mapping/protocolTunnel';
+import { UdpMappingTunnel } from '../../../../../shared/port-mapping/udpTunnel';
+import { listenUdp } from './udpListener';
 import { adminRequest } from '../../api/client';
 import type { AuthSession } from '../../types';
 import { mappingSyncScope, type MappingDocument } from '../../../../../shared/port-mapping/sync';
@@ -17,7 +20,10 @@ export function usePortMappings(options: {
 }) {
   const { client, scope, connected } = options;
   const service = useMemo(() => new PortForwardingService(client, readPortMappings(scope, storage, randomUUID), {
-    createId: randomUUID, createTunnel: (connection, config) => new NativeMappingTunnel(connection, config),
+    createId: randomUUID, createTunnel: (connection, config) => protocolTunnel(config.protocol, {
+      tcp: () => new NativeMappingTunnel(connection, config),
+      udp: () => new UdpMappingTunnel(connection, config, listenUdp),
+    }),
   }), [client, scope]);
   const entries = useSyncExternalStore(service.subscribe, service.snapshot);
   const exchange = useMemo(() => {

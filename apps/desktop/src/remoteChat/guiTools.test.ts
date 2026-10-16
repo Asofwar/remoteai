@@ -21,14 +21,15 @@ vi.mock('../pages/codexGui/terminal/api', () => ({
 const request = (id: string, body: object) => ({ kind: 'request' as const, method: 'request' as const, id, body });
 const flush = async () => { for (let index = 0; index < 10; index++) await Promise.resolve(); };
 
-it('keeps remote preview stream retries idempotent across long transfers and isolates reconnects', async () => {
+it.each(['read', 'udpRead', 'udpWrite'])('keeps %s retries idempotent across long transfers and isolates reconnects',
+  async type => {
   const operations = new ChatOperations();
   vi.mocked(invoke).mockResolvedValueOnce('resource');
   await operations.execute(request('resource', { operation: 'guiResourceOpen', url: 'http://localhost:1234' }),
     'relay', 'owner', 'same-account');
   vi.mocked(invoke).mockResolvedValue({ type: 'data', data: 'YQ==', eof: false });
   const stream = (id: string) => request(id, { operation: 'guiResourceLink', id: 'resource',
-    request: { type: 'read', id: 'socket' } });
+    request: { type, id: 'socket', ...(type === 'udpWrite' ? { packets: [{ peer: 'peer', data: 'YQ==' }] } : {}) } });
   for (let index = 0; index < 650; index++) {
     expect((await operations.execute(stream(`chunk-${index}`), 'relay', 'owner')).error).toBeUndefined();
     await operations.execute(stream(`chunk-${index}`), 'direct', 'owner');

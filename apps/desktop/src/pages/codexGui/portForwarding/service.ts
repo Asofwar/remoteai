@@ -2,11 +2,17 @@ import { PortForwardingService as SharedService } from '../../../../../../shared
 import { TerminalLinkTunnels } from '../terminal/linkTunnel';
 import type { ForwardingClient } from '../../../../../../shared/port-mapping/service';
 import type { PortMapping } from './settings';
+import { protocolTunnel } from '../../../../../../shared/port-mapping/protocolTunnel';
+import { UdpMappingTunnel } from '../../../../../../shared/port-mapping/udpTunnel';
+import { listenUdp } from './udpListener';
 export type { ForwardingClient, ForwardingEntry } from '../../../../../../shared/port-mapping/service';
 
 export class PortForwardingService extends SharedService {
   constructor(client: ForwardingClient, saved: PortMapping[] = []) {
     super(client, saved, { createId: () => crypto.randomUUID(),
-      createTunnel: (connection, options) => new TerminalLinkTunnels(connection, undefined, options) });
+      createTunnel: (connection, options) => protocolTunnel(options.protocol, {
+        tcp: () => new TerminalLinkTunnels(connection, undefined, options),
+        udp: () => new UdpMappingTunnel(connection, options, listenUdp),
+      }) });
   }
 }

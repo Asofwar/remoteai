@@ -1,6 +1,7 @@
 import type { GuiToolsClient } from '../remote-chat/guiTools';
 import type { MappingTunnel, TunnelFactory } from './types';
-import { MAX_PORT_MAPPINGS, mappingConflicts, validPort, type MappingMode, type PortMapping } from './settings';
+import { MAX_PORT_MAPPINGS, MAPPING_PROTOCOLS, mappingConflicts, validPort,
+  type MappingMode, type MappingProtocol, type PortMapping } from './settings';
 import { mappingOrigin, normalizeMappingHost } from './target';
 import { StreamBudget } from './streamBudget';
 
@@ -14,7 +15,9 @@ export interface ForwardingEntry extends PortMapping {
 interface RunningMapping { tunnels: MappingTunnel; resource?: string }
 const START_ERROR = '映射未能启动，请确认远程服务已启动后重试。';
 const LOCAL_ERRORS = new Set(['本地端口已被占用，请换一个端口。', '无法监听本地端口，请换一个端口重试。',
-  '请更新应用后使用端口映射。', '请返回应用后重新启动映射。']);
+  '请更新应用后使用端口映射。', '请返回应用后重新启动映射。',
+  'UDP 映射未能启动，请确认两端应用均已更新。']);
+type MappingTarget = Pick<PortMapping, 'remoteHost' | 'remotePort' | 'localPort' | 'protocol'>;
 
 /** One manager per authenticated computer; switching chat threads never releases its mappings. */
 export class PortForwardingService {
@@ -53,8 +56,9 @@ export class PortForwardingService {
     }
   };
 
-  add = (remotePort: number, localPort: number, remoteHost = '') => {
-    const target = this.validate({ remoteHost, remotePort, localPort });
+  add = (remotePort: number, localPort: number, remoteHost = '', protocol?: MappingProtocol) => {
+    const target = this.validate({ remoteHost, remotePort, localPort,
+      ...(protocol === undefined ? {} : { protocol }) });
     if (this.entries.length >= MAX_PORT_MAPPINGS) throw new Error('最多添加 8 条映射，请先删除一条。');
     const entry: ForwardingEntry = { id: this.platform.createId(), ...target, updatedAt: Date.now(), status: 'stopped' };
     this.publish([...this.entries, entry]);
@@ -62,7 +66,7 @@ export class PortForwardingService {
     void this.start(entry.id);
   };
 
-  edit = async (id: string, target: Pick<PortMapping, 'remoteHost' | 'remotePort' | 'localPort'>) => {
+  edit = async (id: string, target: MappingTarget) => {
     const previous = this.entries.find(entry => entry.id === id);
     if (!previous) throw new Error('该映射已被删除，请重新添加。');
     const entry = { id, ...this.validate(target, id), updatedAt: Date.now() };
@@ -83,7 +87,8 @@ export class PortForwardingService {
     }
   };
 
-  private validate(target: Pick<PortMapping, 'remoteHost' | 'remotePort' | 'localPort'>, id?: string) {
+  private validate(target: MappingTarget, id?: string) {
+    if (!MAPPING_PROTOCOLS.includes(target.protocol ?? 'tcp')) throw new Error('请选择 TCP、UDP 或全部。');
     if (!validPort(target.remotePort) || !validPort(target.localPort)) {
       throw new Error('请输入 1–65535 之间的端口号。');
     }
@@ -114,12 +119,13 @@ export class PortForwardingService {
     if (!entry || !this.connected || this.running.has(id) || this.stopping.has(id) || entry.status === 'stopping') return;
     const job: RunningMapping = { tunnels: this.platform.createTunnel(this.client, {
       mappingId: entry.id, localPort: entry.localPort, bridgeBudget: this.bridgeBudget,
+      protocol: entry.protocol,
       onClosed: () => { void this.fail(id, job, '映射已中断，请重新启动。'); },
     }) };
     this.running.set(id, job);
     this.update(id, { status: 'starting', error: undefined });
     try {
-      // The existing resource protocol uses a URL only to identify a TCP destination; bytes stay unchanged.
+      // The resource URL identifies the authorized destination for both TCP streams and UDP datagrams.
       const url = mappingOrigin(entry);
       job.resource = await this.client.openResource(url);
       if (this.running.get(id) !== job) { await this.release(job); return; }
@@ -194,5 +200,6 @@ export class PortForwardingService {
 
 function sameTarget(left: PortMapping, right: PortMapping) {
   return normalizeMappingHost(left.remoteHost) === normalizeMappingHost(right.remoteHost)
+    && (left.protocol ?? 'tcp') === (right.protocol ?? 'tcp')
     && left.remotePort === right.remotePort && left.localPort === right.localPort;
 }

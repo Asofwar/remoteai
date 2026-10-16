@@ -30,6 +30,7 @@ export class LinkSocketFixture {
       });
       return { type: 'socket', id };
     }
+    if (!('id' in request)) throw new Error('Unsupported fixture request');
     const state = this.sockets.get(request.id)!;
     if (request.type === 'close') { state?.socket.destroy(); return { type: 'done' }; }
     if (request.type === 'write') {

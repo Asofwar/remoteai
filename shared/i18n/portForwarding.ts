@@ -1,6 +1,14 @@
 import { portMappingEditingEnglish, portMappingEditingRussian } from './portMappingEditing';
 
 export const portForwardingEnglish: Readonly<Record<string, string>> = {
+  '协议设置暂未同步，本机映射仍可使用。': 'Protocol settings have not synced yet. Local mappings still work.',
+  '协议': 'Protocol',
+  '全部（TCP + UDP）': 'Both (TCP + UDP)',
+  '支持 TCP 和 UDP，仅本机可访问。': 'TCP and UDP, accessible only on this device.',
+  '请选择 TCP、UDP 或全部。': 'Choose TCP, UDP, or both.',
+  'UDP 映射未能启动，请确认两端应用均已更新。': 'Could not start UDP mapping. Check that both apps are up to date.',
+  '选择协议后添加映射。TCP 网页服务可点击地址打开；UDP 地址可复制到对应应用。':
+    'Choose a protocol to add a mapping. Tap TCP web addresses to open them, or copy UDP addresses to your app.',
   '网页未能加载，请刷新重试。': 'Could not load the page. Please refresh and try again.',
   '部分网页资源无法加载，请检查服务后刷新。': 'Some page resources could not load. Check the service and refresh.',
   '网页内容较多，暂时无法在此预览。': 'This page is too large to preview here.',
@@ -63,6 +71,14 @@ export const portForwardingEnglish: Readonly<Record<string, string>> = {
 };
 
 export const portForwardingRussian: Readonly<Record<string, string>> = {
+  '协议设置暂未同步，本机映射仍可使用。': 'Протоколы пока не синхронизированы. Локальный проброс продолжает работать.',
+  '协议': 'Протокол',
+  '全部（TCP + UDP）': 'Оба (TCP + UDP)',
+  '支持 TCP 和 UDP，仅本机可访问。': 'TCP и UDP. Доступ только с этого устройства.',
+  '请选择 TCP、UDP 或全部。': 'Выберите TCP, UDP или оба протокола.',
+  'UDP 映射未能启动，请确认两端应用均已更新。': 'Не удалось запустить UDP. Проверьте обновления обоих приложений.',
+  '选择协议后添加映射。TCP 网页服务可点击地址打开；UDP 地址可复制到对应应用。':
+    'Выберите протокол. Нажмите на TCP-адрес для открытия сайта или скопируйте UDP-адрес в нужное приложение.',
   '网页未能加载，请刷新重试。': 'Не удалось загрузить страницу. Обновите её и попробуйте снова.',
   '部分网页资源无法加载，请检查服务后刷新。': 'Часть ресурсов не загрузилась. Проверьте сервис и обновите страницу.',
   '网页内容较多，暂时无法在此预览。': 'Страница слишком велика для предпросмотра здесь.',

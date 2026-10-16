@@ -2,8 +2,13 @@ import { mappingAddress, normalizeMappingHost } from './target';
 
 export const MAX_PORT_MAPPINGS = 8;
 export const MAX_PORT = 65535;
+export type MappingProtocol = 'tcp' | 'udp' | 'both';
+export const MAPPING_PROTOCOLS: readonly MappingProtocol[] = ['tcp', 'udp', 'both'];
+export const protocolLabel = (protocol?: MappingProtocol) => protocol === 'both' ? 'TCP + UDP'
+  : (protocol ?? 'tcp').toUpperCase();
 export interface PortMapping {
   id: string; remoteHost?: string; remotePort: number; localPort: number; updatedAt?: number;
+  protocol?: MappingProtocol;
 }
 export type MappingMode = 'tcp' | 'preview';
 export interface MappingStorage {
@@ -35,9 +40,11 @@ export function readMapping(value: unknown, createId: () => string): PortMapping
   const entry = value as Record<string, unknown>;
   if (!validPort(entry.remotePort) || !validPort(entry.localPort)) return;
   if (entry.remoteHost !== undefined && typeof entry.remoteHost !== 'string') return;
+  if (entry.protocol !== undefined && !MAPPING_PROTOCOLS.includes(entry.protocol as MappingProtocol)) return;
   try {
     return { id: typeof entry.id === 'string' && /^[\w-]{1,64}$/.test(entry.id) ? entry.id : createId(),
       remoteHost: normalizeMappingHost(entry.remoteHost), remotePort: entry.remotePort, localPort: entry.localPort,
+      ...(entry.protocol === undefined ? {} : { protocol: entry.protocol as MappingProtocol }),
       ...(typeof entry.updatedAt === 'number' && Number.isFinite(entry.updatedAt) ? { updatedAt: entry.updatedAt } : {}) };
   } catch { return; } // Discard invalid saved targets without losing the remaining mappings.
 }
@@ -50,12 +57,16 @@ export function savePortMappings(scope: string, entries: readonly PortMapping[],
   } catch { console.warn('Port forwarding settings could not be saved'); }
 }
 
-export function mappingConfig({ id, remoteHost, remotePort, localPort, updatedAt }: PortMapping): PortMapping {
+export function mappingConfig({ id, remoteHost, remotePort, localPort, updatedAt, protocol }: PortMapping): PortMapping {
   return { id, remoteHost: normalizeMappingHost(remoteHost), remotePort, localPort,
+    ...(protocol === undefined ? {} : { protocol }),
     ...(updatedAt === undefined ? {} : { updatedAt }) };
 }
 
 export function mappingConflicts(left: Omit<PortMapping, 'id'>, right: Omit<PortMapping, 'id'>,
   mode: MappingMode = 'tcp'): boolean {
-  return mode === 'preview' ? mappingAddress(left) === mappingAddress(right) : left.localPort === right.localPort;
+  const overlaps = (left.protocol ?? 'tcp') === (right.protocol ?? 'tcp')
+    || left.protocol === 'both' || right.protocol === 'both';
+  return overlaps && (mode === 'preview' ? mappingAddress(left) === mappingAddress(right)
+    : left.localPort === right.localPort);
 }

@@ -32,6 +32,10 @@ async fn open_resource(state: &Arc<LinkState>, url: String) -> super::Result<Str
 fn resource_scope(request: &LinkRequest) -> Option<&str> {
     match request {
         LinkRequest::Connect { scope, .. }
+        | LinkRequest::UdpConnect { scope, .. }
+        | LinkRequest::UdpRead { scope, .. }
+        | LinkRequest::UdpWrite { scope, .. }
+        | LinkRequest::UdpClose { scope, .. }
         | LinkRequest::Read { scope, .. }
         | LinkRequest::Write { scope, .. }
         | LinkRequest::Close { scope, .. }
@@ -60,11 +64,16 @@ async fn resource_request(
     let scope = resource_scope(&request)
         .ok_or(LinkError::Invalid)?
         .to_owned();
-    let connecting = matches!(request, LinkRequest::Connect { .. });
+    let connecting = matches!(
+        request,
+        LinkRequest::Connect { .. } | LinkRequest::UdpConnect { .. }
+    );
     {
         let mut resources = state.resources.lock().await;
         let url = resources.get(&scope).ok_or(LinkError::Closed)?;
-        if let LinkRequest::Connect { url: target, .. } = &request {
+        if let LinkRequest::Connect { url: target, .. }
+        | LinkRequest::UdpConnect { url: target, .. } = &request
+        {
             if destination(target)? != destination(url)? {
                 return Err(LinkError::Invalid);
             }

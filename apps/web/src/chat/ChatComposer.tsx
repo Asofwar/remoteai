@@ -4,7 +4,7 @@ import { ComposerInput } from './ComposerInput';
 import { t, useLanguage } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUp, ChevronDown, File, Folder, MessageSquare, Pause, Play, Plus,
-  SlidersHorizontal, Square, Target, X } from 'lucide-react';
+  SlidersHorizontal, Square, X } from 'lucide-react';
 import { COMPOSER_ACTION_LABELS } from '../../../../shared/remote-chat/composerAction';
 import { composerLabel } from '../../../../shared/remote-chat/composer';
 import { requestSpeedSuffix } from '../../../../shared/remote-chat/requestSpeed';
@@ -14,6 +14,7 @@ import { ComposerModelPicker } from './ComposerModelPicker';
 import { ComposerSpeedIndicator } from './ComposerSpeedIndicator';
 import { ChatSettings } from './ChatSettings';
 import { ComposerFooter } from './ComposerFooter';
+import { ComposerGoal } from './ComposerGoal';
 import { ChatAttachmentPreviews } from './ChatAttachments';
 import { pickChatImages } from './pickChatImages';
 import { ChatImageEditor } from './ChatImageEditor';
@@ -151,6 +152,10 @@ export function ChatComposer(props: ComposerProps) {
               <button type="button" aria-label={t("移除{value1}", { value1: item.name })}
                 disabled={busy} onClick={() => attachments.remove(item)}><X size={14} /></button></span>)}</div>
           <ComposerQuotes disabled={busy} />
+          {(goalMode.enabled || goal) && <ComposerGoal key={`goal:${threadId}:${active}`}
+            goal={goalMode.enabled ? null : goal} draft={draft.text}
+            disabled={sending || goalBusy || (!!goal && !ready)} remove={state.removeGoal}
+            beforeOpen={() => { closeMenus(); menu.input.current?.blur(); }} />}
           <ComposerSuggestion text={suggestion.text} accept={suggestion.accept} />
           <ComposerInput ref={menu.input} aria-label={t("聊天消息")} value={draft.text} maxLength={100_000} rows={1}
             readOnly={state.queueEditor.loading}
@@ -185,9 +190,6 @@ export function ChatComposer(props: ComposerProps) {
           {desktop && <ComposerAccess key={`${threadId}:${active}`} selection={selection}
             settingsBusy={settingsBusy} updateSettings={updateSettings} beforeOpen={closeMenus} />}
           <div className="chat-composer-trailing">
-            {(goalMode.enabled || goal) && <span className="chat-goal-capsule"><Target size={15} /><span>{t("目标")}</span>
-              <button type="button" aria-label={t("退出目标模式")} disabled={sending || goalBusy || (!!goal && !ready)}
-                onClick={state.removeGoal}><X size={13} /></button></span>}
             {desktop && <ComposerDesktopStatus key={`status:${threadId}:${cwd}:${active}`} props={props}
               beforeOpen={closeMenus} />}
             {desktop ? <ComposerModelPicker key={`model:${threadId}:${cwd}:${active}`} models={models}

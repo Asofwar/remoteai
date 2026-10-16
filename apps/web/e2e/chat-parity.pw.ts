@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page, type TestInfo } from '@playwright/test';
 import { openChatList, connect, fixtureUrl, login, operationCount, screenshot, send, settled, state } from './chat-helpers';
 
 const closeSheet = (page: Page) => page.getByRole('button', { name: '关闭', exact: true }).last().click();
@@ -140,17 +140,43 @@ test('sends skills, plugin and file capsules and keeps goal controls removable',
     expect.objectContaining({ kind: 'file', path: 'F:/projects/demo/assets/notes.txt' }),
     expect.objectContaining({ name: 'test.txt', data: Buffer.from('Web file test').toString('base64') }),
   ]));
+  await verifyGoalControls(page, request, info);
+});
+
+async function verifyGoalControls(page: Page, request: APIRequestContext, info: TestInfo) {
+  const input = page.getByRole('textbox', { name: '聊天消息' });
   await input.fill('/goal');
   await page.getByRole('menuitem', { name: '目标模式' }).click();
   await expect(input).toHaveValue('');
   await expect(input).toHaveAttribute('placeholder', '描述想完成的目标…');
-  await send(page, '完成聊天界面测试');
+  const objective = '完成聊天界面测试，确保手机窄屏上的目标文字完整换行，点击后可以查看全部内容。\n'
+    + '同时验证桌面布局与移除目标按钮。';
+  await input.fill(objective);
+  await page.getByRole('button', { name: '查看目标', exact: true }).click();
+  await expect(page.locator('.chat-goal-details')).toContainText(objective);
+  expect(await operationCount(request, 'goalSet')).toBe(0);
+  await closeSheet(page);
+  await expect(input).toHaveValue(objective);
+  await send(page, objective);
   await expect.poll(() => operationCount(request, 'goalSet')).toBe(1);
-  await expect(page.getByRole('button', { name: '退出目标模式' })).toBeVisible();
-  await page.getByRole('button', { name: '退出目标模式' }).click();
+  const preview = page.locator('.chat-goal-preview .chat-goal-objective');
+  await expect(preview).toHaveText(objective);
+  expect(await preview.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  expect(await preview.evaluate(element => element.scrollHeight <= element.clientHeight)).toBe(true);
+  await screenshot(page, info, 'goal-wrapped');
+  const viewGoal = page.getByRole('button', { name: '查看目标', exact: true });
+  if (info.project.use.hasTouch) await viewGoal.tap(); else await viewGoal.click();
+  await expect(page.locator('.chat-goal-details .chat-goal-objective')).toHaveText(objective);
+  await expect(page.locator('.chat-goal-details .chat-goal-objective')).toBeInViewport({ ratio: 1 });
+  await expect(page.locator('.chat-goal-details')).toContainText('进行中');
+  expect((await page.locator('.chat-goal-details').boundingBox())!.width).toBeLessThanOrEqual(400);
+  expect(await operationCount(request, 'goalClear')).toBe(0);
+  await screenshot(page, info, 'goal-details');
+  await closeSheet(page);
+  await page.getByRole('button', { name: '移除目标', exact: true }).click();
   await expect.poll(() => operationCount(request, 'goalClear')).toBe(1);
-  await expect(page.getByRole('button', { name: '退出目标模式' })).toHaveCount(0);
-});
+  await expect(viewGoal).toHaveCount(0);
+}
 
 test('changes context capacity and opens profile, account picker and token summary', async ({ page, request }, info) => {
   await selectChat(page);

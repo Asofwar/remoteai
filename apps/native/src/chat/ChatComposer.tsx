@@ -215,6 +215,12 @@ export function ChatComposer({ projectPicker, suggestions, models, selection, se
       <ComposerReferences items={attachments.items} disabled={attachmentBusy} remove={attachments.remove}
         upload={sending ? upload : undefined} reconnecting={reconnecting} />
       <ComposerQuotes disabled={sending} active={active} />
+      {(goalMode.enabled || goal) && <ComposerGoal key={`goal:${threadId}:${active}`}
+        goal={goalMode.enabled ? null : goal} draft={draft.text}
+        disabled={sending || !!goalBusy || (!!goal && !ready)} remove={() => {
+          if (goal && threadId && goals) void goals.clear(threadId).then(cleared => { if (cleared) goalMode.exit(); });
+          else goalMode.exit();
+        }} />}
       <ComposerSuggestion text={suggestion.text} accept={suggestion.accept} />
       <ComposerInput ref={menu.input} accessibilityLabel={t("聊天消息")} compact={compactField}
         multiline value={draft.text} maxLength={100_000} selection={menu.selection} editable={!queueEditor.loading}
@@ -232,11 +238,6 @@ export function ChatComposer({ projectPicker, suggestions, models, selection, se
           <Text style={styles.composerAddText}>+</Text>
         </Pressable>
         <View style={styles.composerTrailing}>
-          {(goalMode.enabled || goal) && <ComposerGoal disabled={sending || !!goalBusy || (!!goal && !ready)}
-            remove={() => {
-              if (goal && threadId && goals) void goals.clear(threadId).then((cleared) => { if (cleared) goalMode.exit(); });
-              else goalMode.exit();
-            }} />}
           <ComposerModelButton models={models} selection={selection} compact={compactField}
             onPress={() => setSettings(true)} />
           <ComposerActionButton action={action} disabled={actionDisabled} busy={pausing || sending}

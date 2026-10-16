@@ -45,13 +45,12 @@
 .is-compact .chat-composer-trailing { flex: 0; }
 .chat-composer-capsules { display: flex; flex-wrap: wrap; gap: 6px; }
 .chat-composer-capsules:not(:empty) { margin: 4px 8px 8px; }
-.chat-capsule, .chat-goal-capsule { display: inline-flex; align-items: center; gap: 6px; min-width: 0;
+.chat-capsule { display: inline-flex; align-items: center; gap: 6px; min-width: 0;
   max-width: min(100%, 280px); padding: 6px 8px; border-radius: 20px; background: var(--app-elevated, #edf2ef); font-size: 12px; }
 .chat-capsule > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-capsule svg { flex-shrink: 0; }
-.chat-capsule button, .chat-goal-capsule button { display: grid; place-items: center; flex-shrink: 0;
+.chat-capsule button { display: grid; place-items: center; flex-shrink: 0;
   width: 24px; height: 24px; border: 0; border-radius: 50%; background: transparent; color: inherit; }
-.chat-goal-capsule { padding: 3px 4px 3px 8px; flex-shrink: 0; color: var(--app-accent, #14806f); }
 .chat-composer-popover { position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 20;
   width: min(400px, 100%); max-height: min(350px, 45dvh); overflow: auto; border-radius: 18px;
   overscroll-behavior: contain;

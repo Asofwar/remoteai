@@ -1,5 +1,6 @@
 import { assertRunning } from './permissions.js';
 import { clearControlledTabs } from './tab-indicator.js';
+import { clearTabPointer } from './pointer.js';
 
 const connections = new Map();
 const keyOf = target => target.tabId === undefined ? `worker:${target.targetId}` : `tab:${target.tabId}`;
@@ -75,7 +76,10 @@ async function detach(connection) {
   } catch {
     // Attach failure, tab/worker closure and Chrome's Cancel button can detach first.
   }
-  if (connection.target.tabId !== undefined) await clearControlledTabs(connection.target.tabId);
+  if (connection.target.tabId !== undefined) {
+    await clearTabPointer(connection.target.tabId);
+    await clearControlledTabs(connection.target.tabId);
+  }
 }
 
 export function debuggerDetached(target) {

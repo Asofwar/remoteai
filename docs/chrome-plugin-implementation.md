@@ -426,3 +426,12 @@ Chrome's debugger banner still identifies the controlled page. This prevents syn
 from starving page reads when another extension or an old extension world restores its own icon.
 The fixture verifies page reads, reload and cleanup. Reload uses `chrome.tabs.reload` so it does not
 first require scripts or debugger commands to complete in the old document.
+
+Mouse actions display a black pointer with short movement and click animations. The overlay lives in
+an isolated world with a closed shadow root, ignores hit testing and accessibility reads, and follows
+the coordinate space of each debugger session. Background waits use the extension's timer rather
+than page animation promises. Pointer updates never observe or repeatedly repair page mutations.
+Switching frame sessions, task completion and pause remove the owned overlays; an idle timer also
+hides them if revoked website access prevents cleanup. Reduced-motion preferences skip travel.
+Run `node --test scripts/chrome-plugin-pointer.test.mjs` and `node scripts/chrome-plugin-pointer.e2e.mjs`
+to verify appearance, positioning, trusted input, same/cross-origin frames, drag, scroll and cleanup.

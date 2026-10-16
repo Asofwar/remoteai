@@ -1,5 +1,6 @@
 import { pageCall } from './driver.js';
 import { reference } from './snapshot.js';
+import { movePointer, showPointer } from './pointer.js';
 
 async function point(driver, ref) {
   await pageCall(driver, ref, `function() {
@@ -18,12 +19,14 @@ async function point(driver, ref) {
 
 async function mouse(driver, position, options = {}) {
   const { frameId, x, y } = position;
-  await driver.guard();
+  await movePointer(driver, position);
   for (let clickCount = 1; clickCount <= (options.doubleClick ? 2 : 1); clickCount += 1) {
+    await showPointer(driver, position, { phase: 'press' });
     await driver.send('Input.dispatchMouseEvent', { x, y, button: options.button ?? 'left',
       clickCount, type: 'mousePressed' }, frameId);
     await driver.send('Input.dispatchMouseEvent', { x, y, button: options.button ?? 'left',
       clickCount, type: 'mouseReleased' }, frameId);
+    await showPointer(driver, position, { phase: 'release' });
   }
 }
 
@@ -83,8 +86,10 @@ export async function key(driver, args) {
 export async function scroll(driver, args) {
   const metrics = await driver.send('Page.getLayoutMetrics');
   const viewport = metrics.cssVisualViewport;
+  const position = { x: args.x ?? viewport.clientWidth / 2, y: args.y ?? viewport.clientHeight / 2 };
+  await movePointer(driver, position);
   await driver.send('Input.dispatchMouseEvent', { type: 'mouseWheel',
-    x: args.x ?? viewport.clientWidth / 2, y: args.y ?? viewport.clientHeight / 2,
+    ...position,
     deltaY: args.deltaY, deltaX: args.deltaX ?? 0 });
   return { scrolled: true };
 }
@@ -114,14 +119,22 @@ export async function drag(driver, args) {
   const from = await point(driver, await reference(driver, args.fromRef));
   const to = await point(driver, await reference(driver, args.toRef));
   if (from.frameId !== to.frameId) throw new Error('请在同一页面框架内拖动。');
-  await driver.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: from.x, y: from.y }, from.frameId);
+  await movePointer(driver, from);
+  await showPointer(driver, from, { phase: 'press' });
   await driver.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1,
     x: from.x, y: from.y }, from.frameId);
-  for (let step = 1; step <= 10; step += 1) {
+  const steps = 10;
+  const stepDelayMs = 16;
+  for (let step = 1; step <= steps; step += 1) {
+    const position = { x: from.x + (to.x - from.x) * step / steps,
+      y: from.y + (to.y - from.y) * step / steps, frameId: from.frameId };
     await driver.send('Input.dispatchMouseEvent', { type: 'mouseMoved', button: 'left', buttons: 1,
-      x: from.x + (to.x - from.x) * step / 10, y: from.y + (to.y - from.y) * step / 10 }, from.frameId);
+      x: position.x, y: position.y }, from.frameId);
+    await showPointer(driver, position);
+    await new Promise(resolve => setTimeout(resolve, stepDelayMs));
   }
   await driver.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1,
     x: to.x, y: to.y }, from.frameId);
+  await showPointer(driver, to, { phase: 'release' });
   return { dragged: true };
 }

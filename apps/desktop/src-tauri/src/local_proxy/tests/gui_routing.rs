@@ -77,7 +77,8 @@ fn gui_provider_request_keeps_its_account_while_shared_switches_and_polling_cont
     write_state(&paths, &shared).unwrap();
     tauri::async_runtime::block_on(gui_context::record_usage(&json!({
         "threadId": session_id,
-        "tokenUsage": {"modelContextWindow": 285_000, "last": {"totalTokens": 15_000}}
+        "tokenUsage": {"modelContextWindow": 285_000, "contextTokens": 247_017,
+            "last": {"totalTokens": 206_357}}
     })));
     for _ in 0..3 {
         assert!(active_proxy_session_ids().unwrap().contains(&session_id));
@@ -89,9 +90,14 @@ fn gui_provider_request_keeps_its_account_while_shared_switches_and_polling_cont
         );
         let session = proxy_sessions().lock().unwrap()[&session_id].metadata_snapshot();
         assert_eq!(session.gui_context.unwrap().capacity, Some(285_000));
-        assert_eq!(session.context_tokens, Some(15_000));
+        assert_eq!(session.context_tokens, Some(247_017));
         assert_eq!(session.active_requests, 1);
     }
+    tauri::async_runtime::block_on(gui_context::record_usage(&json!({
+        "threadId": session_id,
+        "tokenUsage": {"modelContextWindow": 285_000, "last": {"totalTokens": 15_000}}
+    })));
+    assert_eq!(proxy_sessions().lock().unwrap()[&session_id].context_tokens, Some(15_000));
     release.send(()).unwrap();
     let payload = worker.join().unwrap();
     assert_eq!(payload.status, 200);

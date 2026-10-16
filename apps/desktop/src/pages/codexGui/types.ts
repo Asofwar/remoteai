@@ -103,6 +103,8 @@ export interface Question {
   options?: { label: string; description: string }[];
 }
 export interface ThreadTokenUsage {
+  /** Codex's active-context estimate used by its compaction check, separate from billed usage. */
+  contextTokens?: number | null;
   total: { totalTokens: number };
   last: { totalTokens: number };
   modelContextWindow?: number | null;

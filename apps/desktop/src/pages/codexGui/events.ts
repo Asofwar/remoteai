@@ -23,7 +23,8 @@ export function conversation(thread: Thread, previous?: Conversation): Conversat
   const active = turns.find((turn) => turn.status === "inProgress");
   return { thread, turns, activeTurn: active?.id ?? null,
     ...(active ? { processing: restoreProcessing(active, previous?.processing) } : {}),
-    tokens: previous?.tokens ?? 0, tokenUsage: previous?.tokenUsage, error: "" };
+    tokens: previous?.tokens ?? thread.tokenUsage?.total.totalTokens ?? 0,
+    tokenUsage: previous?.tokenUsage ?? thread.tokenUsage, error: "" };
 }
 
 function updateTurn(value: Conversation, id: string, update: (turn: Turn) => Turn): Conversation {

@@ -5,12 +5,12 @@ import { join } from "node:path";
 
 const TIMEOUT_MS = 30000;
 
-export function connectAppServer({ executable, home, cwd, overrides = [] }) {
+export function connectAppServer({ executable, home, cwd, overrides = [], env = {}, onDiagnostic }) {
   const quotePath = (path) => JSON.stringify(path.replaceAll("\\", "/"));
   const child = spawn(executable, ["app-server", ...overrides.flatMap((value) => ["-c", value]),
     "-c", "features.step_model_switching=true",
     "-c", `sqlite_home=${quotePath(home)}`, "-c", `log_dir=${quotePath(join(home, "log"))}`], {
-    cwd, env: { ...process.env, CODEX_HOME: home, CODEX_INTERNAL_ORIGINATOR_OVERRIDE: "codex-tui" },
+    cwd, env: { ...process.env, CODEX_HOME: home, CODEX_INTERNAL_ORIGINATOR_OVERRIDE: "codex-tui", ...env },
     windowsHide: true, stdio: ["pipe", "pipe", "pipe"],
   });
   const pending = new Map();
@@ -18,6 +18,8 @@ export function connectAppServer({ executable, home, cwd, overrides = [] }) {
   let sequence = 0;
   let stderr = "";
   child.stderr.on("data", (chunk) => { stderr = (stderr + chunk).slice(-6000); });
+  const diagnostics = onDiagnostic ? createInterface({ input: child.stderr }) : null;
+  diagnostics?.on("line", onDiagnostic);
   const lines = createInterface({ input: child.stdout });
   lines.on("line", (line) => {
     const message = JSON.parse(line);
@@ -36,7 +38,7 @@ export function connectAppServer({ executable, home, cwd, overrides = [] }) {
     }, TIMEOUT_MS);
     pending.set(id, { resolve, reject, timer }); send({ id, method, params });
   });
-  return { rpc, events, async initialize() {
+  return { rpc, events, respond(id, result) { send({ id, result }); }, async initialize() {
     await rpc("initialize", { clientInfo: { name: "codex-tui", version: "0.157.1" },
       capabilities: { experimentalApi: true } });
     send({ method: "initialized" });
@@ -51,6 +53,7 @@ export function connectAppServer({ executable, home, cwd, overrides = [] }) {
   }, async close() {
     for (const call of pending.values()) clearTimeout(call.timer);
     lines.close();
+    diagnostics?.close();
     if (child.exitCode === null) { child.kill(); await once(child, "exit"); }
     child.stdin.destroy(); child.stdout.destroy(); child.stderr.destroy();
   } };

@@ -38,6 +38,18 @@ describe("Codex GUI event projection", () => {
       .toEqual(compacted);
   });
 
+  it("restores persisted context estimates without overwriting a live update", () => {
+    const tokenUsage = { total: { totalTokens: 8744228 }, last: { totalTokens: 206357 },
+      contextTokens: 247017, modelContextWindow: 258400 };
+    const restored = conversation({ ...thread, tokenUsage });
+    expect(restored.tokenUsage?.contextTokens).toBe(247017);
+    expect(restored.tokens).toBe(8744228);
+    const newer = reduceConversation(restored, event("thread/tokenUsage/updated", {
+      tokenUsage: { ...tokenUsage, contextTokens: 16273 },
+    }));
+    expect(conversation({ ...thread, tokenUsage }, newer).tokenUsage?.contextTokens).toBe(16273);
+  });
+
   it("attaches plan and net diff to their turn and retains both when reopening history", () => {
     let value = conversation(thread);
     const first = { id: "turn", status: "inProgress", items: [] };

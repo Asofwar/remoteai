@@ -1,6 +1,7 @@
 mod completion_notifications;
 mod context_capacity;
 mod context_change;
+mod context_usage;
 mod conversation_awareness;
 mod coze;
 mod deletion;
@@ -60,6 +61,7 @@ pub(super) struct Client {
     active_turns: Mutex<HashMap<String, String>>,
     completion_notifications: Mutex<completion_notifications::CompletionNotifications>,
     context_capacity: context_capacity::ContextCapacity,
+    context_usage: Mutex<context_usage::UsageCache>,
     idle_threads: idle_threads::IdleThreads,
     plugin_revision: Mutex<Option<String>>,
     next_id: AtomicU64,
@@ -109,12 +111,14 @@ impl Client {
             )
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .kill_on_drop(true);
+        context_usage::configure(&mut command);
         platform::hide_window(&mut command);
         let mut process = command.spawn().map_err(|_| GuiError::Startup)?;
         let writer = process.stdin.take().ok_or(GuiError::Startup)?;
         let stdout = process.stdout.take().ok_or(GuiError::Startup)?;
+        let stderr = process.stderr.take().ok_or(GuiError::Startup)?;
         let client = Arc::new(Self {
             workspaces: Arc::clone(&app.state::<super::GuiState>().workspaces),
             title_jobs: Mutex::default(),
@@ -130,6 +134,7 @@ impl Client {
             active_turns: Mutex::new(HashMap::new()),
             completion_notifications: Mutex::default(),
             context_capacity: context_capacity::ContextCapacity::default(),
+            context_usage: Mutex::default(),
             idle_threads: idle_threads::IdleThreads::default(),
             plugin_revision: Mutex::new(None),
             next_id: AtomicU64::new(1),
@@ -139,6 +144,7 @@ impl Client {
             app,
         });
         tokio::spawn(client.clone().read(stdout));
+        tokio::spawn(client.clone().read_context_usage(stderr));
         let handshake = client
             .request(
                 "initialize",
@@ -180,6 +186,7 @@ impl Client {
         let changed_thread = matches!(method, "thread/rollback" | "thread/revert")
             .then(|| params["threadId"].clone());
         let mut result = self.request_internal(method, params).await?;
+        self.restore_context_usage(method, &mut result).await;
         super::conversation_context::display(&mut result);
         if let Some(thread_id) = changed_thread {
             self.emit(GuiEvent {
@@ -294,9 +301,6 @@ impl Client {
             if matches!(method, "turn/started" | "turn/completed") {
                 self.track_live_turn(&event).await;
             }
-            if method == "thread/tokenUsage/updated" {
-                crate::local_proxy::gui_context::record_usage(&event.params).await;
-            }
             if method == "turn/completed" {
                 self.notify_completion(&event).await;
                 if let Some(id) = event.params["turn"]["id"].as_str() {
@@ -387,7 +391,15 @@ impl Client {
         !self.active_turns.lock().await.is_empty() || !self.pending.lock().await.is_empty()
     }
 
-    async fn emit(&self, mut event: GuiEvent) {
+    async fn emit(&self, event: GuiEvent) {
+        if context_usage::tracks(&event) {
+            self.emit_context_usage(event).await;
+        } else {
+            self.publish_event(event);
+        }
+    }
+
+    fn publish_event(&self, mut event: GuiEvent) {
         if !self.events_enabled.load(Ordering::Acquire) {
             return;
         }

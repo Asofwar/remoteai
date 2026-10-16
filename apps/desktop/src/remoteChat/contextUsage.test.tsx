@@ -44,6 +44,17 @@ it('applies context events without a turn id and isolates other conversations', 
     .selected?.tokenUsage).toEqual(usage);
 });
 
+it('uses the engine estimate consistently through mobile/web events and history sync', () => {
+  const tokenUsage = { ...usage, last: { totalTokens: 206_357 }, contextTokens: 247_017,
+    modelContextWindow: 258_400 };
+  const state = applyChatEvent({ ...initialChatState(), selected: thread }, event(tokenUsage));
+  expect(contextUsageLabel(state.selected?.tokenUsage)).toBe('上下文 247K / 258.4K Token（96% 已用）');
+  expect(state.selected?.tokenUsage?.last.totalTokens).toBe(206_357);
+  expect(state.selected?.tokenUsage?.total.totalTokens).toBe(usage.total.totalTokens);
+  const compacted = applyChatEvent(state, event({ ...tokenUsage, contextTokens: 16_273 }));
+  expect(contextUsageLabel(compacted.selected?.tokenUsage)).toContain('6% 已用');
+});
+
 it('keeps a live compaction decrease during history reads and accepts newer snapshots', () => {
   const before = { ...thread, tokenUsage: usage };
   const compacted = { ...usage, last: { totalTokens: 25_800 } };

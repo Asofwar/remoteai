@@ -61,8 +61,13 @@ pub(crate) async fn record_usage(params: &Value) {
         .pointer("/tokenUsage/modelContextWindow")
         .and_then(Value::as_u64);
     let used = params
-        .pointer("/tokenUsage/last/totalTokens")
-        .and_then(Value::as_u64);
+        .pointer("/tokenUsage/contextTokens")
+        .and_then(Value::as_u64)
+        .or_else(|| {
+            params
+                .pointer("/tokenUsage/last/totalTokens")
+                .and_then(Value::as_u64)
+        });
     let id = id.to_owned();
     if tauri::async_runtime::spawn_blocking(move || {
         update_usage(&id, capacity, used);

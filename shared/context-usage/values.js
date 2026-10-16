@@ -2,7 +2,9 @@
 export const FULL_PERCENT = 100;
 
 export function contextUsage(usage) {
-  const used = usage?.last?.totalTokens;
+  const estimate = usage?.contextTokens;
+  const used = typeof estimate === "number" && Number.isFinite(estimate) && estimate >= 0
+    ? estimate : usage?.last?.totalTokens;
   const total = usage?.modelContextWindow;
   if (typeof used !== "number" || !Number.isFinite(used) || used < 0) return null;
   const capacity = typeof total === "number" && Number.isFinite(total) && total > 0 ? total : null;

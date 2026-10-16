@@ -1,5 +1,28 @@
 # Codex GUI 上下文容量隔离验证
 
+## 上下文估算用量（2026-10-16）
+
+GUI、代理会话列表、Web 和原生手机端优先显示 Codex 最近一次压缩检查使用的内部估算，
+不再只用最近一次 API 回复的 `last.totalTokens` 计算百分比。累计 Token 和计费用量保持原值。
+
+Codex 0.163.0 的 app-server 用量协议尚未提供这项估算。GUI 启动子进程时启用限定目标的 JSON
+诊断流，读取 `post sampling token usage` 的 `total_usage_tokens`，按轮次关联到对应对话，
+通过 `tokenUsage.contextTokens` 发布。不会扫描会话文件或轮询日志数据库，也不会把原始诊断发给前端。
+stdout 与 stderr 的更新串行合并；压缩、回退和删除会使旧估算失效，迟到的诊断不能恢复压缩前用量。
+估算快照通过后台任务保存，重新打开对话或重启后可恢复；历史回放不匹配时会清除旧快照。
+旧版引擎或尚未产生估算的对话仍使用原有回报值，收到内部估算后自动切换。
+
+真实 Codex 0.163.0 配合本地 Responses 夹具验证：API 回报 206,357 Token（79.9%），内部估算
+250,455 Token（96.9%），超过 244,800 的压缩阈值。Rust 桥接测试直接解析真实诊断并验证显示值一致。
+前端测试覆盖桌面弹窗、Web/原生手机端、压缩后的下降以及重新读取历史；390px 和 1280px
+页面测试在用量请求挂起时验证百分比更新、输入和定时刷新继续工作。
+
+```powershell
+$env:CODEX_GUI_TEST_CLI = '<codex.exe 路径>'
+cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml `
+  --test codex_switch_lib_tests real_cli_estimate_matches -- --ignored --nocapture
+```
+
 2026-09-15，Windows 11 Hyper-V 虚拟机 `win11`（设备名 `ZH2`），Codex CLI 0.154.0。
 虚拟机沿用现有 Remote AI Provider，连接上游 Remote AI，使用真实模型 `gpt-6-astra`。
 

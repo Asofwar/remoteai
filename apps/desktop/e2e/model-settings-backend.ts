@@ -3,6 +3,7 @@ import type { ModelSettingsSnapshot } from "../src/pages/codexGui/threadModelSet
 import type { ModelSelection } from "../src/pages/codexGui/modelSelection";
 import type { QueueSnapshot } from "../src/pages/codexGui/queueJournal";
 import type { RequestSpeed } from '../../../shared/remote-chat/composer';
+import type { ThreadTokenUsage } from '../src/pages/codexGui/types';
 
 export function modelSettingsBackend(liveUpdate?: ModelSettingsSnapshot["liveUpdate"]) {
   const saved = new Map<string | null, ModelSettingsSnapshot>();
@@ -90,6 +91,8 @@ export function modelSettingsBackend(liveUpdate?: ModelSettingsSnapshot["liveUpd
     });
   }
   return { attach, sends, contextDefaults, contextOverrides,
+    contextUsage: (threadId: string, tokenUsage: ThreadTokenUsage) => events.push({ name: 'codex-gui-event',
+      payload: { method: 'thread/tokenUsage/updated', params: { threadId, tokenUsage } } }),
     modelRequests: () => modelRequests, pauseModels: () => { modelsPaused = true; },
     emptyModels: (empty: boolean) => { modelsEmpty = empty; },
     addModel: (model: string) => models.push({ ...models[0], id: model, model, displayName: model, isDefault: false }),

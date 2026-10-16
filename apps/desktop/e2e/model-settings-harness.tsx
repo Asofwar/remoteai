@@ -8,8 +8,11 @@ import { ComposerSubmit } from "../src/pages/codexGui/ComposerSubmit";
 import { useUsageStatus } from "../src/pages/codexGui/useUsageStatus";
 import { useGuiRequestSpeed } from "../src/pages/codexGui/useGuiRequestSpeed";
 import { GuiAutoSwitchSettingsDialog } from "../src/pages/codexGui/GuiAutoSwitchSettingsDialog";
+import { UsageStatus } from "../src/pages/codexGui/UsageStatus";
+import { ChatUsage } from "../../web/src/chat/ChatUsage";
 
 const controller = getGuiController();
+const pendingUsage = () => new Promise<never>(() => {});
 function Harness() {
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const [text, setText] = useState("");
@@ -31,6 +34,10 @@ function Harness() {
     <p>当前对话：<output aria-label="当前对话">{state.selected ?? "新对话"}</output></p>
     <output aria-label="刷新次数">{beats}</output>
     <p>{usage ? `用量 ${usage.totalTokens}` : "正在刷新用量"}</p>
+    <UsageStatus active threadId={state.selected}
+      tokenUsage={state.selected ? state.conversations[state.selected]?.tokenUsage : undefined} />
+    <ChatUsage active ready read={pendingUsage}
+      tokenUsage={state.selected ? state.conversations[state.selected]?.tokenUsage : undefined} />
     <p role="status" aria-label="模型同步">{state.modelSettingsLoading ? "正在同步模型设置" : "模型设置已同步"}</p>
     {!!state.error && <p role="alert">{state.error}</p>}
     <Messages selected={state.selected} value={state.selected ? state.conversations[state.selected] : undefined} />

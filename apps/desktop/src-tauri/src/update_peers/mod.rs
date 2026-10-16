@@ -15,6 +15,7 @@ pub(crate) mod packages;
 mod parallel;
 pub(crate) mod policy;
 mod remote_policy;
+mod reporting;
 mod signaling;
 mod snapshot;
 mod transfer;
@@ -44,6 +45,7 @@ enum Error {
 type Result<T> = std::result::Result<T, Error>;
 
 pub(crate) struct Service {
+    reporter: Option<reporting::Reporter>,
     cache: Arc<cache::Cache>,
     broker: watch::Sender<Option<mpsc::Sender<signaling::Request>>>,
     uploads: Arc<Semaphore>,
@@ -67,6 +69,7 @@ pub(crate) fn setup<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Resu
         key,
     ));
     let service = Arc::new(Service {
+        reporter: Some(reporting::reporter(app)),
         cache: cache.clone(),
         broker: watch::channel(None).0,
         uploads: Arc::new(Semaphore::new(MAX_UPLOADS)),

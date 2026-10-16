@@ -4,12 +4,14 @@ import type { AppRelease } from './appUpdate';
 
 const state = vi.hoisted(() => ({ artifact: vi.fn(), peers: vi.fn(), official: vi.fn(),
   find: vi.fn(), close: vi.fn(), load: vi.fn(), profile: vi.fn(),
-  listen: vi.fn(), remove: vi.fn(), failed: vi.fn() }));
+  listen: vi.fn(), remove: vi.fn(), failed: vi.fn(), reported: vi.fn(), report: vi.fn() }));
 vi.mock('react-native', () => ({ DeviceEventEmitter: { addListener: state.listen }, NativeModules: { AppUpdate: {
   artifactId: state.artifact, downloadPeers: state.peers, downloadOfficial: state.official,
+  get downloadPeersReported() { return state.reported.getMockImplementation() ? state.reported : undefined; },
 } } }));
 vi.mock('../api/client', () => ({ loadSession: state.load, fetchUserProfile: state.profile }));
 vi.mock('../../../../shared/app-update/peerLookup', () => ({ findUpdatePeers: state.find }));
+vi.mock('../../../../shared/app-update/downloadReport', () => ({ reportDownload: state.report }));
 const release = { version: '2.0.0', androidAsset: { name: 'android.apk', size: 123,
   downloadUrl: 'https://github.com/piperhex/remoteai/releases/download/v2.0.0/android.apk', sha256: 'a'.repeat(64),
 } } as AppRelease;
@@ -50,4 +52,16 @@ it('never requests peer bytes without an authoritative hash', async () => {
   const unsigned = { ...release, androidAsset: { ...release.androidAsset!, sha256: undefined } };
   expect(await downloadSharedAndroidUpdate({ release: unsigned, path: '/x', wifiOnly: false })).toBeNull();
   expect(state.find).not.toHaveBeenCalled();
+});
+
+it.each(['success', 'failed'])('reports the native verified outcome: %s', async outcome => {
+  const report = { id: 'report-id', artifact: 'b'.repeat(64), platform: 'android', outcome,
+    peerBytes: 23, serverBytes: 100, originBytes: 0,
+    failures: outcome === 'failed' ? [{ source: 'download', stage: 'verify', code: 'invalid', count: 1 }] : [] };
+  const path = outcome === 'success' ? '/update.apk' : null;
+  state.reported.mockResolvedValue(JSON.stringify({ path, report }));
+  expect(await downloadSharedAndroidUpdate({ release, path: '/update.apk', wifiOnly: true })).toBe(path);
+  expect(state.report).toHaveBeenCalledWith({ baseUrl: 'https://example.test', accessToken: 'secret' }, report);
+  expect(state.peers).not.toHaveBeenCalled();
+  expect(state.close).toHaveBeenCalledOnce();
 });

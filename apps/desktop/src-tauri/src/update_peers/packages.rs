@@ -1,4 +1,5 @@
 //! Blocking-worker adapter for GUI dependencies, using the existing peer transport and cache.
+use super::reporting::{Report, Source};
 use super::{cache::Artifact, dependency, parallel, Error, Result, Service, TRANSFER_LIFETIME};
 use std::{path::Path, sync::Arc};
 use tauri::{AppHandle, Manager};
@@ -99,10 +100,30 @@ pub(super) async fn download_peer(
     if !service.policy.allows_download() {
         return Err(Error::Unavailable);
     }
+    let delivery = service.reporter.as_ref().and_then(|reporter| reporter());
+    let mut report = Report::new(&artifact.id);
+    let result = download_recorded(service, artifact, progress, &mut report).await;
+    if let Err(error) = &result {
+        report.interrupted(error);
+    }
+    report.finish(result.is_ok());
+    if let Some(deliver) = delivery {
+        deliver(report);
+    }
+    result
+}
+
+async fn download_recorded(
+    service: &Arc<Service>,
+    artifact: &Artifact,
+    progress: impl FnMut(usize, Option<u64>),
+    report: &mut Report,
+) -> Result<Arc<Vec<u8>>> {
     let scope = service.policy.preferences().scope;
     let mut leases = match service.find_peers(&artifact.id).await {
         Ok(leases) => leases,
         Err(error) => {
+            report.failure(Source::Peer, "lookup", &error);
             let discovery = service
                 .broker
                 .borrow()
@@ -118,9 +139,17 @@ pub(super) async fn download_peer(
     };
     let transfer = async {
         if leases.iter().all(|lease| lease.protocol >= 2) {
-            super::block_download::download(&mut leases, artifact, service, progress).await
+            super::block_download::download_recorded(
+                &mut leases,
+                artifact,
+                service,
+                (&mut *report, progress),
+            )
+            .await
         } else {
-            parallel::download(&leases, &artifact.id, progress).await
+            let bytes = parallel::download(&leases, &artifact.id, progress).await?;
+            report.accepted(Source::Peer, bytes.len());
+            Ok(bytes)
         }
     };
     let bytes = tokio::time::timeout(TRANSFER_LIFETIME, async {
@@ -134,6 +163,7 @@ pub(super) async fn download_peer(
     match verify(service, artifact, bytes).await {
         Ok(bytes) => Ok(bytes),
         Err(error) => {
+            report.failure(Source::Download, "verify", &error);
             for lease in &leases {
                 lease.failed();
             }

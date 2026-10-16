@@ -5,6 +5,7 @@ use tokio::sync::{watch, Semaphore};
 fn bridge() -> (Bridge, tempfile::TempDir) {
     let directory = tempfile::tempdir().unwrap();
     let service = Arc::new(Service {
+        reporter: None,
         cache: Arc::new(cache::Cache::new(directory.path().into(), String::new())),
         broker: watch::channel(None).0,
         mirror_base: watch::channel(None).0,

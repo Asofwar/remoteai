@@ -8,6 +8,7 @@ import org.json.JSONObject
 
 /** Counts accepted bytes, excluding restored blocks and duplicate requests. */
 internal class UpdateDownloadProgress(private val context: ReactApplicationContext, input: JSONObject) {
+  val report = UpdateDownloadReport(input)
   private val path = input.getString("path")
   private val notification = UpdateDownloadNotification(context, input)
   private var received = 0L

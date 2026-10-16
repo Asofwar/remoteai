@@ -5,6 +5,7 @@ use super::{
     cache::Artifact,
     checkpoint::Checkpoint,
     origin_blocks::Origin,
+    reporting::{Report, Source as ReportSource},
     signaling::Lease,
     snapshot::BLOCK_BYTES,
     Error, Result, Service, MAX_DOWNLOAD_PEERS,
@@ -96,6 +97,7 @@ type Job<'a> = BoxFuture<'a, (usize, Result<Source>)>;
 type Discovery<'a> = Option<BoxFuture<'a, Result<Vec<Lease>>>>;
 
 struct Download<'a> {
+    report: &'a mut Report,
     artifact: &'a Artifact,
     service: &'a Service,
     leases: &'a mut Vec<Lease>,
@@ -107,14 +109,31 @@ struct Download<'a> {
     origin_attempts: usize,
 }
 
+#[cfg(test)]
 pub(super) async fn download(
     leases: &mut Vec<Lease>,
     artifact: &Artifact,
     service: &Service,
-    mut progress: impl FnMut(usize, Option<u64>),
+    progress: impl FnMut(usize, Option<u64>),
 ) -> Result<Vec<u8>> {
+    download_recorded(
+        leases,
+        artifact,
+        service,
+        (&mut Report::new(&artifact.id), progress),
+    )
+    .await
+}
+
+pub(super) async fn download_recorded(
+    leases: &mut Vec<Lease>,
+    artifact: &Artifact,
+    service: &Service,
+    reporting: (&mut Report, impl FnMut(usize, Option<u64>)),
+) -> Result<Vec<u8>> {
+    let (report, mut progress) = reporting;
     let (sender, mut blocks) = mpsc::channel(16);
-    let mut state = Download::new(leases, artifact, service);
+    let mut state = Download::new(leases, artifact, service, report);
     state.start();
     let mut next_refill = Instant::now() + REFILL_INTERVAL;
     let mut discovery: Discovery<'_> = None;
@@ -163,8 +182,14 @@ async fn discover(discovery: &mut Discovery<'_>) -> Result<Vec<Lease>> {
 }
 
 impl<'a> Download<'a> {
-    fn new(leases: &'a mut Vec<Lease>, artifact: &'a Artifact, service: &'a Service) -> Self {
+    fn new(
+        leases: &'a mut Vec<Lease>,
+        artifact: &'a Artifact,
+        service: &'a Service,
+        report: &'a mut Report,
+    ) -> Self {
         Self {
+            report,
             artifact,
             service,
             leases,
@@ -262,7 +287,17 @@ impl<'a> Download<'a> {
     ) -> Result<()> {
         let worker = match result {
             Ok(worker) if self.valid_size(worker.size()) => worker,
-            _ => {
+            result => {
+                let error = result.err().unwrap_or(Error::Invalid);
+                self.report.failure(
+                    report_source(source),
+                    if self.plan.is_some() {
+                        "transfer"
+                    } else {
+                        "connect"
+                    },
+                    &error,
+                );
                 self.failed(source);
                 return Ok(());
             }
@@ -339,6 +374,7 @@ impl<'a> Download<'a> {
             &metrics.peer_bytes
         };
         counter.fetch_add(length as u64, Ordering::Relaxed);
+        self.report.accepted(report_source(block.source), length);
         progress(length, Some(plan.size as u64));
         Ok(true)
     }
@@ -392,5 +428,13 @@ impl<'a> Download<'a> {
     async fn finish(self) -> Result<Vec<u8>> {
         let size = self.plan.ok_or(Error::Invalid)?.size;
         self.destination.ok_or(Error::Invalid)?.finish(size).await
+    }
+}
+
+fn report_source(source: usize) -> ReportSource {
+    match source {
+        ORIGIN => ReportSource::Origin,
+        MIRROR => ReportSource::Server,
+        _ => ReportSource::Peer,
     }
 }

@@ -34,7 +34,10 @@ internal class UpdatePeerDownload(
       }
       repeat(configs.length()) { tasks.take().get() }
       progress.publish(verifying = true)
-      check(files.verify(input))
+      if (!files.verify(input)) {
+        progress.report.failure("download", "verify", "invalid")
+        error("Invalid update package")
+      }
       complete = true
       return target.path
     } finally {
@@ -136,6 +139,7 @@ internal class UpdatePeerDownload(
         }
         val bytes = decodeChunk(frame, offset, end)
         file.write(bytes); offset += bytes.size
+        progress.report.accepted("peer", bytes.size.toLong())
         progress.advance(bytes.size.toLong())
         val elapsed = SystemClock.elapsedRealtime() - rateAt
         if (elapsed >= 15_000) {

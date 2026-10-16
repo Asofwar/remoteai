@@ -34,7 +34,13 @@ class AppUpdateModule(private val context: ReactApplicationContext) : ReactConte
   fun verifyPackage(options: String, promise: Promise) = task(promise) { files.verify(JSONObject(options)) }
 
   @ReactMethod
-  fun downloadPeers(options: String, promise: Promise) = download(options, promise) { input, progress ->
+  fun downloadPeers(options: String, promise: Promise) = sharedDownload(options, promise, false)
+
+  @ReactMethod
+  fun downloadPeersReported(options: String, promise: Promise) = sharedDownload(options, promise, true)
+
+  private fun sharedDownload(options: String, promise: Promise, reported: Boolean) =
+    download(options, promise, reported) { input, progress ->
     val configs = input.getJSONArray("configs")
     if ((0 until configs.length()).all { configs.getJSONObject(it).optInt("packageProtocol") >= 2 }) {
       val transfer = UpdateBlockDownload(context, files, input, progress)
@@ -54,7 +60,7 @@ class AppUpdateModule(private val context: ReactApplicationContext) : ReactConte
     downloadOfficial(context, files, input, progress)
   }
 
-  private fun download(options: String, promise: Promise,
+  private fun download(options: String, promise: Promise, reported: Boolean = false,
     action: (JSONObject, UpdateDownloadProgress) -> String) = task(promise) {
     check(downloading.compareAndSet(false, true))
     var progress: UpdateDownloadProgress? = null
@@ -65,9 +71,13 @@ class AppUpdateModule(private val context: ReactApplicationContext) : ReactConte
       val reporter = UpdateDownloadProgress(context, input)
       progress = reporter
       reporter.restore(0)
-      val path = action(input, reporter)
+      val path = try { action(input, reporter) } catch (error: Exception) {
+        if (!reported) throw error
+        reporter.report.interrupted(error)
+        return@task reporter.report.finish(null)
+      }
       complete = true
-      path
+      if (reported) reporter.report.finish(path) else path
     } finally {
       progress?.finish(complete)
       downloading.set(false)

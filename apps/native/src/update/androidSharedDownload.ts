@@ -4,6 +4,7 @@ import { findUpdatePeers } from '../../../../shared/app-update/peerLookup';
 import { watchUpdatePeers } from '../../../../shared/app-update/peerDiscovery';
 import { updateMirrorUrl } from '../../../../shared/app-update/mirrorUrl';
 import { updateNotificationLabels } from './androidUpdateNotifications';
+import { reportDownload, type DownloadReport } from '../../../../shared/app-update/downloadReport';
 
 interface UpdateModule {
   sharingProtocol?: number;
@@ -11,6 +12,7 @@ interface UpdateModule {
   updatePath(version: string): Promise<string>;
   artifactId(metadata: string): Promise<string>;
   downloadPeers(options: string): Promise<string>;
+  downloadPeersReported?(options: string): Promise<string>;
   addUpdatePeers?(options: string): Promise<boolean>;
   downloadOfficial(options: string): Promise<string>;
   verifyPackage(options: string): Promise<boolean>;
@@ -46,10 +48,19 @@ export async function downloadSharedAndroidUpdate(options: {
         : findUpdatePeers(session, artifact, { protocol: native.sharingProtocol === 2 ? 2 : 0 }))
         .catch(() => undefined);
     }
-    return await native.downloadPeers(JSON.stringify({ ...metadata, path: options.path,
+    const input = JSON.stringify({ ...metadata, path: options.path,
       mirrorUrl: session ? updateMirrorUrl(session.baseUrl, asset.downloadUrl) : undefined,
       notification: updateNotificationLabels(),
-      wifiOnly: options.wifiOnly, artifact, configs: lease?.configs ?? [] }));
+      wifiOnly: options.wifiOnly, artifact, configs: lease?.configs ?? [] });
+    if (!native.downloadPeersReported) return await native.downloadPeers(input);
+    const result = JSON.parse(await native.downloadPeersReported(input)) as {
+      path: string | null; report: DownloadReport;
+    };
+    if (!lease && result.report.failures.length < 16) {
+      result.report.failures.push({ source: 'peer', stage: 'lookup', code: 'unavailable', count: 1 });
+    }
+    if (session) void reportDownload(session, result.report);
+    return result.path;
   } catch {
     // Peer lookup, transport, file and integrity failures all return to the original GitHub URL.
     return null;

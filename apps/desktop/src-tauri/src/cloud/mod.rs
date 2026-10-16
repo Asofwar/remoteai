@@ -65,6 +65,7 @@ mod token_pricing;
 mod totp;
 mod transport;
 mod types;
+mod update_downloads;
 
 #[cfg(test)]
 mod tests;
@@ -89,3 +90,4 @@ pub(crate) use token_pricing::*;
 pub(super) use totp::*;
 use transport::*;
 pub(super) use types::*;
+pub(crate) use update_downloads::report_update_download;

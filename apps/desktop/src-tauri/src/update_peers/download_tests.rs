@@ -127,6 +127,7 @@ impl Drop for Origin {
 
 fn service(path: &std::path::Path, key: &str) -> Arc<Service> {
     Arc::new(Service {
+        reporter: None,
         cache: Arc::new(Cache::new(path.into(), key.into())),
         broker: watch::channel(None).0,
         mirror_base: watch::channel(None).0,

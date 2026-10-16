@@ -15,7 +15,8 @@ internal class UpdateBlockDownload(
   private val context: ReactApplicationContext, private val files: UpdateFiles, private val input: JSONObject,
   private val progress: UpdateDownloadProgress,
 ) {
-  private data class Result(val source: Int, val block: Int = -1, val bytes: ByteArray? = null, val failed: Boolean = false)
+  private data class Result(val source: Int, val block: Int = -1, val bytes: ByteArray? = null,
+    val error: Exception? = null)
   private val size = input.getLong("size").also { require(it in 1..MAX_UPDATE_BYTES) }
   private val count = ((size + UPDATE_BLOCK_BYTES - 1) / UPDATE_BLOCK_BYTES).toInt()
   private val plan = UpdateBlockPlan(count, SOURCE_COUNT)
@@ -73,7 +74,10 @@ internal class UpdateBlockDownload(
     }
     check(plan.complete())
     progress.publish(verifying = true)
-    return checkpoint.finish()
+    return try { checkpoint.finish() } catch (error: Exception) {
+      progress.report.failure("download", "verify", "invalid")
+      throw error
+    }
   }
 
   private fun submit(source: Int, action: () -> Unit) {
@@ -81,7 +85,7 @@ internal class UpdateBlockDownload(
     executor.execute {
       try { action(); results.put(Result(source)) }
       catch (_: InterruptedException) { Thread.currentThread().interrupt() }
-      catch (_: Exception) { if (!closed) results.put(Result(source, failed = true)) }
+      catch (error: Exception) { if (!closed) results.put(Result(source, error = error)) }
     }
   }
 
@@ -111,10 +115,18 @@ internal class UpdateBlockDownload(
       if (!plan.finish(result.source, result.block)) return false
       val bytes = checkNotNull(result.bytes)
       checkpoint.write(result.block, bytes)
+      progress.report.accepted(sourceName(result.source), bytes.size.toLong())
       progress.advance(bytes.size.toLong())
       return true
     }
-    if (!result.failed) { ready[result.source] = true; return false }
+    if (result.error == null) { ready[result.source] = true; return false }
+    val code = when (result.error) {
+      is java.net.SocketTimeoutException -> "timeout"
+      is java.io.IOException -> "network"
+      is IllegalArgumentException -> "invalid"
+      else -> "unavailable"
+    }
+    progress.report.failure(sourceName(result.source), "transfer", code)
     plan.fail(result.source)
     if (result.source == MIRROR) return false
     if (result.source == ORIGIN) {
@@ -154,6 +166,12 @@ internal class UpdateBlockDownload(
     executor.shutdownNow()
     while (!executor.awaitTermination(1, TimeUnit.SECONDS)) { /* Payload workers must stop before storage closes. */ }
     try { origin.close(); mirror?.close() } finally { sessions.filterNotNull().forEach { it.close() } }
+  }
+
+  private fun sourceName(source: Int) = when (source) {
+    ORIGIN -> "origin"
+    MIRROR -> "server"
+    else -> "peer"
   }
 
   private companion object {

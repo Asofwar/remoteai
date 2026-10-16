@@ -1,6 +1,7 @@
 import { Button, Card, Form, Select, Space, Switch, Typography } from 'antd';
 import { useI18n } from '../i18n-context';
 import { useUpdateSharingSettings, type UpdateSharingSettingsProps } from '../hooks/useUpdateSharingSettings';
+import { UpdateDownloadStatistics } from './UpdateDownloadStatistics';
 
 const UPLOAD_SPEEDS = [0, 64, 128, 256, 512, 1024, 2048, 4096, 8192];
 
@@ -17,6 +18,7 @@ export function UpdateSharingPage({ api, canManage }: UpdateSharingSettingsProps
         : 'Let online computers share public installers to speed up downloads for computers and phones. '
           + 'These settings apply to all users.'}</Typography.Paragraph>
     </div>
+    <UpdateDownloadStatistics api={api} />
     <Card title={zh ? '安装包共享' : 'Installer sharing'} loading={settings.loading}>
       <Form form={settings.form} layout="vertical" onFinish={settings.save} disabled={disabled}
         style={{ maxWidth: 560 }}>

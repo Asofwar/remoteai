@@ -17,7 +17,18 @@ async fn exercise(behavior: &'static str) {
     if behavior == "cache-unwritable" {
         std::fs::write(&path, b"not a directory").unwrap();
     }
-    let service = service(&path);
+    let mut service = service(&path);
+    let reports = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let captured = reports.clone();
+    Arc::get_mut(&mut service).unwrap().reporter = Some(Arc::new(move || {
+        let captured = captured.clone();
+        Some(Box::new(move |report| {
+            captured
+                .lock()
+                .unwrap()
+                .push(serde_json::to_value(report).unwrap());
+        }))
+    }));
     let package = package();
     let host = network_fixture::host(&format!("dependency-{behavior}")).await;
     let mut listener = host
@@ -59,6 +70,20 @@ async fn exercise(behavior: &'static str) {
         .unwrap()
         .unwrap();
     check_result(behavior, result.unwrap(), progress, (&service, &package)).await;
+    if behavior == "valid" {
+        shared(&service, &package.0, |_, _| {}).await.unwrap();
+    }
+    let reports = reports.lock().unwrap();
+    assert_eq!(reports.len(), 1, "cached packages must not count again");
+    let success = matches!(behavior, "valid" | "cache-unwritable");
+    assert_eq!(
+        reports[0]["outcome"],
+        if success { "success" } else { "failed" }
+    );
+    assert_eq!(reports[0]["serverBytes"], 0);
+    if behavior == "tampered" {
+        assert_eq!(reports[0]["failures"][0]["stage"], "verify");
+    }
 }
 
 async fn check_result(

@@ -25,6 +25,7 @@ fn package() -> Package {
 
 fn service(path: &Path) -> Arc<Service> {
     Arc::new(Service {
+        reporter: None,
         cache: Arc::new(Cache::new(path.into(), String::new())),
         broker: watch::channel(None).0,
         mirror_base: watch::channel(None).0,

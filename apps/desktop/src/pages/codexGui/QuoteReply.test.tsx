@@ -7,6 +7,7 @@ import { Messages } from "./Messages";
 import { GuiController } from "./controller";
 import { conversation } from "./events";
 import { initialState } from "./preferences";
+import { testModels } from "./testModels";
 import type { GuiState } from "./types";
 
 vi.mock("./UsageStatus", () => ({ UsageStatus: () => null }));
@@ -48,7 +49,7 @@ beforeEach(async () => {
   Object.defineProperty(HTMLElement.prototype, "scrollTo", { configurable: true, value: vi.fn() });
   controller = new GuiController();
   vi.spyOn(controller, "send").mockResolvedValue(true);
-  state = { ...initialState(), selected: "one", connection: "ready", conversations: {
+  state = { ...initialState(), models: testModels, selected: "one", connection: "ready", conversations: {
     one: conversation({ id: "one", cwd: "D:/project", preview: "", updatedAt: 1, turns: [
       { id: "turn", status: "completed", items: [
         { id: "question", type: "userMessage", content: [{ type: "text", text: "我的问题" }] },

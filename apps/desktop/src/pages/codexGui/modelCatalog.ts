@@ -136,6 +136,10 @@ export class GuiModelCatalog {
       } catch (error) {
         if (!this.active) return;
         if (generation !== this.generation) continue;
+        if (cacheOnly) {
+          await withModelCatalogTimeout(Promise.resolve(this.host.accept([])), attempt.signal);
+          if (!current()) continue;
+        }
         this.host.failed?.(guiText("模型列表暂时无法更新，请稍后重试。"));
         throw error;
       } finally { attempt.abort(); if (this.attempt === attempt) this.attempt = undefined; }

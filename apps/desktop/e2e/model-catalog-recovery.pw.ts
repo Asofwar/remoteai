@@ -123,3 +123,31 @@ for (const width of [1280, 390]) {
     } finally { backend.releaseUsage(); }
   });
 }
+
+for (const width of [1280, 390]) {
+  test("exposes manual retry after a reconnect cache failure at " + width + "px", async ({ page }) => {
+    const backend = modelSettingsBackend();
+    await page.clock.install();
+    await backend.attach(page.context());
+    await page.setViewportSize({ width, height: 900 });
+    try {
+      await page.goto("/e2e/model-settings-harness.html", { waitUntil: "domcontentloaded" });
+      const picker = page.getByRole("button", { name: /^模型与推理强度/ });
+      await expect(picker).toContainText("模型一");
+      await page.getByRole("textbox", { name: "聊天消息" }).fill("重连后继续");
+      backend.failCache();
+      await page.getByRole("button", { name: "重连", exact: true }).click();
+      const retry = page.getByRole("button", { name: "模型加载失败，点击重试", exact: true });
+      await expect(retry).toBeEnabled();
+      await expect(page.getByRole("button", { name: "发送消息", exact: true })).toBeDisabled();
+      await page.clock.fastForward(24 * 60 * 60 * 1000);
+      expect(backend.modelRequests()).toBe(2);
+      expect(backend.discoveryRequests()).toBe(0);
+      await retry.click();
+      await expect(picker).toContainText("模型一");
+      await expect(page.getByRole("button", { name: "发送消息", exact: true })).toBeEnabled();
+      await expect(page.getByRole("textbox", { name: "聊天消息" })).toHaveValue("重连后继续");
+      expect(backend.discoveryRequests()).toBe(1);
+    } finally { backend.releaseUsage(); }
+  });
+}

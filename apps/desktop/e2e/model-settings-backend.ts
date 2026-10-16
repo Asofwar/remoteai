@@ -15,6 +15,7 @@ export function modelSettingsBackend(liveUpdate?: ModelSettingsSnapshot["liveUpd
   const pendingModels: (() => void)[] = [];
   let modelsPaused = false;
   let modelsEmpty = false;
+  let cacheFailed = false;
   let modelRequests = 0;
   let discoveryRequests = 0;
   let speed: RequestSpeed = 'normal';
@@ -72,6 +73,10 @@ export function modelSettingsBackend(liveUpdate?: ModelSettingsSnapshot["liveUpd
         let data: unknown = {};
         if (request.operation === "models") {
           modelRequests++;
+          if (request.cacheOnly && cacheFailed) {
+            await route.fulfill({ json: { ok: false, error: "Model cache unavailable" } });
+            return;
+          }
           if (!request.cacheOnly) discoveryRequests++;
           if (modelsPaused) await new Promise<void>((resolve) => pendingModels.push(resolve));
           data = { data: modelsEmpty ? [] : models, nextCursor: null };
@@ -98,6 +103,7 @@ export function modelSettingsBackend(liveUpdate?: ModelSettingsSnapshot["liveUpd
     discoveryRequests: () => discoveryRequests,
     modelRequests: () => modelRequests, pauseModels: () => { modelsPaused = true; },
     emptyModels: (empty: boolean) => { modelsEmpty = empty; },
+    failCache: () => { cacheFailed = true; },
     addModel: (model: string) => models.push({ ...models[0], id: model, model, displayName: model, isDefault: false }),
     releaseModels: () => { modelsPaused = false; pendingModels.splice(0).forEach((resolve) => resolve()); },
     startTurn: (threadId: string) => events.push({ name: "codex-gui-event",

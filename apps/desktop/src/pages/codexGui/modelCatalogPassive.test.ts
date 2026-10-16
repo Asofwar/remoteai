@@ -93,3 +93,26 @@ it("cancels an earlier automatic failure retry when reconnecting with cached dat
   expect(requests()).toHaveLength(2);
   expect(vi.getTimerCount()).toBe(0);
 });
+
+it("clears stale models after a reconnect cache failure and waits for an explicit retry", async () => {
+  const controller = new GuiController();
+  cleanup.push(() => controller.dispose());
+  await controller.connect();
+  expect(controller.getSnapshot().models).toEqual([model]);
+  vi.mocked(guiApi.request).mockImplementation(async request => {
+    if (request.operation === "models") throw new Error("cache unavailable");
+    return { data: [], nextCursor: null };
+  });
+  await controller.connect();
+  expect(controller.getSnapshot()).toMatchObject({ models: [], modelCatalogLoading: false });
+  expect(controller.getSnapshot().modelCatalogError).toBeTruthy();
+  await expect(controller.modelCatalog.ready()).rejects.toThrow();
+  await vi.advanceTimersByTimeAsync(DAY_MS);
+  expect(requests()).toHaveLength(2);
+  expect(requests().every(([request]) => request.operation === "models" && request.cacheOnly)).toBe(true);
+  vi.mocked(guiApi.request).mockResolvedValue(page);
+  await controller.refreshModels();
+  expect(controller.getSnapshot()).toMatchObject({ models: [model], modelCatalogError: "" });
+  expect(requests()[2][0]).toEqual({ operation: "models", cursor: undefined });
+  await expect(controller.modelCatalog.ready()).resolves.toBeUndefined();
+});

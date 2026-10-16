@@ -14,6 +14,7 @@ import time
 
 PUBLIC_READ_EXECUTE = 0o555
 STARTUP_TIMEOUT_SECONDS = 45
+WINDOW_STABILITY_SECONDS = 5
 WINDOW_TITLE = "Remote AI"
 
 
@@ -44,6 +45,7 @@ def extract_appimage(appimage, destination):
 
 def wait_for_window(process):
     deadline = time.monotonic() + STARTUP_TIMEOUT_SECONDS
+    visible_since = None
     while time.monotonic() < deadline:
         if process.poll() is not None:
             raise RuntimeError(f"AppImage exited before opening its window: {process.returncode}")
@@ -51,8 +53,13 @@ def wait_for_window(process):
             ["xwininfo", "-name", WINDOW_TITLE, "-stats"], capture_output=True, text=True, timeout=5,
         )
         if window.returncode == 0 and "Map State: IsViewable" in window.stdout:
-            print("Verified visible Remote AI window.", flush=True)
-            return
+            if visible_since is None:
+                visible_since = time.monotonic()
+            if time.monotonic() - visible_since >= WINDOW_STABILITY_SECONDS:
+                print("Verified visible Remote AI window stable for 5 seconds.", flush=True)
+                return
+        else:
+            visible_since = None
         time.sleep(0.5)
     raise RuntimeError("AppImage did not open a visible window within 45 seconds.")
 

@@ -5,7 +5,9 @@ import { ChatController } from './controller';
 import { CHAT_SERVICE_STOPPED } from './backgroundConnection';
 import { useChatCatalog } from './useChatCatalog';
 
-export function useChat(session: AuthSession, deviceId: string, enabled: boolean) {
+const HISTORY_REFRESH_MS = 15_000;
+
+export function useChat(session: AuthSession, deviceId: string, active: boolean) {
   const controller = useMemo(() => new ChatController(session, deviceId), [session, deviceId]);
   const state = useSyncExternalStore(controller.subscribe, controller.snapshot);
   const catalog = useChatCatalog({ session, deviceId, controller, state });
@@ -15,7 +17,8 @@ export function useChat(session: AuthSession, deviceId: string, enabled: boolean
     return () => subscription.remove();
   }, []);
   useEffect(() => {
-    if (!enabled) return;
+    // Device visibility controls polling, while the mounted chat owns the connection.
+    if (!deviceId) return;
     controller.start();
     const stopped = DeviceEventEmitter.addListener(CHAT_SERVICE_STOPPED, () => controller.stop());
     const resumed = AppState.addEventListener('change', (next) => {
@@ -23,14 +26,17 @@ export function useChat(session: AuthSession, deviceId: string, enabled: boolean
       controller.start();
       // Returning to chat should not wait for a background retry's backoff timer.
       controller.connectNow();
-      void controller.refreshSelected();
     });
     return () => { stopped.remove(); resumed.remove(); controller.stop(); };
-  }, [enabled, controller]);
+  }, [deviceId, controller]);
   useEffect(() => {
-    if (!enabled || !foreground || (state.mode !== 'direct' && state.mode !== 'relay')) return;
-    const timer = setInterval(() => { void controller.refreshSelected(); }, 15_000);
+    if (active && foreground && deviceId) controller.connectNow();
+  }, [active, foreground, deviceId, controller]);
+  useEffect(() => {
+    if (!active || !foreground || (state.mode !== 'direct' && state.mode !== 'relay')) return;
+    void controller.refreshSelected();
+    const timer = setInterval(() => { void controller.refreshSelected(); }, HISTORY_REFRESH_MS);
     return () => clearInterval(timer);
-  }, [enabled, foreground, controller, state.mode]);
+  }, [active, foreground, controller, state.mode]);
   return { controller, state, foreground, catalog };
 }

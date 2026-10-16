@@ -4,11 +4,11 @@ import type { AuthSession } from '../types';
 import { downloadManager, downloadOwner } from './manager';
 
 export function useDownloadConnection(options: {
-  session: AuthSession; deviceId: string; deviceName: string; controller: ChatController;
+  session: AuthSession; deviceId: string; deviceName: string; controller: ChatController; enabled?: boolean;
 }) {
-  const { session, deviceId, deviceName, controller } = options;
+  const { session, deviceId, deviceName, controller, enabled = true } = options;
   useEffect(() => {
-    if (!deviceId) return;
+    if (!deviceId || !enabled) return;
     void downloadManager.initialize();
     const update = () => {
       const state = controller.snapshot();
@@ -19,5 +19,5 @@ export function useDownloadConnection(options: {
     update();
     const unsubscribe = controller.subscribe(update);
     return () => { unsubscribe(); downloadManager.unbind(controller.files); };
-  }, [session.baseUrl, session.email, deviceId, deviceName, controller]);
+  }, [session.baseUrl, session.email, deviceId, deviceName, controller, enabled]);
 }

@@ -10,12 +10,12 @@ interface ImagePreview {
 const ImagePreviewContext = createContext<((image: ImagePreview) => void) | null>(null);
 
 /** Keep the modal outside virtualized messages so rotation cannot unmount the active image. */
-export function ChatImagePreviewProvider({ children }: { children: ReactNode }) {
+export function ChatImagePreviewProvider({ children, active = true }: { children: ReactNode; active?: boolean }) {
   const [image, setImage] = useState<ImagePreview | null>(null);
   const open = useCallback((preview: ImagePreview) => { Keyboard.dismiss(); setImage(preview); }, []);
   return <ImagePreviewContext.Provider value={open}>
     {children}
-    {image && <ImageViewer key={image.key} thumbnail={image.thumbnail} description={image.description}
+    {active && image && <ImageViewer key={image.key} thumbnail={image.thumbnail} description={image.description}
       load={image.load} save={image.save} close={() => setImage(null)} />}
   </ImagePreviewContext.Provider>;
 }

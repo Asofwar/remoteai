@@ -5,17 +5,24 @@ import { useChat } from './useChat';
 
 const runtime = vi.hoisted(() => ({
   controller: undefined as ChatController | undefined,
-  effects: [] as Array<() => void>,
+  effects: [] as Array<{ dependencies: unknown[]; cleanup?: () => void }>,
+  pending: [] as Array<() => void>,
+  cursor: 0,
   listeners: new Set<(state: string) => void>(),
   state: 'active',
 }));
 vi.mock('react', () => ({
   useMemo: <T>(create: () => T) => create(),
-  useState: <T>(value: T) => [value, () => undefined],
+  useState: () => [runtime.state === 'active', () => undefined],
   useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),
-  useEffect: (effect: () => void | (() => void)) => {
-    const cleanup = effect();
-    if (cleanup) runtime.effects.push(cleanup);
+  useEffect: (effect: () => void | (() => void), dependencies: unknown[]) => {
+    const index = runtime.cursor++;
+    const previous = runtime.effects[index];
+    if (previous && dependencies.every((value, offset) => Object.is(value, previous.dependencies[offset]))) return;
+    runtime.pending.push(() => {
+      previous?.cleanup?.();
+      runtime.effects[index] = { dependencies, cleanup: effect() || undefined };
+    });
   },
 }));
 vi.mock('react-native', () => ({
@@ -34,7 +41,8 @@ vi.mock('./useChatCatalog', () => ({ useChatCatalog: () => ({}) }));
 
 beforeEach(() => { vi.useFakeTimers(); runtime.state = 'active'; });
 afterEach(() => {
-  for (const cleanup of runtime.effects.splice(0)) cleanup();
+  for (const effect of runtime.effects.splice(0)) effect.cleanup?.();
+  runtime.pending = []; runtime.cursor = 0;
   runtime.controller = undefined;
   runtime.listeners.clear();
   vi.useRealTimers();
@@ -67,9 +75,16 @@ function mount(healthy = false) {
       request: <T>(method: string) => request(method) as Promise<T>,
     };
   });
-  useChat({ baseUrl: 'https://example.test', email: 'test@example.test',
-    accessToken: 'access', refreshToken: 'refresh' }, 'device', true);
-  return { controller: runtime.controller, events, attempts: () => attempts, stop, request, retryNow };
+  const session = { baseUrl: 'https://example.test', email: 'test@example.test',
+    accessToken: 'access', refreshToken: 'refresh' };
+  const render = (visible = true) => {
+    runtime.cursor = 0;
+    const result = useChat(session, 'device', visible);
+    runtime.pending.splice(0).forEach(effect => effect());
+    return result;
+  };
+  render();
+  return { controller: runtime.controller, events, attempts: () => attempts, stop, request, retryNow, render };
 }
 
 it('retries immediately on foreground return while the transport is waiting for automatic retry', () => {
@@ -105,6 +120,7 @@ it('leaves an in-progress reconnection running when the app becomes active', () 
 it('resumes a background socket retry even when the retained chat is already ready', async () => {
   const client = mount(true);
   await vi.advanceTimersByTimeAsync(0);
+  client.retryNow.mockClear();
   changeAppState('background');
   client.events.mode('connecting');
   changeAppState('active');
@@ -112,4 +128,34 @@ it('resumes a background socket retry even when the retained chat is already rea
   expect(client.controller.snapshot().ready).toBe(true);
   expect(client.stop).not.toHaveBeenCalled();
   expect(client.request.mock.calls.filter(([method]) => method === 'connect')).toHaveLength(1);
+});
+
+it('keeps the connection and chat state when another device is selected', async () => {
+  const client = mount(true);
+  await vi.advanceTimersByTimeAsync(0);
+  client.controller.chooseDraftProject({ cwd: '/project', label: 'Project' });
+  const refresh = vi.spyOn(client.controller, 'refreshSelected');
+  client.render(false);
+  await vi.advanceTimersByTimeAsync(30_000);
+  expect(refresh).not.toHaveBeenCalled();
+  expect(client.stop).not.toHaveBeenCalled();
+  expect(client.render().state.draftProject?.cwd).toBe('/project');
+  expect(refresh).toHaveBeenCalledOnce();
+  await vi.advanceTimersByTimeAsync(15_000);
+  expect(refresh).toHaveBeenCalledTimes(2);
+  expect(client.attempts()).toBe(1);
+  expect(client.request.mock.calls.filter(([method]) => method === 'connect')).toHaveLength(1);
+});
+
+it('resumes a retained device without polling its history while another device is visible', async () => {
+  const client = mount(true);
+  await vi.advanceTimersByTimeAsync(0);
+  client.render(false);
+  const refresh = vi.spyOn(client.controller, 'refreshSelected');
+  changeAppState('background');
+  changeAppState('active');
+  await vi.advanceTimersByTimeAsync(30_000);
+  expect(client.controller.snapshot().ready).toBe(true);
+  expect(client.stop).not.toHaveBeenCalled();
+  expect(refresh).not.toHaveBeenCalled();
 });

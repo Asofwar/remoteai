@@ -117,6 +117,14 @@ function descendants(value: unknown): React.ReactElement<Record<string, unknown>
   return [value, ...descendants(value.props.children)];
 }
 
+it('hides a retained device preview while another device is active', () => {
+  state.file = { path: '/project/file.ts' };
+  const hidden = ChatFileProvider({ ...providerProps, active: false });
+  expect(React.Children.toArray(hidden.props.children)).toEqual(['Conversation']);
+  const visible = ChatFileProvider({ ...providerProps, active: true });
+  expect(React.Children.toArray(visible.props.children)).toHaveLength(2);
+});
+
 it('loads and displays code in an external deployment directory using its exact path', () => {
   const path = 'F:/codex-deploy/admin-web/source/apps/desktop/src/remoteChat/legacyLinkFailures.test.ts';
   state.text = { path, text: 'const ready = true;\n' };

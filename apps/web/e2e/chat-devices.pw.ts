@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { RemoteDevice } from '../src/types';
-import { connect, fixtureUrl, login } from './chat-helpers';
+import { connect, fixtureUrl, login, navigate, openChatList, operationCount, screenshot, state } from './chat-helpers';
 
 const STORAGE_PREFIX = 'codex-switch.web.last-connected-device.v1';
 const COMPUTER = 'computer';
@@ -16,11 +16,14 @@ function computers(): RemoteDevice[] {
 }
 
 async function provideComputers(page: Page, devices: () => RemoteDevice[]) {
+  let publish = () => {};
   // The local chat fixture routes every device ID to the same emulated computer.
   await page.route('**/devices', (route) => route.fulfill({ json: { devices: devices() } }));
   await page.routeWebSocket('**/device-switch', (socket) => {
-    socket.onMessage(() => socket.send(JSON.stringify({ type: 'devices-snapshot', devices: devices() })));
+    publish = () => socket.send(JSON.stringify({ type: 'devices-snapshot', devices: devices() }));
+    socket.onMessage(() => publish());
   });
+  return () => publish();
 }
 
 async function rememberedComputer(page: Page) {
@@ -41,8 +44,83 @@ async function chooseLaptop(page: Page) {
   await page.getByRole('button', { name: '另一台电脑 在线', exact: true }).click();
 }
 
+async function chooseComputer(page: Page) {
+  await page.getByRole('button', { name: '选择电脑', exact: true }).click();
+  await page.getByRole('button', { name: '我的工作电脑 在线', exact: true }).click();
+}
+
 test.beforeEach(async ({ request }) => {
   await request.post(`${fixtureUrl}/test/reset`);
+});
+
+for (const transport of ['P2P', 'Relay']) {
+  test(`retains both device sessions, conversation and drafts over ${transport}`, async ({ page, request }, info) => {
+    if (transport === 'Relay') await page.addInitScript(() => {
+      window.RTCPeerConnection = class {
+        constructor() { throw new Error('Direct transport disabled for the relay regression'); }
+      } as unknown as typeof RTCPeerConnection;
+    });
+    await provideComputers(page, computers);
+    await login(page);
+    await connect(page);
+    await connectedTo(page, '我的工作电脑');
+    await openChatList(page);
+    await page.getByRole('button', { name: '移动端聊天体验', exact: true }).click();
+    await expect(page.getByText('帮我整理今天的工作计划。')).toBeVisible();
+    const input = page.getByRole('textbox', { name: '聊天消息' });
+    await input.fill('工作电脑的草稿');
+    await chooseLaptop(page);
+    await connectedTo(page, '另一台电脑');
+    await expect(input).toHaveValue('');
+    await input.fill('另一台电脑的草稿');
+    await expect.poll(async () => (await state(request)).connectedMobiles).toBe(2);
+    const connections = (await state(request)).mobileConnections;
+    const lists = await operationCount(request, 'list');
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await chooseComputer(page);
+      await connectedTo(page, '我的工作电脑');
+      await expect(input).toHaveValue('工作电脑的草稿');
+      await expect(page.getByRole('heading', { name: '移动端聊天体验', exact: true })).toBeVisible();
+      await expect(page.getByRole('status').filter({ hasText: transport })).toBeVisible();
+      await chooseLaptop(page);
+      await connectedTo(page, '另一台电脑');
+      await expect(input).toHaveValue('另一台电脑的草稿');
+    }
+    expect((await state(request)).mobileConnections).toBe(connections);
+    expect(await operationCount(request, 'list')).toBe(lists);
+    await expect.poll(() => rememberedComputer(page)).toBe(LAPTOP);
+    await request.post(`${fixtureUrl}/test/sidebar`, { data: { action: 'start' } });
+    await request.post(`${fixtureUrl}/test/sidebar`, { data: { action: 'complete' } });
+    await expect.poll(async () => (await state(request)).sidebar.readState['demo-chat']?.unread).toBe(true);
+    await chooseComputer(page);
+    await expect(input).toHaveValue('工作电脑的草稿');
+    await expect.poll(async () => (await state(request)).sidebar.readState['demo-chat']?.unread).toBe(false);
+    expect((await state(request)).mobileConnections).toBe(connections);
+    await screenshot(page, info, `retained-devices-${transport}`);
+  });
+}
+
+test('releases removed device sessions and closes every connection on logout', async ({ page, request }) => {
+  let devices = computers();
+  const publish = await provideComputers(page, () => devices);
+  await login(page);
+  await connect(page);
+  await connectedTo(page, '我的工作电脑');
+  await chooseLaptop(page);
+  await connectedTo(page, '另一台电脑');
+  await expect.poll(async () => (await state(request)).connectedMobiles).toBe(2);
+  devices = devices.filter(device => device.deviceId !== COMPUTER);
+  publish();
+  await expect.poll(async () => (await state(request)).connectedMobiles).toBe(1);
+  devices = computers();
+  publish();
+  await chooseComputer(page);
+  await connectedTo(page, '我的工作电脑');
+  await expect.poll(async () => (await state(request)).connectedMobiles).toBe(2);
+  await navigate(page, '设置');
+  await page.getByRole('button', { name: '退出登录', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '退出登录', exact: true }).click();
+  await expect.poll(async () => (await state(request)).connectedMobiles).toBe(0);
 });
 
 test('remembers the first successful connection and restores a manually chosen computer after reload',

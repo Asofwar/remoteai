@@ -59,6 +59,9 @@ it('keeps identity and retry actions outside ellipsized text and opens fingerpri
   expect(identityButton.props.style?.maxWidth).toBe('100%');
   identityButton.props.onPress!();
   const verification = descendants(render()).find(({ element }) => element.type === HostIdentityVerification)!;
+  props.active = false;
+  expect(descendants(render()).some(({ element }) => element.type === HostIdentityVerification)).toBe(false);
+  props.active = true;
   await verification.element.props.confirm!('confirmed-fingerprint');
   expect(confirm).toHaveBeenCalledWith('confirmed-fingerprint');
   expect(retry).toHaveBeenCalledOnce();

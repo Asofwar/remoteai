@@ -33,6 +33,7 @@ import { TaskReviewProvider } from '../../../../shared/remote-chat/TaskReviewCon
 import { ChatRetryProvider } from '../../../../shared/remote-chat/ChatRetryProvider';
 import { ChatTools } from './ChatTools';
 import { useChat } from './useChat';
+import { useRetainedChatDevices } from '../../../../shared/remote-chat/useRetainedChatDevices';
 import { useDownloadConnection } from '../downloads/useDownloadConnection';
 import { useChatDevice } from './useChatDevice';
 import { useOfflineDevices } from './offline/devices';
@@ -59,7 +60,10 @@ export function ChatPage(props: Props) {
   const devices = useOfflineDevices(session, props.devices, props.devicesLoaded);
   const { device, chooseDevice: selectDevice } = useChatDevice({ session, devices,
     devicesLoaded: props.devicesLoaded, requestedDeviceId: notification?.deviceId });
-  const backgroundError = useChatBackground(Boolean(device));
+  const scope = JSON.stringify([session.baseUrl, session.email]);
+  const retained = useRetainedChatDevices({ scope, devices, selectedId: device?.deviceId });
+  const chats = device ? retained : [...retained, undefined];
+  const backgroundError = useChatBackground(retained.length > 0);
   const chooseDevice = (id: string) => {
     if (notification) notificationHandled(notificationId(notification));
     selectDevice(id);
@@ -70,22 +74,28 @@ export function ChatPage(props: Props) {
     {!!backgroundError && <Text accessibilityRole="alert" style={styles.error}>{backgroundError}</Text>}
     {!!notificationError && <Pressable accessibilityRole="button" accessibilityLabel={t("打开通知设置")}
       onPress={() => { void Linking.openSettings(); }}><Text style={styles.error}>{notificationError}</Text></Pressable>}
-    <ConnectedChat key={`${session.baseUrl}:${session.email}:${device?.deviceId ?? ''}`} {...props} session={session}
-      device={device} devices={devices} active={active} chooseDevice={chooseDevice}
-      notification={notification} notificationError={notificationError} notificationHandled={notificationHandled} />
+    {chats.map(chatDevice => {
+      const selected = chatDevice?.deviceId === device?.deviceId;
+      return <View key={JSON.stringify([scope, chatDevice?.deviceId])}
+        style={[styles.fill, !selected && styles.hidden]}>
+        <ConnectedChat {...props} device={chatDevice} devices={devices} selected={selected}
+          active={active && selected} chooseDevice={chooseDevice} />
+      </View>;
+    })}
   </View>;
 }
 
-function ConnectedChat({ session, device, devices, active: pageActive, chooseDevice, notification, notificationHandled,
-  tokenSummary, openTokenSummary, closeTokenSummary }: Props & {
-  device?: RemoteDevice; chooseDevice: (id: string) => void;
+function ConnectedChat({ session, device, devices, selected, active: pageActive, chooseDevice, notification,
+  notificationHandled, tokenSummary, openTokenSummary, closeTokenSummary }: Props & {
+  device?: RemoteDevice; selected: boolean; chooseDevice: (id: string) => void;
 }) {
   const styles = useStyles();
   useLanguage();
   const active = pageActive && !tokenSummary;
   const insets = useSafeAreaInsets();
-  const { state, controller, foreground, catalog } = useChat(session, device?.deviceId ?? '', Boolean(device));
-  useDownloadConnection({ session, deviceId: device?.deviceId ?? '', deviceName: device?.name ?? '', controller });
+  const { state, controller, foreground, catalog } = useChat(session, device?.deviceId ?? '', active);
+  useDownloadConnection({ session, deviceId: device?.deviceId ?? '', deviceName: device?.name ?? '', controller,
+    enabled: selected });
   useChatCompletionNotifications(controller, session, device?.deviceId ?? '');
   useOpenChatNotification({ controller, target: notification?.deviceId === device?.deviceId ? notification : null,
     ready: state.ready, sending: state.sending, handled: notificationHandled });
@@ -137,7 +147,7 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
     enabled={active && !state.selectedArchived}>
   <ChatDrawer ref={drawerRef} enabled={active && !pickingDevice}
     onOpen={() => setDrawer(true)} onMoving={() => setDrawer(true)} onClose={closed}
-    navigation={<ChatThreads state={state} controller={controller} newChat={newChat}
+    navigation={<ChatThreads state={state} controller={controller} newChat={newChat} active={active}
       openSearch={() => setSearching(true)}
       profileMenu={<ChatProfileMenu client={controller.guiAccounts} deviceName={device?.name} email={session.email}
         guiTools={controller.guiTools}
@@ -179,9 +189,9 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
       <ImageAiContext.Provider value={{ enabled: active && ready && !state.selectedArchived
         && !state.sending && !state.settingsBusy && !state.workspaceBusy && !state.compacting,
         send: imageAiSender(controller, prepareImageEdit) }}>
-      <ChatImagePreviewProvider key={state.selected?.id ?? 'new'}>
+      <ChatImagePreviewProvider key={state.selected?.id ?? 'new'} active={active}>
       <ChatFileProvider key={state.selected?.id ?? 'new'} threadId={state.selected?.id ?? null}
-        ready={ready} load={controller.textPreview} videos={controller.videos} files={controller.files}>
+        active={active} ready={ready} load={controller.textPreview} videos={controller.videos} files={controller.files}>
       <TaskReviewProvider controller={controller} state={state} active={active && foreground}>
       <ChatRetryProvider controller={controller} state={state}>
       <ChatMessages key={state.selected?.id ?? 'new'} thread={state.selected} offline={!ready}
@@ -212,7 +222,8 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
       goals={controller.goals} goal={state.selected ? state.goals?.[state.selected.id] : null} goalBusy={state.goalBusy}
       threadId={state.selected?.id ?? null} models={state.models} selection={state.settings}
       contextSettings={controller.contextSettings}
-      readUsage={controller.readUsage} usageActive={foreground && ready} tokenUsage={state.selected?.tokenUsage}
+      readUsage={controller.readUsage} usageActive={active && foreground && ready}
+      tokenUsage={state.selected?.tokenUsage}
       readConversationMetrics={controller.readConversationMetrics}
       loadCatalog={controller.loadComposerCatalog} loadFiles={controller.loadProjectFiles}
       loadConversations={controller.searchThreads}
@@ -225,7 +236,7 @@ function ConnectedChat({ session, device, devices, active: pageActive, chooseDev
       upload={state.upload} reconnecting={state.mode === 'connecting' || state.mode === 'offline'}
       send={(input) => controller.send(input)} interrupted={state.selected?.turns?.at(-1)?.status === 'interrupted'}
       interrupt={() => controller.interrupt()} />
-    {pickingDevice && <ChatDevices devices={devices} onClose={() => setPickingDevice(false)}
+    {active && pickingDevice && <ChatDevices devices={devices} onClose={() => setPickingDevice(false)}
       choose={(id) => { chooseDevice(id); setPickingDevice(false); }} />}
     {searching && active && <ChatSearch state={state} controller={controller} onClose={() => setSearching(false)}
       select={(thread) => { setSearching(false); closeDrawer(() => { void controller.select(thread); }); }} />}

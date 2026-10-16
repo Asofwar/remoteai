@@ -39,8 +39,9 @@ export function ChatConnectionInfo({ state, controller, device, active, chooseDe
         {canReconnect && <ChatReconnectButton retryAt={state.retryAt} onClick={controller.connectNow} />}
       </div>
     </div>
-    {healthOpen && <ChatConnectionHealth state={state} device={device}
+    {active && healthOpen && <ChatConnectionHealth state={state} device={device}
       reconnect={controller.connectNow} close={() => setHealthOpen(false)} />}
-    {verifying && <HostIdentityVerification confirm={controller.confirmHostIdentity} close={() => setVerifying(false)} />}
+    {active && verifying && <HostIdentityVerification
+      confirm={controller.confirmHostIdentity} close={() => setVerifying(false)} />}
   </>;
 }

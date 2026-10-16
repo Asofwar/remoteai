@@ -6,11 +6,11 @@ import { downloadManager, downloadOwner } from './manager';
 import { getChatPolicy, subscribeChatPolicy } from '../../../../shared/remote-chat/policy';
 
 export function useDownloadConnection(options: {
-  session: AuthSession; deviceId: string; deviceName: string; controller: ChatController;
+  session: AuthSession; deviceId: string; deviceName: string; controller: ChatController; enabled?: boolean;
 }) {
-  const { session, deviceId, deviceName, controller } = options;
+  const { session, deviceId, deviceName, controller, enabled = true } = options;
   useEffect(() => {
-    if (Platform.OS !== 'android' || !deviceId) return;
+    if (Platform.OS !== 'android' || !deviceId || !enabled) return;
     const update = () => {
       const state = controller.snapshot();
       downloadManager.bind({ owner: downloadOwner(session), deviceId, deviceName,
@@ -22,5 +22,5 @@ export function useDownloadConnection(options: {
     const unsubscribe = controller.subscribe(update);
     const unsubscribePolicy = subscribeChatPolicy(update);
     return () => { unsubscribe(); unsubscribePolicy(); downloadManager.unbind(controller.files); };
-  }, [session, deviceId, deviceName, controller]);
+  }, [session, deviceId, deviceName, controller, enabled]);
 }

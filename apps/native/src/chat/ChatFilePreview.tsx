@@ -23,6 +23,7 @@ import { isDownloadOnlyFile } from '../../../../shared/remote-chat/filePreview';
 
 export const ChatFileContext = createContext<((file: FileReference) => void) | null>(null);
 interface Props {
+  active?: boolean;
   threadId: string | null;
   ready: boolean;
   load: (threadId: string, path: string, options?: PreviewLoadOptions) => Promise<TextPreview>;
@@ -91,12 +92,12 @@ function FilePreviewContent(props: PreviewProps) {
   return <FilePreview {...props} />;
 }
 
-export function ChatFileProvider({ children, ...options }: Props) {
+export function ChatFileProvider({ children, active = true, ...options }: Props) {
   useLanguage();
   const [file, setFile] = useState<FileReference | null>(null);
   const open = useCallback((value: FileReference) => { Keyboard.dismiss(); setFile(value); }, []);
   return <ChatFileContext.Provider value={open}>
     {children}
-    {file && <FilePreviewContent key={file.path} {...options} file={file} close={() => setFile(null)} />}
+    {active && file && <FilePreviewContent key={file.path} {...options} file={file} close={() => setFile(null)} />}
   </ChatFileContext.Provider>;
 }

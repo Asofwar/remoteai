@@ -14,9 +14,10 @@ import { palette, useStyles } from './styles';
 interface Props {
   state: ChatState; controller: ChatController; newChat: (project?: ChatProject) => void;
   openSearch: () => void; select: (thread: Thread) => void; profileMenu: ReactNode;
+  active?: boolean;
 }
 
-export function ChatThreads({ state, controller, newChat, openSearch, select, profileMenu }: Props) {
+export function ChatThreads({ state, controller, newChat, openSearch, select, profileMenu, active = true }: Props) {
   const styles = useStyles();
   const listStyles = useListStyles();
   const color = useThemeColor();
@@ -37,7 +38,7 @@ export function ChatThreads({ state, controller, newChat, openSearch, select, pr
     </View>
     <ChatThreadList state={state} controller={controller} newChat={newChat} select={select}
       openActions={actions.open} bottomInset={footerHeight} />
-    <ChatThreadActions actions={actions} />
+    {active && <ChatThreadActions actions={actions} />}
     <View style={listStyles.footer} pointerEvents="box-none"
       onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}>
       <Pressable accessibilityRole="button" accessibilityLabel={t("新聊天")} disabled={state.sending}

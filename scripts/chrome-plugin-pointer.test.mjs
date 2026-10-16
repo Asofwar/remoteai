@@ -34,7 +34,8 @@ test('black pointer moves smoothly, pulses on press and never participates in pa
   const { window, animations, update } = page();
   assert.equal(update({ animate: true }), 180);
   const state = window.__remoteAIControlPointer;
-  assert.equal(state.cursor.querySelector('path').getAttribute('fill'), '#111111');
+  assert.equal(state.cursor.querySelector('path').getAttribute('fill'), '#000000');
+  assert.equal(state.cursor.querySelector('path').getAttribute('stroke'), '#000000');
   assert.equal(state.host.getAttribute('aria-hidden'), 'true');
   assert.equal(state.host.inert, true);
   assert.equal(state.host.style.pointerEvents, 'none');

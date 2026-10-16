@@ -19,9 +19,10 @@ function createPointerLayer(ownerId) {
     + '.ring{position:absolute;left:2px;top:1px;width:26px;height:26px;border:1.5px solid #1116;'
     + 'background:#1111;border-radius:50%;box-sizing:border-box;opacity:0;'
     + 'transform:translate(-50%,-50%)}';
-  const cursor = svgNode('svg', { class: 'cursor', width: '24', height: '32', viewBox: '0 0 24 32' });
-  cursor.append(svgNode('path', { d: 'M2 1v23l6-6 5 11 5-3-5-10h10L2 1Z',
-    fill: '#111111', stroke: '#ffffff', 'stroke-width': '1.5', 'stroke-linejoin': 'round' }));
+  const cursor = svgNode('svg', { class: 'cursor', width: '28', height: '32', viewBox: '0 0 28 32' });
+  cursor.append(svgNode('path', {
+    d: 'M2 1Q1 1.7 1.1 3L3 29Q3.2 32 5.2 29.8L12.6 20.6L24.2 19.4Q27 19.1 24.8 17.4L4.3 1.3Q2.8 .2 2 1Z',
+    fill: '#000000', stroke: '#000000', 'stroke-width': '1.5', 'stroke-linejoin': 'round' }));
   const ring = document.createElement('div');
   ring.className = 'ring';
   shadow.append(style, ring, cursor);

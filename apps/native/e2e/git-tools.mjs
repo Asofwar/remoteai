@@ -57,8 +57,8 @@ try {
   assert.ok((await nodes()).some(node => node.text === '已提交 8f17d63a'));
   assert.ok(!(await nodes()).some(node => node['content-desc'] === '选择 src/app.ts'));
   await tap('提交记录');
-  await tap('加载更多提交');
   await waitText('首次提交');
+  assert.ok(!(await nodes()).some(node => node.text === '加载更多提交'));
   await screenshot('git-history');
   await tap('e950cd31 合并工具面板');
   await waitText('变更文件 4');

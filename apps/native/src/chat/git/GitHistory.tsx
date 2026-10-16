@@ -6,6 +6,7 @@ import { gitGraph, GRAPH_ROW_HEIGHT, type GraphLine, type GraphRow } from '../..
 import type { RemoteGit } from '../../../../../shared/remote-chat/useRemoteGit';
 import { GIT_HISTORY_CONTENT_WIDTH, GIT_HISTORY_DATE_FORMAT } from '../../../../../shared/remote-chat/gitHistoryLayout';
 import { useGitStyles as useStyles } from './styles';
+import { useGitHistoryScroll } from './useGitHistoryScroll';
 
 function Line({ line }: { line: GraphLine }) {
   useLanguage();
@@ -32,7 +33,10 @@ export function GitHistory({ panel, connected }: { panel: RemoteGit; connected: 
   useLanguage();
   const [width, setWidth] = useState(0);
   const graph = useMemo(() => gitGraph(panel.commits), [panel.commits]);
-  return <ScrollView style={styles.fill} onLayout={event => setWidth(event.nativeEvent.layout.width)}>
+  const { failed, loadingMore, retry, onLayout, ...scrollProps } = useGitHistoryScroll(panel, connected);
+  return <ScrollView style={styles.fill} {...scrollProps} onLayout={event => {
+    setWidth(event.nativeEvent.layout.width); onLayout(event);
+  }}>
     {!panel.busy && !panel.commits.length && <Text style={styles.notice}>{t("还没有提交记录。")}</Text>}
     <ScrollView horizontal>
       <View>{graph.rows.map(row => <Pressable key={row.commit.hash} accessibilityRole="button"
@@ -55,7 +59,10 @@ export function GitHistory({ panel, connected }: { panel: RemoteGit; connected: 
         </View>
       </Pressable>)}</View>
     </ScrollView>
-    {panel.hasMore && <Pressable accessibilityRole="button" style={styles.button} disabled={panel.busy || !connected}
-      onPress={() => void panel.more()}><Text style={styles.buttonText}>{t("加载更多提交")}</Text></Pressable>}
+    {panel.hasMore && <View style={styles.button}>
+      {loadingMore && <Text accessibilityLiveRegion="polite" style={styles.meta}>{t("正在加载…")}</Text>}
+      {failed && <Pressable accessibilityRole="button" disabled={panel.busy || !connected} onPress={retry}>
+        <Text style={styles.buttonText}>{t("重试")}</Text></Pressable>}
+    </View>}
   </ScrollView>;
 }

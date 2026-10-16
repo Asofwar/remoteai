@@ -56,9 +56,8 @@ test('tools open Git changes, commit only checked files and draw merge history',
   const submitted = (await state(request)).operations.filter(op => op.operation === 'guiGitCommit').at(-1);
   expect(submitted?.files).toEqual([{ path: 'src/app.ts', version: 'app-v1' }]);
   await drawer.getByRole('tab', { name: '提交记录', exact: true }).click();
-  await expect(drawer.locator('.git-history-row')).toHaveCount(3);
-  await drawer.getByRole('button', { name: '加载更多提交' }).click();
   await expect(drawer.locator('.git-history-row')).toHaveCount(6);
+  await expect(drawer.getByRole('button', { name: '加载更多提交' })).toHaveCount(0);
   await expect(drawer.locator('.git-history svg circle')).toHaveCount(6);
   await expect(drawer.locator('.git-history svg line')).not.toHaveCount(0);
   await expect(drawer).toContainText('feature/git');

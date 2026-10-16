@@ -3,6 +3,7 @@ import { gitGraph, GRAPH_ROW_HEIGHT } from '../../../../../shared/remote-chat/gi
 import { GIT_HISTORY_CONTENT_WIDTH, GIT_HISTORY_DATE_FORMAT } from '../../../../../shared/remote-chat/gitHistoryLayout';
 import type { RemoteGit } from '../../../../../shared/remote-chat/useRemoteGit';
 import { t, getLocale } from '../../i18n';
+import { useGitHistoryScroll } from './useGitHistoryScroll';
 import './gitHistory.css';
 
 const HISTORY_STYLE = { '--git-history-compact-width': `${GIT_HISTORY_CONTENT_WIDTH}px`,
@@ -10,7 +11,8 @@ const HISTORY_STYLE = { '--git-history-compact-width': `${GIT_HISTORY_CONTENT_WI
 
 export function GitHistory({ panel, connected }: { panel: RemoteGit; connected: boolean }) {
   const graph = useMemo(() => gitGraph(panel.commits), [panel.commits]);
-  return <div className="git-history" style={HISTORY_STYLE}>
+  const pagination = useGitHistoryScroll(panel, connected);
+  return <div className="git-history" style={HISTORY_STYLE} ref={pagination.list} onScroll={pagination.onScroll}>
     {!panel.busy && !panel.commits.length && <p className="git-notice">{t('还没有提交记录。')}</p>}
     {graph.rows.map(row => <button type="button" key={row.commit.hash} className="git-history-row"
       style={{ minWidth: `calc(${row.width}px + var(--git-history-content-width, 560px))` }}
@@ -32,7 +34,10 @@ export function GitHistory({ panel, connected }: { panel: RemoteGit; connected: 
           new Date(row.commit.date).toLocaleString(getLocale(), GIT_HISTORY_DATE_FORMAT)}</time>
       </span>
     </button>)}
-    {panel.hasMore && <button type="button" className="git-more" disabled={panel.busy || !connected}
-      onClick={() => void panel.more()}>{t('加载更多提交')}</button>}
+    <div ref={pagination.end} className="git-history-end">
+      {panel.hasMore && pagination.loadingMore && <span role="status">{t('正在加载…')}</span>}
+      {panel.hasMore && pagination.failed && <button type="button" className="git-more"
+        disabled={panel.busy || !connected} onClick={pagination.retry}>{t('重试')}</button>}
+    </div>
   </div>;
 }

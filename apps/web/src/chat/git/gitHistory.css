@@ -1,4 +1,5 @@
 .git-history { container: git-history / inline-size; }
+.git-history-end { min-height: 24px; text-align: center; color: var(--git-muted, #718078); font-size: 12px; }
 .chat-git .git-history-row {
   display: flex;
   align-items: center;

@@ -1,7 +1,6 @@
 import {
   BarChart3,
   Bot,
-  ClipboardList,
   Download,
   FolderOpen,
   FileSliders,
@@ -13,6 +12,7 @@ import {
   UserRound,
 } from "lucide-react";
 import type { Translate } from "../../i18n";
+import { LogDiagnosticsIcon } from "./LogDiagnosticsIcon";
 
 export type DashboardPage =
   | "accounts"
@@ -52,7 +52,7 @@ const NAVIGATION_ITEMS = [
 ] as const;
 
 const LOG_DIAGNOSTICS_ITEM = {
-  page: "logDiagnostics", icon: ClipboardList, labelKey: "logDiagnostics.title",
+  page: "logDiagnostics", icon: LogDiagnosticsIcon, labelKey: "logDiagnostics.title",
 } as const;
 const DOWNLOADS_ITEM = { page: "downloads", icon: Download, labelKey: "downloads.title" } as const;
 

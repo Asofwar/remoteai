@@ -17,7 +17,7 @@ export function ChatProcessing(props: ChatProcessingProps) {
 }
 
 const useProcessingStyles = createThemedStyles(() => ({
-  row: { flexShrink: 0 },
+  row: { flexShrink: 0, justifyContent: 'flex-start' },
   // Reserve the available width so Android's fallback font can wrap without clipping the final glyphs.
   label: { flex: 1, minWidth: 0, maxWidth: 400 },
 }));

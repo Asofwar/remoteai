@@ -2,6 +2,7 @@ import { init, parse } from 'es-module-lexer';
 import { encodeBase64, mappingUrl, type MappingHttpResponse } from '../../../../../shared/port-mapping/http';
 import type { WebMappingTunnel } from './httpTunnel';
 import { PreviewError } from './previewErrors';
+import { BROWSER_MODULE, previewModuleGlobals } from './previewModuleGlobals';
 
 const MAX_RESOURCES = 2048;
 const MAX_ACTIVE_REQUESTS = 8;
@@ -116,6 +117,8 @@ export class PreviewAssets {
   }
 
   private async rewriteModule(source: string, url: string) {
+    const globals = previewModuleGlobals(source);
+    if (globals) this.modules.set(BROWSER_MODULE.url, BROWSER_MODULE);
     const [imports] = parse(source);
     const edits: { start: number; end: number; text: string }[] = [];
     let prefix = '__remoteMapping';
@@ -145,7 +148,7 @@ export class PreviewAssets {
     if (needsMeta) code = `const ${metaName}={url:${JSON.stringify(url)}};\n` + code;
     if (needsImport) code = `const ${importName}=(value,options)=>`
       + `globalThis.__importPreviewModule(value,${JSON.stringify(url)},options);\n` + code;
-    return code;
+    return globals + code;
   }
 }
 

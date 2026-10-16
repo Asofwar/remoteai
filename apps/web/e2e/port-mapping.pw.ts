@@ -10,6 +10,31 @@ test.beforeEach(async ({ request }) => {
   expect(Number.isInteger(servicePort)).toBe(true);
 });
 
+for (const mode of ['browser', 'hash']) test(`supports React Router ${mode} redirects and navigation`, async ({ page }) => {
+  await page.goto('e2e/port-mapping-harness.html');
+  await page.getByRole('button', { name: '端口映射', exact: true }).click();
+  await page.getByRole('spinbutton', { name: '远程端口' }).fill(String(developmentPort));
+  await page.getByRole('button', { name: '添加并启动' }).click();
+  await page.getByRole('button', { name: '在 Remote AI 中预览' }).click();
+  const path = mode === 'browser' ? '/router.html' : '/router.html?hash';
+  await page.getByRole('textbox', { name: '网页路径' }).fill(path);
+  await page.getByRole('button', { name: '打开', exact: true }).click();
+  const preview = page.frameLocator('iframe[title="端口映射预览"]');
+  await expect(preview.getByRole('heading', { name: 'Router login' })).toBeVisible();
+  await preview.getByRole('link', { name: 'Next route' }).click();
+  await expect(preview.getByRole('heading', { name: 'Router home' })).toBeVisible();
+  await preview.getByRole('button', { name: 'Previous route' }).click();
+  await expect(preview.getByRole('heading', { name: 'Router login' })).toBeVisible();
+  const route = mode === 'browser' ? '/login' : '/router.html?hash#/login';
+  await expect(page.getByRole('textbox', { name: '网页路径' })).toHaveValue(route);
+  await page.getByRole('button', { name: '刷新', exact: true }).click();
+  await expect(preview.getByRole('heading', { name: 'Router login' })).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await preview.getByRole('button', { name: 'Check route isolation' }).click();
+  await expect(preview.locator('#isolation')).toHaveText('SecurityError');
+  expect(page.url()).toContain('/web/e2e/port-mapping-harness.html');
+});
+
 test('keeps preview browser storage isolated and available across refreshes', async ({ page }) => {
   await page.goto('e2e/port-mapping-harness.html');
   await page.evaluate(() => localStorage.setItem('mapping-secret', 'must-stay-in-host'));
@@ -25,7 +50,7 @@ test('keeps preview browser storage isolated and available across refreshes', as
   await expect(preview.locator('#state')).toHaveText('1 / available / isolated');
   expect(await page.evaluate(() => localStorage.getItem('mapping-secret'))).toBe('must-stay-in-host');
   expect(await page.evaluate(() => localStorage.getItem('preview-count'))).toBeNull();
-  await page.getByRole('button', { name: '关闭', exact: true }).click();
+  await page.getByRole('dialog', { name: '端口映射预览' }).getByRole('button', { name: '关闭', exact: true }).click();
   await page.getByRole('button', { name: '在 Remote AI 中预览' }).click();
   await page.getByRole('textbox', { name: '网页路径' }).fill('/browser-state');
   await page.getByRole('button', { name: '打开', exact: true }).click();
@@ -237,7 +262,7 @@ test('previews different IPs on the same port and restores their targets', async
     await expect(preview.locator('#socket')).toHaveText('Socket echo: hello');
     await preview.getByRole('button', { name: 'Fetch data' }).click();
     await expect(preview.locator('#result')).toHaveText('Mapped API response');
-    await page.getByRole('button', { name: '关闭', exact: true }).click();
+    await page.getByRole('dialog', { name: '端口映射预览' }).getByRole('button', { name: '关闭', exact: true }).click();
   }
   await page.reload(); await page.getByRole('button', { name: '端口映射', exact: true }).click();
   await expect(page.getByRole('switch', { name: '启动映射' })).toHaveCount(2);
@@ -274,7 +299,7 @@ test('maps a real HTTP service with assets, modules, API calls, WebSocket and is
   await expect(preview.getByRole('heading', { name: 'Port mapping works' })).toBeVisible();
   await preview.getByRole('button', { name: 'Submit form' }).click();
   await expect(preview.getByRole('heading', { name: 'Received message=mapping' })).toBeVisible();
-  await page.getByRole('button', { name: '关闭', exact: true }).click();
+  await page.getByRole('dialog', { name: '端口映射预览' }).getByRole('button', { name: '关闭', exact: true }).click();
   await page.getByRole('switch', { name: '停止映射' }).click();
   await expect(page.getByRole('button', { name: '在 Remote AI 中预览' })).toBeDisabled();
   await page.getByRole('switch', { name: '启动映射' }).click();

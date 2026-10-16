@@ -7,6 +7,8 @@ import runtime from './previewRuntime.js?raw';
 import xhr from './previewXhr.js?raw';
 import storageRuntime from './previewStorageRuntime.js?raw';
 import diagnostics from './previewDiagnostics.js?raw';
+import navigationRuntime from './previewNavigation.js?raw';
+import browserRuntime from './previewBrowser.js?raw';
 import type { PreviewStorage } from './previewStorage';
 import { isPreviewFailure, previewDiagnostic, previewFailure, type PreviewStatus } from './previewErrors';
 
@@ -16,7 +18,8 @@ export const PREVIEW_DOCUMENT = '<!doctype html><meta charset="utf-8">'
   + 'script-src \'unsafe-inline\' blob:; style-src \'unsafe-inline\' data: blob:; '
   + 'img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src \'none\'; '
   + 'form-action \'none\'; base-uri \'none\'">'
-  + `<script>${[xhr, storageRuntime, diagnostics, runtime].join('\n').replace(/<\/script/gi, '<\\/script')}</script>`;
+  + `<script>${[xhr, storageRuntime, navigationRuntime, browserRuntime, diagnostics, runtime]
+    .join('\n').replace(/<\/script/gi, '<\\/script')}</script>`;
 
 type PreviewMessage = { id?: number; type?: string; input?: MappingHttpRequest; url?: string;
   socketId?: string; protocols?: string[]; data?: string | Uint8Array; failure?: unknown;
@@ -24,7 +27,8 @@ type PreviewMessage = { id?: number; type?: string; input?: MappingHttpRequest; 
 
 export function attachPreview(options: {
   frame: HTMLIFrameElement; tunnel: WebMappingTunnel; input: MappingHttpRequest; storage: PreviewStorage;
-  navigate: (input: MappingHttpRequest) => void; status: (value: PreviewStatus) => void;
+  navigate: (input: MappingHttpRequest) => void; route: (input: MappingHttpRequest) => void;
+  status: (value: PreviewStatus) => void;
 }) {
   const { frame, tunnel, input, navigate, status } = options;
   const channel = new MessageChannel();
@@ -78,6 +82,10 @@ export function attachPreview(options: {
     }
     if (message.type === 'navigate') {
       try { navigate(validateRequest(message.input, input.url)); } catch { status('address-error'); }
+      return;
+    }
+    if (message.type === 'route') {
+      try { options.route(validateRequest(message.input, input.url)); } catch { status('address-error'); }
       return;
     }
     if (!Number.isSafeInteger(message.id) || active >= 128) return;

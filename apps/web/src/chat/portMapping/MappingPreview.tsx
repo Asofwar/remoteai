@@ -27,6 +27,10 @@ export function MappingPreview({ tunnel, origin, close }: {
     setStatus('loading'); setGeneration(value => value + 1);
   };
   const refresh = () => { cleanup.current?.(); setStatus('loading'); setGeneration(value => value + 1); };
+  const route = (next: MappingHttpRequest) => {
+    const url = mappingUrl(next.url, origin);
+    setInput(next); setPath(url.pathname + url.search + url.hash);
+  };
   useEffect(() => () => cleanup.current?.(), []);
   return <AdaptiveSheet open title={t('端口映射预览')} onClose={close} width={1100} presentation="drawer"
     afterOpenChange={setPresented}
@@ -55,7 +59,8 @@ export function MappingPreview({ tunnel, origin, close }: {
         if (!frame.current || frame.current.dataset.attached) return;
         frame.current.dataset.attached = 'true';
         cleanup.current?.();
-        cleanup.current = attachPreview({ frame: frame.current, tunnel, input, storage, navigate, status: setStatus });
+        cleanup.current = attachPreview({ frame: frame.current, tunnel, input, storage, navigate, route,
+          status: setStatus });
       }} />}
   </AdaptiveSheet>;
 }

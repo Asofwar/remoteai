@@ -157,6 +157,11 @@
   async function render() {
     const content = await request('document');
     base = content.url;
+    window.__installPreviewBrowser(base, {
+      route(url) { base = url; port.postMessage({ type: 'route', input: { url } }); },
+      navigate(url) { navigate({ url }); },
+    });
+    delete window.__installPreviewBrowser;
     window.__installPreviewStorage(content.storage, message => port.postMessage(message));
     delete window.__installPreviewStorage;
     document.documentElement.innerHTML = content.html;

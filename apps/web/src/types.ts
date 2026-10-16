@@ -36,7 +36,7 @@ export interface AccountSummary {
 
 export type RemoteControlCapability =
   | 'provider-switch' | 'provider-group-switch' | 'restart-codex' | 'gui-model-switch'
-  | 'aggregate-switch' | 'gui-aggregate-switch';
+  | 'aggregate-switch' | 'gui-aggregate-switch' | 'account-usage';
 
 export interface RemoteDevice {
   guiAccountId?: string | null;

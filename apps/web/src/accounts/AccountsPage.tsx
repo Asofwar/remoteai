@@ -10,6 +10,8 @@ import { useRemoteModelRestartPrompt } from '../devices/useRemoteModelRestartPro
 import { AccountCard } from './AccountCard';
 import { AccountOverview } from './AccountOverview';
 import { AccountDetails } from './AccountDetails';
+import { QuotaConsumptionSheet } from './QuotaConsumptionSheet';
+import { selectUsageDevice, usageDevice } from './remoteUsage';
 import { maskEmail } from './formatters';
 import './styles.css';
 
@@ -19,11 +21,14 @@ export function AccountsPage() {
   useLanguage();
   const dispatch = useAppDispatch();
   const { accounts, devices, loading, refreshing, switchingAccountId, lastRefreshAt } = useAppSelector(s => s.data);
+  const { consumingQuota, refreshingAccountId, selectedChatDeviceId } = useAppSelector(s => s.data);
+  const usageBusy = refreshing || consumingQuota || Boolean(refreshingAccountId);
   const promptRestart = useRemoteModelRestartPrompt();
   const [privateMode, setPrivateMode] = useState(true);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [switchId, setSwitchId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [consumeDeviceName, setConsumeDeviceName] = useState<string | null>(null);
   const detail = accounts.find(account => account.id === detailId);
   const target = accounts.find(account => account.id === switchId);
   const online = devices.filter(device => device.online);
@@ -31,6 +36,10 @@ export function AccountsPage() {
     try { await dispatch(refreshAll()).unwrap(); }
     catch { /* The global toast reports the failure. */ }
   }, [dispatch]);
+  const openConsumption = () => {
+    try { setConsumeDeviceName(usageDevice(devices, selectedChatDeviceId).name); }
+    catch (error) { Toast.show({ icon: 'fail', content: error instanceof Error ? error.message : t('请稍后重试') }); }
+  };
 
   const switchAccount = async (deviceId: string) => {
     if (!target || switchingAccountId) return;
@@ -46,7 +55,8 @@ export function AccountsPage() {
     <PullToRefresh onRefresh={refresh} renderText={status => REFRESH_TEXT[status]}>
       <div className="page-body accounts-page">
         <AccountOverview count={accounts.length} online={online.length} privateMode={privateMode}
-          refreshing={refreshing} updatedAt={lastRefreshAt} onPrivacy={() => setPrivateMode(value => !value)}
+          refreshing={refreshing} consuming={consumingQuota} busy={usageBusy} onConsume={openConsumption}
+          updatedAt={lastRefreshAt} onPrivacy={() => setPrivateMode(value => !value)}
           onRefresh={() => void refresh()} onAdd={() => setAdding(true)} />
         {loading ? <div className="page-loading"><SpinLoading /><span>{t("正在读取账户概览")}</span></div>
           : !accounts.length ? <Empty description={t("暂无账号，点击“添加账户”开始使用")} />
@@ -57,7 +67,11 @@ export function AccountsPage() {
       </div>
     </PullToRefresh>
     {detail && <AccountDetails key={detail.id} account={detail} devices={devices} privateMode={privateMode}
-      onClose={() => setDetailId(null)} onUpdated={refresh} />}
+      onClose={() => setDetailId(null)} onUpdated={refresh}
+      onSwitch={() => { setDetailId(null); setSwitchId(detail.id); }} />}
+    {consumeDeviceName && <QuotaConsumptionSheet accounts={accounts} privateMode={privateMode}
+      deviceName={selectUsageDevice(devices, selectedChatDeviceId)?.name ?? consumeDeviceName}
+      onClose={() => setConsumeDeviceName(null)} />}
     <AddAccountSheet open={adding} onClose={() => setAdding(false)} onAdded={refresh} />
     <AdaptiveSheet open={Boolean(target)} title={t("切换到设备")}
       subtitle={target ? (privateMode ? maskEmail(target.email) : target.email) : undefined}

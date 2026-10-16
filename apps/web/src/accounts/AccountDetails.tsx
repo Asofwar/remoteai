@@ -14,13 +14,15 @@ import { ResetCredits } from './ResetCredits';
 import { useResetCredits } from './useResetCredits';
 import { maskEmail } from './formatters';
 
-export function AccountDetails({ account, devices, privateMode, onClose, onUpdated }: {
+export function AccountDetails({ account, devices, privateMode, onClose, onUpdated, onSwitch }: {
   account: AccountSummary; devices: RemoteDevice[]; privateMode: boolean;
   onClose: () => void; onUpdated: () => Promise<void>;
+  onSwitch: () => void;
 }) {
   useLanguage();
   const dispatch = useAppDispatch();
-  const refreshing = useAppSelector(s => s.data.refreshingAccountId === account.id);
+  const refreshing = useAppSelector(s => s.data.refreshing || s.data.consumingQuota
+    || Boolean(s.data.refreshingAccountId));
   const [panel, setPanel] = useState<'overview' | 'edit' | 'note' | 'credits'>('overview');
   const [details, setDetails] = useState<AccountSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,6 +62,8 @@ export function AccountDetails({ account, devices, privateMode, onClose, onUpdat
           <button type="button" disabled={refreshing} onClick={() => void refresh()} aria-label={t("刷新账号状态")}>
             <RefreshCw size={24} className={refreshing ? 'spin' : ''} /><span>{t("刷新状态")}</span></button></div>
         <AccountUsage usage={account.usage} refreshing={refreshing} onRefresh={() => void refresh()} />
+        <Button className="account-detail-switch" color="primary" fill="outline" onClick={onSwitch}>
+          {t('切换到设备')}</Button>
         {loading ? <div className="sheet-loading"><SpinLoading /><span>{t("正在读取账号信息")}</span></div>
           : loadError ? <div className="detail-load-error" role="alert"><p>{t("账号信息暂时无法读取")}</p>
             <Button size="small" onClick={() => setRevision(value => value + 1)}>{t("重新读取")}</Button></div>

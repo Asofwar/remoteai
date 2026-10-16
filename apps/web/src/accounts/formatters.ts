@@ -39,6 +39,18 @@ export function remainingPercent(value?: number | null) {
 const CRITICAL_PERCENT = 15;
 const LOW_PERCENT = 40;
 
+const SAFE_USAGE_ERRORS = new Set([
+  '电脑未确认额度消耗完成，请先查看用量，避免重复消耗。',
+  '额度已消耗，但用量刷新失败，请稍后刷新用量。',
+  '电脑上没有这个账号，请先同步账号后重试。',
+  '连接已断开，请先刷新用量，避免重复消耗。',
+  '电脑暂未确认结果，请先刷新用量，避免重复消耗。',
+]);
+
+export function usageErrorLabel(error: string) {
+  return t(SAFE_USAGE_ERRORS.has(error) ? error : '用量更新失败，请稍后重试');
+}
+
 export function usageTone(remaining: number | null) {
   if (remaining === null) return 'unavailable';
   if (remaining <= CRITICAL_PERCENT) return 'danger';

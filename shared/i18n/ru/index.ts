@@ -1,4 +1,5 @@
 import { imageAiRussian } from '../imageAi';
+import { accountUsageRussian } from '../accountUsage';
 import { aggregateRoutingRussian } from '../aggregateRouting';
 import { messageEditingRussian } from '../messageEditing';
 import { fileReferencesRussian } from '../fileReferences';
@@ -21,6 +22,7 @@ import { cozeRussian } from '../coze';
 import { portForwardingRussian } from '../portForwarding';
 
 export const russian = {
+  ...accountUsageRussian,
   ...aggregateRoutingRussian,
   ...messageEditingRussian,
   '分辨率': 'Разрешение',

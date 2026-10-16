@@ -2,7 +2,7 @@ import { t, useLanguage } from '../i18n';
 import { Button } from 'antd-mobile';
 import { Clock3, RefreshCw } from 'lucide-react';
 import type { AccountSummary } from '../types';
-import { maskEmail, remainingPercent, resetLabel, usageTone } from './formatters';
+import { maskEmail, remainingPercent, resetLabel, usageErrorLabel, usageTone } from './formatters';
 
 export function AccountCard({ account, privateMode, switching, busy, onOpen, onSwitch }: {
   account: AccountSummary; privateMode: boolean; switching: boolean; busy: boolean;
@@ -24,7 +24,7 @@ export function AccountCard({ account, privateMode, switching, busy, onOpen, onS
       </span>
       <span className="account-row-reset"><Clock3 size={15} />
         {remaining === null ? t("用量暂不可用") : resetLabel(account.usage.primary?.resetsAt)}</span>
-      {account.usage.error && <span className="account-row-error">{t("用量更新失败，请稍后重试")}</span>}
+      {account.usage.error && <span className="account-row-error">{usageErrorLabel(account.usage.error)}</span>}
     </button>
     <Button className="account-switch" loading={switching} disabled={busy} onClick={onSwitch}
       aria-label={t("切换到账号 {value1}", { value1: email })}><RefreshCw size={19} /><span>{t("切换")}</span></Button>

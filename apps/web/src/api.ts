@@ -9,7 +9,6 @@ import type {
   RemoteModelSwitchResult,
   RemoteProviderSummary,
   ResetCreditsSummary,
-  UsageSummary,
   TotpVault,
   UserProfile,
 } from "./types";
@@ -161,20 +160,7 @@ export async function logout() {
   setActiveSession(null);
 }
 
-async function mapWithConcurrency<T, R>(values: T[], limit: number, mapper: (value: T) => Promise<R>) {
-  const results = new Array<R>(values.length);
-  let cursor = 0;
-  const workers = Array.from({ length: Math.min(limit, values.length) }, async () => {
-    while (cursor < values.length) {
-      const index = cursor++;
-      results[index] = await mapper(values[index] as T);
-    }
-  });
-  await Promise.all(workers);
-  return results;
-}
-
-export async function fetchDashboardData(refreshUsage = true) {
+export async function fetchDashboardData() {
   const [{ accounts }, devicesPayload, { providers }, profile] = await Promise.all([
     apiJson<{ accounts: AccountSummary[] }>("/sync/accounts/web-summary"),
     apiJson<{ devices: RemoteDevice[] }>("/devices"),
@@ -186,23 +172,7 @@ export async function fetchDashboardData(refreshUsage = true) {
     ...provider,
     group: typeof provider.group === "string" ? provider.group : "",
   }));
-  if (!refreshUsage) return { accounts, devices, providers: normalizedProviders, profile };
-  const refreshedAccounts = await mapWithConcurrency(accounts, 4, async (account) => {
-    try {
-      const usage = await apiJson<UsageSummary>(`/sync/accounts/${encodeURIComponent(account.id)}/usage`);
-      return { ...account, plan: usage.plan ?? account.plan, usage };
-    } catch (error) {
-      return {
-        ...account,
-        usage: {
-          ...account.usage,
-          fetchedAt: new Date().toISOString(),
-          error: error instanceof Error ? error.message : "用量刷新失败",
-        },
-      };
-    }
-  });
-  return { accounts: refreshedAccounts, devices, providers: normalizedProviders, profile };
+  return { accounts, devices, providers: normalizedProviders, profile };
 }
 
 export function deviceStatusWebSocketUrl(baseUrl: string) {
@@ -276,10 +246,6 @@ export async function putTotpVault(vault: TotpVault) {
     body: JSON.stringify(vault),
   });
 }
-export async function refreshAccountUsage(accountId: string) {
-  return apiJson<UsageSummary>(`/sync/accounts/${encodeURIComponent(accountId)}/usage`);
-}
-
 export async function fetchResetCredits(accountId: string) {
   return apiJson<ResetCreditsSummary>(`/sync/accounts/${encodeURIComponent(accountId)}/reset-credits`);
 }
@@ -336,6 +302,7 @@ function normalizeRemoteDevice(device: RemoteDevice): RemoteDevice {
         || capability === "gui-model-switch"
         || capability === "aggregate-switch"
         || capability === "gui-aggregate-switch"
+        || capability === "account-usage"
       ))
       : [],
   };

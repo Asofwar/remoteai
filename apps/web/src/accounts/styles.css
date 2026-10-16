@@ -9,21 +9,32 @@ body:has(.accounts-page)
   -webkit-user-select: text;
   user-select: text;
 }
-.accounts-page { background: var(--app-canvas, #f5fcfa); }
-.accounts-overview { padding: 24px; border-radius: 20px; background: linear-gradient(110deg, var(--app-accentSoft, #e1fcf3), var(--app-surface, #78efd2)); }
+.accounts-page { background: var(--app-canvas, #f5fcfa); font-family: var(--adm-font-family); }
+.accounts-overview { padding: 24px; border-radius: 20px; background: linear-gradient(110deg,
+  var(--app-accentSoft, #e1fcf3), var(--app-accountBanner, #82ecd5)); }
+:root[data-theme="dark"] .accounts-overview {
+  --app-accountBanner: color-mix(in srgb, var(--app-accent) 25%, var(--app-surface)); }
 .accounts-overview header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
 .accounts-overview h1 { color: var(--app-ink, #404963); font-size: 23px; font-weight: 750; }
 .accounts-overview .icon-button { border: 0; background: transparent; }
 .accounts-overview-stats { display: grid; grid-template-columns: 1fr 1fr auto; gap: 14px; align-items: stretch; }
-.accounts-overview-stats > div { display: flex; align-items: center; gap: 18px; padding: 20px 24px;
+.accounts-overview-stats > .accounts-stat { display: flex; align-items: center; gap: 18px; padding: 20px 24px;
   border-radius: 13px; background: color-mix(in srgb, var(--app-surface, #fff) 70%, transparent); color: var(--app-accent, #009f70); }
 .accounts-overview-stats > div:nth-child(2) { color: var(--app-muted, #7b819e); }
 .accounts-overview-stats b { display: block; color: var(--app-ink, #101125); font-size: 32px; line-height: 1.2; }
 .accounts-overview-stats small { display: block; margin-top: 5px; color: var(--app-muted, #7b819e); font-size: 13px; }
-.accounts-overview-stats > .adm-button { align-self: center; min-height: 46px; border-radius: 12px; }
+.accounts-overview-actions { display: grid; gap: 7px; min-width: 0; }
+.accounts-overview-actions .adm-button { min-height: 40px; padding: 8px; border: 0; border-radius: 12px;
+  font-size: 13px; font-weight: 650; }
+.accounts-page .accounts-overview-actions .adm-button-content {
+  display: flex; justify-content: center; gap: 5px; white-space: nowrap; }
+.accounts-overview-actions .accounts-consume {
+  background: color-mix(in srgb, var(--app-surface, #fff) 80%, transparent); color: var(--app-muted, #7b819e); }
+.accounts-consume svg { fill: #ffc400; color: #ffc400; }
 .accounts-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 18px 0; }
 .accounts-toolbar > span { display: flex; align-items: center; gap: 6px; color: var(--app-muted, #7b819e); font-size: 13px; }
-.accounts-toolbar .adm-button { flex-shrink: 0; font-weight: 650; }
+.accounts-toolbar .adm-button { flex-shrink: 0; font-weight: 650;
+  background: var(--app-surface, #fff); border-radius: 12px; }
 .accounts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .account-row { --quota-color: #2aceac; display: flex; align-items: center; gap: 16px; min-width: 0;
   padding: 20px; border: 1px solid var(--app-border, #e4eeeb); border-radius: 17px; background: var(--app-surface, white);
@@ -50,6 +61,7 @@ body:has(.accounts-page)
 .account-row-error { display: block; margin-top: 8px; color: var(--app-danger, #dc5c55); font-size: 12px; }
 .account-switch.adm-button { flex-shrink: 0; padding: 13px; border: 0; border-radius: 11px;
   color: var(--app-accent, #009f70); background: var(--app-accentSoft, #e3faf2); font-size: 15px; font-weight: 650; }
+.account-detail-switch { display: none; }
 .account-details { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; color: var(--app-ink, #111827); }
 .account-detail-identity { display: flex; align-items: center; gap: 13px; padding: 18px;
   border-radius: 16px; background: var(--app-canvas, #f0f8f8); }
@@ -106,20 +118,29 @@ button.account-info-row { cursor: pointer; }
   .accounts-overview { padding: 17px 12px 12px; border-radius: 15px; }
   .accounts-overview h1 { font-size: 19px; }
   .accounts-overview header { margin-bottom: 12px; padding: 0 4px; }
-  .accounts-overview-stats { gap: 7px; grid-template-columns: 1fr 1fr; }
-  .accounts-overview-stats > div { gap: 12px; padding: 14px; }
-  .accounts-overview-stats > .adm-button { grid-column: 1 / -1; margin-top: 3px; min-height: 42px; }
-  .accounts-overview-stats b { font-size: 29px; }
+  .accounts-overview .icon-button { width: 32px; height: 32px; }
+  .accounts-overview-stats { gap: 7px; grid-template-columns: 1fr 1fr 1.1fr; }
+  .accounts-overview-stats > .accounts-stat { gap: 8px; padding: 12px 10px; min-width: 0; }
+  .accounts-stat svg { flex-shrink: 0; width: 23px; }
+  .accounts-overview-stats b { font-size: 27px; }
+  .accounts-overview-stats small { font-size: 12px; white-space: nowrap; }
+  .accounts-overview-actions .adm-button { padding: 7px 3px; font-size: 11px; }
+  .accounts-page .accounts-overview-actions .adm-button-content { gap: 3px; }
+  .accounts-overview-actions .adm-button svg { flex-shrink: 0; width: 17px; }
+  .accounts-overview-actions .accounts-consume { font-size: 12px; }
+  .accounts-overview-actions .accounts-consume svg { width: 23px; }
   .accounts-toolbar { margin: 12px 0; }
   .accounts-toolbar > span { font-size: 11px; }
   .accounts-toolbar .adm-button { padding: 8px; font-size: 13px; }
-  .account-row { gap: 12px; padding: 16px 12px; }
-  .account-row-identity { gap: 8px; }
-  .account-row-identity strong { font-size: 15px; }
-  .account-row .plan-badge { font-size: 11px; padding: 4px 7px; }
-  .account-switch.adm-button { padding: 12px 10px; }
-  .account-switch .adm-button-content { flex-direction: column; }
-  .account-row-reset { font-size: 11px; }
+  .account-row { gap: 12px; padding: 12px; }
+  .account-row-identity { gap: 8px; line-height: 1.25; }
+  .account-row-identity strong { font-size: 17px; }
+  .account-row .plan-badge { font-size: 13px; padding: 5px 8px; }
+  .account-switch.adm-button { display: none; }
+  .account-detail-switch { display: block; }
+  .account-row-meter { margin-top: 10px; gap: 12px; line-height: 1.2; }
+  .account-row-meter b { font-size: 16px; }
+  .account-row-reset { margin-top: 8px; font-size: 12px; line-height: 1.4; }
   .account-detail-identity { gap: 10px; padding: 13px; }
   .account-avatar { width: 40px; height: 40px; font-size: 18px; }
   .account-detail-identity h2 { font-size: 16px; }
@@ -128,4 +149,14 @@ button.account-info-row { cursor: pointer; }
   .account-detail-section header h3 { font-size: 15px; }
   .account-detail-section header small { font-size: 10px; }
   .account-info-row > span:first-child { width: 65px; }
+}
+@media (max-width: 360px) {
+  .accounts-overview-stats > .accounts-stat { gap: 4px; padding: 10px 6px; }
+  .accounts-stat svg { width: 18px; }
+  .accounts-overview-stats small { font-size: 10px; }
+  .accounts-overview-actions .adm-button { font-size: 10px; }
+  .accounts-page .accounts-overview-actions .adm-button-content { gap: 2px; }
+  .accounts-overview-actions .adm-button svg { width: 14px; }
+  .accounts-toolbar > span { font-size: 10px; gap: 3px; }
+  .accounts-toolbar .adm-button { font-size: 12px; }
 }

@@ -1,5 +1,7 @@
 import { t, useLanguage } from '../i18n';
 import { useEffect, useState } from 'react';
+import { useAppDispatch } from '../hooks';
+import { chatDeviceSelected } from '../store';
 import type { AuthSession, RemoteDevice } from '../types';
 import { ConnectedChat } from './ConnectedChat';
 import { ChatTools } from './ChatTools';
@@ -13,6 +15,7 @@ interface Props { session: AuthSession; devices: RemoteDevice[]; active: boolean
 
 export function ChatPage({ session, devices, active }: Props) {
   useLanguage();
+  const dispatch = useAppDispatch();
   const [lastConnectedDeviceId] = useState(() => loadLastConnectedDevice(session));
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const device = devices.find((entry) => entry.deviceId === deviceId)
@@ -21,6 +24,9 @@ export function ChatPage({ session, devices, active }: Props) {
   useEffect(() => {
     if (device && deviceId !== device.deviceId) setDeviceId(device.deviceId);
   }, [deviceId, device?.deviceId]);
+  useEffect(() => {
+    dispatch(chatDeviceSelected(device?.deviceId ?? null));
+  }, [dispatch, device?.deviceId]);
   useChatViewport(active);
   const scope = JSON.stringify([session.baseUrl, session.email]);
   const retained = useRetainedChatDevices({ scope, devices, selectedId: device?.deviceId });

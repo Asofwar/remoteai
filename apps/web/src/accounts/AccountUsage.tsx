@@ -2,7 +2,7 @@ import { t, useLanguage } from '../i18n';
 import { Tooltip } from 'antd';
 import { ChartNoAxesColumn, CircleHelp, Clock3, RefreshCw } from 'lucide-react';
 import type { UsageSummary, UsageWindow } from '../types';
-import { displayDate, remainingPercent, resetLabel, usageTone } from './formatters';
+import { displayDate, remainingPercent, resetLabel, usageErrorLabel, usageTone } from './formatters';
 
 function UsageMeter({ title, usage, secondary }: { title: string; usage?: UsageWindow | null; secondary?: boolean }) {
   useLanguage();
@@ -30,6 +30,6 @@ export function AccountUsage({ usage, refreshing, onRefresh }: {
         aria-label={t("刷新账号用量")}><RefreshCw size={18} className={refreshing ? 'spin' : ''} /></button></header>
     <UsageMeter title={t("主用量窗口")} usage={usage.primary} />
     <UsageMeter title={t("次用量窗口")} usage={usage.secondary} secondary />
-    {usage.error && <p className="account-row-error">{t("用量更新失败，请稍后重试")}</p>}
+    {usage.error && <p className="account-row-error">{usageErrorLabel(usage.error)}</p>}
   </section>;
 }

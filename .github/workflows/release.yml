@@ -11,8 +11,8 @@ on:
         description: "Rebuild Linux packages for an existing draft release"
         type: boolean
         default: false
-      desktop_only:
-        description: "Rebuild desktop packages only; keep the existing release draft"
+      unix_only:
+        description: "Rebuild macOS and Linux packages only; keep the existing release draft"
         type: boolean
         default: false
   push:
@@ -114,6 +114,12 @@ jobs:
         # The Windows video helper requires Visual Studio 2022.
         include: >-
           ${{ fromJSON(inputs.linux_only && '[
+            {"name":"ubuntu-x86_64","platform":"ubuntu-22.04","releasePlatform":"linux","args":"","rustTargets":""}
+          ]' || inputs.unix_only && '[
+            {"name":"macos-aarch64","platform":"macos-latest","releasePlatform":"macos",
+             "args":"--target aarch64-apple-darwin","rustTargets":"aarch64-apple-darwin,x86_64-apple-darwin"},
+            {"name":"macos-x86_64","platform":"macos-latest","releasePlatform":"macos",
+             "args":"--target x86_64-apple-darwin","rustTargets":"aarch64-apple-darwin,x86_64-apple-darwin"},
             {"name":"ubuntu-x86_64","platform":"ubuntu-22.04","releasePlatform":"linux","args":"","rustTargets":""}
           ]' || '[
             {"name":"macos-aarch64","platform":"macos-latest","releasePlatform":"macos",
@@ -360,7 +366,7 @@ jobs:
           done
 
   native-android:
-    if: ${{ !inputs.linux_only && !inputs.desktop_only }}
+    if: ${{ !inputs.linux_only && !inputs.unix_only }}
     name: Build Android APK
     needs: create-release
     runs-on: ubuntu-latest
@@ -507,7 +513,7 @@ jobs:
           fail_on_unmatched_files: true
 
   native-ios:
-    if: ${{ !inputs.linux_only && !inputs.desktop_only }}
+    if: ${{ !inputs.linux_only && !inputs.unix_only }}
     name: Build iOS app
     needs: create-release
     # React Native 0.79's fmt pod is not compatible with Xcode 26 yet.
@@ -602,14 +608,14 @@ jobs:
           fail_on_unmatched_files: true
 
   dream-skin-resources:
-    if: ${{ !inputs.linux_only && !inputs.desktop_only }}
+    if: ${{ !inputs.linux_only && !inputs.unix_only }}
     name: Publish Dream Skin resources
     uses: ./.github/workflows/dream-skin-resources.yml
     with:
       ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
   coze-runtime:
-    if: ${{ !inputs.linux_only && !inputs.desktop_only }}
+    if: ${{ !inputs.linux_only && !inputs.unix_only }}
     name: Publish independent Coze runtime
     uses: ./.github/workflows/coze-runtime.yml
     with:
@@ -617,7 +623,7 @@ jobs:
     secrets: inherit
 
   publish-release:
-    if: ${{ !inputs.linux_only && !inputs.desktop_only }}
+    if: ${{ !inputs.linux_only && !inputs.unix_only }}
     name: Publish GitHub Release
     needs:
       - create-release

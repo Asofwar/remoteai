@@ -232,12 +232,23 @@ jobs:
           path: ${{ runner.temp }}/linux-peer-network.log
           if-no-files-found: ignore
 
+      # The large CodeMirror/jsdom fixtures exceed Vitest's default five seconds on shared runners.
+      # Keep every admin check, with a bounded integration-test budget and no concurrent workspace builds.
+      - name: Check admin UI
+        shell: bash
+        working-directory: apps/admin-ui
+        run: |
+          set -euo pipefail
+          npx tsc --noEmit -p tsconfig.json
+          npm run test -- --testTimeout 30000
+          npm run build
+
       - name: Run checks in isolated test processes
         if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
-          npx lerna run check --ignore @codex-switch/backend --stream
+          npx lerna run check --ignore @codex-switch/backend --ignore @codex-switch/admin-ui --stream
           npm run check:backend
           cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
           cargo nextest run --locked --manifest-path apps/desktop/src-tauri/Cargo.toml \
@@ -251,7 +262,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          npx lerna run check --ignore @codex-switch/backend --stream
+          npx lerna run check --ignore @codex-switch/backend --ignore @codex-switch/admin-ui --stream
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm run check:backend
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

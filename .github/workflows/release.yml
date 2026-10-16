@@ -11,6 +11,10 @@ on:
         description: "Rebuild Linux packages for an existing draft release"
         type: boolean
         default: false
+      desktop_only:
+        description: "Rebuild desktop packages only; keep the existing release draft"
+        type: boolean
+        default: false
   push:
     tags:
       - "v*"
@@ -248,6 +252,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # The UDP round-trip fixture exercises the full IPv4 datagram size.
+          # Darwin defaults to 9216 bytes, rejecting that fixture before it reaches the app.
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            sudo sysctl -w net.inet.udp.maxdgram=65535
+          fi
           npx lerna run check --ignore @codex-switch/backend --ignore @codex-switch/admin-ui --stream
           npm run check:backend
           cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
@@ -351,7 +360,7 @@ jobs:
           done
 
   native-android:
-    if: ${{ !inputs.linux_only }}
+    if: ${{ !inputs.linux_only && !inputs.desktop_only }}
     name: Build Android APK
     needs: create-release
     runs-on: ubuntu-latest
@@ -498,7 +507,7 @@ jobs:
           fail_on_unmatched_files: true
 
   native-ios:
-    if: ${{ !inputs.linux_only }}
+    if: ${{ !inputs.linux_only && !inputs.desktop_only }}
     name: Build iOS app
     needs: create-release
     # React Native 0.79's fmt pod is not compatible with Xcode 26 yet.
@@ -593,14 +602,14 @@ jobs:
           fail_on_unmatched_files: true
 
   dream-skin-resources:
-    if: ${{ !inputs.linux_only }}
+    if: ${{ !inputs.linux_only && !inputs.desktop_only }}
     name: Publish Dream Skin resources
     uses: ./.github/workflows/dream-skin-resources.yml
     with:
       ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
   coze-runtime:
-    if: ${{ !inputs.linux_only }}
+    if: ${{ !inputs.linux_only && !inputs.desktop_only }}
     name: Publish independent Coze runtime
     uses: ./.github/workflows/coze-runtime.yml
     with:
@@ -608,7 +617,7 @@ jobs:
     secrets: inherit
 
   publish-release:
-    if: ${{ !inputs.linux_only }}
+    if: ${{ !inputs.linux_only && !inputs.desktop_only }}
     name: Publish GitHub Release
     needs:
       - create-release

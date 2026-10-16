@@ -4,6 +4,8 @@ import { invoke, isDesktopApp } from "../../api/backend";
 import type { AttachmentReference } from "./attachmentTypes";
 import { readClipboardImages } from "./clipboardImages";
 import { MISSING_CLIPBOARD_IMAGES, readPastedContent } from "../../../../../shared/chat/clipboard";
+import { pastedTextFile } from "../../../../../shared/chat/pastedText";
+import { usePastedTextAttachment } from "./usePastedTextAttachment";
 
 interface PasteOptions {
   key: string;
@@ -17,6 +19,7 @@ interface PendingPaste { fallback?: () => void | Promise<void> }
 export function useFilePaste({ key, addAttachments, addImages, report }: PasteOptions) {
   const pending = useRef(new Map<string, PendingPaste>());
   const [reading, setReading] = useState<Record<string, boolean>>({});
+  const textAttachment = usePastedTextAttachment({ key, addAttachments, report });
   const readNative = () => {
     const existing = pending.current.get(key);
     if (existing) return existing;
@@ -42,6 +45,11 @@ export function useFilePaste({ key, addAttachments, addImages, report }: PasteOp
   };
   const paste = (event: ClipboardEvent<HTMLElement>) => {
     const { files, text, hasImages, missingImages } = readPastedContent(event.clipboardData);
+    const textFile = pastedTextFile(text);
+    if (textFile) {
+      event.preventDefault();
+      void textAttachment.add(textFile);
+    }
     if (!files.length && text && !hasImages) {
       const request = pending.current.get(key);
       // Plain text needs no native fallback, even if the clipboard is temporarily busy.
@@ -72,5 +80,5 @@ export function useFilePaste({ key, addAttachments, addImages, report }: PasteOp
       fallback();
     }
   };
-  return { paste, pasteKeyDown, readingFiles: Boolean(reading[key]) };
+  return { paste, pasteKeyDown, readingFiles: Boolean(reading[key]) || textAttachment.reading };
 }

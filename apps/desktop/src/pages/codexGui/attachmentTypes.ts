@@ -7,6 +7,11 @@ export interface AttachmentReference {
 }
 export const MAX_ATTACHMENTS = 32;
 
+/** Uploaded files have no host path until sent; their generated names identify draft chips. */
+export function attachmentKey(item: AttachmentReference): string {
+  return item.data === undefined ? item.path : `upload:${item.name}`;
+}
+
 export interface ComposerPlugin {
   id: string;
   name: string;

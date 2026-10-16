@@ -104,3 +104,43 @@ it('preserves text and reports browser-inaccessible QQ images', async () => {
   expect(insertText).toHaveBeenCalledExactlyOnceWith('图片说明', undefined);
   expect(paste.error).toBe('部分图片未能粘贴，请单独复制图片，或保存后添加。');
 });
+
+it('turns large browser text into a file before inserting it into the textarea', async () => {
+  await render({ browserOnly: true });
+  await act(async () => {
+    expect(event([], '正文'.repeat(10_000)).preventDefault).toHaveBeenCalledOnce();
+  });
+  expect(insertText).not.toHaveBeenCalled();
+  expect(addFiles).toHaveBeenCalledOnce();
+  const [file] = addFiles.mock.calls[0][0];
+  expect(file.name).toMatch(/\.txt$/); expect(file.size).toBe(60_000);
+});
+
+it('retains the long text attachment alongside native images from the same paste', async () => {
+  const file = image(); native.mockResolvedValue([file]);
+  await act(async () => { shortcut(); event([], '正文'.repeat(10_000), false, '<img src="cid:0">'); });
+  expect(insertText).not.toHaveBeenCalled();
+  expect(addFiles).toHaveBeenCalledOnce();
+  expect(addFiles.mock.calls[0][0][0]).toBe(file);
+  expect(addFiles.mock.calls[0][0][1].name).toMatch(/\.txt$/);
+});
+
+it('preserves consecutive long pastes while the native clipboard is still being read', async () => {
+  let resolve!: (files: File[]) => void;
+  native.mockReturnValue(new Promise(done => { resolve = done; }));
+  await act(async () => { shortcut(); event([], 'a'.repeat(20_000)); event([], 'b'.repeat(20_000)); });
+  await act(async () => event([], 'ordinary text'));
+  await act(async () => resolve([]));
+  expect(addFiles).toHaveBeenCalledOnce();
+  const files = addFiles.mock.calls[0][0];
+  expect(files).toHaveLength(2); expect(files[0].name).not.toBe(files[1].name);
+});
+
+it('ignores a late long-text paste when leaving its conversation', async () => {
+  let resolve!: (files: File[]) => void;
+  native.mockReturnValue(new Promise(done => { resolve = done; }));
+  await act(async () => { shortcut(); event([], 'a'.repeat(20_000)); });
+  await render({ scope: 'other' });
+  await act(async () => resolve([]));
+  expect(addFiles).not.toHaveBeenCalled();
+});

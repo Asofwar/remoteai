@@ -36,9 +36,12 @@ export function readPastedContent(data: DataTransfer): PastedContent {
   const files = Array.from(data.files ?? []);
   if (!files.length) files.push(...Array.from(data.items ?? []).filter(item => item.kind === 'file')
     .map(item => item.getAsFile()).filter((file): file is File => file !== null));
-  const html = data.getData?.('text/html') ?? '';
-  const rich = html && html.length <= MAX_HTML_LENGTH ? htmlContent(html) : { sources: [], text: '' };
   const plain = (data.getData?.('text/plain') ?? '').replace(/\r\n?/g, '\n');
+  const html = data.getData?.('text/html') ?? '';
+  // Large code/document copies often include thousands of styled nodes but no images.
+  const needsHtml = !plain || /<img[\s/>]/i.test(html);
+  const rich = needsHtml && html && html.length <= MAX_HTML_LENGTH
+    ? htmlContent(html) : { sources: [], text: '' };
   const hasImages = rich.sources.length > 0;
   const browserImages = files.filter(file => file.type.startsWith('image/')).length;
   // Chromium may already expose HTML image references as Files. Do not add the same image twice.
@@ -47,7 +50,7 @@ export function readPastedContent(data: DataTransfer): PastedContent {
   }
   const imageCount = files.filter(file => file.type.startsWith('image/')).length;
   const imagesOnly = files.length > 0 && imageCount === files.length;
-  const fileNames = plain.trim().split(/\r?\n/).every(line => files.some(file =>
+  const fileNames = imagesOnly && plain.trim().split(/\r?\n/).every(line => files.some(file =>
     line === file.name || line.replace(/\\/g, '/').split('/').at(-1) === file.name));
   const text = hasImages || !files.length || (imagesOnly && !fileNames) ? plain || rich.text : '';
   return { files, text, hasImages, missingImages: rich.sources.length > imageCount };

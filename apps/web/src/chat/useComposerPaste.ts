@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react';
 import { t } from '../i18n';
 import { MISSING_CLIPBOARD_IMAGES, readPastedContent } from '../../../../shared/chat/clipboard';
+import { pastedTextFile } from '../../../../shared/chat/pastedText';
 
 interface Options {
   scope: string | null;
@@ -10,7 +11,7 @@ interface Options {
   addFiles: (files: File[]) => Promise<void>;
   insertText?: (text: string, input: HTMLTextAreaElement) => void;
 }
-interface PendingPaste { files: File[]; textOnly: boolean; missingImages: boolean }
+interface PendingPaste { files: File[]; textOnly: boolean; missingImages: boolean; collecting: boolean }
 
 /** Coalesce native shortcuts and DOM paste events; never send local paths to another computer. */
 export function useComposerPaste(options: Options) {
@@ -28,10 +29,12 @@ export function useComposerPaste(options: Options) {
 
   const read = (files: File[] = [], missingImages = false) => {
     if (pending.current) {
-      pending.current.files = files; pending.current.missingImages = missingImages; return;
+      if (!pending.current.collecting) { setError(t('文件粘贴失败，请重新复制后再试。')); return; }
+      pending.current.files.push(...files); pending.current.missingImages ||= missingImages;
+      pending.current.textOnly = false; return;
     }
     if (!options.active || options.busy) return;
-    const request: PendingPaste = { files, textOnly: false, missingImages };
+    const request: PendingPaste = { files, textOnly: false, missingImages, collecting: true };
     const current = generation.current;
     const valid = () => current === generation.current && latest.current.active
       && latest.current.scope === options.scope;
@@ -45,25 +48,34 @@ export function useComposerPaste(options: Options) {
         }
       }
       if (!valid() || request.textOnly) return;
-      const selected = native.length ? native : request.files;
+      request.collecting = false;
+      const documents = request.files.filter(file => !file.type.startsWith('image/'));
+      const selected = native.length ? [...native, ...documents] : request.files;
       if (selected.length) await latest.current.addFiles(selected);
       if (valid() && !native.length && request.missingImages) setError(t(MISSING_CLIPBOARD_IMAGES));
     })().catch(() => {
-      if (valid()) setError(t('图片粘贴失败，请重新复制后再试。'));
+      if (valid()) setError(t('文件粘贴失败，请重新复制后再试。'));
     }).finally(() => {
       if (pending.current === request) { pending.current = null; setReading(false); }
     });
   };
   const paste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
     const { files, text, hasImages, missingImages } = readPastedContent(event.clipboardData);
+    const textFile = pastedTextFile(text);
+    if (textFile) files.push(textFile);
     if (!files.length && text && !hasImages) {
-      if (pending.current) pending.current.textOnly = true;
+      if (pending.current && !pending.current.files.length && !pending.current.missingImages) {
+        pending.current.textOnly = true;
+      }
       return;
     }
     if (!files.length && !hasImages && !options.readClipboardImages) return;
     event.preventDefault();
-    if (!options.active || options.busy) return;
-    if (text) options.insertText?.(text, event.currentTarget);
+    if (!options.active || options.busy) {
+      if (textFile) setError(t('文件粘贴失败，请重新复制后再试。'));
+      return;
+    }
+    if (text && !textFile) options.insertText?.(text, event.currentTarget);
     read(files, missingImages);
   };
   const pasteKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useFilePaste } from "./useFilePaste";
 import type { GuiController } from "./controller";
 import type { ComposerText } from "./types";
-import { MAX_ATTACHMENTS, type AttachmentReference } from "./attachmentTypes";
+import { attachmentKey, MAX_ATTACHMENTS, type AttachmentReference } from "./attachmentTypes";
+import { validateUploadedFiles } from "../../../../../shared/remote-chat/composerAttachments";
 import { MAX_REPLY_QUOTES, MAX_QUOTE_CHARACTERS, quoteKey, quotedReply, type ReplyQuote } from "./replyQuotes";
 import { queuedMessageText } from "./queuedMessageDraft";
 import { MAX_CONVERSATION_REFERENCES } from "./conversationReferences";
@@ -37,8 +38,13 @@ export function useComposerDraft(key: string, controller: GuiController) {
     });
   }, [controller, key, recovered]);
   const draft = drafts[key] ?? EMPTY_DRAFT;
-  const update = (change: (value: Draft) => Draft) => setDrafts((values) =>
-    ({ ...values, [key]: change(values[key] ?? EMPTY_DRAFT) }));
+  const latestDrafts = useRef(drafts);
+  latestDrafts.current = drafts;
+  const update = (change: (value: Draft) => Draft) => {
+    const values = latestDrafts.current;
+    latestDrafts.current = { ...values, [key]: change(values[key] ?? EMPTY_DRAFT) };
+    setDrafts(latestDrafts.current);
+  };
   const editText = (text: string) => update((value) => ({ ...value, text, mentions: [] }));
   const editContent = (content: ComposerText) => update((value) => ({ ...value, ...content }));
   const editQueued = (id: string) => {
@@ -67,19 +73,23 @@ export function useComposerDraft(key: string, controller: GuiController) {
     ({ ...value, quotes: value.quotes?.filter((item) => quoteKey(item) !== key) }));
   const clearQuotes = () => update((value) => ({ ...value, quotes: [] }));
   const addAttachments = (attachments: AttachmentReference[]) => {
-    const combined = [...new Map([...(draft.attachments ?? []), ...attachments]
-      .map((item) => [item.path, item])).values()];
+    const current = latestDrafts.current[key] ?? EMPTY_DRAFT;
+    const combined = [...new Map([...(current.attachments ?? []), ...attachments]
+      .map((item) => [attachmentKey(item), item])).values()];
     if (combined.filter((item) => item.kind === "conversation").length > MAX_CONVERSATION_REFERENCES) {
       controller.report("每条消息最多引用 8 个对话。"); return;
     }
-    if ((draft.attachments?.length ?? 0) + attachments.length > MAX_ATTACHMENTS) {
-      controller.report("每条消息最多添加 32 个附件或对话引用。");
+    if (combined.length > MAX_ATTACHMENTS) {
+      controller.report("每条消息最多添加 32 个附件或对话引用。"); return;
     }
-    update((value) => ({ ...value, attachments: [...new Map([...(value.attachments ?? []), ...attachments]
-      .map((item) => [item.path, item])).values()].slice(0, MAX_ATTACHMENTS) }));
+    try { validateUploadedFiles(combined, 'relay'); }
+    catch (cause) {
+      controller.report(cause instanceof Error ? cause.message : "文件粘贴失败，请重新复制后再试。"); return;
+    }
+    update((value) => ({ ...value, attachments: combined }));
   };
   const removeAttachment = (path: string) => update((value) =>
-    ({ ...value, attachments: value.attachments?.filter((item) => item.path !== path) }));
+    ({ ...value, attachments: value.attachments?.filter((item) => attachmentKey(item) !== path) }));
   const removeImage = (id: string) => update((value) =>
     ({ ...value, images: value.images.filter((image) => image.id !== id) }));
   const editImage = (id: string, url: string) => update((value) =>

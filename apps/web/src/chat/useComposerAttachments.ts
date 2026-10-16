@@ -3,15 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { AttachmentReference, ComposerPlugin } from '../../../desktop/src/pages/codexGui/attachmentTypes';
 import { remoteAttachments } from '../../../../shared/remote-chat/composerAttachments';
 import { checkFileUploadSize } from '../../../../shared/remote-chat/policy';
-
-function readFile(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error(t("文件无法读取，请重新选择。")));
-    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
-    reader.readAsDataURL(file);
-  });
-}
+import { readFileBase64 } from '../../../../shared/chat/fileData';
 
 export function useComposerAttachments({ threadId, sending }: { threadId: string | null; sending: boolean }) {
   const [items, setItems] = useState<AttachmentReference[]>([]);
@@ -38,13 +30,13 @@ export function useComposerAttachments({ threadId, sending }: { threadId: string
       for (const file of files) {
         if (current !== generation.current) return;
         checkFileUploadSize(file.size);
-        additions.push({ kind: 'file', name: file.name, path: '', data: await readFile(file) });
+        additions.push({ kind: 'file', name: file.name, path: '', data: await readFileBase64(file) });
         remoteAttachments([...items, ...additions]);
       }
       if (current === generation.current) setItems(existing => [...existing, ...additions]);
     } catch (cause) {
       if (current === generation.current) setError(cause instanceof Error && /文件|附件/.test(cause.message)
-        ? cause.message : t("文件添加失败，请重新选择。"));
+        ? t(cause.message) : t("文件添加失败，请重新选择。"));
     } finally { picking.current = false; if (mounted.current) setBusy(false); }
   };
   const add = (item: AttachmentReference) => {

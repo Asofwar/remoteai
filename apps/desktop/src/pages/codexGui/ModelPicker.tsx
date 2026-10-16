@@ -1,7 +1,7 @@
 import { guiText } from "../../i18n/guiText";
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Button, Input, Popover, Tooltip } from "antd";
-import { Check, ChevronLeft, ChevronRight, RotateCcw, Search, Zap } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, RefreshCw, RotateCcw, Search, Zap } from "lucide-react";
 import type { Model } from "./types";
 import { resolveModelSelection, type ModelSelection } from "./modelSelection";
 import styles from "./ModelPicker.module.less";
@@ -15,7 +15,7 @@ interface ModelPickerProps extends ModelSelection {
   disabled: boolean;
   speed?: RequestSpeed;
   onChange: (selection: ModelSelection) => void;
-  onRetry?: () => void;
+  onRetry?: () => void | Promise<void>;
   error?: string;
 }
 
@@ -31,16 +31,24 @@ function moveModelFocus(event: KeyboardEvent<HTMLDivElement>) {
   buttons[next]?.focus();
 }
 
-function ModelList({ models, model, onSelect, onBack }: {
+function ModelList({ models, model, onSelect, onBack, onRefresh, refreshing }: {
   models: Model[]; model: string; onSelect: (model: string) => void; onBack: () => void;
+  onRefresh?: () => Promise<void>; refreshing: boolean;
 }) {
   const [query, setQuery] = useState("");
   const options = models.map((entry) => ({ value: entry.model, label: entry.displayName || entry.model }))
     .filter((option) => `${option.label} ${option.value}`.toLowerCase().includes(query.trim().toLowerCase()));
   return <div className={styles.models}>
-    <button className={styles.listHeading} onClick={onBack} aria-label={guiText("返回推理强度设置")}>
-      <ChevronLeft size={12} /><span>{guiText("选择模型")}</span>
-    </button>
+    <div className={styles.listHeader}>
+      <button className={styles.listHeading} onClick={onBack} aria-label={guiText("返回推理强度设置")}>
+        <ChevronLeft size={12} /><span>{guiText("选择模型")}</span>
+      </button>
+      <Tooltip title={guiText("刷新")} styles={{ root: { maxWidth: 400 } }}>
+        <Button type="text" size="small" className={styles.refresh} icon={<RefreshCw size={14} />}
+          aria-label={guiText("刷新")} aria-busy={refreshing} loading={refreshing}
+          disabled={!onRefresh || refreshing} onClick={onRefresh} />
+      </Tooltip>
+    </div>
     {models.length > MODEL_SEARCH_THRESHOLD && <Input size="small" className={styles.search}
       prefix={<Search size={12} />}
       placeholder={guiText("搜索模型")} aria-label={guiText("搜索模型")} value={query} allowClear
@@ -64,6 +72,14 @@ export function ModelPicker(props: ModelPickerProps) {
   const disabled = props.disabled || !model;
   const [open, setOpen] = useState(false);
   const [choosingModel, setChoosingModel] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshPending = useRef(false);
+  const refresh = async () => {
+    if (!props.onRetry || refreshPending.current) return;
+    refreshPending.current = true; setRefreshing(true);
+    try { await props.onRetry(); }
+    finally { refreshPending.current = false; setRefreshing(false); }
+  };
   const selected = models.find((entry) => entry.model === model);
   const modelLabel = selected?.displayName || model || guiText("正在加载模型…");
   const effortLabel = guiText(EFFORT_LABELS[effort] || effort);
@@ -87,6 +103,7 @@ export function ModelPicker(props: ModelPickerProps) {
     if (event.key === "Escape") { event.stopPropagation(); setOpen(false); }
   }}>
     {choosingModel ? <ModelList models={models} model={model} onSelect={selectModel}
+      refreshing={refreshing} onRefresh={props.onRetry ? refresh : undefined}
       onBack={() => setChoosingModel(false)} /> : <div className={styles.reasoning}>
       <div className={styles.summary}>
         <span className={styles.speed}><GuiSpeedButton active={open && !disabled} /></span>
@@ -112,13 +129,13 @@ export function ModelPicker(props: ModelPickerProps) {
     </div>}
   </div>;
   if (!model || (props.disabled && props.error)) {
-    const loading = props.disabled && !props.error;
+    const loading = (props.disabled && !props.error) || refreshing;
     let label = guiText("暂无可用模型，点击重试");
     if (loading) label = guiText("正在加载模型…");
     else if (props.error) label = guiText("模型加载失败，点击重试");
     return <button type="button" className={`${styles.trigger} ${styles.catalogStatus}`}
       disabled={loading || !props.onRetry}
-      aria-busy={loading} onClick={props.onRetry}>
+      aria-busy={loading} onClick={refresh}>
       <span className={styles.triggerModel}>{label}</span>
     </button>;
   }

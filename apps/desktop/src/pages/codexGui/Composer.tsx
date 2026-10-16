@@ -148,7 +148,7 @@ export const Composer = forwardRef<ComposerHandle, {
           <ModelPicker models={state.models} model={state.settings.model} effort={state.settings.effort}
             speed={requestSpeed}
             error={state.modelCatalogError}
-            onRetry={() => void controller.refreshModels().catch(controller.report)}
+            onRetry={() => controller.refreshModels().catch(controller.report)}
             disabled={state.connection !== "ready" || Boolean(state.modelCatalogLoading)}
             onChange={controller.settings} />
           <ComposerSubmit state={state} controller={controller}

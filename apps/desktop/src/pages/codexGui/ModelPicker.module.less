@@ -47,8 +47,10 @@
 }
 .hint { margin: 6px 0 0; color: var(--muted); font-size: 11px; line-height: 16px; text-align: center; }
 .models { padding: 8px 6px; }
+.listHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 4px; }
+.refresh { flex-shrink: 0; color: var(--muted); }
 .listHeading {
-  display: flex; align-items: center; gap: 5px; padding: 4px 7px 8px; width: 100%;
+  display: flex; align-items: center; gap: 5px; padding: 4px 7px; min-width: 0;
   border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 11px; line-height: 16px;
   text-align: left; cursor: pointer;
 }

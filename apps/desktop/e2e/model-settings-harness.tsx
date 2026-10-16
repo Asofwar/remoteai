@@ -47,7 +47,7 @@ function Harness() {
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
         <ModelPicker models={state.models} {...state.settings} speed={speed} error={state.modelCatalogError}
           disabled={state.connection !== "ready" || Boolean(state.modelCatalogLoading)} onChange={controller.settings}
-          onRetry={() => void controller.refreshModels().catch(controller.report)} />
+          onRetry={() => controller.refreshModels().catch(controller.report)} />
         <ComposerSubmit state={state} controller={controller} hasDraft={Boolean(text.trim())}
           reading={Boolean(state.modelSettingsLoading || state.modelCatalogLoading)} onSend={async () => {
             if (await controller.send(text, [])) setText("");

@@ -93,6 +93,15 @@ it('keeps an uncertain send visible even when unrelated history refreshes', () =
   expect(taskStatus(value)?.label).toBe('发送结果待核实');
 });
 
+it('shows a queued message error as needing attention instead of successful receipt', () => {
+  const value = state();
+  value.queue.threads.thread = [{ id: 'queued', text: 'picture', imageCount: 1, attachmentCount: 0, busy: false,
+    error: '图片无法读取，请重新选择后发送。' }];
+  expect(taskStatus(value)).toMatchObject({ label: '待发送消息需要处理', kind: 'issue' });
+  value.queue.threads.thread[0].error = undefined;
+  expect(taskStatus(value)).toMatchObject({ label: '电脑已收到', kind: 'progress' });
+});
+
 it('shows stale running and approval state as unverified while reconnecting', () => {
   const value = state();
   value.selected!.turns![0].status = 'inProgress';

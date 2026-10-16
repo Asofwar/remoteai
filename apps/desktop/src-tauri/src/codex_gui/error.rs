@@ -34,6 +34,10 @@ pub(super) enum GuiError {
     ImagePreview,
     #[error("图片过大，暂时无法预览。请缩小尺寸后重试。")]
     ImagePreviewResources,
+    #[error("图片无法读取，请重新选择后发送。")]
+    ImageInput,
+    #[error("图片过大，请缩小图片或减少图片后发送。")]
+    ImageInputTooLarge,
     #[error("这条对话或其子对话仍有任务未完成，请等待结束并处理待发送消息后再删除。")]
     Busy,
     #[error("未能删除对话，请稍后重试。")]

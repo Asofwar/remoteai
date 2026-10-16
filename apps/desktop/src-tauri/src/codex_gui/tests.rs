@@ -211,7 +211,6 @@ fn invalid_inline_images_and_excess_attachments_are_rejected() {
         json!(["data:image/svg+xml;base64,PHN2Zz4="]),
         json!(["data:image/png;base64,not base64"]),
         json!(["data:image/png;base64,aGVsbG8="]),
-        json!(["data:image/jpeg;base64,iVBORw0KGgo="]),
         json!(["data:image/png;base64,"]),
         json!(["https://example.com/image.png"]),
         json!(vec!["data:image/png;base64,iVBORw0KGgo="; 9]),

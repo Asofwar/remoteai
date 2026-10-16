@@ -47,7 +47,7 @@ export function ChatQueue({ messages, running, disabled, act, edit, editDisabled
           {message.imageCount > 0 && <Text style={styles.subtitle}>{message.imageCount}{' '}{t("张图片")}</Text>}
           {message.attachmentCount > 0 && <Text style={styles.subtitle}>{message.attachmentCount}{' '}{t("个附件")}</Text>}
           {message.busy && <Text accessibilityLiveRegion="polite" style={styles.subtitle}>{t("正在发送…")}</Text>}
-          {message.error && <Text accessibilityRole="alert" style={queueStyles.error}>{message.error}</Text>}
+          {message.error && <Text accessibilityRole="alert" style={queueStyles.error}>{t(message.error)}</Text>}
         </Pressable>
         <Pressable accessibilityRole="button" disabled={disabled || sending} style={queueStyles.action}
           onPress={() => void act('queueSendNow', message.id)}>
@@ -73,5 +73,5 @@ const useQueueStyles = createThemedStyles((color) => ({
     borderColor: color(palette.border, 'border'), paddingVertical: 6 },
   text: { color: color(palette.ink, 'ink'), fontSize: 13, lineHeight: 20 },
   action: { minHeight: 40, minWidth: 32, paddingHorizontal: 6, justifyContent: 'center', alignItems: 'center' },
-  error: { color: color(palette.danger, 'danger'), fontSize: 12, lineHeight: 18 },
+  error: { color: color(palette.danger, 'danger'), fontSize: 12, lineHeight: 18, maxWidth: 400 },
 }));

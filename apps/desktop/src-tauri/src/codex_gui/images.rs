@@ -16,8 +16,11 @@ pub(super) fn input(image: String) -> Result<Value> {
 
 pub(super) fn input_limited(image: String, max_bytes: u64) -> Result<Value> {
     if image.starts_with("data:") {
-        decode_data_url(&image, max_bytes)?;
-        return Ok(json!({"type": "image", "url": image}));
+        let (_, format) = decode_payload(&image, max_bytes)?;
+        let (_, encoded) = image.split_once(',').ok_or(GuiError::ImageInput)?;
+        // Old queues can contain valid image bytes with incorrect picker MIME metadata.
+        let url = format!("data:{};base64,{encoded}", format.to_mime_type());
+        return Ok(json!({"type": "image", "url": url}));
     }
     let path = Path::new(&image);
     let extension = path
@@ -34,28 +37,48 @@ pub(super) fn input_limited(image: String, max_bytes: u64) -> Result<Value> {
             .unwrap_or(true)
         || !["png", "jpg", "jpeg", "webp", "gif"].contains(&extension.as_str())
     {
-        return Err(GuiError::InvalidRequest);
+        return Err(GuiError::ImageInput);
     }
     Ok(json!({"type": "localImage", "path": image}))
 }
 
 pub(super) fn decode_data_url(url: &str, max_bytes: u64) -> Result<Vec<u8>> {
-    let (header, encoded) = url.split_once(',').ok_or(GuiError::InvalidRequest)?;
-    let format = match header {
-        "data:image/png;base64" => ImageFormat::Png,
-        "data:image/jpeg;base64" => ImageFormat::Jpeg,
-        "data:image/webp;base64" => ImageFormat::WebP,
-        "data:image/gif;base64" => ImageFormat::Gif,
-        _ => return Err(GuiError::InvalidRequest),
-    };
-    if encoded.is_empty() || encoded.len() as u64 > max_bytes.div_ceil(3).saturating_mul(4) {
-        return Err(GuiError::InvalidRequest);
-    }
-    let bytes = STANDARD
-        .decode(encoded)
-        .map_err(|_| GuiError::InvalidRequest)?;
-    if bytes.len() as u64 > max_bytes || image::guess_format(&bytes).ok() != Some(format) {
-        return Err(GuiError::InvalidRequest);
+    let (bytes, format) = decode_payload(url, max_bytes)?;
+    if !url.starts_with(&format!("data:{};base64,", format.to_mime_type())) {
+        return Err(GuiError::ImageInput);
     }
     Ok(bytes)
 }
+
+fn decode_payload(url: &str, max_bytes: u64) -> Result<(Vec<u8>, ImageFormat)> {
+    let (header, encoded) = url.split_once(',').ok_or(GuiError::ImageInput)?;
+    if !matches!(
+        header,
+        "data:image/png;base64"
+            | "data:image/jpeg;base64"
+            | "data:image/webp;base64"
+            | "data:image/gif;base64"
+    ) || encoded.is_empty()
+    {
+        return Err(GuiError::ImageInput);
+    }
+    if encoded.len() as u64 > max_bytes.div_ceil(3).saturating_mul(4) {
+        return Err(GuiError::ImageInputTooLarge);
+    }
+    let bytes = STANDARD.decode(encoded).map_err(|_| GuiError::ImageInput)?;
+    if bytes.len() as u64 > max_bytes {
+        return Err(GuiError::ImageInputTooLarge);
+    }
+    let format = image::guess_format(&bytes).map_err(|_| GuiError::ImageInput)?;
+    if !matches!(
+        format,
+        ImageFormat::Png | ImageFormat::Jpeg | ImageFormat::WebP | ImageFormat::Gif
+    ) {
+        return Err(GuiError::ImageInput);
+    }
+    Ok((bytes, format))
+}
+
+#[cfg(test)]
+#[path = "images_tests.rs"]
+mod tests;

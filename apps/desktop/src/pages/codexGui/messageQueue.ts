@@ -2,6 +2,7 @@ import { guiText } from "../../i18n/guiText";
 import { guiApi } from "./api";
 import { conversation } from "./events";
 import { withSentMessage } from "./sentMessages";
+import { queueSendError } from "./queueSendError";
 import type { GuiState, MessageInput, QueuedMessage, Settings, Thread, Turn } from "./types";
 
 const MAX_QUEUED_MESSAGES = 100;
@@ -81,7 +82,7 @@ export class MessageQueue {
     this.host.report(error);
     this.update(threadId, this.list(threadId).map((item) => ids.has(item.id)
       ? { ...item, needsReview: dispatched,
-        error: dispatched ? guiText("发送结果尚未确认，请查看聊天后重试。") : guiText("发送失败，请重试。") } : item));
+        error: queueSendError(error, dispatched) } : item));
   };
   private completeSend = (threadId: string, turnId: string, messages: QueuedMessage[], userMessageIndex: number) => {
     const state = this.host.getSnapshot();

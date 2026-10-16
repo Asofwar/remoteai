@@ -205,6 +205,17 @@ it('retains failed messages for retry and never transmits image data in queue pr
   expect(guiApi.request).toHaveBeenLastCalledWith(expect.objectContaining({ operation: 'steer', images }));
 });
 
+it('shares the specific image failure with phone and web clients without losing the queued image', async () => {
+  const images = ['data:image/png;base64,aGVsbG8='];
+  const error = '图片无法读取，请重新选择后发送。';
+  await queue.request({ ...input, images });
+  const id = queue.read().threads.phone[0].id;
+  vi.mocked(guiApi.request).mockRejectedValueOnce(error);
+  await queue.request({ operation: 'queueSendNow', threadId: 'phone', id });
+  expect(queue.read().threads.phone).toMatchObject([{ id, imageCount: 1, busy: false, error }]);
+  expect(controller.getSnapshot().queued.phone[0].images).toEqual(images);
+});
+
 it('rejects invalid input and synchronizes PC edits and removals', async () => {
   await expect(queue.request({ ...input, images: ['file:///private'] })).rejects.toThrow();
   expect(queue.read().threads).toEqual({});

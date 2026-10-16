@@ -195,6 +195,23 @@ it("keeps failed batches available for retry and does not loop", async () => {
   expect(messages()).toEqual([]);
 });
 
+it.each(['sendBatch', 'steer'])('shows image validation errors from %s and retains the message for editing',
+  async operation => {
+    const error = '图片无法读取，请重新选择后发送。';
+    await controller.send('keep my picture', ['broken-image']);
+    const original = vi.mocked(guiApi.request).getMockImplementation()!;
+    vi.mocked(guiApi.request).mockImplementation(async request => {
+      if (request.operation === operation) throw error;
+      return original(request);
+    });
+    if (operation === 'sendBatch') await finish();
+    else await controller.queue.steer('one', messages()[0].id);
+    expect(messages()[0]).toMatchObject({ text: 'keep my picture', images: ['broken-image'],
+      error, needsReview: true, busy: false });
+    await controller.queue.flush('one');
+    expect(vi.mocked(guiApi.request).mock.calls.filter(([request]) => request.operation === operation)).toHaveLength(1);
+  });
+
 it("merges acknowledgement items after an earlier turn event without reviving a completed turn", async () => {
   await controller.send("continue", []);
   const original = vi.mocked(guiApi.request).getMockImplementation()!;

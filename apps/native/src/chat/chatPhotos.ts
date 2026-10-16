@@ -2,6 +2,7 @@ import { t } from '../i18n';
 import { EncodingType, getInfoAsync, readAsStringAsync } from 'expo-file-system';
 import { base64Bytes, getChatPolicy, isDirectChat, MIB } from '../../../../shared/remote-chat/policy';
 import { compressChatImage, ImagePolicyError } from '../../../../shared/remote-chat/compressImage';
+import { normalizeImageDataUrl } from '../../../../shared/remote-chat/imageDataUrl';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
@@ -44,7 +45,8 @@ export async function preparePhoto(asset: ImagePicker.ImagePickerAsset): Promise
   }
   if (isDirectChat() && /^image\/(png|jpeg|webp|gif)$/.test(asset.mimeType ?? '')) {
     const data = await readAsStringAsync(asset.uri, { encoding: EncodingType.Base64 });
-    return { id: asset.uri, uri: asset.uri, dataUrl: `data:${asset.mimeType};base64,${data}` };
+    return { id: asset.uri, uri: asset.uri,
+      dataUrl: normalizeImageDataUrl(`data:${asset.mimeType};base64,${data}`) };
   }
   return compressChatImage(async (edge, quality) => {
     const resize = asset.width >= asset.height ? { width: edge } : { height: edge };

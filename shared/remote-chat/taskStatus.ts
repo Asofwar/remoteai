@@ -21,7 +21,8 @@ const EXECUTION: Record<string, TaskStatus | undefined> = {
 function queuedStatus(queue: QueueMessage[]): TaskStatus | undefined {
   if (!queue.length) return;
   const attention = queue.some(item => item.error);
-  return { label: '电脑已收到', detail: attention ? '待发送消息需要处理，请查看下方提示。'
+  return { label: attention ? '待发送消息需要处理' : '电脑已收到',
+    detail: attention ? '待发送消息需要处理，请查看下方提示。'
     : '消息已保存在电脑的待发送列表中，等待 AI 处理。', kind: attention ? 'issue' : 'progress' };
 }
 

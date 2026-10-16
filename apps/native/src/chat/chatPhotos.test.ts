@@ -14,6 +14,15 @@ vi.mock('expo-file-system', () => ({ getInfoAsync: async () => ({ exists: true, 
 beforeEach(() => { vi.resetAllMocks(); setChatConnectionMode('offline'); setChatPolicy(DEFAULT_CHAT_POLICY); });
 
 describe('chat photos', () => {
+  it('corrects incorrect P2P picker metadata while preserving the original PNG bytes', async () => {
+    const data = btoa('\x89PNG\r\n\x1a\noriginal-pixels');
+    mocks.read.mockResolvedValue(data);
+    setChatConnectionMode('direct');
+    const photo = await preparePhoto({ uri: 'content://photos/original', mimeType: 'image/jpeg',
+      width: 1772, height: 909, fileSize: 100 });
+    expect(photo.dataUrl).toBe(`data:image/png;base64,${data}`);
+    expect(mocks.manipulate).not.toHaveBeenCalled();
+  });
   it('preserves original P2P photos above source and transport limits and restores Relay validation', async () => {
     const data = 'YWFh'.repeat(2 * 1024 * 1024);
     mocks.read.mockResolvedValue(data);

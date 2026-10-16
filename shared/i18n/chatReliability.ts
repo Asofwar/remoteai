@@ -1,4 +1,7 @@
 export const reliabilityEnglish: Readonly<Record<string, string>> = {
+  '待发送消息需要处理': 'Queued messages need attention',
+  '图片无法读取，请重新选择后发送。': 'Could not read the image. Choose it again before sending.',
+  '图片过大，请缩小图片或减少图片后发送。': 'Images are too large. Resize them or send fewer images.',
   '此工作目录正在使用中，请等待当前任务或分支操作完成后重试。':
     'This folder is busy. Wait for the current task or branch operation to finish, then try again.',
   '当前 P2P 连接': 'Current P2P connection',
@@ -89,6 +92,9 @@ export const reliabilityEnglish: Readonly<Record<string, string>> = {
 };
 
 export const reliabilityRussian: Readonly<Record<string, string>> = {
+  '待发送消息需要处理': 'Сообщения в очереди требуют внимания',
+  '图片无法读取，请重新选择后发送。': 'Не удалось прочитать изображение. Выберите его заново перед отправкой.',
+  '图片过大，请缩小图片或减少图片后发送。': 'Изображения слишком большие. Уменьшите их размер или количество.',
   '此工作目录正在使用中，请等待当前任务或分支操作完成后重试。':
     'Эта папка занята. Дождитесь завершения текущей задачи или операции с веткой и повторите попытку.',
   '当前 P2P 连接': 'Текущее P2P-подключение',

@@ -88,3 +88,10 @@ it('keeps original web image bytes on P2P without applying the source, compressi
   expect(() => validateChatImages([image.url])).toThrow('较大');
   await expect(pickChatImages([file], 8)).rejects.toThrow('1 MB');
 });
+
+it('corrects P2P web file metadata without changing the original PNG payload', async () => {
+  setChatConnectionMode('direct');
+  const bytes = Uint8Array.from('\x89PNG\r\n\x1a\noriginal-pixels', character => character.charCodeAt(0));
+  const [image] = await pickChatImages([new File([bytes], 'photo.jpg', { type: 'image/jpeg' })], 8);
+  expect(image.url).toBe(`data:image/png;base64,${Buffer.from(bytes).toString('base64')}`);
+});

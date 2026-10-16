@@ -4,6 +4,7 @@ import { ChatImageError, draftImage, MAX_CHAT_IMAGES, chatImageCharLimit,
 
 import { base64Bytes, getChatPolicy, isDirectChat, MIB } from '../../../../shared/remote-chat/policy';
 import { compressChatImage, ImagePolicyError } from '../../../../shared/remote-chat/compressImage';
+import { normalizeImageDataUrl } from '../../../../shared/remote-chat/imageDataUrl';
 
 function readOriginal(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -23,7 +24,7 @@ async function prepareImage(file: File) {
     throw new ChatImageError(t("单张图片不能超过 {value1} MB，请选择较小的图片。", { value1: policy.imageSourceMaxMb }));
   }
   if (isDirectChat() && /^image\/(png|jpeg|webp|gif)$/.test(file.type)) {
-    return draftImage(await readOriginal(file));
+    return draftImage(normalizeImageDataUrl(await readOriginal(file)));
   }
   try {
     const image = new Image();

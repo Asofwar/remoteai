@@ -16,6 +16,7 @@ export function modelSettingsBackend(liveUpdate?: ModelSettingsSnapshot["liveUpd
   let modelsPaused = false;
   let modelsEmpty = false;
   let modelRequests = 0;
+  let discoveryRequests = 0;
   let speed: RequestSpeed = 'normal';
   let queue: QueueSnapshot = { revision: 0, threads: {} };
   const thread = (id: string) => ({ id, cwd: "", preview: id, updatedAt: 1, turns: [] });
@@ -71,6 +72,7 @@ export function modelSettingsBackend(liveUpdate?: ModelSettingsSnapshot["liveUpd
         let data: unknown = {};
         if (request.operation === "models") {
           modelRequests++;
+          if (!request.cacheOnly) discoveryRequests++;
           if (modelsPaused) await new Promise<void>((resolve) => pendingModels.push(resolve));
           data = { data: modelsEmpty ? [] : models, nextCursor: null };
         }
@@ -93,6 +95,7 @@ export function modelSettingsBackend(liveUpdate?: ModelSettingsSnapshot["liveUpd
   return { attach, sends, contextDefaults, contextOverrides,
     contextUsage: (threadId: string, tokenUsage: ThreadTokenUsage) => events.push({ name: 'codex-gui-event',
       payload: { method: 'thread/tokenUsage/updated', params: { threadId, tokenUsage } } }),
+    discoveryRequests: () => discoveryRequests,
     modelRequests: () => modelRequests, pauseModels: () => { modelsPaused = true; },
     emptyModels: (empty: boolean) => { modelsEmpty = empty; },
     addModel: (model: string) => models.push({ ...models[0], id: model, model, displayName: model, isDefault: false }),

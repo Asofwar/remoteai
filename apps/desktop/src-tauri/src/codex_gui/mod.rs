@@ -41,6 +41,9 @@ mod images;
 mod local_file;
 mod mcp_approval;
 mod message_edit;
+mod model_catalog_cache;
+mod model_discovery;
+pub(crate) use model_catalog_cache::cached_catalog;
 pub(crate) mod model_context;
 pub(crate) mod model_settings;
 pub(crate) mod notification_navigation;
@@ -89,6 +92,7 @@ use protocol::{ApprovalReply, GuiEvent, GuiRequest, GuiResponse};
 
 #[derive(Default)]
 pub(crate) struct GuiState {
+    pub(crate) model_discovery: model_discovery::ModelDiscovery,
     workspaces: Arc<workspace_activity::WorkspaceActivity>,
     pub(crate) proxy: crate::local_proxy::gui_runtime::GuiProxyRuntime,
     pub(crate) upload_policy: Arc<upload_policy::UploadPolicyStore>,
@@ -179,6 +183,17 @@ pub(crate) async fn codex_gui_request(
 async fn execute_request(state: &GuiState, request: GuiRequest) -> Result<GuiResponse> {
     let client = connected(state).await?;
     match request {
+        GuiRequest::Models {
+            cursor,
+            cache_only: Some(true),
+        } => {
+            let home = client.home.clone();
+            return tauri::async_runtime::spawn_blocking(move || {
+                model_catalog_cache::read(&home, cursor)
+            })
+            .await
+            .map_err(|_| GuiError::ModelCatalog)?;
+        }
         GuiRequest::CozeCatalog => return client.coze_catalog().await,
         GuiRequest::DownloadBrowse(options) => return downloads::browse(&client, options).await,
         GuiRequest::DownloadOpen(options) => {
@@ -257,6 +272,17 @@ async fn execute_request(state: &GuiState, request: GuiRequest) -> Result<GuiRes
     })
     .await
     .map_err(|_| GuiError::InvalidRequest)??;
+    let _discovery = if method == "model/list" {
+        if params["cursor"].is_null() {
+            let home = client.home.clone();
+            tauri::async_runtime::spawn_blocking(move || model_catalog_cache::expire(&home))
+                .await
+                .map_err(|_| GuiError::ModelCatalog)??;
+        }
+        Some(state.model_discovery.begin())
+    } else {
+        None
+    };
     let mut data = icons::resolve(method, client.request(method, params).await?).await?;
     workspaces::hide_project_paths(&mut data, &response_root);
     Ok(GuiResponse { data })

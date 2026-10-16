@@ -24,6 +24,7 @@ export class GuiModelCatalog {
   private pending?: Promise<void>;
   private attempt?: AbortController;
   private invalid = false;
+  private cacheOnly = false;
   private switching = 0;
   private fingerprint?: string;
   private providerSource?: () => Promise<Model[] | null>;
@@ -44,7 +45,7 @@ export class GuiModelCatalog {
 
   /** Remote reads can recover a failed host without reconnecting or invalidating a usable catalog. */
   async recover() {
-    if (this.invalid && !this.pending && !this.switching) await this.refresh();
+    if (this.invalid && !this.cacheOnly && !this.pending && !this.switching) await this.refresh();
     await this.ready();
   }
 
@@ -59,7 +60,18 @@ export class GuiModelCatalog {
     }
   }
 
+  /** Connections restore local data without starting discovery or failure retries. */
+  restore = (): Promise<void> => {
+    this.clearRetry(); this.cacheOnly = true; this.generation++; this.markInvalid();
+    return this.loadCurrent();
+  };
+
   refresh = (): Promise<void> => {
+    if (this.cacheOnly && this.pending) this.generation++;
+    this.cacheOnly = false; return this.loadCurrent();
+  };
+
+  private loadCurrent = (): Promise<void> => {
     if (!this.active || !this.host.ready() || this.switching) return Promise.resolve();
     if (this.pending) return this.pending;
     this.clearRetry();
@@ -69,7 +81,8 @@ export class GuiModelCatalog {
       if (retry) this.scheduleRetry();
       else this.retryDelay = MODEL_CATALOG_RETRY_MS;
     }, error => {
-      this.scheduleRetry();
+      if (!this.cacheOnly) this.scheduleRetry();
+      else this.host.syncing?.(false);
       throw error;
     }).finally(() => { this.pending = undefined; });
   };
@@ -88,7 +101,7 @@ export class GuiModelCatalog {
   private clearRetry() { clearTimeout(this.retryTimer); this.retryTimer = undefined; }
 
   private scheduleRetry() {
-    if (!this.active || !this.host.ready() || this.retryTimer) return;
+    if (this.cacheOnly || !this.active || !this.host.ready() || this.retryTimer) return;
     this.retryTimer = setTimeout(() => {
       this.retryTimer = undefined;
       void this.refresh().catch(() => { /* The catalog error remains visible while recovery continues. */ });
@@ -99,16 +112,17 @@ export class GuiModelCatalog {
   private async load() {
     while (this.active && this.host.ready() && !this.switching) {
       let generation = this.generation;
+      const cacheOnly = this.cacheOnly;
       const attempt = this.attempt = new AbortController();
       const current = () => !attempt.signal.aborted && this.active && generation === this.generation;
       try {
         const { models, retry } = await withModelCatalogTimeout(
-          this.readModels(current, attempt.signal), attempt.signal,
+          this.readModels(current, attempt.signal, cacheOnly), attempt.signal,
         );
         if (!this.active) return;
         if (generation !== this.generation) continue;
         // The CLI can return an empty list after discovery times out; it is not a catalog update.
-        if (!models.length) throw new Error(guiText(MODEL_CATALOG_ERROR));
+        if (!models.length && !cacheOnly) throw new Error(guiText(MODEL_CATALOG_ERROR));
         const fingerprint = JSON.stringify(models);
         if (!this.invalid && fingerprint === this.fingerprint) return retry;
         generation = ++this.generation;
@@ -116,7 +130,7 @@ export class GuiModelCatalog {
         await withModelCatalogTimeout(Promise.resolve(this.host.accept(models)), attempt.signal);
         if (!this.active || generation !== this.generation) continue;
         this.fingerprint = fingerprint;
-        this.invalid = false;
+        this.invalid = !models.length;
         this.host.syncing?.(false);
         return retry;
       } catch (error) {
@@ -128,23 +142,24 @@ export class GuiModelCatalog {
     }
   }
 
-  private async readModels(current: () => boolean, signal: AbortSignal) {
+  private async readModels(current: () => boolean, signal: AbortSignal, cacheOnly: boolean) {
     const configured = this.providerSource ? await this.providerSource() : null;
     if (!current()) return { models: [], retry: false };
     if (configured !== null) {
-      const updated = configured.length ? await this.providerSync.refresh(signal) : true;
+      const updated = configured.length && !cacheOnly ? await this.providerSync.refresh(signal) : true;
       return { models: configured, retry: !updated };
     }
-    return { models: await this.readPages(current), retry: false };
+    return { models: await this.readPages(current, cacheOnly), retry: false };
   }
 
-  private async readPages(current: () => boolean) {
+  private async readPages(current: () => boolean, cacheOnly: boolean) {
     let cursor: string | undefined;
     const models: Model[] = [];
     const cursors = new Set<string>();
     let pages = 0;
     do {
-      const response = await guiApi.request<ListResponse<Model>>({ operation: "models", cursor });
+      const response = await guiApi.request<ListResponse<Model>>({ operation: "models", cursor,
+        ...(cacheOnly ? { cacheOnly: true } : {}) });
       if (!current()) return models;
       models.push(...response.data);
       cursor = response.nextCursor || undefined;

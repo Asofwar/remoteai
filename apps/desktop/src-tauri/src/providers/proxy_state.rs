@@ -8,9 +8,19 @@ fn target_uses_provider(target: Option<&ImageModelTarget>, provider_id: &str) ->
 pub(crate) fn apply_local_proxy_config_for_state<R: Runtime>(
     app: &tauri::AppHandle<R>,
 ) -> Result<(), String> {
+    restore_local_proxy_config_for_state(app)?;
+    for paths in crate::storage::resolve_enabled_paths(app)? {
+        refresh_codex_models_for_current_target(&paths);
+    }
+    Ok(())
+}
+
+/// Startup restores routing files without requesting fresh model metadata.
+pub(crate) fn restore_local_proxy_config_for_state<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> Result<(), String> {
     for paths in crate::storage::resolve_enabled_paths(app)? {
         apply_local_proxy_config_for_paths(&paths)?;
-        refresh_codex_models_for_current_target(&paths);
     }
     Ok(())
 }

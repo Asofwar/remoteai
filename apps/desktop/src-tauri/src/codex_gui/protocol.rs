@@ -51,6 +51,7 @@ pub(crate) enum GuiRequest {
     },
     Models {
         cursor: Option<String>,
+        cache_only: Option<bool>,
     },
     Skills {
         cwd: Option<String>,
@@ -263,7 +264,10 @@ impl GuiRequest {
                     json!({"cwds": cwd.into_iter().collect::<Vec<_>>(), "forceReload": true}),
                 ))
             }
-            Self::Models { cursor } => {
+            Self::Models { cursor, cache_only } => {
+                if cache_only.unwrap_or(false) {
+                    return Err(GuiError::InvalidRequest);
+                }
                 Ok(("model/list", json!({"limit": PAGE_SIZE, "cursor": cursor})))
             }
             Self::List {

@@ -28,6 +28,8 @@ function Harness() {
   return <ConfigProvider><main>
     <nav>{["a", "b"].map((id) => <button key={id} onClick={() => void controller.select(id)}>对话 {id}</button>)}
       <button onClick={controller.newConversation}>新对话</button>
+      <button onClick={() => void controller.refreshModels().catch(controller.report)}>刷新模型</button>
+      <button onClick={() => void controller.connect()}>重连</button>
       <button onClick={() => setSettingsOpen(true)}>GUI 设置</button></nav>
     {settingsOpen && <GuiAutoSwitchSettingsDialog accounts={[]} providers={[]} privacyMode={false}
       onClose={() => setSettingsOpen(false)} />}
@@ -45,7 +47,7 @@ function Harness() {
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
         <ModelPicker models={state.models} {...state.settings} speed={speed} error={state.modelCatalogError}
           disabled={state.connection !== "ready" || Boolean(state.modelCatalogLoading)} onChange={controller.settings}
-          onOpen={() => void controller.refreshModels().catch(controller.report)} />
+          onRetry={() => void controller.refreshModels().catch(controller.report)} />
         <ComposerSubmit state={state} controller={controller} hasDraft={Boolean(text.trim())}
           reading={Boolean(state.modelSettingsLoading || state.modelCatalogLoading)} onSend={async () => {
             if (await controller.send(text, [])) setText("");

@@ -233,7 +233,7 @@ pub fn run() {
                     providers::cleanup_stale_local_proxy_config(app.handle())?;
                 }
             }
-            official_models::refresh_on_startup(app.handle().clone());
+            official_models::setup(app.handle().clone());
             if !launch_options.headless {
                 system_tray::setup(app)?;
                 floating_bubble::setup(app.handle())?;

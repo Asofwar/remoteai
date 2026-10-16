@@ -42,6 +42,5 @@ fn launch_runtime_renderer(
     wait_for_targets(port, CODEX_RENDERER_START_TIMEOUT)?;
     state.session = NativeRuntimeStatus::Active;
     write_session(state)?;
-    refresh_models_after_runtime_ready(paths);
     Ok(())
 }

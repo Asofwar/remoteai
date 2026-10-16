@@ -4,7 +4,7 @@ import { guiApi } from "./api";
 import { GuiController } from "./controller";
 import { ComposerBridge } from "./composerBridge";
 import { GuiModelCatalog } from "./modelCatalog";
-import { MODEL_CATALOG_REFRESH_MS, watchModelCatalog } from "./modelCatalogRefresh";
+import { watchModelCatalog } from "./modelCatalogRefresh";
 import { subscribeGuiEvent } from "./webEvents";
 import type { Model } from "./types";
 
@@ -56,7 +56,7 @@ it("publishes new upstream models to desktop and remote clients during an active
   stop(); detach(); controller.dispose();
 });
 
-it("coalesces menu and timer refreshes, paginates, and drops an old account response", async () => {
+it("coalesces explicit refreshes, paginates, and drops an old account response", async () => {
   const accept = vi.fn();
   const catalog = new GuiModelCatalog({ ready: () => true, accept });
   let finish!: (value: unknown) => void;
@@ -90,7 +90,7 @@ it("keeps the last successful catalog after failure and ignores results after su
   expect(accept).toHaveBeenCalledExactlyOnceWith([existing]);
 });
 
-it("stops polling and unsubscribes even when the subscription finishes after cleanup", async () => {
+it("unsubscribes even when the subscription finishes after cleanup", async () => {
   vi.useFakeTimers();
   const catalog = new GuiModelCatalog({ ready: () => true, accept: vi.fn() });
   let subscribe!: (stop: () => void) => void;
@@ -98,14 +98,13 @@ it("stops polling and unsubscribes even when the subscription finishes after cle
   let finish!: (value: unknown) => void;
   vi.mocked(guiApi.request).mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
   const stop = watchModelCatalog(catalog, vi.fn());
-  await vi.advanceTimersByTimeAsync(MODEL_CATALOG_REFRESH_MS);
   expect(catalog.refresh()).toBe(catalog.refresh());
   expect(guiApi.request).toHaveBeenCalledOnce();
   stop(); catalog.suspend();
   const unsubscribe = vi.fn();
   subscribe(unsubscribe);
   finish({ data: [existing], nextCursor: null });
-  await vi.advanceTimersByTimeAsync(MODEL_CATALOG_REFRESH_MS * 3);
+  await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
   expect(unsubscribe).toHaveBeenCalledOnce();
   expect(guiApi.request).toHaveBeenCalledOnce();
 });
@@ -136,7 +135,7 @@ it("keeps a failed settings reconciliation blocked during passive readiness chec
   catalog.suspend();
 });
 
-it("keeps models and conversation choices when the CLI returns an empty catalog during polling", async () => {
+it("keeps models and conversation choices when the CLI returns an empty catalog during an explicit refresh", async () => {
   vi.mocked(guiApi.request).mockImplementation(async request => ({
     data: request.operation === "models" ? [existing] : [], nextCursor: null,
   }));

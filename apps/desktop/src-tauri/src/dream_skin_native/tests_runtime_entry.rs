@@ -61,7 +61,6 @@ impl SimulatedMonitor {
             PATHS.get_or_init(|| MonitorPaths {
                 paths: Mutex::new(Some(RuntimePaths {
                     bundled_root: PathBuf::new(),
-                    codex_paths: None,
                 })),
             })
         })

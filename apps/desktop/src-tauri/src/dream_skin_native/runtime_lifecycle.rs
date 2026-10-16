@@ -18,27 +18,7 @@ fn verify_runtime_skin(mode: SkinVerificationMode, port: Option<u16>) -> Result<
 fn runtime_paths_for_app(app: &AppHandle) -> Result<RuntimePaths, String> {
     Ok(RuntimePaths {
         bundled_root: bundled_root(app)?,
-        codex_paths: Some(crate::storage::resolve_paths(app)?),
     })
-}
-
-fn refresh_models_after_runtime_ready(paths: &RuntimePaths) {
-    const RETRIES: usize = 8;
-    const RETRY_DELAY: Duration = Duration::from_millis(500);
-    let Some(codex_paths) = paths.codex_paths.clone() else {
-        return;
-    };
-    let _ = thread::Builder::new()
-        .name("codex-model-refresh-after-launch".to_string())
-        .spawn(move || {
-            for attempt in 0..RETRIES {
-                thread::sleep(RETRY_DELAY);
-                crate::providers::refresh_codex_models_for_current_target(&codex_paths);
-                if attempt + 1 < RETRIES {
-                    thread::sleep(RETRY_DELAY);
-                }
-            }
-        });
 }
 
 fn managed_runtime_arguments(port: u16, profile: &Path) -> Vec<String> {

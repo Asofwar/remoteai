@@ -25,7 +25,13 @@ fn restore_blocking<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
         }
         // Updating the cache reads existing preferences; it never resaves or migrates them.
         if let Err(error) =
-            super::update_cached_official_model_context_windows(app, &paths, &settings)
+            super::update_cached_model_context_windows(&paths, &settings, |catalog| {
+                super::official_context_models::complete_cached(
+                    app,
+                    catalog,
+                    &settings.official_model_context_windows,
+                )
+            })
         {
             eprintln!("Could not update an official model context cache at startup: {error}");
         }

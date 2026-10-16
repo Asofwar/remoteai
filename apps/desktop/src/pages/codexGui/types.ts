@@ -230,7 +230,7 @@ export type Request =
   | { operation: "steer"; threadId: string; turnId: string; text: string; images: string[];
       skills: SkillReference[]; attachments?: AttachmentReference[]; transferMode?: 'direct' | 'relay' }
   | { operation: "skills"; cwd?: string }
-  | { operation: "models"; cursor?: string }
+  | { operation: "models"; cursor?: string; cacheOnly?: boolean }
   | { operation: "list"; cursor?: string; archived: boolean; search?: string; limit?: number }
   | { operation: "start"; cwd?: string; model?: string; access: AccessMode }
   | { operation: "fork"; threadId: string; turnId: string; access: AccessMode; cwd?: string }

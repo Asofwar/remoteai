@@ -15,7 +15,7 @@ pub(crate) fn restore_local_proxy_if_enabled<R: Runtime>(
     };
     let write_codex = crate::claude_code::should_write_codex_for_app(app)?;
     let config_result = if write_codex {
-        providers::apply_local_proxy_config_for_state(app)
+        providers::restore_local_proxy_config_for_state(app)
     } else {
         Ok(())
     };

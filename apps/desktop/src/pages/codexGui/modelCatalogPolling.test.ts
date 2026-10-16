@@ -3,107 +3,67 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { subscribeToProviderEvents } from "../../api/backend";
 import { guiApi } from "./api";
 import { GuiModelCatalog } from "./modelCatalog";
-import { MODEL_CATALOG_REFRESH_MS, watchModelCatalog } from "./modelCatalogRefresh";
-import { MODEL_CATALOG_TIMEOUT_MS } from "./modelCatalogTimeout";
+import { watchModelCatalog } from "./modelCatalogRefresh";
 import { subscribeGuiEvent } from "./webEvents";
 import type { Model } from "./types";
 
-vi.mock("../../api/backend", () => ({ isHostedWebApp: true, subscribeToProviderEvents: vi.fn() }));
+const backend = vi.hoisted(() => ({ hosted: true }));
+vi.mock("../../api/backend", () => ({ get isHostedWebApp() { return backend.hosted; },
+  subscribeToProviderEvents: vi.fn() }));
 vi.mock("./api", () => ({ guiApi: { request: vi.fn() } }));
 vi.mock("./webEvents", () => ({ subscribeGuiEvent: vi.fn() }));
 const model: Model = { id: "model", model: "model", displayName: "Model", isDefault: true,
   defaultReasoningEffort: "high", supportedReasoningEfforts: [{ reasoningEffort: "high", description: "" }] };
+const DAY_MS = 24 * 60 * 60 * 1000;
 let stop: () => void;
-let poll: () => void | Promise<void>;
 let accountChanged: () => void;
 
 beforeEach(() => {
-  vi.resetAllMocks(); vi.useFakeTimers();
+  vi.resetAllMocks(); vi.useFakeTimers(); backend.hosted = true;
   vi.mocked(subscribeGuiEvent).mockImplementation(async (_name, callback) => {
     accountChanged = () => callback(undefined); return () => {};
   });
-  vi.mocked(subscribeToProviderEvents).mockImplementation(callback => { poll = callback; return () => {}; });
+  vi.mocked(guiApi.request).mockResolvedValue({ data: [model], nextCursor: null });
+  vi.mocked(subscribeToProviderEvents).mockReturnValue(() => {});
 });
-afterEach(() => { stop?.(); vi.useRealTimers(); });
+afterEach(() => { stop?.(); vi.clearAllTimers(); vi.useRealTimers(); });
 
-it("accepts a slow catalog despite repeated hosted Provider polls", async () => {
-  let finish!: (value: unknown) => void;
-  vi.mocked(guiApi.request).mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+it("never polls models or subscribes to synthetic hosted Provider polling", async () => {
+  const catalog = new GuiModelCatalog({ ready: () => true, accept: vi.fn() });
+  stop = watchModelCatalog(catalog, vi.fn());
+  await vi.advanceTimersByTimeAsync(DAY_MS);
+  expect(subscribeToProviderEvents).not.toHaveBeenCalled();
+  expect(guiApi.request).not.toHaveBeenCalled();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it("refreshes actual account changes but does not follow them with periodic requests", async () => {
   const accept = vi.fn();
   const catalog = new GuiModelCatalog({ ready: () => true, accept });
   stop = watchModelCatalog(catalog, vi.fn());
-  const pending = catalog.invalidate();
-  poll(); poll(); poll();
-  finish({ data: [model], nextCursor: null });
-  await pending;
+  accountChanged();
+  await vi.advanceTimersByTimeAsync(0);
   expect(guiApi.request).toHaveBeenCalledOnce();
   expect(accept).toHaveBeenCalledExactlyOnceWith([model]);
-  await expect(catalog.ready()).resolves.toBeUndefined();
-});
-
-it("reports timeout instead of endlessly restarting a stalled catalog on hosted polls", async () => {
-  vi.mocked(guiApi.request).mockReturnValue(new Promise(() => {}));
-  const failed = vi.fn();
-  const catalog = new GuiModelCatalog({ ready: () => true, accept: vi.fn(), failed });
-  stop = watchModelCatalog(catalog, vi.fn());
-  const failure = expect(catalog.invalidate()).rejects.toThrow("模型加载超时");
-  for (let tick = 0; tick < 4; tick++) {
-    poll();
-    await vi.advanceTimersByTimeAsync(MODEL_CATALOG_TIMEOUT_MS / 4);
-  }
-  await failure;
+  await vi.advanceTimersByTimeAsync(DAY_MS);
   expect(guiApi.request).toHaveBeenCalledOnce();
-  expect(failed).toHaveBeenLastCalledWith(expect.stringContaining("模型列表"));
-});
-
-it("does not invalidate a valid send guard while a scheduled refresh is pending", async () => {
-  vi.mocked(guiApi.request).mockResolvedValueOnce({ data: [model], nextCursor: null });
-  const syncing = vi.fn();
-  const catalog = new GuiModelCatalog({ ready: () => true, accept: vi.fn(), syncing });
-  await catalog.refresh();
-  const guard = catalog.guard();
-  syncing.mockClear();
-  vi.mocked(guiApi.request).mockReturnValue(new Promise(() => {}));
-  stop = watchModelCatalog(catalog, vi.fn());
-  await vi.advanceTimersByTimeAsync(MODEL_CATALOG_REFRESH_MS);
-  poll(); poll();
-  expect(guiApi.request).toHaveBeenCalledTimes(2);
-  expect(guard()).toBe(true);
-  expect(syncing).not.toHaveBeenCalled();
-  catalog.suspend();
+  accountChanged();
   await vi.advanceTimersByTimeAsync(0);
+  expect(guiApi.request).toHaveBeenCalledTimes(2);
+  stop(); accountChanged();
+  await vi.advanceTimersByTimeAsync(DAY_MS);
+  expect(guiApi.request).toHaveBeenCalledTimes(2);
 });
 
-it("refreshes every six hours without extra reads from hosted Provider polls", async () => {
-  vi.mocked(guiApi.request).mockResolvedValue({ data: [model], nextCursor: null });
+it("retains desktop Provider change refreshes while idle time never triggers a request", async () => {
+  backend.hosted = false;
   const catalog = new GuiModelCatalog({ ready: () => true, accept: vi.fn() });
   stop = watchModelCatalog(catalog, vi.fn());
-  poll();
-  await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000 - 1);
-  poll();
+  expect(subscribeToProviderEvents).toHaveBeenCalledOnce();
+  await vi.advanceTimersByTimeAsync(DAY_MS);
   expect(guiApi.request).not.toHaveBeenCalled();
-  await vi.advanceTimersByTimeAsync(1);
-  expect(guiApi.request).toHaveBeenCalledOnce();
-  poll(); poll();
-  expect(guiApi.request).toHaveBeenCalledOnce();
-  await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000);
-  expect(guiApi.request).toHaveBeenCalledTimes(2);
-  stop();
-  await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000);
-  expect(guiApi.request).toHaveBeenCalledTimes(2);
-});
-
-it("refreshes account changes immediately without delaying the next scheduled check", async () => {
-  vi.mocked(guiApi.request).mockResolvedValue({ data: [model], nextCursor: null });
-  const catalog = new GuiModelCatalog({ ready: () => true, accept: vi.fn() });
-  stop = watchModelCatalog(catalog, vi.fn());
-  accountChanged();
+  await vi.mocked(subscribeToProviderEvents).mock.calls[0][0]();
   await vi.advanceTimersByTimeAsync(0);
   expect(guiApi.request).toHaveBeenCalledOnce();
-  await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
-  accountChanged();
-  await vi.advanceTimersByTimeAsync(0);
-  expect(guiApi.request).toHaveBeenCalledTimes(2);
-  await vi.advanceTimersByTimeAsync(5 * 60 * 60 * 1000);
-  expect(guiApi.request).toHaveBeenCalledTimes(3);
+  await expect(catalog.ready()).resolves.toBeUndefined();
 });

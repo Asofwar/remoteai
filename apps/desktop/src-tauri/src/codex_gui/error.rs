@@ -56,6 +56,8 @@ pub(super) enum GuiError {
     WorkspaceBusy,
     #[error("对话请求无效，请刷新后重试。")]
     InvalidRequest,
+    #[error("模型列表暂时无法读取，请点击重试。")]
+    ModelCatalog,
     #[error("Codex 已断开连接，请重新连接后继续。")]
     Disconnected,
     #[error("Codex 响应超时，请检查连接状态。")]

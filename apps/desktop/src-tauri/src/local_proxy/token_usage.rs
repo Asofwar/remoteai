@@ -27,6 +27,16 @@ fn update_cached_official_model_context_windows<R: Runtime>(
     paths: &Paths,
     settings: &AppSettings,
 ) -> Result<(), String> {
+    update_cached_model_context_windows(paths, settings, |catalog| {
+        official_context_models::complete(app, catalog, &settings.official_model_context_windows)
+    })
+}
+
+fn update_cached_model_context_windows(
+    paths: &Paths,
+    settings: &AppSettings,
+    complete: impl FnOnce(&mut Value) -> bool,
+) -> Result<(), String> {
     if !should_update_official_model_cache(paths) {
         return Ok(());
     }
@@ -35,8 +45,7 @@ fn update_cached_official_model_context_windows<R: Runtime>(
         return Ok(());
     }
     let mut catalog = read_json(&path)?;
-    let completed =
-        official_context_models::complete(app, &mut catalog, &settings.official_model_context_windows);
+    let completed = complete(&mut catalog);
     let updated = apply_official_context_windows(
         &mut catalog,
         settings.gpt_5_6_sol_context_window,

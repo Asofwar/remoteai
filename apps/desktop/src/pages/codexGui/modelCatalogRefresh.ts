@@ -3,34 +3,24 @@ import type { GuiModelCatalog } from "./modelCatalog";
 import { subscribeGuiEvent } from "./webEvents";
 import { isHostedWebApp, subscribeToProviderEvents } from "../../api/backend";
 
-// Codex refreshes its remote catalog in the background; copy updates into the shared UI state.
-export const MODEL_CATALOG_REFRESH_MS = 6 * 60 * 60 * 1000;
-
+/** Only real account/Provider changes invalidate the catalog; time and hosted polls do not. */
 export function watchModelCatalog(catalog: GuiModelCatalog, report: (error: unknown) => void) {
   let stopped = false;
   let unsubscribe: (() => void) | undefined;
   let observed: Promise<void> | undefined;
-  let nextAutomaticRefresh = Date.now() + MODEL_CATALOG_REFRESH_MS;
   const failed = () => { if (!stopped) report(guiText("模型列表暂时无法更新，请稍后重试。")); };
-  const refresh = (invalidate = false) => {
-    if (!invalidate) {
-      if (Date.now() < nextAutomaticRefresh) return;
-      nextAutomaticRefresh = Date.now() + MODEL_CATALOG_REFRESH_MS;
-    }
-    const pending = invalidate ? catalog.invalidate() : catalog.refresh();
+  const refresh = () => {
+    if (stopped) return;
+    const pending = catalog.invalidate();
     if (observed === pending) return;
     observed = pending;
-    void pending.catch(() => { /* The picker displays catalog failures until automatic recovery. */ })
+    void pending.catch(() => { /* The picker displays failures until recovery or an explicit retry. */ })
       .finally(() => { if (observed === pending) observed = undefined; });
   };
-  const timer = setInterval(refresh, MODEL_CATALOG_REFRESH_MS);
-  // Hosted Provider polls have no change signal, so they share the six-hour automatic refresh limit.
-  const stopProviders = subscribeToProviderEvents(() => { if (!stopped) refresh(!isHostedWebApp); });
-  void subscribeGuiEvent("codex-gui-account-changed", () => {
-    if (!stopped) refresh(true);
-  }).then((stop) => {
+  const stopProviders = isHostedWebApp ? undefined : subscribeToProviderEvents(refresh);
+  void subscribeGuiEvent("codex-gui-account-changed", refresh).then((stop) => {
     if (stopped) stop();
     else unsubscribe = stop;
   }).catch(failed);
-  return () => { stopped = true; clearInterval(timer); stopProviders(); unsubscribe?.(); };
+  return () => { stopped = true; stopProviders?.(); unsubscribe?.(); };
 }

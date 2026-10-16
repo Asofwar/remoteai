@@ -14,7 +14,6 @@ import {
   hasLocalBackend,
   isDesktopApp,
   refreshAccountUsage,
-  refreshOfficialModelCatalog,
   removeAccount,
   setAccountAutoSwitchEnabled,
   setAccountGroup,
@@ -271,7 +270,6 @@ export function useAccountManager(
     if (showSpinner) setRefreshingAll(true);
     try {
       await Promise.allSettled(targetAccounts.map((account) => refreshAccountUsage(account.id)));
-      await refreshOfficialModelCatalog().catch(() => undefined);
       if (hasLocalBackend) await load();
       else {
         const fetchedAt = new Date().toISOString();

@@ -73,7 +73,7 @@ it('loads all account model pages when the desktop GUI has not been opened', asy
     .mockResolvedValueOnce({ data: [models[1]], nextCursor: null });
   const snapshot = await new ComposerBridge().read();
   expect(snapshot.models).toEqual(models);
-  expect(guiApi.request).toHaveBeenLastCalledWith({ operation: 'models', cursor: 'next' });
+  expect(guiApi.request).toHaveBeenLastCalledWith({ operation: 'models', cursor: 'next', cacheOnly: true });
 });
 
 it('does not publish an empty catalog over the last phone-only selection', async () => {

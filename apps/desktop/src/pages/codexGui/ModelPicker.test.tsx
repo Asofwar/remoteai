@@ -69,17 +69,18 @@ it("updates an open menu and accepts selections while usage polling waits for a 
   expect(controller.getSnapshot().settings.model).toBe("deepseek-v3");
 });
 
-it("keeps an open picker usable while refreshing and then displays the new model", async () => {
+it("opens without fetching and displays model changes received while open", async () => {
   const onChange = vi.fn();
   let finish!: (models: Model[]) => void;
   const pending = new Promise<Model[]>((resolve) => { finish = resolve; });
-  const onOpen = vi.fn(() => { void pending.then(render); });
+  const onRetry = vi.fn();
+  void pending.then((models) => render(models));
   const render = (catalog: Model[]) => root.render(<ModelPicker models={catalog} model={models[0].model}
-    effort="high" disabled={false} onChange={onChange} onOpen={onOpen} />);
+    effort="high" disabled={false} onChange={onChange} onRetry={onRetry} />);
   await act(async () => render([models[0]]));
   await act(async () => container.querySelector<HTMLButtonElement>("button")!.click());
   await act(async () => document.querySelector<HTMLButtonElement>('[aria-label="选择模型"]')!.click());
-  expect(onOpen).toHaveBeenCalledOnce();
+  expect(onRetry).not.toHaveBeenCalled();
   const released = { ...models[1], id: "gpt-6.1-sol", model: "gpt-6.1-sol", displayName: "GPT-6.1 Sol" };
   await act(async () => finish([models[0], released]));
   const option = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
@@ -110,7 +111,7 @@ it("shows a concrete initial selection and restores the recommended effort by na
 it("offers retry after an initial load fails and returns to loading while retrying", async () => {
   const retry = vi.fn();
   const render = (error?: string) => root.render(<ModelPicker models={[]} model="" effort=""
-    disabled onChange={vi.fn()} onOpen={retry} error={error} />);
+    disabled onChange={vi.fn()} onRetry={retry} error={error} />);
   await act(async () => render());
   const trigger = container.querySelector<HTMLButtonElement>("button")!;
   expect(trigger.textContent).toBe("正在加载模型…");
@@ -129,7 +130,7 @@ it("offers retry after an initial load fails and returns to loading while retryi
 it("distinguishes an empty catalog from loading and offers a retry", async () => {
   const retry = vi.fn();
   await act(async () => root.render(<ModelPicker models={[]} model="" effort="" disabled={false}
-    onChange={vi.fn()} onOpen={retry} />));
+    onChange={vi.fn()} onRetry={retry} />));
   const trigger = container.querySelector<HTMLButtonElement>("button")!;
   expect(trigger.textContent).toBe("暂无可用模型，点击重试");
   expect(trigger.disabled).toBe(false);
@@ -141,7 +142,7 @@ it("offers retry instead of selecting stale models after an account switch fails
   const retry = vi.fn();
   const change = vi.fn();
   await act(async () => root.render(<ModelPicker models={models} model={models[0].model} effort="high"
-    disabled onChange={change} onOpen={retry} error="offline" />));
+    disabled onChange={change} onRetry={retry} error="offline" />));
   const trigger = container.querySelector<HTMLButtonElement>("button")!;
   expect(trigger.textContent).toBe("模型加载失败，点击重试");
   expect(trigger.disabled).toBe(false);

@@ -188,8 +188,8 @@ export class GuiController {
       this.patch({ connection: "ready", approvals, error: "" });
       this.modelCatalog.activate();
       const results = await Promise.allSettled([
-        this.refresh(), this.modelCatalog.invalidate().catch(() => {
-          // The picker owns this error and clears it when automatic recovery succeeds.
+        this.refresh(), this.modelCatalog.restore().catch(() => {
+          // A missing local catalog waits for an explicit retry or source change.
         }), this.modelSettings.refresh(),
       ]);
       results.forEach((result) => { if (result.status === "rejected") this.report(result.reason); });

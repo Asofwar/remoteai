@@ -72,15 +72,9 @@ pub(crate) fn save_source_catalog(
     Ok(cache)
 }
 
-pub(crate) fn refresh_on_startup(app: AppHandle) {
-    let _ = OFFICIAL_MODELS_APP.set(app.clone());
-    let _ = thread::Builder::new()
-        .name("official-model-catalog-startup-refresh".to_string())
-        .spawn(move || {
-            if let Err(error) = refresh_official_model_catalog_blocking(&app) {
-                eprintln!("Failed to refresh the official model catalog at startup: {error}");
-            }
-        });
+pub(crate) fn setup(app: AppHandle) {
+    // Account changes still need the handle; startup must not fetch a catalog.
+    let _ = OFFICIAL_MODELS_APP.set(app);
 }
 
 pub(crate) fn refresh_after_account_switch(account_id: &str) {

@@ -4,7 +4,7 @@ use crate::{
     storage,
 };
 use serde_json::{json, Value};
-use std::{fs, future::Future, path::PathBuf, sync::mpsc, task::Poll, thread, time::Duration};
+use std::{fs, path::PathBuf, time::Duration};
 use tauri::Manager;
 
 const PROBE_ENV: &str = "CSW_OFFICIAL_CONTEXT_STARTUP_TEST";
@@ -152,7 +152,7 @@ fn startup_probe() {
         }
         assert_other_targets_are_untouched(&fixture);
     }
-    assert_slow_lookup_keeps_polling_responsive();
+    assert_missing_metadata_does_not_fetch_or_block_polling();
 }
 
 fn assert_other_targets_are_untouched(fixture: &Fixture) {
@@ -169,43 +169,16 @@ fn assert_other_targets_are_untouched(fixture: &Fixture) {
     }
 }
 
-fn assert_slow_lookup_keeps_polling_responsive() {
+fn assert_missing_metadata_does_not_fetch_or_block_polling() {
+    use crate::local_proxy::{begin_proxy_session_request, list_proxy_session_requests_blocking};
     let fixture = Fixture::new();
     fs::remove_file(fixture.root.join("official-models-cache.json")).unwrap();
     let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
     let mut settings = read_app_settings(fixture.app.handle()).unwrap();
     settings.cloud_base_url = Some(format!("http://{}", server.server_addr()));
     storage::write_app_settings(fixture.app.handle(), &settings).unwrap();
-    let (received, waiting) = mpsc::channel();
-    let (release, released) = mpsc::channel();
-    let worker = thread::spawn(move || {
-        let request = server.recv_timeout(TIMEOUT).unwrap().unwrap();
-        assert_eq!(request.url(), "/official-models");
-        received.send(()).unwrap();
-        released.recv_timeout(TIMEOUT).unwrap();
-        request
-            .respond(tiny_http::Response::from_string(source().to_string()))
-            .unwrap();
-    });
+    let before = fixture.preferences();
     let task = restore(fixture.app.handle().clone());
-    waiting.recv_timeout(TIMEOUT).unwrap();
-    tauri::async_runtime::block_on(assert_pending_and_poll(task, &fixture, release));
-    worker.join().unwrap();
-    fixture.assert_restored();
-}
-
-async fn assert_pending_and_poll(
-    task: tauri::async_runtime::JoinHandle<()>,
-    fixture: &Fixture,
-    release: mpsc::Sender<()>,
-) {
-    use crate::local_proxy::{begin_proxy_session_request, list_proxy_session_requests_blocking};
-    let mut task = std::pin::pin!(task);
-    assert!(
-        std::future::poll_fn(|cx| Poll::Ready(task.as_mut().poll(cx)))
-            .await
-            .is_pending()
-    );
     let id = "startup-context-polling";
     let guard = begin_proxy_session_request(&[("thread-id".into(), id.into())], None, b"{}", None);
     for _ in 0..3 {
@@ -217,7 +190,16 @@ async fn assert_pending_and_poll(
             500_000
         );
     }
-    release.send(()).unwrap();
-    task.await.unwrap();
+    tauri::async_runtime::block_on(async {
+        tokio::time::timeout(TIMEOUT, task).await.unwrap().unwrap();
+    });
+    assert!(server
+        .recv_timeout(Duration::from_millis(100))
+        .unwrap()
+        .is_none());
+    let cache = storage::read_json(&fixture.cache_path()).unwrap();
+    assert_eq!(cache["models"].as_array().unwrap().len(), 1);
+    assert_eq!(cache["models"][0]["slug"], "gpt-6-sol");
+    assert_eq!(fixture.preferences(), before);
     drop(guard);
 }

@@ -94,7 +94,7 @@ export class ComposerBridge {
     const models: Model[] = [];
     let cursor: string | undefined;
     do {
-      const result = await guiApi.request<ListResponse<Model>>({ operation: 'models', cursor });
+      const result = await guiApi.request<ListResponse<Model>>({ operation: 'models', cursor, cacheOnly: true });
       models.push(...result.data);
       cursor = result.nextCursor || undefined;
     } while (cursor);

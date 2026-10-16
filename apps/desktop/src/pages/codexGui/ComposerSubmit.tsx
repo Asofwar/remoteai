@@ -17,7 +17,7 @@ export function ComposerSubmit({ state, controller, hasDraft, reading, onSend, g
   const current = state.selected ? state.conversations[state.selected] : undefined;
   const interrupted = current?.turns[current.turns.length - 1]?.status === "interrupted";
   const continuing = interrupted && !hasDraft && !goalMode;
-  const disabled = state.connection !== "ready" || state.sending || state.archived || reading;
+  const disabled = state.connection !== "ready" || state.sending || state.archived || reading || !state.models.length;
   const submit = async () => {
     if (disabled) return;
     if (continuing) await controller.send(CONTINUE_MESSAGE, []);

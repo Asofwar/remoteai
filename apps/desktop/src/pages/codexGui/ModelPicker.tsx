@@ -15,7 +15,7 @@ interface ModelPickerProps extends ModelSelection {
   disabled: boolean;
   speed?: RequestSpeed;
   onChange: (selection: ModelSelection) => void;
-  onOpen?: () => void;
+  onRetry?: () => void;
   error?: string;
 }
 
@@ -77,7 +77,7 @@ export function ModelPicker(props: ModelPickerProps) {
   useEffect(() => { if (props.disabled && props.error) setOpen(false); }, [props.disabled, props.error]);
   const changeOpen = (next: boolean) => {
     setOpen(next);
-    if (next) { setChoosingModel(false); props.onOpen?.(); }
+    if (next) setChoosingModel(false);
   };
   const selectModel = (value: string) => {
     onChange(resolveModelSelection(models, { model: value, effort: "" }));
@@ -117,8 +117,8 @@ export function ModelPicker(props: ModelPickerProps) {
     if (loading) label = guiText("正在加载模型…");
     else if (props.error) label = guiText("模型加载失败，点击重试");
     return <button type="button" className={`${styles.trigger} ${styles.catalogStatus}`}
-      disabled={loading || !props.onOpen}
-      aria-busy={loading} onClick={props.onOpen}>
+      disabled={loading || !props.onRetry}
+      aria-busy={loading} onClick={props.onRetry}>
       <span className={styles.triggerModel}>{label}</span>
     </button>;
   }

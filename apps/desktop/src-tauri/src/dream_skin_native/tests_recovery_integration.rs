@@ -166,7 +166,6 @@ include!("runtime_recovery.rs");
 fn runtime_paths() -> RuntimePaths {
     RuntimePaths {
         bundled_root: PathBuf::from("simulated/resources"),
-        codex_paths: None,
     }
 }
 

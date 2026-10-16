@@ -77,7 +77,7 @@ export const Composer = forwardRef<ComposerHandle, {
   } }));
   const goal = state.selected ? state.goals?.[state.selected] : null;
   const canSend = !disabled && !reading && !state.modelSettingsLoading && !state.modelCatalogLoading
-    && hasDraft;
+    && state.models.length > 0 && hasDraft;
   const send = async () => {
     if (!canSend || drop.isReading()) return;
     await sendDraft(goalMode.enabled, goalMode.exit);
@@ -148,7 +148,7 @@ export const Composer = forwardRef<ComposerHandle, {
           <ModelPicker models={state.models} model={state.settings.model} effort={state.settings.effort}
             speed={requestSpeed}
             error={state.modelCatalogError}
-            onOpen={() => void controller.refreshModels().catch(controller.report)}
+            onRetry={() => void controller.refreshModels().catch(controller.report)}
             disabled={state.connection !== "ready" || Boolean(state.modelCatalogLoading)}
             onChange={controller.settings} />
           <ComposerSubmit state={state} controller={controller}

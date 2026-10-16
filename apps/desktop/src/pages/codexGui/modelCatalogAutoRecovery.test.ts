@@ -37,6 +37,7 @@ it('recovers the host through remote reads without reconnecting the phone or com
   const bridge = new ComposerBridge();
   cleanup.push(() => pc.dispose(), bridge.attach(pc));
   await pc.connect();
+  await expect(pc.modelCatalog.invalidate()).rejects.toThrow('initial catalog failure');
   const request = vi.fn(async (method: string, body?: Record<string, unknown>) => {
     if (method === 'connect') return { ...chatHandshake, approvals: [] };
     if (body?.operation === 'models') {
@@ -57,7 +58,7 @@ it('recovers the host through remote reads without reconnecting the phone or com
   expect(pc.getSnapshot()).toMatchObject({ modelCatalogError: '', error: '' });
   expect(guiApi.connect).toHaveBeenCalledOnce();
   expect(request.mock.calls.filter(([method]) => method === 'connect')).toHaveLength(1);
-  expect(vi.mocked(guiApi.request).mock.calls.filter(([body]) => body.operation === 'models')).toHaveLength(2);
+  expect(vi.mocked(guiApi.request).mock.calls.filter(([body]) => body.operation === 'models')).toHaveLength(3);
 });
 
 it('automatically retries initial failure and removes the retry timer after success', async () => {

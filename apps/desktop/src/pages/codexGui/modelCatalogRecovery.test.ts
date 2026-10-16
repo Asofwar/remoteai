@@ -44,12 +44,12 @@ it("accepts a catalog after official discovery and Admin use their full network 
   expect(vi.getTimerCount()).toBe(0);
 });
 
-it("reports an empty initial catalog as a failed load and recovers on retry", async () => {
+it("leaves an empty local cache idle and fetches only on explicit retry", async () => {
   vi.mocked(guiApi.request).mockResolvedValue(page([]));
   const controller = new GuiController();
   await controller.connect();
-  expect(controller.getSnapshot()).toMatchObject({ models: [], modelCatalogLoading: true,
-    modelCatalogError: expect.stringContaining("模型列表") });
+  expect(controller.getSnapshot()).toMatchObject({ models: [], modelCatalogLoading: false,
+    modelCatalogError: "" });
   expect(await controller.send("wait", [])).toBe(false);
   vi.mocked(guiApi.request).mockResolvedValue(page([current]));
   await controller.refreshModels();
@@ -66,7 +66,7 @@ it("ends a stalled initial load, keeps sending blocked, and retries without reco
   const connecting = controller.connect();
   await vi.advanceTimersByTimeAsync(MODEL_CATALOG_TIMEOUT_MS);
   await connecting;
-  expect(controller.getSnapshot()).toMatchObject({ connection: "ready", modelCatalogLoading: true,
+  expect(controller.getSnapshot()).toMatchObject({ connection: "ready", modelCatalogLoading: false,
     modelCatalogError: expect.stringContaining("模型列表"), models: [] });
   expect(await controller.send("wait", [])).toBe(false);
   vi.mocked(guiApi.request).mockResolvedValue(page([current]));

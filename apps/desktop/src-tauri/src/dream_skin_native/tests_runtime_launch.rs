@@ -100,9 +100,6 @@ fn ensure_monitor(_: RuntimePaths) {
 fn wake_monitor() {
     record_debug_operation();
 }
-fn refresh_models_after_runtime_ready(_: &RuntimePaths) {
-    record_debug_operation();
-}
 
 fn wait_for_targets(_: u16, _: Duration) -> Result<(), String> {
     record_debug_operation();
@@ -119,7 +116,6 @@ fn launch() -> Result<(), String> {
     start_managed_runtime(
         &RuntimePaths {
             bundled_root: PathBuf::new(),
-            codex_paths: None,
         },
         &CodexInstall {
             executable: PathBuf::from("simulated/ChatGPT.exe"),

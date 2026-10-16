@@ -11,6 +11,17 @@ pub(super) fn complete<R: Runtime>(
     catalog: &mut Value,
     overrides: &ContextWindows,
 ) -> bool {
+    let mut changed = complete_cached(app, catalog, overrides);
+    // Explicit refreshes may supplement cached metadata from Admin.
+    changed |= complete_from(catalog, overrides, || super::admin_model_catalog(app));
+    changed
+}
+
+pub(super) fn complete_cached<R: Runtime>(
+    app: &AppHandle<R>,
+    catalog: &mut Value,
+    overrides: &ContextWindows,
+) -> bool {
     if !needs_models(catalog, overrides) {
         return false;
     }
@@ -20,9 +31,6 @@ pub(super) fn complete<R: Runtime>(
     {
         changed |= append_configured_models(catalog, overrides, &source);
     }
-    // Older clients/accounts can return a valid catalog that omits a newly selected model.
-    // Use its real metadata, including prompts and tools, rather than cloning another model.
-    changed |= complete_from(catalog, overrides, || super::admin_model_catalog(app));
     changed
 }
 

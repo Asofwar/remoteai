@@ -113,6 +113,15 @@ fn models<R: Runtime>(
             );
         }
     }
+    if !request
+        .app
+        .try_state::<crate::codex_gui::GuiState>()
+        .is_some_and(|state| state.model_discovery.allowed())
+    {
+        let home = crate::codex_home::gui_home(request.app)?;
+        let catalog = crate::codex_gui::cached_catalog(&home).map_err(|error| error.to_string())?;
+        return super::gui_context::model_catalog(json_payload(200, catalog), |_| Ok(()));
+    }
     let catalog_url = catalog_url(request.url, || {
         Ok(crate::official_models::model_client_version(
             &resolve_paths(request.app)?,
@@ -165,6 +174,40 @@ fn catalog_url(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn passive_cli_discovery_uses_only_gui_cache_without_account_credentials() {
+        let mut context = tauri::test::mock_context(tauri::test::noop_assets());
+        context.config_mut().identifier =
+            format!("com.codex-switch.catalog-test.{}", uuid::Uuid::new_v4());
+        let app = tauri::test::mock_builder().build(context).unwrap();
+        app.manage(crate::codex_gui::GuiState::default());
+        let home = crate::codex_home::gui_home(app.handle()).unwrap();
+        std::fs::create_dir_all(&home).unwrap();
+        let path = home.join("models_cache.json");
+        let cached = json!({"models": [{"slug": "cached", "visibility": "list"}]});
+        std::fs::write(&path, serde_json::to_vec(&cached).unwrap()).unwrap();
+        let request = GuiProxyRequest {
+            app: app.handle(),
+            method: &Method::Get,
+            url: "/v1/models",
+            headers: &[],
+            body: Vec::new(),
+            session_id: None,
+            session_request_id: None,
+        };
+        let target = ActiveTarget::Official {
+            model: "cached".into(),
+        };
+        let mut payload = models(&request, &target, None).unwrap();
+        let bytes = read_official_model_catalog_body(&mut payload.body).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<Value>(&bytes).unwrap()["models"][0]["slug"],
+            "cached"
+        );
+        std::fs::remove_file(path).unwrap();
+        assert!(models(&request, &target, None).is_err());
+    }
 
     #[test]
     fn catalog_requests_supply_required_version_without_replacing_cli_queries() {

@@ -20,7 +20,14 @@ const discovered = { ...template, slug: "gpt-6.1-sol", display_name: "GPT-6.1 So
   visibility: "list", supported_in_api: true };
 let models = [discovered, { ...discovered, slug: "fixture-hidden", visibility: "hide" }];
 const requests = [];
-const server = createServer((request, response) => {
+let discoveryAllowed = false;
+const server = createServer(async (request, response) => {
+  if (!discoveryAllowed) {
+    const cached = await readFile(join(home, "models_cache.json"), "utf8").catch(() => null);
+    response.writeHead(cached ? 200 : 503, { "Content-Type": "application/json" });
+    response.end(cached ?? JSON.stringify({ error: { message: "No cached models" } }));
+    return;
+  }
   requests.push({ url: request.url, authorization: request.headers.authorization });
   // Match the GUI proxy: an empty upstream catalog is a failed refresh, never a cache replacement.
   response.writeHead(models.length ? 200 : 502, { "Content-Type": "application/json" });
@@ -43,9 +50,19 @@ experimental_bearer_token = "fixture-token"
 supports_websockets = false
 `);
 const client = connectAppServer({ executable, home, cwd: home });
+let clientClosed = false;
+async function refreshModels() {
+  discoveryAllowed = true;
+  try { return await client.rpc("model/list", { limit: 100 }); }
+  finally { discoveryAllowed = false; }
+}
 try {
   await client.initialize();
-  const initial = await client.rpc("model/list", { limit: 100 });
+  await client.rpc("thread/list", { limit: 1 });
+  assert.equal(requests.length, 0, "Starting a connection must not discover models");
+  await new Promise(resolve => setTimeout(resolve, 250));
+  assert.equal(requests.length, 0, "Background CLI startup discovery must stay local");
+  const initial = await refreshModels();
   assert.deepEqual(initial.data.map((model) => model.model), ["gpt-6.1-sol"]);
   assert.ok(requests.length > 0, "The CLI must fetch the proxy's model catalog");
   assert.ok(requests.every((request) => request.url.startsWith("/codex-gui/v1/models?client_version=")));
@@ -54,7 +71,7 @@ try {
   const cachePath = join(home, "models_cache.json");
   const cache = JSON.parse(await readFile(cachePath, "utf8"));
   await writeFile(cachePath, JSON.stringify({ ...cache, fetched_at: "2000-01-01T00:00:00Z" }));
-  const refreshed = await client.rpc("model/list", { limit: 100 });
+  const refreshed = await refreshModels();
   assert.deepEqual(refreshed.data.map((model) => model.model), ["gpt-6.1-sol", "fixture-new-model"]);
   const successful = JSON.parse(await readFile(cachePath, "utf8"));
   const expired = JSON.stringify({ ...successful, fetched_at: "2000-01-01T00:00:00Z" });
@@ -62,16 +79,25 @@ try {
   models = [];
   const beforeEmpty = requests.length;
   // This CLI can still return [] on failure; the UI protects its own last successful snapshot separately.
-  await client.rpc("model/list", { limit: 100 });
+  await refreshModels();
   assert.ok(requests.length > beforeEmpty, "An expired catalog must attempt a refresh");
   assert.equal(await readFile(cachePath, "utf8"), expired, "Failed refreshes must preserve the nonempty disk cache");
   models = [{ ...discovered, slug: "fixture-new-account" }];
   await unlink(cachePath);
-  const switched = await client.rpc("model/list", { limit: 100 });
+  const switched = await refreshModels();
   assert.deepEqual(switched.data.map((model) => model.model), ["fixture-new-account"]);
-  console.log("PASS: discovery, empty-response protection, cache expiry and account changes without CLI restart.");
-} finally {
   await client.close();
+  clientClosed = true;
+  const beforeReconnect = requests.length;
+  const reconnected = connectAppServer({ executable, home, cwd: home });
+  try {
+    await reconnected.initialize();
+    await reconnected.rpc("thread/list", { limit: 1 });
+    assert.equal(requests.length, beforeReconnect, "Reconnecting must not discover models");
+  } finally { await reconnected.close(); }
+  console.log("PASS: passive connection/reconnection, explicit discovery, cache expiry and source changes.");
+} finally {
+  if (!clientClosed) await client.close();
   server.closeAllConnections();
   await new Promise((resolve) => server.close(resolve));
 }

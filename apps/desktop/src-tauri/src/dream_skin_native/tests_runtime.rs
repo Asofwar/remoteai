@@ -313,7 +313,6 @@
         restart_managed_runtime(
             &RuntimePaths {
                 bundled_root,
-                codex_paths: None,
             },
             SkinVerificationMode::Required,
         )

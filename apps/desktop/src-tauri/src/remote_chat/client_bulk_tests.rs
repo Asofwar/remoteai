@@ -54,6 +54,9 @@ fn raw_batches_preserve_records_and_require_the_matching_acknowledgement() {
     }
     bulk.flush().unwrap();
     let bytes = output.recv().unwrap();
+    let expired = Instant::now() + std::time::Duration::from_secs(31);
+    assert!(!bulk.stalled(Instant::now()));
+    assert!(bulk.stalled(expired));
     assert_eq!(&bytes[..9], b"CGR1\0\0\0\x01\x10");
     assert_eq!(bytes.len(), BATCH_HEADER_BYTES + 16 * (4 + record.len()));
     for encoded in bytes[9..].chunks_exact(4 + record.len()) {
@@ -61,11 +64,13 @@ fn raw_batches_preserve_records_and_require_the_matching_acknowledgement() {
         assert_eq!(&encoded[4..], record);
     }
     bulk.acknowledge(2);
+    assert!(bulk.stalled(expired));
     bulk.flush().unwrap();
     assert!(output.try_recv().is_err());
     assert_eq!(bulk.buffered, 20 * record.len());
     bulk.acknowledge(1);
     bulk.acknowledge(1);
+    assert!(!bulk.stalled(expired));
     assert_eq!(bulk.buffered, 4 * record.len());
     bulk.flush().unwrap();
     assert_eq!(&output.recv().unwrap()[..9], b"CGR1\0\0\0\x02\x04");

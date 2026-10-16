@@ -11,6 +11,7 @@ mod client_runtime;
 mod config;
 pub(crate) mod host_health;
 pub(crate) mod identity;
+mod ipc_ack;
 mod protocol;
 mod runtime;
 mod sessions;
@@ -185,5 +186,7 @@ pub(crate) fn start<R: tauri::Runtime>(app: tauri::AppHandle<R>) {
     let authority = tcp.authority.clone();
     app.manage(tcp);
     app.manage(traversal::State::default());
-    std::thread::spawn(move || runtime::run(receiver, configs, upload_policy, authority));
+    let health = host_health::start(app);
+    let runtime = runtime::Runtime::new(upload_policy, authority, health);
+    std::thread::spawn(move || runtime::run(runtime, receiver, configs));
 }

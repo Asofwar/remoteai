@@ -9,12 +9,12 @@ use std::{
 use crate::codex_gui::upload_policy::UploadPolicyStore;
 use serde_json::json;
 use std::sync::Arc;
-use tokio::sync::{mpsc, watch};
 use tungstenite::{stream::MaybeTlsStream, Error as SocketError, Message, WebSocket};
 
 use super::{
     bridge::Bridge,
     config::Config,
+    host_health::Health,
     protocol::{ChatError, Command, Envelope, Event, Outgoing, FRAME_LIMIT},
     sessions::Sessions,
     SendRequest,
@@ -22,11 +22,16 @@ use super::{
 
 type Socket = WebSocket<MaybeTlsStream<TcpStream>>;
 type Dial = sync_mpsc::Receiver<Result<Socket, ChatError>>;
+#[path = "runtime_worker.rs"]
+mod worker;
+pub(super) use worker::run;
 #[path = "runtime_bulk.rs"]
 mod binary;
 #[cfg(test)]
 #[path = "bulk_runtime_tests.rs"]
 mod bulk_tests;
+#[path = "runtime_recovery.rs"]
+mod recovery;
 #[cfg(test)]
 #[path = "runtime_tests.rs"]
 mod tests;
@@ -35,36 +40,6 @@ const RECONNECT_DELAY: Duration = Duration::from_millis(1500);
 const PING_INTERVAL: Duration = Duration::from_secs(20);
 const RECEIVE_TIMEOUT: Duration = Duration::from_secs(60);
 const AUTH_TIMEOUT: Duration = Duration::from_secs(10);
-const COMMANDS_PER_TICK: usize = 64;
-
-pub(super) fn run(
-    mut commands: mpsc::Receiver<Command>,
-    mut configs: watch::Receiver<Option<Config>>,
-    upload_policy: Arc<UploadPolicyStore>,
-    tcp_authority: Arc<super::tcp::Authority>,
-) {
-    let mut runtime = Runtime {
-        upload_policy,
-        tcp_authority,
-        ..Runtime::default()
-    };
-    loop {
-        for _ in 0..COMMANDS_PER_TICK {
-            match commands.try_recv() {
-                Ok(command) => runtime.command(command),
-                Err(mpsc::error::TryRecvError::Empty) => break,
-                Err(mpsc::error::TryRecvError::Disconnected) => return,
-            }
-        }
-        if configs.has_changed().unwrap_or(false) {
-            runtime.configure(configs.borrow_and_update().clone());
-        }
-        runtime.tick();
-        if runtime.socket.is_none() {
-            thread::sleep(POLL_INTERVAL);
-        }
-    }
-}
 
 struct ConnectionTimes {
     opened: Instant,
@@ -73,6 +48,7 @@ struct ConnectionTimes {
 }
 
 pub(super) struct Runtime {
+    health: Arc<Health>,
     bulk: super::client_bulk::ClientBulk,
     auth_renewal: super::auth_renewal::AuthRenewal,
     tcp_authority: Arc<super::tcp::Authority>,
@@ -94,6 +70,7 @@ impl Default for Runtime {
     fn default() -> Self {
         let now = Instant::now();
         Self {
+            health: Arc::default(),
             bulk: super::client_bulk::ClientBulk::new(None),
             auth_renewal: super::auth_renewal::AuthRenewal::default(),
             tcp_authority: Arc::default(),
@@ -118,6 +95,19 @@ impl Default for Runtime {
 }
 
 impl Runtime {
+    pub(super) fn new(
+        upload_policy: Arc<UploadPolicyStore>,
+        tcp_authority: Arc<super::tcp::Authority>,
+        health: Arc<Health>,
+    ) -> Self {
+        Self {
+            upload_policy,
+            tcp_authority,
+            health,
+            ..Self::default()
+        }
+    }
+
     pub(super) fn command(&mut self, command: Command) {
         match command {
             Command::Attach {
@@ -127,6 +117,7 @@ impl Runtime {
             } => {
                 self.bulk = super::client_bulk::ClientBulk::new(bulk);
                 self.bridge = Some(Bridge::new(client_id, deliver));
+                self.health.attached();
                 self.reset();
                 self.retry_at = Instant::now();
             }
@@ -246,17 +237,20 @@ impl Runtime {
     }
 
     pub(super) fn tick(&mut self) {
+        if self.recover_stalled_ipc(Instant::now()) {
+            return;
+        }
         self.finish_dial();
         if self.bridge.as_mut().is_some_and(|bridge| !bridge.flush()) {
-            self.reset();
-            self.bridge = None;
+            self.fail_host_transport();
+            return;
         }
         self.start_dial();
         if self.socket.is_none() {
             return;
         }
         if self.bulk.flush().is_err() {
-            self.disconnect();
+            self.fail_host_transport();
             return;
         }
         if !self.bulk.has_capacity() {

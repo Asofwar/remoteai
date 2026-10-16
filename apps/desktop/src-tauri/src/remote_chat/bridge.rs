@@ -1,8 +1,11 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, time::Instant};
 
 use serde::Serialize;
 
-use super::protocol::{Envelope, Event};
+use super::{
+    ipc_ack::PendingAck,
+    protocol::{Envelope, Event},
+};
 
 const MAX_QUEUED_EVENTS: usize = 256;
 const MAX_QUEUED_BYTES: usize = 4 * 1024 * 1024;
@@ -21,7 +24,7 @@ pub(super) struct Bridge {
     queue: VecDeque<Envelope>,
     bytes: usize,
     sequence: u64,
-    pending: bool,
+    pending: PendingAck,
 }
 
 impl Bridge {
@@ -32,7 +35,7 @@ impl Bridge {
             queue: VecDeque::new(),
             bytes: 0,
             sequence: 0,
-            pending: false,
+            pending: PendingAck::default(),
         }
     }
 
@@ -58,12 +61,12 @@ impl Bridge {
 
     pub fn acknowledge(&mut self, sequence: u64) {
         if sequence == self.sequence {
-            self.pending = false;
+            self.pending.clear();
         }
     }
 
     pub fn flush(&mut self) -> bool {
-        if self.pending || self.queue.is_empty() {
+        if self.pending.pending() || self.queue.is_empty() {
             return true;
         }
         let events: Vec<_> = self
@@ -74,11 +77,15 @@ impl Bridge {
             .bytes
             .saturating_sub(events.iter().map(event_bytes).sum());
         self.sequence += 1;
-        self.pending = true;
+        self.pending.sent();
         (self.deliver)(Batch {
             sequence: self.sequence,
             events,
         })
+    }
+
+    pub fn stalled(&self, now: Instant) -> bool {
+        self.pending.expired(now)
     }
 }
 

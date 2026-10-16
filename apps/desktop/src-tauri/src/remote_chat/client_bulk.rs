@@ -1,9 +1,9 @@
 //! Bounded raw IPC for relay downloads. File bytes never enter the JSON chat bridge.
-use std::collections::VecDeque;
+use std::{collections::VecDeque, time::Instant};
 
 use tauri::ipc::{Channel, Response};
 
-use super::{bulk, protocol::ChatError};
+use super::{bulk, ipc_ack::PendingAck, protocol::ChatError};
 
 const MAX_FRAME_BYTES: usize = 16 * 1024 + 5 + 128;
 const MAX_BUFFER_BYTES: usize = 4 * 1024 * 1024;
@@ -18,6 +18,7 @@ pub(super) struct ClientBulk {
     buffered: usize,
     sequence: u32,
     pending: usize,
+    acknowledgement: PendingAck,
 }
 
 impl ClientBulk {
@@ -29,6 +30,7 @@ impl ClientBulk {
             buffered: 0,
             sequence: 0,
             pending: 0,
+            acknowledgement: PendingAck::default(),
         }
     }
 
@@ -44,6 +46,7 @@ impl ClientBulk {
         self.queue.clear();
         self.buffered = 0;
         self.pending = 0;
+        self.acknowledgement.clear();
         self.enabled = false;
     }
 
@@ -69,6 +72,7 @@ impl ClientBulk {
         if sequence == u64::from(self.sequence) {
             self.buffered -= self.pending;
             self.pending = 0;
+            self.acknowledgement.clear();
         }
     }
 
@@ -90,9 +94,14 @@ impl ClientBulk {
             batch.extend_from_slice(&frame);
         }
         self.pending = length;
+        self.acknowledgement.sent();
         channel
             .send(Response::new(batch))
             .map_err(|_| ChatError::Transport)
+    }
+
+    pub fn stalled(&self, now: Instant) -> bool {
+        self.acknowledgement.expired(now)
     }
 }
 

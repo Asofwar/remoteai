@@ -5,17 +5,26 @@ import { mobileConnection } from './mobileConnection';
 import { invoke } from '@tauri-apps/api/core';
 
 const HOST_HEARTBEAT_MS = 10_000;
+interface HostHealthStatus { restartRequired: boolean }
 
 export function useChatHost() {
   useEffect(() => {
     const releaseSession = retainGuiSession();
-    const host = new ChatHost(mobileConnection.setConnected);
+    let host = new ChatHost(mobileConnection.setConnected);
     let pending = false;
     let active = true;
     const heartbeat = async () => {
       if (pending || !active) return;
       pending = true;
-      try { await invoke('remote_chat_host_alive', { active: mobileConnection.getSnapshot() }); }
+      try {
+        const status = await invoke<HostHealthStatus>('remote_chat_host_alive', {
+          active: mobileConnection.getSnapshot(),
+        });
+        if (active && status.restartRequired) {
+          host.close();
+          host = new ChatHost(mobileConnection.setConnected);
+        }
+      }
       catch { console.warn('Chat host health check unavailable.'); }
       finally { pending = false; }
     };

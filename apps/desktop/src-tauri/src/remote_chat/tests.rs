@@ -81,6 +81,8 @@ fn a_paused_frontend_has_bounded_buffers_and_stale_acknowledgements_do_not_relea
     bridge.reset(1);
     assert!(bridge.flush());
     let first = receiver.recv().unwrap();
+    let expired = Instant::now() + Duration::from_secs(31);
+    assert!(!bridge.stalled(Instant::now()));
     for _ in 0..256 {
         assert!(bridge.enqueue(Envelope {
             generation: 1,
@@ -93,9 +95,11 @@ fn a_paused_frontend_has_bounded_buffers_and_stale_acknowledgements_do_not_relea
     }));
     bridge.reset(2);
     bridge.acknowledge(first.sequence + 1);
+    assert!(bridge.stalled(expired));
     assert!(bridge.flush());
     assert!(receiver.try_recv().is_err());
     bridge.acknowledge(first.sequence);
+    assert!(!bridge.stalled(expired));
     assert!(bridge.flush());
     let reset = receiver.recv().unwrap();
     assert_eq!(reset.events.len(), 1);

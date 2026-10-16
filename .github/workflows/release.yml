@@ -218,6 +218,16 @@ jobs:
         with:
           tool: cargo-nextest
 
+      # Peer readiness requires a measured, nonzero RTT. Same-host Linux sockets can
+      # finish below the microsecond timer resolution; model a small LAN delay instead.
+      - name: Model Linux peer network latency
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo tc qdisc add dev lo root netem delay 1ms
+          tc qdisc show dev lo
+
       - name: Diagnose Linux peer discovery
         if: runner.os == 'Linux' && inputs.linux_only
         shell: bash
@@ -253,16 +263,6 @@ jobs:
           npm run test -- --testTimeout 30000
           npm run build
 
-      # Retried tags keep immutable app sources while using the current CI test policy.
-      - name: Checkout Linux release test policy
-        if: runner.os == 'Linux'
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.workflow_sha }}
-          path: .release-checks
-          sparse-checkout: .github/nextest-release.toml
-          sparse-checkout-cone-mode: false
-
       - name: Run checks in isolated test processes
         if: runner.os != 'Windows'
         shell: bash
@@ -273,15 +273,11 @@ jobs:
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             sudo sysctl -w net.inet.udp.maxdgram=65535
           fi
-          nextest_args=()
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            nextest_args+=(--config-file .release-checks/.github/nextest-release.toml)
-          fi
           npx lerna run check --ignore @codex-switch/backend --ignore @codex-switch/admin-ui --stream
           npm run check:backend
           cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
           cargo nextest run --locked --manifest-path apps/desktop/src-tauri/Cargo.toml \
-            "${nextest_args[@]}" --test-threads 1 --no-fail-fast
+            --test-threads 1 --no-fail-fast
           cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --doc
           node scripts/check-installer-helper.mjs
           node scripts/check-installer-fixture.mjs

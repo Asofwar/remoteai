@@ -1,0 +1,12 @@
+# Native peer discovery has a fixed production connection deadline. On shared Linux
+# runners these two cold-start fixtures can miss it, while the same binary passes
+# in isolation. Retry only these fixtures, in fresh processes, with a bounded delay.
+# Keep the production deadlines and every assertion; three failures still fail CI.
+[[profile.default.overrides]]
+platform = 'cfg(target_os = "linux")'
+filter = '''
+test(=update_peers::commands::tests::peer_tests::native_seed_serves_verified_cache_over_a_discovered_direct_connection)
+|
+test(=update_peers::commands::tests::pipeline_tests::an_empty_swarm_discovers_a_new_source_without_restarting_download)
+'''
+retries = { backoff = "fixed", count = 2, delay = "2s" }

@@ -419,3 +419,10 @@ unselected tabs, trusted clicks, animation updates, input, checkboxes, and same/
 It asserts that window state and tab selection are unchanged. The harness attaches raw CDP only to
 the extension worker: Playwright page setup would otherwise supply its own focus emulation and hide
 the original bug. The test does not connect to the user's native host or touch existing browser profiles.
+
+`node scripts/chrome-plugin-icon-conflict.e2e.mjs` reproduces a competing favicon observer in an
+isolated browser. The indicator defers repairs to a timer and gives up after repeated conflicts;
+Chrome's debugger banner still identifies the controlled page. This prevents synchronous observers
+from starving page reads when another extension or an old extension world restores its own icon.
+The fixture verifies page reads, reload and cleanup. Reload uses `chrome.tabs.reload` so it does not
+first require scripts or debugger commands to complete in the old document.

@@ -40,6 +40,19 @@ beforeEach(async () => {
   await permissionModule.initializePermissions();
 });
 
+test('reload uses the tab API without waiting for the current document or attaching a debugger', async () => {
+  storage.local.siteAccessMode = 'all';
+  const reloaded = [];
+  chrome.tabs = { get: async id => ({ id, url: 'https://example.com' }),
+    reload: async id => reloaded.push(id) };
+  assert.deepEqual(await execute({ clientId: 'test' }, { operation: 'reload', args: { tabId: 1 } }),
+    { reloaded: true });
+  assert.deepEqual(reloaded, [1]);
+  chromeWebsiteAccess = false;
+  await assert.rejects(execute({ clientId: 'test' }, { operation: 'reload', args: { tabId: 1 } }), /Chrome/);
+  assert.deepEqual(reloaded, [1], 'reload still requires website permission');
+});
+
 test('rejects browser internals, credential-bearing URLs, invalid tabs and forged operations',()=>{
   for(const url of ['file:///C:/secret','chrome://settings','javascript:alert(1)','https://user:pass@example.com']) {
     assert.throws(()=>website(url));

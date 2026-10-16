@@ -22,13 +22,29 @@ export function updatePageIcon(iconUrl) {
   icon.rel = 'icon';
   icon.type = 'image/svg+xml';
   icon.href = iconUrl;
+  const repairDelayMs = 50;
+  const repairWindowMs = 1000;
+  const maxRepairs = 4;
+  let timer;
+  let repairs = [];
   const observer = new MutationObserver(() => {
-    for (const node of document.querySelectorAll('link[rel~="icon"]')) {
-      if (node === icon) continue;
-      if (!originals.includes(node)) originals.push(node);
-      node.remove();
-    }
-    if (!icon.isConnected) document.head.append(icon);
+    if (timer !== undefined) return;
+    // Another extension world (including an unloaded version) may also enforce its icon.
+    // Mutating in this callback can starve the renderer's task queue indefinitely.
+    timer = setTimeout(() => {
+      timer = undefined;
+      const others = [...document.querySelectorAll('link[rel~="icon"]')].filter(node => node !== icon);
+      if (!others.length && icon.isConnected) return;
+      const now = Date.now();
+      repairs = repairs.filter(time => now - time < repairWindowMs);
+      if (repairs.length >= maxRepairs) { globalThis[key]?.restore(); return; }
+      repairs.push(now);
+      for (const node of others) {
+        if (!originals.includes(node)) originals.push(node);
+        node.remove();
+      }
+      if (!icon.isConnected) document.head.append(icon);
+    }, repairDelayMs);
   });
   for (const node of originals) node.remove();
   document.head.append(icon);
@@ -36,6 +52,7 @@ export function updatePageIcon(iconUrl) {
     attributeFilter: ['rel', 'href'] });
   globalThis[key] = { restore: () => {
     observer.disconnect();
+    clearTimeout(timer);
     icon.remove();
     for (const node of originals) document.head.append(node);
     delete globalThis[key];

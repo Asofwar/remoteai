@@ -22,7 +22,7 @@ export async function execute(context, request) {
     return withWorker(context, args, connection => standaloneWorkerLogs(connection, args));
   }
   if (operation === 'open') return open(context, args);
-  if (['navigate', 'close', 'focus'].includes(operation)) {
+  if (['navigate', 'close', 'focus', 'reload'].includes(operation)) {
     return queueTarget({ tabId: args.tabId }, () => tabAction(context, operation, args));
   }
   return withTab(context, args, (driver) => pageAction(driver, operation, args),
@@ -56,6 +56,12 @@ async function open(context, args) {
 async function tabAction(context, operation, args) {
   const tab = await chrome.tabs.get(args.tabId);
   await authorize(tab.url, context.clientId, context.signal);
+  if (operation === 'reload') {
+    // Recovery must not depend on scripts or debugger commands in the stalled document.
+    invalidate(tab.id);
+    await chrome.tabs.reload(tab.id);
+    return { reloaded: true };
+  }
   if (operation === 'close') {
     await chrome.tabs.remove(tab.id);
     invalidate(tab.id);
@@ -90,11 +96,6 @@ async function pageAction(driver, operation, args) {
     return { tabId: driver.tab.id, image: { mimeType: 'image/jpeg', data: result.data } };
   }
   if (operation === 'wait') return waitForText(driver, args);
-  if (operation === 'reload') {
-    invalidate(driver.tab.id);
-    await driver.send('Page.reload');
-    return { reloaded: true };
-  }
   return history(driver, operation);
 }
 

@@ -1,8 +1,9 @@
-import { Button, Card, Input, Space, Tag, Typography } from "antd";
+import { Button, Card, Space, Tag, Typography } from "antd";
 import { useI18n } from "../i18n-context";
 import { useOfficialModels, type OfficialModelsProps } from "../hooks/useOfficialModels";
 import { HelpAssistantSettings } from "./HelpAssistantSettings";
 import { OfficialModelRefreshSettings } from "./OfficialModelRefreshSettings";
+import { CatalogEditor } from "./official-models/CatalogEditor";
 
 export function OfficialModelsPage({ api, canManage }: OfficialModelsProps) {
   const { language } = useI18n();
@@ -10,7 +11,7 @@ export function OfficialModelsPage({ api, canManage }: OfficialModelsProps) {
   const models = useOfficialModels(api, zh);
   const busy = models.loading || models.action !== null;
   const catalog = models.snapshot?.catalog;
-  const count = Array.isArray(catalog?.models) ? catalog.models.length : 0;
+  const count = models.parsed.catalog?.models.length ?? 0;
   return <Space direction="vertical" size="large" style={{ width: "100%" }}>
     <div>
       <Typography.Title level={2}>{zh ? "官方模型" : "Official models"}</Typography.Title>
@@ -39,13 +40,10 @@ export function OfficialModelsPage({ api, canManage }: OfficialModelsProps) {
         ? "尚无可用列表。可从官方刷新，或填写完整列表后保存。"
         : "No model list yet. Refresh from the official service or enter a complete list below."}
       </Typography.Paragraph>}
-      <Typography.Paragraph>{zh ? "模型列表内容（JSON）" : "Model list (JSON)"}</Typography.Paragraph>
-      <Input.TextArea aria-label={zh ? "模型列表内容" : "Model list content"} value={models.draft}
-        onChange={(event) => models.setDraft(event.target.value)} readOnly={!canManage}
-        disabled={busy || !models.snapshot} autoSize={{ minRows: 16, maxRows: 28 }}
-        spellCheck={false} style={{ fontFamily: "monospace", overflowWrap: "anywhere" }} />
+      <CatalogEditor draft={models.draft} onChange={models.setDraft} parsed={models.parsed}
+        disabled={!canManage || busy || !models.snapshot} canManage={canManage} zh={zh} />
       {canManage && <Button type="primary" style={{ marginTop: 16 }} loading={models.action === "save"}
-        disabled={busy || !models.snapshot} onClick={() => void models.submit("save")}>
+        disabled={busy || !models.snapshot || Boolean(models.parsed.error)} onClick={() => void models.submit("save")}>
         {zh ? "保存修改" : "Save changes"}
       </Button>}
     </Card>

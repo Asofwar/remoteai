@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { App } from "antd";
+import { catalogErrorMessage, parseCatalog } from "../pages/official-models/catalog";
 
 export interface OfficialModelsSnapshot {
   catalog: Record<string, unknown> | null;
@@ -18,6 +19,7 @@ export function useOfficialModels(api: OfficialModelsProps["api"], zh: boolean) 
   const { message } = App.useApp();
   const [snapshot, setSnapshot] = useState<OfficialModelsSnapshot | null>(null);
   const [draft, setDraft] = useState("");
+  const parsed = useMemo(() => parseCatalog(draft), [draft]);
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState<"save" | "refresh" | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -44,12 +46,11 @@ export function useOfficialModels(api: OfficialModelsProps["api"], zh: boolean) 
     if (pending.current || !snapshot) return;
     let body: string | undefined;
     if (operation === "save") {
-      try { body = JSON.stringify({ catalog: JSON.parse(draft) as unknown, revision: snapshot.revision }); }
-      catch {
-        message.error({ content: zh ? "内容格式有误，请检查后重试。"
-          : "Check the content format and try again.", style: noticeStyle });
+      if (parsed.error) {
+        message.error({ content: catalogErrorMessage(parsed.error, zh), style: noticeStyle });
         return;
       }
+      body = JSON.stringify({ catalog: parsed.catalog, revision: snapshot.revision });
     }
     pending.current = true;
     setAction(operation);
@@ -67,5 +68,5 @@ export function useOfficialModels(api: OfficialModelsProps["api"], zh: boolean) 
       if (active.current) setAction(null);
     }
   };
-  return { snapshot, draft, setDraft, loading, action, submit, reload: () => setAttempt((value) => value + 1) };
+  return { snapshot, draft, parsed, setDraft, loading, action, submit, reload: () => setAttempt((value) => value + 1) };
 }

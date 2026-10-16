@@ -129,7 +129,20 @@ pub(crate) fn read_app_settings<R: Runtime>(
     model_context_settings::apply_saved_context_settings(&path, &mut settings)?;
     language_settings::apply_saved_language(&path, &mut settings);
     settings.non_proxy_enhancements_enabled = crate::client_integration::read_preference(&path)?;
+    merge_shared_group_catalogs(&mut settings);
     Ok(settings)
+}
+
+fn merge_shared_group_catalogs(settings: &mut AppSettings) {
+    let mut groups = Vec::new();
+    for group in settings.provider_groups.iter().chain(&settings.account_groups) {
+        let group = group.trim().to_string();
+        if !group.is_empty() && !groups.contains(&group) {
+            groups.push(group);
+        }
+    }
+    settings.provider_groups.clone_from(&groups);
+    settings.account_groups = groups;
 }
 
 static APP_SETTINGS_WRITE_LOCK: Mutex<()> = Mutex::new(());

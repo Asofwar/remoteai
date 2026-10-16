@@ -6,6 +6,8 @@ import type { Account } from "../../types";
 
 interface AccountGroupManagerProps {
   accounts: Account[];
+  additionalMembers?: { group: string }[];
+  onChangeGroupMembers?: (group: string, nextGroup: string) => Promise<boolean>;
   concurrentGroup: string | null;
   concurrentRoutingEnabled: boolean;
   groups: string[];
@@ -33,6 +35,12 @@ export function AccountGroupManager(options: AccountGroupManagerProps) {
   }, [editingGroup, groups]);
 
   const membersOf = (group: string) => options.accounts.filter((account) => account.group === group);
+  const changeMembers = async (group: string, nextGroup: string) => {
+    if (options.onChangeGroupMembers) return options.onChangeGroupMembers(group, nextGroup);
+    const ids = membersOf(group).map(({ id }) => id);
+    const changed = await options.onChangeMany(ids, nextGroup);
+    return changed.length === ids.length;
+  };
   const saveCatalog = async (nextGroups: string[], busyKey: string) => {
     setBusyGroup(busyKey);
     try {
@@ -52,10 +60,8 @@ export function AccountGroupManager(options: AccountGroupManagerProps) {
     if (nextName === group) return setEditingGroup(null);
     setBusyGroup(group);
     try {
-      const memberIds = membersOf(group).map(({ id }) => id);
-      const changedIds = await options.onChangeMany(memberIds, nextName);
-      if (changedIds.length !== memberIds.length) return;
-      if (options.concurrentGroup === group) {
+      if (!await changeMembers(group, nextName)) return;
+      if (!options.onChangeGroupMembers && options.concurrentGroup === group) {
         await options.onConcurrentRoutingChange(options.concurrentRoutingEnabled, nextName);
       }
       await options.onGroupsChange(groups.map((item) => item === group ? nextName : item));
@@ -67,10 +73,8 @@ export function AccountGroupManager(options: AccountGroupManagerProps) {
   const deleteGroup = async (group: string) => {
     setBusyGroup(group);
     try {
-      const memberIds = membersOf(group).map(({ id }) => id);
-      const changedIds = await options.onChangeMany(memberIds, "");
-      if (changedIds.length !== memberIds.length) return;
-      if (options.concurrentGroup === group) {
+      if (!await changeMembers(group, "")) return;
+      if (!options.onChangeGroupMembers && options.concurrentGroup === group) {
         await options.onConcurrentRoutingChange(options.concurrentRoutingEnabled, null);
       }
       await options.onGroupsChange(groups.filter((item) => item !== group));
@@ -98,7 +102,8 @@ export function AccountGroupManager(options: AccountGroupManagerProps) {
           description={options.t("accounts.group.empty")} />}
         {groups.map((group) => {
           const editing = editingGroup === group;
-          const memberCount = membersOf(group).length;
+          const memberCount = membersOf(group).length
+            + (options.additionalMembers?.filter(member => member.group === group).length ?? 0);
           const nextName = editingName.trim();
           const duplicateName = nextName !== group && groups.includes(nextName);
           return <div className="account-group-manager-row" key={group}>

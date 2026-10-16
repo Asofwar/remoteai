@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Button, Input, Popconfirm, Popover, Space, Tag, Tooltip } from "antd";
 import { FolderKanban, FolderMinus, FolderPlus, Play } from "lucide-react";
 import type { Translate } from "../../i18n";
-import type { Provider } from "../../types";
+import type { Account, Provider } from "../../types";
+import { sharedGroupNames } from "../../utils/sharedGroups";
 
 interface ProviderGroupEditorProps {
   group: string;
@@ -66,6 +67,8 @@ export function ProviderGroupCell({ provider, groups, busy, onChange, t }: Provi
 
 interface ProviderGroupToolbarProps {
   providers: Provider[];
+  accounts?: Account[];
+  activeGroup?: string | null;
   busyProviderId: string | null;
   proxyRunning: boolean;
   onSwitchGroup: (group: string) => void;
@@ -74,27 +77,31 @@ interface ProviderGroupToolbarProps {
 
 export function ProviderGroupToolbar({
   providers,
+  accounts = [],
+  activeGroup,
   busyProviderId,
   proxyRunning,
   onSwitchGroup,
   t,
 }: ProviderGroupToolbarProps) {
-  const groups = [...new Set(providers
+  const enabledAccounts = accounts.filter(account => account.autoSwitchEnabled
+    && account.localProxyCompatible);
+  const groups = sharedGroupNames(providers
     .filter((provider) => provider.kind === "custom")
-    .map((provider) => provider.group)
-    .filter(Boolean))];
+    .map((provider) => provider.group), enabledAccounts.map(account => account.group));
   if (!groups.length) return null;
   return <div className="provider-group-toolbar">
     <span>{t("providers.group.startLabel")}</span>
     <Space size={[6, 6]} wrap>{groups.map((group) => {
       const members = providers.filter((provider) => provider.kind === "custom" && provider.group === group);
-      const active = members.length > 0 && members.every((provider) => provider.active);
-      return <Tooltip key={group} title={t("providers.group.startHint", { count: members.length })}
+      const active = activeGroup === group || (members.length > 0 && members.every((provider) => provider.active));
+      const count = members.length + enabledAccounts.filter(account => account.group === group).length;
+      return <Tooltip key={group} title={t("providers.group.startHint", { count })}
         styles={{ root: { maxWidth: 400 } }}>
         <Button className="provider-group-start-button provider-topbar-button" icon={<Play size={14} />}
           loading={busyProviderId === `group:${group}`} disabled={!proxyRunning || active}
           onClick={() => onSwitchGroup(group)}>
-          {group}<Tag bordered={false}>{members.length}</Tag>
+          {group}<Tag bordered={false}>{count}</Tag>
         </Button>
       </Tooltip>;
     })}</Space>

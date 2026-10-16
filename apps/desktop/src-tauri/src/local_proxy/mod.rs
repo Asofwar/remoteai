@@ -127,6 +127,7 @@ include!("sse.rs");
 mod tests {
     include!("tests/aggregate_failover.rs");
     include!("tests/aggregate_official.rs");
+    include!("tests/shared_groups.rs");
     include!("tests/provider_request_options.rs");
     include!("tests/chat_reasoning_compatibility.rs");
     include!("tests/diagnostics.rs");

@@ -1,5 +1,16 @@
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn shared_group_catalog_migrates_both_legacy_lists_without_losing_names() {
+        let mut settings = AppSettings {
+            provider_groups: vec![" Work ".into(), "API".into()],
+            account_groups: vec!["Work".into(), "Official".into(), "".into()],
+            ..Default::default()
+        };
+        super::merge_shared_group_catalogs(&mut settings);
+        assert_eq!(settings.provider_groups, ["Work", "API", "Official"]);
+        assert_eq!(settings.account_groups, settings.provider_groups);
+    }
     use std::fs;
 
     use super::{

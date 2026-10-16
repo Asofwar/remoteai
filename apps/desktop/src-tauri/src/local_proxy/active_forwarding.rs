@@ -80,6 +80,12 @@ fn forward_active_request<R: Runtime>(
             })
         }
         ActiveTarget::Provider(provider) => {
+            if let Some(account_id) = aggregate_api::member_account_id(&provider.id) {
+                return forward_account_member(OfficialForwardRequest {
+                    app, method, url, headers, body, model: &provider.model, session_id,
+                    account_id_override: Some(account_id),
+                });
+            }
             if is_anthropic_messages_endpoint(request_path(url)) {
                 let settings = read_app_settings(app)?;
                 let subagent_model =
@@ -137,7 +143,11 @@ fn current_usage_payload<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<Upstre
             .into_iter()
             .next()
             .ok_or_else(|| "Provider group does not contain any available APIs".to_string())?;
-        providers::query_provider_usage_blocking(app.clone(), provider.id)?
+        if let Some(account_id) = aggregate_api::member_account_id(&provider.id) {
+            crate::commands::refresh_usage_blocking(app.clone(), account_id.to_string())?
+        } else {
+            providers::query_provider_usage_blocking(app.clone(), provider.id)?
+        }
     } else {
         let account_id = state
             .active_account_id

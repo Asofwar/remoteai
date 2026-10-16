@@ -55,6 +55,17 @@ fn clear_empty_concurrent_account_group(paths: &Paths) -> Result<bool, String> {
     Ok(true)
 }
 
+fn ensure_account_group_change_allowed(paths: &Paths, id: &str, group: &str) -> Result<(), String> {
+    let current = load_account_group(&account_group_path(paths, id));
+    let state = try_read_state(paths)?;
+    if current != group && state.active_provider_group.as_deref()
+        .is_some_and(|active| active == current || active == group)
+    {
+        return Err("Stop the active Provider group before changing it".to_string());
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub(crate) async fn set_account_group<R: Runtime + 'static>(
     app: tauri::AppHandle<R>,
@@ -67,11 +78,13 @@ pub(crate) async fn set_account_group<R: Runtime + 'static>(
             return Err("Account does not exist".to_string());
         }
         let group = normalize_account_group(&group)?;
+        ensure_account_group_change_allowed(&paths, &id, &group)?;
         save_account_group(&account_group_path(&paths, &id), &group)?;
         if !group.is_empty() {
             let mut settings = read_app_settings(&app)?;
             if !settings.account_groups.contains(&group) {
                 settings.account_groups.push(group.clone());
+                settings.provider_groups.clone_from(&settings.account_groups);
                 write_app_settings(&app, &settings)?;
             }
         }
@@ -117,6 +130,7 @@ pub(crate) async fn set_account_groups<R: Runtime + 'static>(
         let groups = normalize_account_groups(groups)?;
         let mut settings = read_app_settings(&app)?;
         settings.account_groups.clone_from(&groups);
+        settings.provider_groups.clone_from(&groups);
         write_app_settings(&app, &settings)?;
         Ok(groups)
     })

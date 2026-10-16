@@ -101,6 +101,9 @@ fn chat_continuation_scope(
 }
 
 fn selected_provider_model(body: &Value, provider: &ProviderProfile) -> String {
+    if aggregate_api::member_account_id(&provider.id).is_some() {
+        return provider.model.clone();
+    }
     if providers::uses_upstream_official_models(provider) {
         return selected_official_model(body, &provider.model);
     }

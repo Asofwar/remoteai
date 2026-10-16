@@ -275,6 +275,19 @@ const BUBBLE_STYLE_PREVIEW_KEY = "codex-switch:bubble-style";
 const THEME_COLOR_PREVIEW_KEY = "codex-switch:theme-color";
 const PROVIDER_GROUPS_PREVIEW_KEY = "codex-switch:provider-groups";
 const ACCOUNT_GROUPS_PREVIEW_KEY = "codex-switch:account-groups";
+const ACCOUNT_GROUP_ASSIGNMENTS_KEY = "codex-switch:account-group-assignments";
+const ACTIVE_GROUP_PREVIEW_KEY = "codex-switch:active-group";
+
+function readPreviewAccounts(): Account[] {
+  let groups: Record<string, unknown> = {};
+  try {
+    groups = JSON.parse(window.localStorage.getItem(ACCOUNT_GROUP_ASSIGNMENTS_KEY) ?? "{}") ?? {};
+  } catch { /* Invalid preview metadata falls back to the demo accounts. */ }
+  return structuredClone(DEMO_ACCOUNTS).map(account => {
+    const group = groups[account.id];
+    return { ...account, group: typeof group === "string" ? group : account.group };
+  });
+}
 const CLAUDE_CODE_WRITE_TARGET_PREVIEW_KEY = "codex-switch:claude-code-write-target";
 const THIRD_PARTY_APP_WRITE_PREVIEW_KEY = "codex-switch:third-party-app-write";
 const CLOUD_BASE_URL_PREVIEW_KEY = "codex-switch:cloud-base-url";
@@ -524,6 +537,7 @@ function previewLocalProxyStatus(): LocalProxyStatus {
     ? "priority" : "default";
   const serviceTier = running ? (storedTier === null ? legacyTier : savedTier) : "default";
   return {
+    activeProviderGroup: window.localStorage.getItem(ACTIVE_GROUP_PREVIEW_KEY),
     running,
     serviceTier,
     fastModeEnabled: serviceTier !== "default",
@@ -574,7 +588,7 @@ function readPreviewImageModelTarget(key: string): LocalProxyStatus["imageInputT
 
 export async function loadDashboard(): Promise<{ accounts: Account[]; info: AppInfo }> {
   if (!hasLocalBackend) {
-    return { accounts: structuredClone(DEMO_ACCOUNTS), info: DEMO_INFO };
+    return { accounts: readPreviewAccounts(), info: DEMO_INFO };
   }
   const [accounts, info] = await Promise.all([
     invoke<Account[]>("list_accounts"),
@@ -660,8 +674,8 @@ export async function loadAppSettings(): Promise<AppSettings> {
         proxyUrl: window.localStorage.getItem(NETWORK_PROXY_URL_PREVIEW_KEY) ?? "",
         proxyPort: Number(window.localStorage.getItem(NETWORK_PROXY_PORT_PREVIEW_KEY)) || null,
       },
-      providerGroups: previewProviderGroups(),
-      accountGroups: previewAccountGroups(),
+      providerGroups: [...new Set([...previewProviderGroups(), ...previewAccountGroups()])],
+      accountGroups: [...new Set([...previewProviderGroups(), ...previewAccountGroups()])],
       thirdPartyAppWrite: previewThirdPartyAppWriteSettings(),
       claudeCodeWriteTarget: previewClaudeCodeWriteTarget(),
     };
@@ -879,6 +893,7 @@ export async function activateAggregateApi(id: string): Promise<void> {
     const selected = aggregates.find((aggregate) => aggregate.id === id);
     if (!selected) throw new Error("Aggregate API does not exist");
     if (!selected.enabled) throw new Error("Enable the aggregate API before using it");
+    window.localStorage.removeItem(ACTIVE_GROUP_PREVIEW_KEY);
     writePreviewProviders(readPreviewProviders().map((provider) => ({ ...provider, active: false })));
     writePreviewAggregateApis(aggregates.map((aggregate) => ({
       ...aggregate,
@@ -1186,6 +1201,7 @@ export async function activateProvider(id: string): Promise<void> {
       throw new Error("Third-party Providers require the local proxy. Start the local proxy before switching Provider.");
     }
     window.localStorage.setItem(LOCAL_PROXY_CONCURRENT_ROUTING_PREVIEW_KEY, "false");
+    window.localStorage.removeItem(ACTIVE_GROUP_PREVIEW_KEY);
     writePreviewProviders(providers.map((provider) => ({ ...provider, active: provider.id === id })));
     writePreviewAggregateApis(readPreviewAggregateApis().map((aggregate) => ({
       ...aggregate,
@@ -1218,6 +1234,7 @@ export async function updateAccountGroups(groups: string[]): Promise<string[]> {
   const normalized = [...new Set(groups.map((group) => group.trim()).filter(Boolean))];
   if (!hasLocalBackend) {
     window.localStorage.setItem(ACCOUNT_GROUPS_PREVIEW_KEY, JSON.stringify(normalized));
+    window.localStorage.setItem(PROVIDER_GROUPS_PREVIEW_KEY, JSON.stringify(normalized));
     return normalized;
   }
   return invoke<string[]>("set_account_groups", { groups: normalized });
@@ -1227,6 +1244,7 @@ export async function updateProviderGroups(groups: string[]): Promise<string[]> 
   const normalized = [...new Set(groups.map((group) => group.trim()).filter(Boolean))];
   if (!hasLocalBackend) {
     window.localStorage.setItem(PROVIDER_GROUPS_PREVIEW_KEY, JSON.stringify(normalized));
+    window.localStorage.setItem(ACCOUNT_GROUPS_PREVIEW_KEY, JSON.stringify(normalized));
     return normalized;
   }
   return invoke<string[]>("set_provider_groups", { groups: normalized });
@@ -1237,7 +1255,10 @@ export async function activateProviderGroup(group: string): Promise<void> {
   if (!normalizedGroup) throw new Error("Select a Provider group");
   if (!hasLocalBackend) {
     const providers = readPreviewProviders();
-    if (!providers.some((provider) => provider.kind === "custom" && provider.group === normalizedGroup)) {
+    const hasOfficialMembers = readPreviewAccounts().some(account => account.autoSwitchEnabled
+      && account.localProxyCompatible && account.group === normalizedGroup);
+    if (!hasOfficialMembers && !providers.some(provider => provider.kind === "custom"
+      && provider.group === normalizedGroup)) {
       throw new Error("Provider group does not contain any available APIs");
     }
     if (!previewLocalProxyStatus().running) {
@@ -1245,6 +1266,9 @@ export async function activateProviderGroup(group: string): Promise<void> {
         "Third-party Providers require the local proxy. Start the local proxy before switching Provider.",
       );
     }
+    window.localStorage.setItem(ACTIVE_GROUP_PREVIEW_KEY, normalizedGroup);
+    window.localStorage.setItem(LOCAL_PROXY_CONCURRENT_ROUTING_PREVIEW_KEY, "false");
+    writePreviewAggregateApis(readPreviewAggregateApis().map(aggregate => ({ ...aggregate, active: false })));
     writePreviewProviders(providers.map((provider) => ({
       ...provider,
       active: provider.kind === "custom" && provider.group === normalizedGroup,
@@ -1320,6 +1344,7 @@ export async function setProviderAutoSwitchEnabled(id: string, enabled: boolean)
 
 export async function deactivateProvider(): Promise<void> {
   if (!hasLocalBackend) {
+    window.localStorage.removeItem(ACTIVE_GROUP_PREVIEW_KEY);
     writePreviewProviders(readPreviewProviders().map((provider) => ({ ...provider, active: false })));
     writePreviewAggregateApis(readPreviewAggregateApis().map((aggregate) => ({
       ...aggregate,
@@ -1680,7 +1705,7 @@ export async function showTokenUsageWindow(): Promise<void> {
 }
 
 export async function loadAccounts(): Promise<Account[]> {
-  if (!hasLocalBackend) return structuredClone(DEMO_ACCOUNTS);
+  if (!hasLocalBackend) return readPreviewAccounts();
   return invoke<Account[]>("list_accounts");
 }
 
@@ -2842,6 +2867,7 @@ export async function chooseAndExportDiagnosticLogs(): Promise<ExportDiagnosticL
 
 export async function activateAccount(id: string): Promise<void> {
   if (!hasLocalBackend) {
+    window.localStorage.removeItem(ACTIVE_GROUP_PREVIEW_KEY);
     writePreviewProviders(readPreviewProviders().map((provider) => ({ ...provider, active: false })));
     return;
   }
@@ -2868,7 +2894,12 @@ export async function setAccountAutoSwitchPriority(id: string, priority: number)
 
 export async function setAccountGroup(id: string, group: string): Promise<string> {
   const normalized = group.trim();
-  if (!hasLocalBackend) return normalized;
+  if (!hasLocalBackend) {
+    const assignments = Object.fromEntries(readPreviewAccounts().map(account => [account.id, account.group]));
+    assignments[id] = normalized;
+    window.localStorage.setItem(ACCOUNT_GROUP_ASSIGNMENTS_KEY, JSON.stringify(assignments));
+    return normalized;
+  }
   return invoke<string>("set_account_group", { id, group: normalized });
 }
 

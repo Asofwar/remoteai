@@ -7,6 +7,7 @@ pub(crate) fn is_running() -> bool {
 
 fn status<R: Runtime>(app: &tauri::AppHandle<R>) -> LocalProxyStatus {
     let (
+        active_provider_group,
         auto_switch_on_quota_exhaustion,
         concurrent_account_routing_enabled,
         concurrent_account_group,
@@ -29,6 +30,7 @@ fn status<R: Runtime>(app: &tauri::AppHandle<R>) -> LocalProxyStatus {
             let state = read_state(&paths);
             let image_output_target = effective_image_output_target(&state);
             (
+                state.active_provider_group.clone(),
                 state.auto_switch_on_quota_exhaustion,
                 state.concurrent_account_routing_enabled,
                 state.concurrent_account_group.clone(),
@@ -49,6 +51,7 @@ fn status<R: Runtime>(app: &tauri::AppHandle<R>) -> LocalProxyStatus {
             )
         })
         .unwrap_or((
+            None,
             false,
             false,
             None,
@@ -74,6 +77,7 @@ fn status<R: Runtime>(app: &tauri::AppHandle<R>) -> LocalProxyStatus {
         ProxyServiceTier::Default
     };
     LocalProxyStatus {
+        active_provider_group,
         running,
         service_tier,
         fast_mode_enabled: service_tier != ProxyServiceTier::Default,

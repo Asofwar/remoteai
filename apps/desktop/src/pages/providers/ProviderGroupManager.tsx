@@ -7,6 +7,8 @@ import type { Provider } from "../../types";
 interface ProviderGroupManagerProps {
   groups: string[];
   providers: Provider[];
+  additionalMembers?: { group: string }[];
+  onChangeGroupMembers?: (group: string, nextGroup: string) => Promise<boolean>;
   busy: boolean;
   onChangeMany: (ids: string[], group: string) => Promise<string[]>;
   onGroupsChange: (groups: string[]) => Promise<void>;
@@ -34,6 +36,12 @@ export function ProviderGroupManager(options: ProviderGroupManagerProps) {
   const membersOf = (group: string) => options.providers.filter(
     (provider) => provider.kind === "custom" && provider.group === group,
   );
+  const changeMembers = async (group: string, nextGroup: string) => {
+    if (options.onChangeGroupMembers) return options.onChangeGroupMembers(group, nextGroup);
+    const ids = membersOf(group).map(({ id }) => id);
+    const changed = ids.length ? await options.onChangeMany(ids, nextGroup) : [];
+    return changed.length === ids.length;
+  };
   const saveCatalog = async (nextGroups: string[], busyKey: string) => {
     setBusyGroup(busyKey);
     try {
@@ -60,9 +68,7 @@ export function ProviderGroupManager(options: ProviderGroupManagerProps) {
     }
     setBusyGroup(group);
     try {
-      const memberIds = membersOf(group).map(({ id }) => id);
-      const changedIds = memberIds.length ? await options.onChangeMany(memberIds, nextName) : [];
-      if (memberIds.length && changedIds.length !== memberIds.length) return;
+      if (!await changeMembers(group, nextName)) return;
       await options.onGroupsChange(groups.map((item) => item === group ? nextName : item));
       setEditingGroup(null);
     } finally {
@@ -72,9 +78,7 @@ export function ProviderGroupManager(options: ProviderGroupManagerProps) {
   const deleteGroup = async (group: string) => {
     setBusyGroup(group);
     try {
-      const memberIds = membersOf(group).map(({ id }) => id);
-      const changedIds = memberIds.length ? await options.onChangeMany(memberIds, "") : [];
-      if (memberIds.length && changedIds.length !== memberIds.length) return;
+      if (!await changeMembers(group, "")) return;
       await options.onGroupsChange(groups.filter((item) => item !== group));
     } finally {
       setBusyGroup(null);
@@ -102,7 +106,8 @@ export function ProviderGroupManager(options: ProviderGroupManagerProps) {
           description={options.t("providers.group.empty")} />}
         {groups.map((group) => {
           const editing = editingGroup === group;
-          const memberCount = membersOf(group).length;
+          const memberCount = membersOf(group).length
+            + (options.additionalMembers?.filter(member => member.group === group).length ?? 0);
           const nextName = editingName.trim();
           const duplicateName = nextName !== group && groups.includes(nextName);
           return <div className="provider-group-manager-row" key={group}>

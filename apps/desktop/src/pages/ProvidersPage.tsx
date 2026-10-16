@@ -57,6 +57,7 @@ interface ProvidersPageProps {
   onGroupChange: (id: string, group: string) => void;
   onGroupChangeMany: (ids: string[], group: string) => Promise<string[]>;
   onProviderGroupsChange: (groups: string[]) => Promise<void>;
+  onChangeGroupMembers?: (group: string, nextGroup: string) => Promise<boolean>;
   onAutoSwitchChange: (id: string, enabled: boolean) => void;
   onDelete: (id: string) => void;
   onDeleteMany: (ids: string[]) => Promise<string[]>;
@@ -93,6 +94,7 @@ export function ProvidersPage({
   onGroupChange,
   onGroupChangeMany,
   onProviderGroupsChange,
+  onChangeGroupMembers,
   onAutoSwitchChange,
   onDelete,
   onDeleteMany,
@@ -123,6 +125,7 @@ export function ProvidersPage({
   const activeAggregateId = aggregateApis.find((aggregate) => aggregate.active)?.id;
   const groups = [...new Set([
     ...providerGroups,
+    ...accounts.map(account => account.group),
     ...providers.filter((provider) => provider.kind === "custom").map((provider) => provider.group),
   ].filter(Boolean))];
 
@@ -238,9 +241,11 @@ export function ProvidersPage({
             onClick={() => setShowAggregateManager(true)}>
             {t("providers.aggregate.manage")}
           </Button>
-          <ProviderGroupToolbar providers={providers} busyProviderId={busyProviderId}
+          <ProviderGroupToolbar providers={providers} accounts={accounts} busyProviderId={busyProviderId}
+            activeGroup={localProxy?.activeProviderGroup}
             proxyRunning={proxyRunning} onSwitchGroup={onSwitchGroup} t={t} />
           <ProviderGroupManager groups={groups} providers={providers} busy={Boolean(busyProviderId)}
+            additionalMembers={accounts} onChangeGroupMembers={onChangeGroupMembers}
             onChangeMany={onGroupChangeMany} onGroupsChange={onProviderGroupsChange} t={t} />
         </Space>,
         topbarHost,

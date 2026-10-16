@@ -17,7 +17,7 @@ pub(super) fn validate_member_id(id: &str) -> Result<(), String> {
 }
 
 /// Only capability metadata is projected as a profile; credentials stay in the account store.
-pub(super) fn read_member_profile(paths: &Paths, id: &str) -> Result<ProviderProfile, String> {
+pub(crate) fn read_member_profile(paths: &Paths, id: &str) -> Result<ProviderProfile, String> {
     validate_member_id(id)?;
     let Some(account_id) = member_account_id(id) else {
         return providers::read_provider(paths, id);

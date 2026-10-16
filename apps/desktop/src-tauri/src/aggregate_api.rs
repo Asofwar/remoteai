@@ -11,8 +11,8 @@ mod active_targets;
 mod members;
 mod models;
 pub(crate) use active_targets::refresh_targets;
-pub(crate) use members::{member_account_id, ACCOUNT_MEMBER_PREFIX};
-use members::{read_member_profile, validate_member_id};
+use members::validate_member_id;
+pub(crate) use members::{member_account_id, read_member_profile, ACCOUNT_MEMBER_PREFIX};
 use models::validate_members;
 pub(crate) use models::{force_aggregate_model, logical_profile, member_model, member_profiles};
 

@@ -5,38 +5,48 @@ fn forward_aggregate_official<R: Runtime>(
     account_id: &str,
     model: &str,
 ) -> Result<UpstreamPayload, String> {
-    if is_anthropic_messages_endpoint(request_path(request.url)) {
-        return forward_anthropic_official(
-            app,
-            request.headers,
-            request.body.clone(),
-            AnthropicOfficialContext {
-                session_id: request.session_id,
-                account_id_override: Some(account_id),
-                model_override: Some(model),
-            },
-        );
-    }
-    forward_official(OfficialForwardRequest {
+    forward_account_member(OfficialForwardRequest {
         app,
         method: request.method,
         url: request.url,
         headers: request.headers,
-        body: aggregate_official_body(request, model)?,
+        body: request.body.clone(),
         model,
         session_id: request.session_id,
         account_id_override: Some(account_id),
     })
 }
 
-fn aggregate_official_body(
-    request: &AggregateForwardRequest<'_>,
+/// Explicit account members never fall back to the globally selected account.
+fn forward_account_member<R: Runtime>(
+    mut request: OfficialForwardRequest<'_, R>,
+) -> Result<UpstreamPayload, String> {
+    if is_anthropic_messages_endpoint(request_path(request.url)) {
+        return forward_anthropic_official(
+            request.app,
+            request.headers,
+            request.body,
+            AnthropicOfficialContext {
+                session_id: request.session_id,
+                account_id_override: request.account_id_override,
+                model_override: Some(request.model),
+            },
+        );
+    }
+    request.body = account_member_body(request.method, request.url, request.body, request.model)?;
+    forward_official(request)
+}
+
+fn account_member_body(
+    method: &Method,
+    url: &str,
+    body: Vec<u8>,
     model: &str,
 ) -> Result<Vec<u8>, String> {
-    if *request.method != Method::Post || !is_responses_endpoint(request_path(request.url)) {
-        return Ok(request.body.clone());
+    if *method != Method::Post || !is_responses_endpoint(request_path(url)) {
+        return Ok(body);
     }
-    let mut body: Value = serde_json::from_slice(&request.body)
+    let mut body: Value = serde_json::from_slice(&body)
         .map_err(|_| "The request body is not valid JSON".to_string())?;
     let object = body
         .as_object_mut()

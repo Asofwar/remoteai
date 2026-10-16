@@ -43,7 +43,6 @@ import {
   subscribeToCloudSessionExpired,
   subscribeToOpenSettings,
   updateAutoDisableStatusCodes,
-  updateAccountGroups,
   updateNetworkProxy,
   updateProviderGroups,
   updateShowUsageNetworkErrors,
@@ -131,6 +130,7 @@ import { AccountToolbox } from "./AccountToolbox";
 import { AccountImageModelButton } from "./AccountImageModelButton";
 import { CodexConfigRepairButton } from "./CodexConfigRepairButton";
 import { AccountGroupManager } from "../accounts/AccountGroupManager";
+import { changeSharedGroupMembers, sharedGroupNames } from "../../utils/sharedGroups";
 import { ExternalProxySpeedButton } from "../accounts/ExternalProxySpeedButton";
 import type {
   AccountDetailsDraft,
@@ -295,8 +295,7 @@ export function DashboardApp() {
   const [showUsageNetworkErrors, setShowUsageNetworkErrors] = useState(false);
   const [showUsageNetworkErrorsLoading, setShowUsageNetworkErrorsLoading] = useState(false);
   const [showCustomCloudServer, setShowCustomCloudServer] = useState(false);
-  const [providerGroups, setProviderGroups] = useState<string[]>([]);
-  const [accountGroups, setAccountGroups] = useState<string[]>([]);
+  const [sharedGroups, setSharedGroups] = useState<string[]>([]);
   const cloudSessionPromptedRef = useRef(false);
   const providerBalanceRefreshCountRef = useRef(0);
   useEffect(() => subscribeToOpenSettings(() => setPage("settings")), []);
@@ -421,41 +420,47 @@ export function DashboardApp() {
         );
         setShowUsageNetworkErrors(settings.showUsageNetworkErrors ?? false);
         setShowCustomCloudServer(settings.showCustomCloudServer ?? false);
-        setProviderGroups(settings.providerGroups ?? []);
-        setAccountGroups(settings.accountGroups ?? []);
+        setSharedGroups(sharedGroupNames(settings.providerGroups ?? [], settings.accountGroups ?? []));
       })
       .catch((error) => notify(String(error)));
   }, [notify]);
   const saveProviderGroups = useCallback(async (groups: string[]) => {
     try {
-      setProviderGroups(await updateProviderGroups(groups));
+      setSharedGroups(await updateProviderGroups(groups));
     } catch (error) {
       notify(String(error));
       throw error;
     }
   }, [notify]);
-  const saveAccountGroups = useCallback(async (groups: string[]) => {
-    try {
-      setAccountGroups(await updateAccountGroups(groups));
-    } catch (error) {
-      notify(String(error));
-      throw error;
+  const saveAccountGroups = saveProviderGroups;
+  const changeGroupMembers = useCallback(async (group: string, nextGroup: string) => {
+    const changed = await changeSharedGroupMembers({
+      group, nextGroup, accounts: manager.accounts, providers: providerManager.providers,
+      changeAccounts: manager.changeAccountGroups, changeProviders: providerManager.changeProviderGroups,
+    });
+    if (changed && providerManager.localProxy?.concurrentAccountGroup === group) {
+      await providerManager.setProxyConcurrentRouting(
+        providerManager.localProxy.concurrentAccountRoutingEnabled, nextGroup || null,
+      );
     }
-  }, [notify]);
+    return changed;
+  }, [manager.accounts, manager.changeAccountGroups, providerManager.providers, providerManager.changeProviderGroups,
+    providerManager.localProxy, providerManager.setProxyConcurrentRouting]);
   const changeAccountGroup = useCallback(async (id: string, group: string) => {
     const changed = await manager.changeAccountGroup(id, group);
     const normalizedGroup = group.trim();
     if (changed && normalizedGroup) {
-      setAccountGroups((current) => current.includes(normalizedGroup)
+      setSharedGroups((current) => current.includes(normalizedGroup)
         ? current
         : [...current, normalizedGroup]);
     }
     return changed;
   }, [manager.changeAccountGroup]);
   const managedAccountGroups = useMemo(() => [...new Set([
-    ...accountGroups,
+    ...sharedGroups,
     ...manager.accounts.map((account) => account.group),
-  ].filter(Boolean))], [accountGroups, manager.accounts]);
+    ...providerManager.providers.filter(provider => provider.kind === "custom").map(provider => provider.group),
+  ].filter(Boolean))], [sharedGroups, manager.accounts, providerManager.providers]);
   const resetCredits = useResetCredits(manager.accounts, notify, t);
   const activeAccount = manager.accounts.find((account) => account.active) ?? null;
   const activeProvider = providerManager.activeProvider;
@@ -1213,6 +1218,8 @@ export function DashboardApp() {
   const officialAccountActions = (
     <>
       {managedAccountGroups.length > 0 && <AccountGroupManager accounts={manager.accounts}
+        additionalMembers={providerManager.providers.filter(provider => provider.kind === "custom")}
+        onChangeGroupMembers={changeGroupMembers}
         concurrentGroup={providerManager.localProxy?.concurrentAccountGroup ?? null}
         concurrentRoutingEnabled={providerManager.localProxy?.concurrentAccountRoutingEnabled ?? false}
         groups={managedAccountGroups} onChangeMany={manager.changeAccountGroups}
@@ -1548,7 +1555,7 @@ export function DashboardApp() {
           <section id="account-panel-providers" className="page-panel providers-page-panel"
             role="tabpanel" aria-labelledby="account-section-providers" hidden={page !== "providers"}>
             <MemoProvidersPage providers={providerManager.providers}
-              aggregateApis={providerManager.aggregateApis} providerGroups={providerGroups}
+              aggregateApis={providerManager.aggregateApis} providerGroups={managedAccountGroups}
               accounts={manager.accounts}
               active={page === "providers"}
               loading={providerManager.loading}
@@ -1568,6 +1575,7 @@ export function DashboardApp() {
               onGroupChange={providerManager.changeProviderGroup}
               onGroupChangeMany={providerManager.changeProviderGroups}
               onProviderGroupsChange={saveProviderGroups}
+              onChangeGroupMembers={changeGroupMembers}
               onAutoSwitchChange={providerManager.setProviderAutoSwitch}
               onDelete={deleteProvider}
               onDeleteMany={providerManager.deleteProviders}

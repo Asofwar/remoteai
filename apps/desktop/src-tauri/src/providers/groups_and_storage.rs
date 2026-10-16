@@ -26,6 +26,7 @@ fn set_provider_groups_blocking<R: Runtime>(
     let groups = normalize_provider_groups(groups)?;
     let mut settings = read_app_settings(&app)?;
     settings.provider_groups.clone_from(&groups);
+    settings.account_groups.clone_from(&groups);
     write_app_settings(&app, &settings)?;
     Ok(groups)
 }
@@ -69,10 +70,11 @@ pub(crate) fn provider_group_profiles(
     if group.is_empty() {
         return Err("Select a Provider group".to_string());
     }
-    let providers = list_provider_profiles(paths)?
+    let mut providers = list_provider_profiles(paths)?
         .into_iter()
         .filter(|provider| provider.kind == ProviderKind::Custom && provider.group == group)
         .collect::<Vec<_>>();
+    providers.extend(group_accounts::profiles(paths, &group)?);
     if providers.is_empty() {
         return Err("Provider group does not contain any available APIs".to_string());
     }

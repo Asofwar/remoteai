@@ -323,6 +323,11 @@ docs/                架构和开发文档
 
 ## 发布版本
 
+部署管理后端与 Web 时，使用 `npm run deploy:admin -- --project-name <现有项目名>`
+和 `npm run deploy:web -- --project-name <现有项目名>`。
+命令更新当前 Docker 环境中已准备好的镜像；构建、上传、检查与回滚步骤见
+[生产部署](apps/admin-go/DEPLOYMENT.md#加载并更新-go)。
+
 推送版本标签后，GitHub Actions 会自动发布构建产物：
 
 ```bash

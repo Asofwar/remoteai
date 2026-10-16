@@ -19,6 +19,8 @@
     "build:admin": "npm run build -w @codex-switch/admin-ui",
     "build:web": "npm run build -w @codex-switch/web",
     "build:backend": "go -C apps/admin-go build -o dist/ ./cmd/admin-go",
+    "deploy:admin": "node scripts/deploy.mjs admin",
+    "deploy:web": "node scripts/deploy.mjs web",
     "test:backend": "go -C apps/admin-go test ./...",
     "check:backend": "node apps/admin-go/scripts/extract-contract.mjs --check && go -C apps/admin-go vet ./... && npm run test:backend",
     "build:apk": "npm run build:apk -w @codex-switch/native",

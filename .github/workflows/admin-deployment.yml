@@ -1,13 +1,23 @@
-name: Admin deployment configuration
+name: Admin and Web deployment configuration
 
 on:
   push:
     paths:
       - 'apps/admin-go/**'
+      - 'apps/web/compose*.yml'
+      - 'scripts/deploy.mjs'
+      - 'scripts/lib/web-deployment.mjs'
+      - 'scripts/web-deployment.test.mjs'
+      - 'package.json'
       - '.github/workflows/admin-deployment.yml'
   pull_request:
     paths:
       - 'apps/admin-go/**'
+      - 'apps/web/compose*.yml'
+      - 'scripts/deploy.mjs'
+      - 'scripts/lib/web-deployment.mjs'
+      - 'scripts/web-deployment.test.mjs'
+      - 'package.json'
       - '.github/workflows/admin-deployment.yml'
 
 permissions:
@@ -22,6 +32,18 @@ jobs:
         env:
           COMPOSE_CONFIG_TEST: '1'
         run: python3 -B -m unittest discover -s apps/admin-go/scripts -p 'test_deployment_*.py' -v
+
+  web-compose-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Verify Web deployment configuration and health checks
+        env:
+          COMPOSE_CONFIG_TEST: '1'
+        run: node --test scripts/web-deployment.test.mjs
 
   kong-routes:
     runs-on: ubuntu-latest

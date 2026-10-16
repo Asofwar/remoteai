@@ -83,6 +83,21 @@ npm run test:chat:android -w @codex-switch/web
 生产构建默认使用 `/web/` 作为静态资源前缀。`apps/web/compose.yml` 将独立 `web` 容器加入
 `ADMIN_GO_KONG_NETWORK` 指定的现有网络，Kong 通过 `codex-switch-web:80` 提供 `/web` 路由。
 云端 API 由 admin-go 提供，构建上传与更新步骤见 [生产部署](../admin-go/DEPLOYMENT.md)。
+
+完成镜像构建、上传和回滚镜像保留后，在部署服务器的仓库根目录运行：
+
+```bash
+# web 替换为已有 Web 容器的实际 Compose 项目名。
+npm run deploy:web -- check --project-name web
+npm run deploy:web -- up --project-name web
+npm run deploy:web -- verify --project-name web
+```
+
+命令保留现有 Compose 文件列表，只更新 Web，并等待健康检查、核对镜像和网络。
+使用其他变量文件时传入 `--env-file`；追加覆盖文件使用 `--file`（可重复）。
+回滚时将已验证的旧镜像恢复为配置中的镜像引用，再使用相同项目与配置执行 `up --force-recreate`。
+检查成功后还需确认公网页面、静态资源和 `version.json` 正常。
+
 API 请求保持同源并携带 `Authorization: Bearer <JWT>`；`/sync`、`/devices` 和
 `/admin/api` 由 Kong JWT 插件校验，登录和刷新令牌接口保持公开。
 

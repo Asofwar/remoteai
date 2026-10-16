@@ -212,6 +212,10 @@ The custom cloud server setting is hidden by default. Self-hosted users can set
 
 ## More documentation
 
+Use `npm run deploy:admin -- --project-name <existing-project>` and
+`npm run deploy:web -- --project-name <existing-project>` to update prepared images in the current Docker environment.
+See [production deployment](apps/admin-go/DEPLOYMENT.md#加载并更新-go) for image preparation, checks and rollback.
+
 - [Linux installation and usage (Chinese)](docs/linux.md)
 - [Architecture and data flow](docs/architecture.md)
 - [Development and debugging](docs/development.md)

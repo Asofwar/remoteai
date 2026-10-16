@@ -95,6 +95,7 @@ test('distinguishes unavailable resources from script errors and recovers after 
     expect((await page.getByRole('alert').boundingBox())!.width).toBeLessThanOrEqual(400);
   }
   expect(diagnostics).toContain('Port mapping preview: script-error cookie-access');
+  expect(diagnostics).toContain('Port mapping preview: resource-error http-404-script');
   await page.getByRole('textbox', { name: '网页路径' }).fill('/');
   await page.getByRole('button', { name: '打开', exact: true }).click();
   await expect(page.frameLocator('iframe[title="端口映射预览"]')

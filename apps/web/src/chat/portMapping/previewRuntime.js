@@ -27,14 +27,16 @@
     const job = pending.get(reply.id);
     if (!job) return;
     pending.delete(reply.id); clearTimeout(job.timer);
-    if (reply.error) job.reject(Object.assign(new Error(reply.error), { previewFailure: reply.failure }));
+    if (reply.error) job.reject(Object.assign(new Error(reply.error), {
+      previewFailure: reply.failure, previewDiagnostic: reply.diagnostic,
+    }));
     else job.resolve(reply.value);
   }
   function absolute(value) { return new URL(value, base).href; }
   function announceError(error) {
     failed = true;
     port?.postMessage({ type: 'preview-error', failure: error?.previewFailure ?? 'script-error',
-      diagnostic: diagnostic(error) });
+      diagnostic: error?.previewDiagnostic ?? diagnostic(error) });
     console.warn('Port mapping preview:', error?.message ?? 'Script failed');
   }
   window.addEventListener('error', event => { if (event.error) announceError(event.error); });

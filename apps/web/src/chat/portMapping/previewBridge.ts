@@ -10,7 +10,7 @@ import diagnostics from './previewDiagnostics.js?raw';
 import navigationRuntime from './previewNavigation.js?raw';
 import browserRuntime from './previewBrowser.js?raw';
 import type { PreviewStorage } from './previewStorage';
-import { isPreviewFailure, previewDiagnostic, previewFailure, type PreviewStatus } from './previewErrors';
+import { isPreviewFailure, PreviewError, previewDiagnostic, previewFailure, type PreviewStatus } from './previewErrors';
 
 // The opaque sandbox cannot read app cookies/storage or reach app APIs, even if remote scripts are hostile.
 export const PREVIEW_DOCUMENT = '<!doctype html><meta charset="utf-8">'
@@ -93,8 +93,9 @@ export function attachPreview(options: {
     void handle(message).then(value => post({ id: message.id, value }))
       .catch(error => {
         const failure = previewFailure(error);
-        console.warn('Port mapping preview:', failure);
-        post({ id: message.id, error: 'Preview request failed', failure });
+        const diagnostic = previewDiagnostic(error instanceof PreviewError ? error.diagnostic : undefined);
+        console.warn('Port mapping preview:', failure, diagnostic);
+        post({ id: message.id, error: 'Preview request failed', failure, diagnostic });
       })
       .finally(() => { active--; });
   };

@@ -1,7 +1,7 @@
 import { init, parse } from 'es-module-lexer';
 import { encodeBase64, mappingUrl, type MappingHttpResponse } from '../../../../../shared/port-mapping/http';
 import type { WebMappingTunnel } from './httpTunnel';
-import { PreviewError } from './previewErrors';
+import { PreviewError, resourceDiagnostic } from './previewErrors';
 import { BROWSER_MODULE, previewModuleGlobals } from './previewModuleGlobals';
 
 const MAX_RESOURCES = 2048;
@@ -43,7 +43,9 @@ export class PreviewAssets {
           if (!location) throw new Error('Invalid redirect');
           return this.load(location, url, { redirects: [...redirects, url], accept });
         }
-        if (reply.status >= 400) throw new PreviewError('resource-error');
+        if (reply.status >= 400) {
+          throw new PreviewError('resource-error', resourceDiagnostic(url, reply.status, accept));
+        }
         return reply;
       }).catch(error => {
         this.resources.delete(key);

@@ -15,7 +15,21 @@ const PREVIEW_DIAGNOSTICS = new Set([
 
 /** Reject arbitrary strings supplied by a remote page before logging its diagnostic category. */
 export function previewDiagnostic(value: unknown) {
-  return typeof value === 'string' && PREVIEW_DIAGNOSTICS.has(value) ? value : 'script-exception';
+  if (typeof value !== 'string') return 'script-exception';
+  return PREVIEW_DIAGNOSTICS.has(value)
+    || /^http-[45]\d\d-(document|stylesheet|script|font|image|resource)$/.test(value) ? value : 'script-exception';
+}
+
+/** Describe failed requests without disclosing remote paths, query strings or response bodies. */
+export function resourceDiagnostic(url: string, status: number, accept: string) {
+  const extension = new URL(url).pathname.split('.').at(-1)?.toLowerCase();
+  let kind = 'resource';
+  if (accept === 'text/html') kind = 'document';
+  else if (accept === 'text/css' || extension === 'css') kind = 'stylesheet';
+  else if (extension && /^(js|mjs|cjs|ts|tsx|jsx)$/.test(extension)) kind = 'script';
+  else if (extension && /^(woff2?|ttf|otf|eot)$/.test(extension)) kind = 'font';
+  else if (extension && /^(png|jpe?g|gif|svg|webp|avif|ico)$/.test(extension)) kind = 'image';
+  return previewDiagnostic(`http-${status}-${kind}`);
 }
 
 export function isPreviewFailure(value: unknown): value is PreviewFailure {
@@ -24,7 +38,7 @@ export function isPreviewFailure(value: unknown): value is PreviewFailure {
 
 /** Only bounded error categories cross the preview boundary; never forward remote URLs or error details. */
 export class PreviewError extends Error {
-  constructor(readonly failure: PreviewFailure) { super(PREVIEW_ERRORS[failure]); }
+  constructor(readonly failure: PreviewFailure, readonly diagnostic?: string) { super(PREVIEW_ERRORS[failure]); }
 }
 
 export function previewFailure(error: unknown): PreviewFailure {

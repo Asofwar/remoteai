@@ -1,4 +1,4 @@
-//! Preview workspace images and exact image references recorded by the task's app server.
+//! Preview local images on the authenticated computer and validated public image URLs.
 use std::{
     fs::File,
     io::{Read, Seek, SeekFrom},
@@ -17,10 +17,6 @@ use super::{
     image_thumbnail::{preview_task, ImageVariant},
     protocol::{thread_params, GuiResponse},
 };
-
-#[path = "image_references.rs"]
-mod references;
-use references::image_references;
 
 const DEFAULT_IMAGE_BYTES: u64 = 20 * 1024 * 1024;
 const MAX_SOURCE_LENGTH: usize = 4096;
@@ -68,28 +64,14 @@ pub(super) async fn preview(
             data: json!({ "url": data }),
         });
     }
-    let mut params = thread_params(thread_id.clone())?;
-    params["includeTurns"] = json!(true);
+    let params = thread_params(thread_id)?;
     // Read the actual workspace before the presentation layer hides projectless paths.
     let response = client.request("thread/read", params).await?;
     let workspace = response["thread"]["cwd"]
         .as_str()
         .ok_or(GuiError::ImagePreview)?;
     let workspace = PathBuf::from(workspace);
-    let generated = client.home.join("generated_images").join(thread_id);
-    let data = preview_task(move || {
-        let references = image_references(&response["thread"]);
-        read_image(
-            &source,
-            &workspace,
-            ReadOptions {
-                generated: &generated,
-                references: &references,
-                preview: options,
-            },
-        )
-    })
-    .await?;
+    let data = preview_task(move || read_image(&source, &workspace, options)).await?;
     Ok(GuiResponse {
         data: json!({ "url": data }),
     })
@@ -115,50 +97,15 @@ pub(super) fn source_path(source: &str) -> Result<PathBuf> {
         PathBuf::from(source)
     };
     // Do not turn model-provided image references into network shares or device access.
-    let text = path.to_string_lossy();
-    if text.replace('\\', "/").starts_with("//") || text.contains("://") {
-        return Err(GuiError::ImagePreview);
-    }
+    super::local_file::validate(&path.to_string_lossy()).map_err(|_| GuiError::ImagePreview)?;
     Ok(path)
 }
 
-fn within(path: &Path, root: &Path) -> bool {
-    root.canonicalize().is_ok_and(|root| path.starts_with(root))
-}
-
-fn matches_reference(path: &Path, workspace: &Path, references: &[String]) -> bool {
-    // Grant only the recorded file, never its parent directory or arbitrary message text.
-    references.iter().any(|source| {
-        source_path(source)
-            .and_then(|source| {
-                workspace
-                    .join(source)
-                    .canonicalize()
-                    .map_err(|_| GuiError::ImagePreview)
-            })
-            .is_ok_and(|reference| reference == path)
-    })
-}
-
-struct ReadOptions<'a> {
-    generated: &'a Path,
-    references: &'a [String],
-    preview: PreviewOptions,
-}
-
-fn read_image(source: &str, workspace: &Path, options: ReadOptions<'_>) -> Result<String> {
+fn read_image(source: &str, workspace: &Path, options: PreviewOptions) -> Result<String> {
     let source = source_path(source)?;
-    let path = workspace
-        .join(source)
-        .canonicalize()
+    let path = super::local_file::resolve(workspace, &source.to_string_lossy())
         .map_err(|_| GuiError::ImagePreview)?;
-    if !within(&path, workspace)
-        && !within(&path, options.generated)
-        && !matches_reference(&path, workspace, options.references)
-    {
-        return Err(GuiError::ImagePreview);
-    }
-    render_file(&path, options.preview)
+    render_file(&path, options)
 }
 
 /// Local previews have no transport byte cap; remote callers can supply their own policy limit.

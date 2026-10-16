@@ -29,60 +29,15 @@ impl Fixture {
     }
 
     fn read(&self, source: &str) -> Result<String> {
-        self.read_with_references(source, &[])
-    }
-
-    fn read_with_references(&self, source: &str, references: &[String]) -> Result<String> {
         read_image(
             source,
             &self.0.join("workspace"),
-            ReadOptions {
-                generated: &self.0.join("generated"),
-                references,
-                preview: PreviewOptions {
-                    variant: ImageVariant::Original,
-                    max_bytes: Some(DEFAULT_IMAGE_BYTES),
-                },
+            PreviewOptions {
+                variant: ImageVariant::Original,
+                max_bytes: Some(DEFAULT_IMAGE_BYTES),
             },
         )
     }
-}
-
-#[test]
-fn previews_only_the_external_image_recorded_in_the_current_thread() {
-    let fixture = Fixture::new();
-    let screenshot = fixture.write_image("outside/页面 截图.png");
-    let sibling = fixture.write_image("outside/unrelated.png");
-    let file_url = url::Url::from_file_path(&screenshot).unwrap();
-    let thread = json!({"turns": [{"items": [
-        {"type": "imageView", "path": file_url.as_str()}
-    ]}]});
-    let references = image_references(&thread);
-    for source in [screenshot.to_str().unwrap(), file_url.as_str()] {
-        assert!(fixture.read(source).is_err());
-        assert!(fixture
-            .read_with_references(source, &references)
-            .unwrap()
-            .starts_with("data:image/png;base64,"));
-    }
-    assert!(fixture
-        .read_with_references(sibling.to_str().unwrap(), &references)
-        .is_err());
-}
-
-#[test]
-fn collects_structured_image_references_without_trusting_message_text_or_tool_arguments() {
-    let thread = json!({"turns": [{"items": [
-        {"type": "userMessage", "content": [
-            {"type": "localImage", "path": "attached.png"},
-            {"type": "text", "text": "secret.png", "path": "secret.png"}
-        ]},
-        {"type": "imageGeneration", "savedPath": "generated.png"},
-        {"type": "agentMessage", "text": "![image](secret.png)", "path": "secret.png"},
-        {"type": "mcpToolCall", "arguments": {"path": "secret.png"}}
-    ]}]});
-    assert_eq!(image_references(&thread), ["attached.png", "generated.png"]);
-    assert!(image_references(&json!({})).is_empty());
 }
 
 impl Drop for Fixture {
@@ -112,12 +67,9 @@ fn previews_workspace_and_generated_images_in_supported_path_forms() {
 }
 
 #[test]
-fn rejects_traversal_other_tasks_network_and_device_paths() {
+fn rejects_missing_network_and_device_paths() {
     let fixture = Fixture::new();
-    let outside = fixture.write_image("outside/secret.png");
     for source in [
-        outside.to_str().unwrap(),
-        "../outside/secret.png",
         "missing.png",
         "file://server/share/image.png",
         r"\\server\share\image.png",
@@ -160,11 +112,11 @@ fn rejects_non_images_empty_files_directories_and_oversized_files() {
 
 #[cfg(unix)]
 #[test]
-fn rejects_symlinks_outside_the_allowed_directories() {
+fn previews_local_symlinks_outside_the_workspace() {
     let fixture = Fixture::new();
     let outside = fixture.write_image("outside/secret.png");
     std::os::unix::fs::symlink(outside, fixture.0.join("workspace/link.png")).unwrap();
-    assert!(fixture.read("link.png").is_err());
+    assert!(fixture.read("link.png").is_ok());
 }
 
 #[test]
@@ -202,11 +154,7 @@ fn local_history_thumbnails_ignore_upload_limits_but_respect_explicit_preview_po
         read_image(
             "large.png",
             &fixture.0.join("workspace"),
-            ReadOptions {
-                generated: &fixture.0.join("generated"),
-                references: &[],
-                preview: PreviewOptions { variant, max_bytes },
-            },
+            PreviewOptions { variant, max_bytes },
         )
     };
     let thumbnail = read(ImageVariant::Thumbnail, None).unwrap();
@@ -218,65 +166,18 @@ fn local_history_thumbnails_ignore_upload_limits_but_respect_explicit_preview_po
 }
 
 #[test]
-fn previews_tool_screenshots_outside_workspace_without_granting_sibling_access() {
+fn previews_external_images_without_recorded_tool_references() {
     let fixture = Fixture::new();
-    let screenshot = fixture.write_image("outside/tool screenshot.png");
-    let sibling = fixture.write_image("outside/unrelated.png");
-    let result = json!({"structuredContent": {"screenshot_path": screenshot}});
-    for item in [
-        json!({"type": "mcpToolCall", "result": result}),
-        json!({"type": "dynamicToolCall", "success": true, "contentItems": [
-            {"type": "inputText", "text": result.to_string()}
-        ]}),
-        json!({"type": "functionCallOutput", "output": result.to_string()}),
-        json!({"type": "mcpToolCall", "result": {"content": [
-            {"type": "resource_link", "uri": url::Url::from_file_path(&screenshot).unwrap()}
-        ]}}),
+    let image = fixture.write_image("outside/页面 截图.png");
+    let file_url = url::Url::from_file_path(&image).unwrap();
+    for source in [
+        image.to_str().unwrap(),
+        file_url.as_str(),
+        "../outside/页面 截图.png",
     ] {
-        let thread = json!({"turns": [{"items": [item]}]});
-        let references = image_references(&thread);
         assert!(fixture
-            .read_with_references(screenshot.to_str().unwrap(), &references)
-            .is_ok());
-        assert!(fixture
-            .read_with_references(sibling.to_str().unwrap(), &references)
-            .is_err());
+            .read(source)
+            .unwrap()
+            .starts_with("data:image/png;base64,"));
     }
-}
-
-#[test]
-fn failed_tools_and_unstructured_text_do_not_authorize_image_reads() {
-    let thread = json!({"turns": [{"items": [
-        {"type": "mcpToolCall", "arguments": {"path": "input.png"}},
-        {"type": "mcpToolCall", "result": {"isError": true, "path": "failed.png"}},
-        {"type": "dynamicToolCall", "success": false, "contentItems": [{"path": "failed.png"}]},
-        {"type": "mcpToolCall", "result": {"content": [
-            {"type": "text", "text": "Screenshot: unstructured.png"}
-        ]}},
-        {"type": "mcpToolCall", "result": {"path": "//server/share/image.png"}},
-        {"type": "mcpToolCall", "result": {"path": "config.toml"}}
-    ]}]});
-    assert!(image_references(&thread).is_empty());
-}
-
-#[cfg(windows)]
-#[test]
-fn previews_canonical_windows_paths_returned_by_computer_use() {
-    let fixture = Fixture::new();
-    let screenshot = fixture.write_image("outside/computer-use.png");
-    let canonical = screenshot.canonicalize().unwrap();
-    let result = json!({"structuredContent": {"screenshot_file_path": canonical}});
-    let thread = json!({"turns": [{"items": [{
-        "type": "dynamicToolCall", "success": true,
-        "contentItems": [{"type": "inputText", "text": result.to_string()}]
-    }]}]});
-    let references = image_references(&thread);
-    assert!(fixture.read(screenshot.to_str().unwrap()).is_err());
-    assert!(fixture
-        .read_with_references(screenshot.to_str().unwrap(), &references)
-        .is_ok());
-    let forbidden = json!({"turns": [{"items": [{"type": "mcpToolCall", "result": {
-        "screenshot_file_path": r"\\?\UNC\server\share\image.png"
-    }}]}]});
-    assert!(image_references(&forbidden).is_empty());
 }

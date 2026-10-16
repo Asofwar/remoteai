@@ -43,99 +43,6 @@ impl Drop for Fixture {
     }
 }
 
-fn edited_thread(fixture: &Fixture, changes: Value) -> Value {
-    json!({"cwd": fixture.root(), "turns": [{"items": [{
-        "type": "fileChange", "status": "completed", "changes": changes
-    }]}]})
-}
-
-#[test]
-fn previews_exact_external_edits_without_granting_access_to_siblings_or_other_threads() {
-    let fixture = Fixture::new();
-    let source = fixture.0.join("legacyLinkFailures.test.ts");
-    let sibling = fixture.0.join("unrelated.ts");
-    let text = "const ready = true;\n";
-    fs::write(&source, text).unwrap();
-    fs::write(&sibling, "private").unwrap();
-    let path = source.to_str().unwrap();
-    let thread = edited_thread(&fixture, json!([{"path": path, "kind": {"type": "add"}}]));
-    assert!(read_text(&fixture.root(), path).is_err());
-    for path in [path.to_owned(), path.replace('\\', "/")] {
-        assert_eq!(read_thread_text(&thread, &path, 1024).unwrap().text, text);
-    }
-    assert!(read_thread_text(&thread, sibling.to_str().unwrap(), 1024).is_err());
-    assert!(read_thread_text(&edited_thread(&fixture, json!([])), path, 1024).is_err());
-}
-
-#[test]
-fn previews_renamed_destination_and_relative_external_edits() {
-    let fixture = Fixture::new();
-    for name in ["before.ts", "after.ts", "updated.ts"] {
-        fs::write(fixture.0.join(name), "source").unwrap();
-    }
-    let thread = edited_thread(
-        &fixture,
-        json!([
-            {"path": "../before.ts", "kind": {"type": "update", "movePath": "../after.ts"}},
-            {"path": "../updated.ts", "kind": {"type": "update"}}
-        ]),
-    );
-    assert!(read_thread_text(&thread, "../before.ts", 1024).is_err());
-    for path in ["../after.ts", "../updated.ts"] {
-        assert_eq!(
-            read_thread_text(&thread, path, 1024).unwrap().text,
-            "source"
-        );
-    }
-}
-
-#[test]
-fn ignores_failed_pending_deleted_and_unstructured_file_references() {
-    let fixture = Fixture::new();
-    fs::write(fixture.0.join("outside.ts"), "private").unwrap();
-    let change = json!({"path": "../outside.ts", "kind": {"type": "add"}});
-    let items = [
-        json!({"type": "fileChange", "status": "failed", "changes": [change]}),
-        json!({"type": "fileChange", "status": "inProgress", "changes": [change]}),
-        json!({"type": "fileChange", "status": "completed", "changes": [
-            {"path": "../outside.ts", "kind": {"type": "delete"}}
-        ]}),
-        json!({"type": "agentMessage", "text": "[source](../outside.ts)", "changes": [change]}),
-        json!({"type": "mcpToolCall", "arguments": {"path": "../outside.ts"}}),
-    ];
-    for item in items {
-        let thread = json!({"cwd": fixture.root(), "turns": [{"items": [item]}]});
-        assert!(read_thread_text(&thread, "../outside.ts", 1024).is_err());
-    }
-}
-
-#[test]
-fn external_edits_still_require_readable_utf8_files_within_the_byte_limit() {
-    let fixture = Fixture::new();
-    fs::write(fixture.0.join("binary.ts"), [0, 1, 2]).unwrap();
-    fs::write(fixture.0.join("invalid.ts"), [0xff]).unwrap();
-    fs::write(fixture.0.join("large.ts"), "中文").unwrap();
-    let paths = [
-        "../binary.ts",
-        "../invalid.ts",
-        "../large.ts",
-        "../missing.ts",
-        "..",
-    ];
-    let changes: Vec<_> = paths
-        .iter()
-        .map(|path| json!({"path": path, "kind": {"type": "add"}}))
-        .collect();
-    let thread = edited_thread(&fixture, json!(changes));
-    for path in paths {
-        assert!(read_thread_text(&thread, path, 5).is_err(), "{path}");
-    }
-    assert_eq!(
-        read_thread_text(&thread, "../large.ts", 6).unwrap().text,
-        "中文"
-    );
-}
-
 #[test]
 fn reads_full_utf8_and_empty_files() {
     let fixture = Fixture::new();
@@ -147,7 +54,7 @@ fn reads_full_utf8_and_empty_files() {
 }
 
 #[test]
-fn rejects_escape_binary_large_missing_and_directory_targets() {
+fn rejects_binary_large_missing_and_directory_targets() {
     let fixture = Fixture::new();
     fs::write(fixture.0.join("outside.txt"), "private").unwrap();
     fs::write(fixture.root().join("binary"), [0, 1, 2]).unwrap();
@@ -157,21 +64,14 @@ fn rejects_escape_binary_large_missing_and_directory_targets() {
         vec![b'a'; DEFAULT_TEXT_BYTES as usize + 1],
     )
     .unwrap();
-    for path in [
-        "../outside.txt",
-        "binary",
-        "invalid",
-        "large",
-        "missing",
-        ".",
-    ] {
+    for path in ["binary", "invalid", "large", "missing", "."] {
         assert!(read_text(&fixture.root(), path).is_err(), "{path}");
     }
     assert!(read_text(
         &fixture.root(),
         fixture.0.join("outside.txt").to_str().unwrap()
     )
-    .is_err());
+    .is_ok());
 }
 
 #[test]
@@ -194,10 +94,28 @@ fn rejects_urls_network_shares_device_paths_and_streams() {
 
 #[cfg(unix)]
 #[test]
-fn rejects_symlinks_outside_workspace() {
+fn previews_local_symlinks_outside_workspace() {
     let fixture = Fixture::new();
     let outside = fixture.0.join("outside.txt");
     fs::write(&outside, "private").unwrap();
     std::os::unix::fs::symlink(outside, fixture.root().join("link")).unwrap();
-    assert!(read_text(&fixture.root(), "link").is_err());
+    assert_eq!(read_text(&fixture.root(), "link").unwrap().text, "private");
+}
+
+#[test]
+fn previews_external_csv_without_recorded_file_changes() {
+    let fixture = Fixture::new();
+    let path = fixture.0.join("中车 WMS.csv");
+    let csv = "\u{feff}序号,功能\r\n1,入库\r\n";
+    fs::write(&path, csv).unwrap();
+    let thread = serde_json::json!({"cwd": fixture.root()});
+    for source in [path.to_str().unwrap(), "../中车 WMS.csv"] {
+        assert_eq!(
+            read_thread_text(&thread, source, csv.len() as u64)
+                .unwrap()
+                .text,
+            csv
+        );
+        assert!(read_thread_text(&thread, source, csv.len() as u64 - 1).is_err());
+    }
 }

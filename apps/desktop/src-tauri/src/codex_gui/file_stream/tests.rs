@@ -162,13 +162,12 @@ fn rejects_changed_files_and_limits_open_handles() {
 }
 
 #[test]
-fn rejects_workspace_escapes_device_paths_and_fake_videos() {
+fn rejects_device_paths_and_fake_videos() {
     let fixture = Fixture::new();
     let root = fixture.root();
     fs::write(root.join("fake.mp4"), b"this is not a video").unwrap();
     fs::write(root.join("test.txt"), b"\0\0\0\x18ftypisom").unwrap();
     for path in [
-        "../outside.mp4",
         "fake.mp4",
         "test.txt",
         ".",
@@ -189,7 +188,8 @@ fn rejects_workspace_escapes_device_paths_and_fake_videos() {
         u64::MAX,
         StreamKind::Video
     )
-    .is_err());
+    .is_ok());
+    assert!(StreamFile::open(&root, "../outside.mp4", u64::MAX, StreamKind::Video).is_ok());
 }
 
 #[test]

@@ -38,6 +38,7 @@ mod image_download;
 mod image_preview;
 mod image_thumbnail;
 mod images;
+mod local_file;
 mod mcp_approval;
 mod message_edit;
 pub(crate) mod model_context;

@@ -20,6 +20,7 @@ import { useManagedDownload } from '../downloads/useManagedDownload';
 import type { PreviewLoadOptions, PreviewProgress } from '../../../../shared/remote-chat/previewProgress';
 import { PreviewTransferProgress } from './PreviewTransferProgress';
 import { isDownloadOnlyFile } from '../../../../shared/remote-chat/filePreview';
+import { filePreviewError } from '../../../../shared/remote-chat/fileErrors';
 
 export const ChatFileContext = createContext<((file: FileReference) => void) | null>(null);
 interface Props {
@@ -53,8 +54,8 @@ function FilePreview({ file, threadId, ready, load, files, close }: PreviewProps
     setError(''); setResult(undefined); setProgress(undefined);
     void load(threadId, file.path, { signal: observer.signal,
       onProgress: value => { if (!observer.signal.aborted) setProgress(value); },
-    }).then((value) => { if (!observer.signal.aborted) setResult(value); }, () => {
-      if (!observer.signal.aborted) setError(t("暂时无法预览，可以下载后打开。"));
+    }).then((value) => { if (!observer.signal.aborted) setResult(value); }, cause => {
+      if (!observer.signal.aborted) setError(t(filePreviewError(cause, "暂时无法预览，可以下载后打开。")));
     });
     return () => { observer.abort(); };
   }, [threadId, ready, load, file.path, attempt, binary]);

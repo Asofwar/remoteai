@@ -1,4 +1,14 @@
 export const downloads: Readonly<Record<string, string>> = {
+  '文件超过当前传输大小上限。': 'The file exceeds the current transfer size limit.',
+  '视频暂时无法读取，请确认文件可访问，且格式为 MP4、MOV 或 WebM。':
+    'Cannot read the video. Check that it is readable and uses MP4, MOV, or WebM format.',
+  '文件暂时无法预览，请确认文件可访问、内容为文本且未超过查看上限。':
+    'Cannot preview the file. Check that it is readable text within the preview size limit.',
+  '图片暂时无法显示，请确认文件可访问且图片格式受支持。':
+    'Cannot display the image. Check that it is readable and uses a supported image format.',
+  '文件暂时无法读取，请确认文件存在且有读取权限。': 'Cannot read the file. Check that it exists and is readable.',
+  '文件暂时无法预览，请确认文件可访问且格式和大小受支持。':
+    'Cannot preview the file. Check that it is readable and its format and size are supported.',
   '文件就绪后可打开或保存到设备。下载中断后会自动重试，最多 5 次。':
     'Open or save files when ready. Interrupted downloads retry automatically, up to 5 times.',
   '切换页面后下载会继续，关闭网页会暂停。文件就绪后可打开或保存到设备。下载中断后会自动重试，最多 5 次。':

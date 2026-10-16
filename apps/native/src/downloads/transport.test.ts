@@ -53,3 +53,10 @@ it.each(['SOURCE_CHANGED', 'PATH_UNAVAILABLE'] as const)('preserves the authenti
   await forwardDownloadRequest({ request, client, native });
   expect(native.accept).toHaveBeenCalledWith('request', JSON.stringify({ code }), true);
 });
+
+it('preserves file access failure instead of reporting a broken connection', async () => {
+  const { client, native } = setup();
+  vi.mocked(client.open).mockRejectedValue(new Error('文件暂时无法下载，请确认文件仍在当前项目中。'));
+  await forwardDownloadRequest({ request, client, native });
+  expect(native.accept).toHaveBeenCalledWith('request', JSON.stringify({ code: 'FILE_UNAVAILABLE' }), true);
+});

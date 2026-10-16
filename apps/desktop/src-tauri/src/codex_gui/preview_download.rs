@@ -41,7 +41,7 @@ pub(super) async fn open(
     if options.max_bytes == 0 {
         return Err(GuiError::InvalidRequest);
     }
-    // Reuse the exact workspace / recorded-reference and public-URL authorization of existing previews.
+    // Reuse local-path validation, public-URL checks and size limits of the existing previews.
     let response = match options.preview {
         PreviewKind::Text => {
             text_preview::preview(

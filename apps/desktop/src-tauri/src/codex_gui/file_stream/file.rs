@@ -19,33 +19,7 @@ pub(super) struct StreamFile {
 }
 
 fn local_path(root: &Path, source: &str) -> Result<std::path::PathBuf> {
-    let normalized = source.replace('\\', "/");
-    let without_drive = if normalized.as_bytes().get(1) == Some(&b':')
-        && normalized.as_bytes()[0].is_ascii_alphabetic()
-        && normalized.as_bytes().get(2) == Some(&b'/')
-    {
-        &normalized[2..]
-    } else {
-        &normalized
-    };
-    if source.is_empty()
-        || source.len() > 4096
-        || source.chars().any(char::is_control)
-        || normalized.starts_with("//")
-        || without_drive.contains(':')
-        || !root.is_absolute()
-    {
-        return Err(GuiError::FileRead);
-    }
-    let root = root.canonicalize().map_err(|_| GuiError::FileRead)?;
-    let path = root
-        .join(source)
-        .canonicalize()
-        .map_err(|_| GuiError::FileRead)?;
-    if !path.starts_with(&root) || !path.is_file() {
-        return Err(GuiError::FileRead);
-    }
-    Ok(path)
+    super::super::local_file::resolve(root, source)
 }
 
 fn check_size(metadata: &Metadata, max_bytes: u64) -> Result<()> {

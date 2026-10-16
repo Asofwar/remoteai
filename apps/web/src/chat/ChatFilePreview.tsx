@@ -16,6 +16,7 @@ import type { PreviewLoadOptions, PreviewProgress } from '../../../../shared/rem
 import { PreviewTransferProgress } from '../../../../shared/chat/PreviewTransferProgress';
 import { ChatDownloadFile, isDownloadOnlyFile } from './ChatDownloadFile';
 import { ChatFileContext } from './ChatFileLink';
+import { filePreviewError } from '../../../../shared/remote-chat/fileErrors';
 
 export interface FilePreviewContext {
   client: FileClient; threadId: string | null; ready: boolean;
@@ -34,7 +35,9 @@ function TextFile({ path, context, line }: { path: string; context: FilePreviewC
     void context.load(context.threadId, path, { signal: observer.signal,
       onProgress: value => { if (!observer.signal.aborted) setProgress(value); },
     }).then(value => { if (!observer.signal.aborted) setResult(value); })
-      .catch(() => { if (!observer.signal.aborted) setError(t("暂时无法预览此文件，可以下载后查看。")); });
+      .catch(cause => {
+        if (!observer.signal.aborted) setError(t(filePreviewError(cause, "暂时无法预览此文件，可以下载后查看。")));
+      });
     return () => { observer.abort(); };
   }, [context.load, context.threadId, context.ready, path]);
   if (error) return <p className="chat-file-preview-note" role="status">{t(error)}</p>;

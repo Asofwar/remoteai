@@ -109,13 +109,12 @@ fn keeps_download_handles_separate_and_rechecks_limits_and_ownership() {
 }
 
 #[test]
-fn rejects_downloads_outside_the_conversation_workspace() {
+fn rejects_missing_non_file_and_nonlocal_downloads() {
     let fixture = Fixture::new();
     let streams = FileStreams::downloads();
     fs::write(fixture.0.join("private.exe"), [1]).unwrap();
     fs::write(fixture.root().join("app.exe"), [1]).unwrap();
     for path in [
-        "../private.exe",
         ".",
         "missing",
         "//server/share",
@@ -126,7 +125,7 @@ fn rejects_downloads_outside_the_conversation_workspace() {
     }
     assert!(fixture
         .open(&streams, fixture.0.join("private.exe").to_str().unwrap())
-        .is_err());
+        .is_ok());
 }
 
 #[test]
@@ -158,7 +157,7 @@ fn reopening_a_changed_file_returns_a_new_revision_even_when_size_is_unchanged()
 }
 
 #[test]
-fn rejects_symbolic_links_outside_the_workspace() {
+fn downloads_local_symbolic_links_outside_the_workspace() {
     let fixture = Fixture::new();
     fs::write(fixture.0.join("private"), [1]).unwrap();
     #[cfg(unix)]
@@ -177,5 +176,24 @@ fn rejects_symbolic_links_outside_the_workspace() {
         }
         result.unwrap();
     }
-    assert!(fixture.open(&FileStreams::downloads(), "link").is_err());
+    assert!(fixture.open(&FileStreams::downloads(), "link").is_ok());
+}
+
+#[test]
+fn downloads_external_csv_with_original_name_and_exact_bytes() {
+    let fixture = Fixture::new();
+    let streams = FileStreams::downloads();
+    let path = fixture.0.join("中车 WMS.csv");
+    let csv = "\u{feff}序号,功能\r\n1,入库\r\n".as_bytes();
+    fs::write(&path, csv).unwrap();
+    for source in [path.to_str().unwrap(), "../中车 WMS.csv"] {
+        let info = fixture.open(&streams, source).unwrap();
+        assert_eq!(info.name, "中车 WMS.csv");
+        assert_eq!(
+            STANDARD
+                .decode(streams.read_chunk(read(&info, 0)).unwrap().data)
+                .unwrap(),
+            csv
+        );
+    }
 }

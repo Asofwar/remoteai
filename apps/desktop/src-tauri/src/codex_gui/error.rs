@@ -8,7 +8,7 @@ pub(super) enum GuiError {
     ConversationReference,
     #[error("暂时无法读取对话的上下文设置，请重试。")]
     ContextSettings,
-    #[error("视频暂时无法读取，请确认文件仍在当前项目中，且格式为 MP4、MOV 或 WebM。")]
+    #[error("视频暂时无法读取，请确认文件可访问，且格式为 MP4、MOV 或 WebM。")]
     VideoPreview,
     #[error("文件超过当前传输大小上限。")]
     FileTooLarge,
@@ -20,9 +20,9 @@ pub(super) enum GuiError {
     FileExpired,
     #[error("正在传输的文件较多，请稍后重试。")]
     FileBusy,
-    #[error("文件暂时无法读取，请确认文件仍在当前项目中，且大小未超过查看上限。")]
+    #[error("文件暂时无法预览，请确认文件可访问、内容为文本且未超过查看上限。")]
     TextPreview,
-    #[error("文件暂时无法下载，请确认文件仍在当前项目中。")]
+    #[error("文件暂时无法读取，请确认文件存在且有读取权限。")]
     FileRead,
     #[error("文件暂时无法添加，请确认单个文件不超过 2 MB 后重试。")]
     Attachment,
@@ -30,7 +30,7 @@ pub(super) enum GuiError {
     ProjectFiles,
     #[error("暂时无法读取文件夹，请确认文件夹仍可访问。")]
     ProjectDirectories,
-    #[error("图片暂时无法显示，请确认文件仍在当前任务目录中。")]
+    #[error("图片暂时无法显示，请确认文件可访问且图片格式受支持。")]
     ImagePreview,
     #[error("图片过大，暂时无法预览。请缩小尺寸后重试。")]
     ImagePreviewResources,

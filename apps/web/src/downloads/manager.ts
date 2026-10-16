@@ -1,6 +1,7 @@
 import { DownloadPolicyError } from '../../../../shared/remote-chat/policy';
 import { DownloadCancelled } from '../../../../shared/remote-chat/fileDownload';
 import { BulkError } from '../../../../shared/remote-chat/bulkLimits';
+import { normalizeFileError } from '../../../../shared/remote-chat/fileErrors';
 import { canRetryDownload, DownloadRetry } from '../../../../shared/remote-chat/downloadRetry';
 import { saveDownload } from './saveDownload';
 import { openBrowserDownload, type DownloadOpener } from './openDownload';
@@ -180,6 +181,7 @@ export class WebDownloadManager {
       this.clearRetry(task.id);
       await this.persist({ ...task, status: 'ready', bytesPerSecond: undefined });
     } catch (error) {
+      error = normalizeFileError(error);
       const paused = signal.aborted || error instanceof DownloadCancelled
         || (error instanceof BulkError && error.code === 'CANCELLED');
       const retrying = canRetryDownload(error) && !signal.aborted && !this.paused.has(task.id)

@@ -1,6 +1,7 @@
 import type { DownloadClient } from '../../../../shared/remote-chat/downloads';
 import type { DownloadNative, DownloadRequest } from './types';
 import { BulkError, bulkAssert } from '../../../../shared/remote-chat/bulkLimits';
+import { normalizeFileError } from '../../../../shared/remote-chat/fileErrors';
 
 const preparing = new Map<string, AbortController>();
 
@@ -64,7 +65,8 @@ export async function forwardDownloadRequest(options: {
     const chunk = await client.read({ threadId: taskId, id: remoteId, offset: request.offset, length: request.length });
     await native.accept(requestId, JSON.stringify(chunk), false);
   } catch (error) {
-    const failure = error instanceof BulkError ? JSON.stringify({ code: error.code }) : null;
+    const cause = normalizeFileError(error);
+    const failure = cause instanceof BulkError ? JSON.stringify({ code: cause.code }) : null;
     await native.accept(requestId, failure, true);
   }
 }

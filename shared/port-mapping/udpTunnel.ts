@@ -1,12 +1,7 @@
 import type { UdpPacket } from '../terminal/links';
 import type { ForwardingClient } from './service';
 import type { MappingTunnel, MappingTunnelOptions } from './types';
-
-export const UDP_MAX_DATAGRAM = 65_507;
-export const UDP_MAX_BATCH = 4;
-export const UDP_QUEUE_SIZE = 32;
-export const UDP_MAX_PEERS = 64;
-export const UDP_PEER_IDLE_MS = 60_000;
+import { UDP_PROTOCOL_VERSION } from './datagrams';
 export interface DatagramEndpoint {
   read: () => Promise<UdpPacket[]>;
   write: (packets: UdpPacket[]) => Promise<void>;
@@ -49,7 +44,7 @@ export class UdpMappingTunnel implements MappingTunnel {
   private async connect(resource: string, url: string): Promise<DatagramEndpoint> {
     let id: string;
     try {
-      const reply = await this.client.link(resource, { type: 'udpConnect', url });
+      const reply = await this.client.link(resource, { type: 'udpConnect', url, version: UDP_PROTOCOL_VERSION });
       if (reply.type !== 'socket') throw new Error('Unexpected UDP response');
       id = reply.id;
     } catch { throw new Error('UDP 映射未能启动，请确认两端应用均已更新。'); }

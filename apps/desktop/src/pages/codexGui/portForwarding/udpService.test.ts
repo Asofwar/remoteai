@@ -32,7 +32,7 @@ it('starts both protocols and restarts protocol edits without losing the saved m
   const entry = service.snapshot()[0];
   expect(entry.status).toBe('running');
   for (const type of ['udpListen', 'listen']) expect(invoke).toHaveBeenCalledWith('codex_gui_terminal_link',
-    { request: { type, port: 1053 } });
+    { request: { type, port: 1053, ...(type === 'udpListen' ? { version: 2 } : {}) } });
   await service.edit(entry.id, { remotePort: 53, localPort: 1053, protocol: 'udp' });
   expect(service.snapshot()[0]).toMatchObject({ id: entry.id, protocol: 'udp', status: 'running' });
   expect(invoke).toHaveBeenCalledWith('codex_gui_terminal_link', { request: { type: 'stop', scope: 'listen' } });

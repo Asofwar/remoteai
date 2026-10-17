@@ -1,5 +1,5 @@
 export type TerminalLinkRequest = { type: 'connect'; url: string }
-  | { type: 'udpConnect'; url: string }
+  | { type: 'udpConnect'; url: string; version: number }
   | { type: 'udpRead' | 'udpClose'; id: string }
   | { type: 'udpWrite'; id: string; packets: UdpPacket[] }
   | { type: 'read' | 'close'; id: string } | { type: 'write'; id: string; data: string };

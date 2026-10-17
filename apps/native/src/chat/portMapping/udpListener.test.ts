@@ -2,8 +2,8 @@ import dgram from 'node:dgram';
 import { randomUUID } from 'node:crypto';
 import { afterEach, expect, it, vi } from 'vitest';
 import { listenUdp } from './udpListener';
-import { UDP_MAX_DATAGRAM, UDP_QUEUE_SIZE,
-  type DatagramEndpoint } from '../../../../../shared/port-mapping/udpTunnel';
+import type { DatagramEndpoint } from '../../../../../shared/port-mapping/udpTunnel';
+import { UDP_MAX_BATCH, UDP_MAX_DATAGRAM, UDP_QUEUE_SIZE } from '../../../../../shared/port-mapping/datagrams';
 
 vi.mock('react-native-udp', () => ({ default: dgram }));
 vi.mock('react-native', () => ({ NativeModules: { UdpSockets: {} } }));
@@ -76,4 +76,36 @@ it('bounds queued datagrams and ignores unknown reply destinations', async () =>
   expect(received).not.toHaveBeenCalled();
   const pending = expect(endpoint.read()).rejects.toThrow('closed');
   await endpoint.close(); await pending;
+});
+
+it('keeps a 128-packet burst while the bridge waits for its preceding remote write', async () => {
+  const localPort = await port();
+  const endpoint = await listenUdp(localPort); endpoints.push(endpoint);
+  const client = await socket();
+  for (let i = 0; i < 128; i++) await send(client, Buffer.from([i]), localPort);
+  await new Promise(resolve => setTimeout(resolve, 30));
+  const packets = [...await endpoint.read(), ...await endpoint.read()];
+  expect(packets.map(packet => Buffer.from(packet.data, 'base64')[0])).toEqual(Array.from({ length: 128 }, (_, i) => i));
+});
+
+it('submits a bounded reply batch before waiting for native send callbacks', async () => {
+  const localPort = await port();
+  const create = vi.spyOn(dgram, 'createSocket');
+  const endpoint = await listenUdp(localPort); endpoints.push(endpoint);
+  const nativeSocket = create.mock.results[0].value as dgram.Socket;
+  create.mockRestore();
+  const client = await socket();
+  await send(client, Buffer.from([7]), localPort);
+  const [packet] = await endpoint.read();
+  const callbacks: (() => void)[] = [];
+  const nativeSend = vi.spyOn(nativeSocket, 'send').mockImplementation((...args: unknown[]) => {
+    const callback = args.at(-1);
+    if (typeof callback !== 'function') throw new Error('Missing send callback');
+    callbacks.push(() => callback());
+  });
+  const pending = endpoint.write(Array.from({ length: UDP_MAX_BATCH }, () => packet));
+  expect(nativeSend).toHaveBeenCalledTimes(UDP_MAX_BATCH);
+  callbacks.forEach(callback => callback());
+  await pending;
+  nativeSend.mockRestore();
 });

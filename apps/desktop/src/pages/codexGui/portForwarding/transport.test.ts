@@ -81,6 +81,10 @@ it('preserves UDP datagram boundaries and peer IDs through encrypted P2P and rel
       await vi.advanceTimersByTimeAsync(100);
       expect(local.datagrams.at(-1)).toEqual(packets);
       expect(service.snapshot()[0].status).toBe('running');
+      const burst = Array.from({ length: 64 }, (_, index) => ({ peer: `client-${index % 4}`, data: btoa(String(index)) }));
+      local.reads.get('1053')!({ type: 'datagrams', packets: burst });
+      await vi.advanceTimersByTimeAsync(100);
+      expect(local.datagrams.at(-1)).toEqual(burst);
     }
     service.dispose(); await vi.advanceTimersByTimeAsync(100);
     expect(transport.resources.size).toBe(0);

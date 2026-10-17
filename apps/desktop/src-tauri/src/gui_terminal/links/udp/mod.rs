@@ -1,5 +1,8 @@
 //! Bounded datagram sessions. Peer IDs are opaque and never authorize arbitrary reply addresses.
 mod local;
+mod queue;
+#[cfg(test)]
+mod queue_tests;
 mod remote;
 mod session;
 #[cfg(test)]
@@ -15,11 +18,22 @@ use tokio::{net::UdpSocket, sync::Mutex};
 const MAX_SESSIONS: usize = 32;
 const MAX_PEERS: usize = 64;
 const MAX_DATAGRAM: usize = 65_507;
-const MAX_BATCH: usize = 4;
-const QUEUE_SIZE: usize = 32;
+const PROTOCOL_VERSION: u8 = 2;
+const MAX_BATCH: usize = 64;
+const MAX_BATCH_BYTES: usize = 256 * 1024;
+const QUEUE_SIZE: usize = 512;
+const QUEUE_BYTES: usize = 2 * 1024 * 1024;
 const PEER_IDLE: Duration = Duration::from_secs(60);
 const SESSION_IDLE: Duration = Duration::from_secs(90);
 const READ_WAIT: Duration = Duration::from_secs(10);
+
+pub(super) fn require_version(version: u8) -> Result<()> {
+    if version == PROTOCOL_VERSION {
+        Ok(())
+    } else {
+        Err(LinkError::Invalid)
+    }
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -98,13 +112,28 @@ impl Sessions {
 
     pub async fn write(&self, scope: &str, id: &str, packets: Vec<Packet>) -> Result<LinkReply> {
         let session = self.get(scope, id).await?;
-        if packets.len() > MAX_BATCH {
+        let encoded_limit = MAX_BATCH_BYTES.div_ceil(3) * 4 + MAX_BATCH * 4;
+        if packets.len() > MAX_BATCH
+            || packets
+                .iter()
+                .map(|packet| packet.data.len())
+                .sum::<usize>()
+                > encoded_limit
+        {
             return Err(LinkError::Invalid);
         }
         let datagrams = packets
             .into_iter()
             .map(decode)
             .collect::<Result<Vec<_>>>()?;
+        if datagrams
+            .iter()
+            .map(|packet| packet.data.len())
+            .sum::<usize>()
+            > MAX_BATCH_BYTES
+        {
+            return Err(LinkError::Invalid);
+        }
         session.write(datagrams).await?;
         Ok(LinkReply::Done)
     }

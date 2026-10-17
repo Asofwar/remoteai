@@ -61,13 +61,37 @@ async fn packets(sessions: &Sessions, scope: &str, id: &str) -> Vec<Packet> {
     packets
 }
 
+async fn local_with_tcp(sessions: &Sessions) -> (String, u16, tokio::net::TcpListener) {
+    const MAX_BIND_ATTEMPTS: usize = 32;
+    // Windows reserves TCP and UDP ports independently; a free UDP port may be forbidden for TCP.
+    for _ in 0..MAX_BIND_ATTEMPTS {
+        let tcp = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = tcp.local_addr().unwrap().port();
+        let reservation = match UdpSocket::bind(("127.0.0.1", port)).await {
+            Ok(socket) => socket,
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::AddrInUse | std::io::ErrorKind::PermissionDenied
+                ) =>
+            {
+                continue;
+            }
+            Err(error) => panic!("UDP port reservation failed: {error}"),
+        };
+        drop(reservation);
+        let LinkReply::Listener { id, .. } = sessions.listen(port).await.unwrap() else {
+            panic!()
+        };
+        return (id, port, tcp);
+    }
+    panic!("No port available for both TCP and UDP");
+}
+
 #[tokio::test]
 async fn datagrams_roundtrip_separate_clients_preserving_empty_binary_and_large_packets() {
     let sessions = Sessions::default();
-    let (local, port) = local(&sessions).await;
-    let tcp = tokio::net::TcpListener::bind(("127.0.0.1", port))
-        .await
-        .unwrap();
+    let (local, port, tcp) = local_with_tcp(&sessions).await;
     let echo = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let LinkReply::Socket { id: remote } = sessions
         .connect(
@@ -137,6 +161,40 @@ async fn port_conflicts_scope_isolation_cancellation_and_immediate_reuse() {
         .unwrap()
         .is_err());
     assert!(UdpSocket::bind(("127.0.0.1", port)).await.is_ok());
+}
+
+#[tokio::test]
+async fn delayed_reader_preserves_a_128_datagram_burst_from_four_clients() {
+    let sessions = Sessions::default();
+    let (id, port) = local(&sessions).await;
+    let mut clients = Vec::new();
+    for _ in 0..4 {
+        clients.push(UdpSocket::bind("127.0.0.1:0").await.unwrap());
+    }
+    for sequence in 0u16..128 {
+        clients[sequence as usize % 4]
+            .send_to(&sequence.to_be_bytes(), ("127.0.0.1", port))
+            .await
+            .unwrap();
+    }
+    tokio::time::sleep(Duration::from_millis(30)).await;
+    let mut received = Vec::new();
+    while received.len() < 128 {
+        received.extend(packets(&sessions, &id, &id).await);
+    }
+    let peers: std::collections::HashSet<_> =
+        received.iter().map(|packet| packet.peer.clone()).collect();
+    assert_eq!(peers.len(), 4);
+    let mut sequence: Vec<_> = received
+        .iter()
+        .map(|packet| {
+            let bytes = STANDARD.decode(&packet.data).unwrap();
+            u16::from_be_bytes(bytes.try_into().unwrap())
+        })
+        .collect();
+    sequence.sort_unstable();
+    assert_eq!(sequence, (0u16..128).collect::<Vec<_>>());
+    sessions.stop(&id).await;
 }
 
 #[test]

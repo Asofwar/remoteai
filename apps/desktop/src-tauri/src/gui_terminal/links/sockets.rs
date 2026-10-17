@@ -97,8 +97,18 @@ impl LinkState {
         request: LinkRequest,
     ) -> Result<LinkReply> {
         match request {
-            LinkRequest::UdpListen { port } => self.udp.listen(port).await,
-            LinkRequest::UdpConnect { scope, url } => self.udp.connect(scope, url).await,
+            LinkRequest::UdpListen { port, version } => {
+                super::udp::require_version(version)?;
+                self.udp.listen(port).await
+            }
+            LinkRequest::UdpConnect {
+                scope,
+                url,
+                version,
+            } => {
+                super::udp::require_version(version)?;
+                self.udp.connect(scope, url).await
+            }
             LinkRequest::UdpRead { scope, id } => self.udp.read(&scope, &id).await,
             LinkRequest::UdpWrite { scope, id, packets } => {
                 self.udp.write(&scope, &id, packets).await

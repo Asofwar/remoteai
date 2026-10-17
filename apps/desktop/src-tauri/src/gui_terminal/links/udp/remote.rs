@@ -2,7 +2,7 @@ use super::{
     session::{enqueue, Activity, Worker},
     *,
 };
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::task::JoinHandle;
 
 struct Flow {
     socket: Arc<UdpSocket>,
@@ -29,11 +29,9 @@ pub(super) async fn run(target: SocketAddr, mut worker: Worker) -> Result<()> {
                 if worker.activity.expired() { return Ok(()); }
                 flows.retain(|_, flow| active(flow));
             }
-            packets = worker.commands.recv() => {
-                let Some(packets) = packets else { return Ok(()) };
-                for packet in packets {
-                    send(&mut flows, target, &worker.packets, packet).await?;
-                }
+            queued = worker.commands.recv() => {
+                let Some(queued) = queued else { return Ok(()) };
+                send(&mut flows, target, &worker.packets, queued.packet).await?;
             }
         }
     }
@@ -42,7 +40,7 @@ pub(super) async fn run(target: SocketAddr, mut worker: Worker) -> Result<()> {
 async fn send(
     flows: &mut HashMap<String, Flow>,
     target: SocketAddr,
-    replies: &mpsc::Sender<Datagram>,
+    replies: &queue::Sender,
     packet: Datagram,
 ) -> Result<()> {
     flows.retain(|_, flow| active(flow));
@@ -67,7 +65,7 @@ fn active(flow: &Flow) -> bool {
     !flow.activity.expired_after(PEER_IDLE) && !flow.receiver.is_finished()
 }
 
-async fn open(target: SocketAddr, peer: String, replies: mpsc::Sender<Datagram>) -> Result<Flow> {
+async fn open(target: SocketAddr, peer: String, replies: queue::Sender) -> Result<Flow> {
     let bind = if target.is_ipv4() {
         "0.0.0.0:0"
     } else {
@@ -94,7 +92,7 @@ async fn open(target: SocketAddr, peer: String, replies: mpsc::Sender<Datagram>)
 async fn receive(
     socket: Arc<UdpSocket>,
     peer: String,
-    replies: mpsc::Sender<Datagram>,
+    replies: queue::Sender,
     activity: Arc<Activity>,
 ) {
     let mut bytes = vec![0; MAX_DATAGRAM + 1];

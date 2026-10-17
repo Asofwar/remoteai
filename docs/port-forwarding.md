@@ -90,8 +90,38 @@ an opaque client ID. The remote host creates a separate connected UDP socket for
 replies only from the configured destination, and routes them back to that client. IPv4 and IPv6 targets work.
 UDP startup confirms the mapping is ready, not that the remote service is listening: UDP has no connection handshake.
 
-Sessions accept up to 64 clients and 65,507 bytes per datagram, including empty datagrams. RPC batches contain
-at most four datagrams; receive queues hold 32 datagrams and send queues hold 32 batches. Excess traffic is dropped.
+UDP listeners and connections require protocol version 2; older peers must update, with no legacy fallback.
+Sessions accept up to 64 clients and 65,507 bytes per datagram, including empty datagrams. Batches drain
+immediately available packets up to 64 datagrams or 256 KiB of payload, whichever comes first. They never wait
+to fill a batch. Each direction queues at most 512 datagrams and 2 MiB of payload. Empty datagrams count against
+the packet limit. Byte permits remain charged while a native socket write is pending, and a datagram deferred
+at the batch byte limit is retained for the next read. Both limits also apply to the phone's listener.
+Sustained overload can still drop datagrams, but small bursts no longer exhaust a 32-packet queue while awaiting
+the preceding remote write. A complete batch is validated before any of its packets are submitted.
+The phone submits each validated reply batch together and awaits all native send callbacks; it does not
+serialize an additional JavaScript/native round trip for every reply. The batch count and byte limits
+also bound these in-flight sends.
+
+Windows hardware verification (2026-10-17, updated viewer and ZH2 host, local UDP `15353` through ZH2
+to LAN DNS `192.168.5.1:53`): four clients sending 128 requests without pacing previously received only
+33 / 34 replies. Three runs with version 2 received 128 / 128 replies, with no duplicates or client mix-ups;
+burst median RTT was 26–37 ms and p95 34–44 ms. Forty requests spaced 30 ms apart remained loss-free at
+7.2–7.5 ms median; 80 requests from four clients spaced 5 ms apart all returned at 5.9–6.5 ms median.
+Direct LAN controls previously received all 128 burst requests. This fixes forwarding burst loss, not
+the underlying difference between encrypted forwarding and direct LAN access.
+
+Two additional real ZH2 loopback echo runs preserved every byte and client identity for 128 / 256 / 512
+packet bursts with 128-byte payloads, 128-packet bursts with 1,200-byte payloads, empty datagrams,
+16 paced 16-KiB datagrams and four paced 65,507-byte datagrams. An unchanged client socket worked after
+95 seconds idle (7.6 ms reply), and three stop/start cycles immediately released and reused the port.
+TCP port 3002 also returned HTTP 200 and a 12,711,048-byte asset matching the direct LAN SHA-256 after
+updating the host. These are bounded test scenarios, not a guarantee against loss under sustained overload.
+
+The rebuilt Android APK was installed on a 2109119BC phone and tested against the same ZH2 DNS mapping.
+Two foreground runs and one background run each returned all 40 paced, 80 multi-client and 128 burst
+requests without duplicate or misrouted responses. Burst median RTT was 102–177 ms and p95 146–226 ms;
+phone forwarding still has higher latency than the desktop path. Web build and shared protocol checks
+passed; browsers continue to omit local port listeners.
 Peer associations expire after 60 seconds without traffic in either direction. Sessions expire after 90 seconds
 without client polling/writes, and disconnect/stop cancels pending reads and releases listeners before returning.
 UDP shares the selected P2P/relay transport, which may be reliable and ordered; it does not promise the latency or

@@ -7,16 +7,21 @@ async fn udp_resources_reject_other_targets_owners_and_remote_listeners() {
     let url = "http://127.0.0.1:53".to_string();
     let scope = open_resource(&state, url.clone()).await.unwrap();
     let other = open_resource(&state, url.clone()).await.unwrap();
-    assert!(
-        resource_request(&state, LinkRequest::UdpListen { port: 1053 })
-            .await
-            .is_err()
-    );
+    assert!(resource_request(
+        &state,
+        LinkRequest::UdpListen {
+            port: 1053,
+            version: 2
+        }
+    )
+    .await
+    .is_err());
     assert!(resource_request(
         &state,
         LinkRequest::UdpConnect {
             scope: scope.clone(),
             url: "http://127.0.0.1:54".into(),
+            version: 2,
         }
     )
     .await
@@ -26,6 +31,7 @@ async fn udp_resources_reject_other_targets_owners_and_remote_listeners() {
         LinkRequest::UdpConnect {
             scope: scope.clone(),
             url,
+            version: 2,
         },
     )
     .await

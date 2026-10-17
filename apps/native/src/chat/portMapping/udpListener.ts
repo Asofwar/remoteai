@@ -3,8 +3,9 @@ import { NativeModules } from 'react-native';
 import { Buffer } from 'buffer';
 import { randomUUID } from 'expo-crypto';
 import type { UdpPacket } from '../../../../../shared/terminal/links';
-import { UDP_MAX_BATCH, UDP_MAX_DATAGRAM, UDP_MAX_PEERS, UDP_PEER_IDLE_MS, UDP_QUEUE_SIZE,
-  type DatagramEndpoint, type UdpListenerFactory } from '../../../../../shared/port-mapping/udpTunnel';
+import type { DatagramEndpoint, UdpListenerFactory } from '../../../../../shared/port-mapping/udpTunnel';
+import { DatagramQueue, UDP_MAX_BATCH, UDP_MAX_BATCH_BYTES, UDP_MAX_DATAGRAM, UDP_MAX_PEERS,
+  UDP_PEER_IDLE_MS } from '../../../../../shared/port-mapping/datagrams';
 import { retainPortMappingConnection } from '../backgroundConnection';
 
 const LOOPBACK = '127.0.0.1';
@@ -28,7 +29,7 @@ export const listenUdp: UdpListenerFactory = async port => {
 class NativeUdpEndpoint implements DatagramEndpoint {
   private readonly socket = dgram.createSocket({ type: 'udp4', reusePort: false });
   private readonly peers = new Map<string, Peer>();
-  private readonly queue: UdpPacket[] = [];
+  private readonly queue = new DatagramQueue();
   private wake?: () => void;
   private failure?: Error;
   private stopping?: Promise<void>;
@@ -64,7 +65,7 @@ class NativeUdpEndpoint implements DatagramEndpoint {
     if (!peer && this.peers.size >= UDP_MAX_PEERS) return;
     peer ??= randomUUID();
     this.peers.set(peer, { ...source, seen: Date.now() });
-    if (this.queue.length < UDP_QUEUE_SIZE) this.queue.push({ peer, data: bytes.toString('base64') });
+    this.queue.push({ peer, data: bytes.toString('base64') }, bytes.length);
     this.wake?.();
   }
 
@@ -72,22 +73,30 @@ class NativeUdpEndpoint implements DatagramEndpoint {
     if (!this.failure && !this.queue.length) await new Promise<void>(resolve => { this.wake = resolve; });
     this.wake = undefined;
     if (this.failure) throw this.failure;
-    return this.queue.splice(0, UDP_MAX_BATCH);
+    return this.queue.take();
   }
 
   async write(packets: UdpPacket[]) {
     this.expire();
     if (packets.length > UDP_MAX_BATCH) throw new Error('Invalid UDP batch');
-    for (const packet of packets) {
-      const peer = this.peers.get(packet.peer);
-      if (!peer || this.stopping) continue;
+    // Validate the complete batch before sending any part of an invalid request.
+    const decoded = packets.map(packet => {
       if (packet.data.length > Math.ceil(UDP_MAX_DATAGRAM / 3) * 4) throw new Error('Invalid UDP datagram');
       const bytes = Buffer.from(packet.data, 'base64');
       if (bytes.length > UDP_MAX_DATAGRAM) throw new Error('Invalid UDP datagram');
+      return { packet, bytes };
+    });
+    if (decoded.reduce((sum, value) => sum + value.bytes.length, 0) > UDP_MAX_BATCH_BYTES) {
+      throw new Error('Invalid UDP batch');
+    }
+    // Submit the bounded batch together instead of paying a native bridge round trip for every reply.
+    await Promise.all(decoded.map(async ({ packet, bytes }) => {
+      const peer = this.peers.get(packet.peer);
+      if (!peer || this.stopping) return;
       peer.seen = Date.now();
       await new Promise<void>((resolve, reject) => this.socket.send(bytes, 0, bytes.length, peer.port, peer.address,
         error => error ? reject(error) : resolve()));
-    }
+    }));
   }
 
   close = () => {
@@ -95,7 +104,7 @@ class NativeUdpEndpoint implements DatagramEndpoint {
     this.stopping ??= new Promise<void>((resolve, reject) => {
       this.socket.once('error', reject);
       this.socket.close(() => { this.socket.off('error', reject); resolve(); });
-    }).finally(async () => { this.peers.clear(); this.queue.length = 0; await this.release(); });
+    }).finally(async () => { this.peers.clear(); this.queue.clear(); await this.release(); });
     return this.stopping;
   };
 

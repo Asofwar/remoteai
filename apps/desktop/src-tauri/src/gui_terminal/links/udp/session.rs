@@ -6,7 +6,6 @@ use std::{
 use tokio::{
     sync::{mpsc, watch},
     task::JoinHandle,
-    time::timeout,
 };
 
 pub(super) struct Activity {
@@ -37,16 +36,16 @@ impl Activity {
 }
 
 pub(super) struct Worker {
-    pub commands: mpsc::Receiver<Vec<Datagram>>,
-    pub packets: mpsc::Sender<Datagram>,
+    pub commands: mpsc::Receiver<queue::Queued>,
+    pub packets: queue::Sender,
     pub cancel: watch::Receiver<bool>,
     pub activity: Arc<Activity>,
 }
 
 pub(super) struct Session {
     pub scope: String,
-    commands: mpsc::Sender<Vec<Datagram>>,
-    packets: Mutex<mpsc::Receiver<Datagram>>,
+    commands: queue::Sender,
+    packets: Mutex<queue::Reader>,
     cancel: watch::Sender<bool>,
     task: Mutex<Option<JoinHandle<Result<()>>>>,
     activity: Arc<Activity>,
@@ -65,8 +64,8 @@ impl Session {
         F: FnOnce(Worker) -> Fut,
         Fut: std::future::Future<Output = Result<()>> + Send + 'static,
     {
-        let (commands, receiver) = mpsc::channel(QUEUE_SIZE);
-        let (sender, packets) = mpsc::channel(QUEUE_SIZE);
+        let (commands, receiver) = queue::channel();
+        let (sender, packets) = queue::channel();
         let (cancel, cancellation) = watch::channel(false);
         let activity = Arc::new(Activity::new());
         let future = run(Worker {
@@ -84,7 +83,7 @@ impl Session {
         Self {
             scope,
             commands,
-            packets: Mutex::new(packets),
+            packets: Mutex::new(queue::Reader::new(packets)),
             cancel,
             task: Mutex::new(Some(task)),
             activity,
@@ -112,21 +111,7 @@ impl Session {
         if *cancel.borrow() {
             return Err(LinkError::Closed);
         }
-        let first = tokio::select! {
-            _ = cancel.changed() => return Err(LinkError::Closed),
-            result = timeout(READ_WAIT, receiver.recv()) => match result {
-                Ok(Some(packet)) => Some(packet),
-                Ok(None) => return Err(LinkError::Closed),
-                Err(_) => None,
-            }
-        };
-        let mut packets: Vec<_> = first.into_iter().collect();
-        while packets.len() < MAX_BATCH {
-            let Ok(packet) = receiver.try_recv() else {
-                break;
-            };
-            packets.push(packet);
-        }
+        let packets = receiver.read(&mut cancel).await?;
         Ok(LinkReply::Datagrams {
             packets: packets
                 .into_iter()
@@ -140,14 +125,14 @@ impl Session {
 
     pub async fn write(&self, packets: Vec<Datagram>) -> Result<()> {
         self.activity.touch();
-        if self.closed() {
+        if self.closed() || self.commands.closed() {
             return Err(LinkError::Closed);
         }
-        // UDP drops at bounded queue limits instead of blocking chat or growing unbounded memory.
-        match self.commands.try_send(packets) {
-            Ok(()) | Err(mpsc::error::TrySendError::Full(_)) => Ok(()),
-            Err(mpsc::error::TrySendError::Closed(_)) => Err(LinkError::Closed),
+        for packet in packets {
+            // Sustained overload still drops UDP packets; bounded bursts no longer hit a 32-packet queue.
+            self.commands.push(packet);
         }
+        Ok(())
     }
 }
 
@@ -157,10 +142,7 @@ impl Drop for Session {
     }
 }
 
-pub(super) fn enqueue(sender: &mpsc::Sender<Datagram>, packet: Datagram) {
+pub(super) fn enqueue(sender: &queue::Sender, packet: Datagram) {
     // Dropping datagrams under overload is intentional; never stall the socket receive loop.
-    match sender.try_send(packet) {
-        Ok(()) | Err(mpsc::error::TrySendError::Full(_) | mpsc::error::TrySendError::Closed(_)) => {
-        }
-    }
+    sender.push(packet);
 }

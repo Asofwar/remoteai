@@ -64,10 +64,12 @@ pub(crate) enum LinkRequest {
     },
     UdpListen {
         port: u16,
+        version: u8,
     },
     UdpConnect {
         scope: String,
         url: String,
+        version: u8,
     },
     UdpRead {
         scope: String,

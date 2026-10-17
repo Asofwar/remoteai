@@ -24,13 +24,12 @@ pub(super) async fn run(socket: UdpSocket, mut worker: Worker) -> Result<()> {
                 if worker.activity.expired() { return Ok(()); }
                 peers.retain(|_, peer| peer.seen.elapsed() < PEER_IDLE);
             }
-            packets = worker.commands.recv() => {
-                let Some(packets) = packets else { return Ok(()) };
-                for packet in packets {
-                    if let Some(peer) = peers.get_mut(&packet.peer) {
-                        peer.seen = Instant::now();
-                        socket.send_to(&packet.data, peer.address).await.map_err(|_| LinkError::Network)?;
-                    }
+            queued = worker.commands.recv() => {
+                let Some(queued) = queued else { return Ok(()) };
+                let packet = &queued.packet;
+                if let Some(peer) = peers.get_mut(&packet.peer) {
+                    peer.seen = Instant::now();
+                    socket.send_to(&packet.data, peer.address).await.map_err(|_| LinkError::Network)?;
                 }
             }
             received = socket.recv_from(&mut bytes) => {

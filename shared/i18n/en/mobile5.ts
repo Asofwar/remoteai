@@ -1,4 +1,6 @@
 export const mobile5: Readonly<Record<string, string>> = {
+  '刷新模型': 'Refresh models',
+  '正在刷新模型…': 'Refreshing models…',
   "继续显示（还有":
     "Show more (remaining: ",
   "维护用户角色和登录状态":

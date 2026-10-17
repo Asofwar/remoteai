@@ -233,6 +233,7 @@ function ConnectedChat({ session, device, devices, selected, active: pageActive,
         && state.compacting === state.selected?.id} compact={controller.compact}
       settingsBusy={state.settingsBusy || !!state.workspaceBusy} settingsError={state.settingsError}
       updateSettings={(settings) => controller.setSettings(settings)}
+      refreshModels={controller.refreshModels}
       active={active} ready={ready} sending={state.sending} running={running}
       upload={state.upload} reconnecting={state.mode === 'connecting' || state.mode === 'offline'}
       send={(input) => controller.send(input)} interrupted={state.selected?.turns?.at(-1)?.status === 'interrupted'}

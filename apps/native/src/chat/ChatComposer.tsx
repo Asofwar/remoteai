@@ -66,6 +66,7 @@ interface Props {
   settingsBusy: boolean;
   settingsError: string;
   updateSettings: (settings: Partial<ComposerSettings>) => Promise<void>;
+  refreshModels: () => Promise<void>;
   threadId: string | null;
   active: boolean;
   ready: boolean;
@@ -85,7 +86,7 @@ interface Props {
 }
 
 export function ChatComposer({ projectPicker, suggestions, models, selection, settingsBusy, settingsError,
-  updateSettings,
+  updateSettings, refreshModels,
   readUsage, readConversationMetrics, usageActive, tokenUsage, contextSettings, connection, queue, goals, goal, goalBusy,
   threadId, active, ready, sending, running, upload, reconnecting = false, interrupted = false, send, interrupt,
   catalog, cwd, compactReason, compacting, compact, loadCatalog, loadFiles, loadConversations }: Props) {
@@ -253,7 +254,7 @@ export function ChatComposer({ projectPicker, suggestions, models, selection, se
       threadId={threadId} contextSettings={contextSettings}
       readUsage={readUsage} usageActive={active && usageActive} tokenUsage={tokenUsage}
       readConversationMetrics={readConversationMetrics}
-      saving={settingsBusy} error={settingsError} ready={ready}
+      saving={settingsBusy} error={settingsError} ready={ready} refreshModels={refreshModels}
       updateSettings={updateSettings} onClose={() => setSettings(false)} />}
   </View></View>;
 }

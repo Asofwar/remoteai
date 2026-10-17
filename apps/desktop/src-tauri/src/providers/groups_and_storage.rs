@@ -98,6 +98,10 @@ fn validate_provider_group_models(providers: &[ProviderProfile]) -> Result<(), S
 }
 
 pub(crate) fn provider_group_model_name(provider: &ProviderProfile, model: &str) -> String {
+    // Email addresses can be shared by multiple workspaces; the stored account ID includes workspace identity.
+    if let Some(id) = crate::aggregate_api::member_account_id(&provider.id) {
+        return format!("{}-{id}-{model}", provider.name);
+    }
     format!("{}-{model}", provider.name)
 }
 

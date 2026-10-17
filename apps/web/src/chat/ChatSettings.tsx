@@ -4,6 +4,7 @@ import { AdaptiveSheet } from '../components/AdaptiveSheet';
 import { ChatUsage } from './ChatUsage';
 import { ChatContextSettings } from './ChatContextSettings';
 import { ChatProfileMenu, type ChatConnectionProps } from './ChatProfileMenu';
+import { ModelRefreshButton } from './ModelRefreshButton';
 import type { ContextSettingsApi } from '../../../../shared/remote-chat/contextSettings';
 import type { ReadUsage } from '../../../../shared/remote-chat/usage';
 import type { ReadConversationMetrics } from '../../../../shared/remote-chat/conversationMetrics';
@@ -25,10 +26,11 @@ interface Props {
   ready: boolean;
   error: string;
   updateSettings: (settings: Partial<ComposerSettings>) => Promise<void>;
+  refreshModels: () => Promise<void>;
   onClose: () => void;
 }
 
-export function ChatSettings({ models, selection, saving, ready, error, updateSettings, onClose,
+export function ChatSettings({ models, selection, saving, ready, error, updateSettings, refreshModels, onClose,
   readUsage, readConversationMetrics, tokenUsage, threadId, contextSettings, connection }: Props) {
   useLanguage();
   const [field, setField] = useState<SettingField | null>(null);
@@ -50,6 +52,7 @@ export function ChatSettings({ models, selection, saving, ready, error, updateSe
         <span aria-hidden="true">›</span>
       </button>)}
       {!!notice && <p role={error ? 'alert' : 'status'} className={error ? 'chat-error' : 'chat-muted'}>{t(notice)}</p>}
+      <ModelRefreshButton ready={ready} refreshModels={refreshModels} />
       {!!error && <button type="button" className="chat-button" onClick={() => { void updateSettings(selection); }}>
         {t("重新保存")}</button>}
       <ChatUsage read={readUsage} active={!field && !contextOpen} ready={ready} tokenUsage={tokenUsage}

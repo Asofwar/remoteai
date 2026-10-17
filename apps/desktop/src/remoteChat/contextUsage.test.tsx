@@ -104,7 +104,7 @@ it('shows and updates context in settings even while daily usage is still loadin
     tokenUsage={tokenUsage} readUsage={readUsage} ready models={[]} saving={false} error=""
     readConversationMetrics={readConversationMetrics}
     selection={{ model: 'astra', effort: 'low', access: 'workspace-write' }}
-    updateSettings={async () => {}} onClose={() => {}} />));
+    updateSettings={async () => {}} refreshModels={async () => {}} onClose={() => {}} />));
   try {
     await render(usage);
     expect(container.textContent).toContain('上下文 121.3K / 258K Token（47% 已用）');

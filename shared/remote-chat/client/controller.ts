@@ -440,6 +440,9 @@ export class ChatController {
   }
 
   async setSettings(settings: Partial<ComposerSettings>) { this.composer.set(settings); }
+  refreshModels = () => this.composer.refreshModels().catch(() => {
+    // The settings panel displays discovery failures and keeps sending blocked until recovery.
+  });
 
   /** Search without replacing the sidebar list or its pagination. */
   searchThreads = (options: { search: string; archived: boolean; cursor?: string }) =>

@@ -1,6 +1,7 @@
 .composer-model-panel { width: min(224px, calc(100vw - 24px)); max-width: 400px; color: var(--app-ink, #13231c);
   background: var(--app-surface, #fbfcfa); border: 1px solid var(--app-border, #dfe5df); border-radius: 16px; font-size: 12px; line-height: 18px; }
 .composer-model-reasoning { padding: 12px; }
+.composer-model-panel > .chat-button { margin: 0 12px 12px; max-width: calc(100% - 24px); }
 .composer-model-summary { display: flex; align-items: flex-start; position: relative; min-height: 40px; }
 .composer-model-heading { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 100%;
   padding: 0 24px 4px; border: 0; background: transparent; cursor: pointer; font: inherit; }

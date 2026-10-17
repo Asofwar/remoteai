@@ -15,7 +15,8 @@ const MODEL_CATALOG_TIMEOUT_MS = 150_000;
 function requestTimeout(body: unknown) {
   const operation = (body as { operation?: unknown } | null)?.operation;
   if (operation === 'guiGitAction' || operation === 'guiGitWorkspace') return GIT_ACTION_TIMEOUT_MS;
-  if (operation === 'models' || operation === 'composerSet' || operation === 'guiAccountSelect') {
+  if (operation === 'models' || operation === 'modelsRefresh'
+    || operation === 'composerSet' || operation === 'guiAccountSelect') {
     return MODEL_CATALOG_TIMEOUT_MS;
   }
   if (operation === 'fileBulk' && (body as { action?: string }).action === 'open') return BULK_LIMITS.prepareMs;

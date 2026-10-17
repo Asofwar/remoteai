@@ -13,6 +13,7 @@ import { ComposerAccess, ComposerDesktopStatus } from './ComposerDesktopControls
 import { ComposerModelPicker } from './ComposerModelPicker';
 import { ComposerSpeedIndicator } from './ComposerSpeedIndicator';
 import { ChatSettings } from './ChatSettings';
+import { ModelRefreshButton } from './ModelRefreshButton';
 import { ComposerFooter } from './ComposerFooter';
 import { ComposerGoal } from './ComposerGoal';
 import { ChatAttachmentPreviews } from './ChatAttachments';
@@ -111,7 +112,8 @@ export function ChatComposer(props: ComposerProps) {
       }} />
       {state.error && <p role="alert" className="chat-error">{t(state.error)}</p>}
       {desktop && settingsError && <p role="alert" className="chat-error">{t(settingsError)}
-        <button type="button" className="chat-button" disabled={settingsBusy}
+        <ModelRefreshButton ready={ready} refreshModels={props.refreshModels} />
+        <button type="button" className="chat-button" disabled={!ready || !models.length}
           onClick={() => { void updateSettings(selection); }}>{t('重新保存')}</button></p>}
       {props.compacting && <p role="status" className="chat-muted">{t("正在压缩上下文…")}</p>}
       {(draft.picking || attachments.busy || state.readingClipboard || state.drop.reading)
@@ -193,6 +195,7 @@ export function ChatComposer(props: ComposerProps) {
             {desktop && <ComposerDesktopStatus key={`status:${threadId}:${cwd}:${active}`} props={props}
               beforeOpen={closeMenus} />}
             {desktop ? <ComposerModelPicker key={`model:${threadId}:${cwd}:${active}`} models={models}
+              ready={ready} refreshModels={props.refreshModels}
               selection={selection} updateSettings={updateSettings} settingsBusy={settingsBusy} beforeOpen={closeMenus} />
               : <button type="button" className="chat-model" onPointerDown={event => event.preventDefault()}
               aria-label={t("{value1}{value2}，聊天设置", {
@@ -222,7 +225,7 @@ export function ChatComposer(props: ComposerProps) {
       connection={props.connection}
       contextSettings={props.contextSettings} readUsage={readUsage} tokenUsage={tokenUsage}
       readConversationMetrics={props.readConversationMetrics}
-      saving={settingsBusy} error={settingsError} ready={ready}
+      saving={settingsBusy} error={settingsError} ready={ready} refreshModels={props.refreshModels}
       updateSettings={updateSettings} onClose={() => setSettings(false)} />}
   </div>;
 }

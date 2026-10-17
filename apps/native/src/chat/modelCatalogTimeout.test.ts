@@ -17,7 +17,8 @@ function harness() {
   return { rpc, messages, reply };
 }
 
-it.each(['models', 'composerSet', 'guiAccountSelect'])('allows host catalog recovery to finish for %s', async operation => {
+it.each(['models', 'modelsRefresh', 'composerSet', 'guiAccountSelect'])(
+  'allows host catalog recovery to finish for %s', async operation => {
   vi.useFakeTimers();
   const { rpc, messages, reply } = harness();
   const result = rpc.request('request', { operation });
@@ -29,7 +30,8 @@ it.each(['models', 'composerSet', 'guiAccountSelect'])('allows host catalog reco
   rpc.close();
 });
 
-it.each(['models', 'composerSet', 'guiAccountSelect'])('still bounds stalled %s requests', async operation => {
+it.each(['models', 'modelsRefresh', 'composerSet', 'guiAccountSelect'])(
+  'still bounds stalled %s requests', async operation => {
   vi.useFakeTimers();
   const { rpc } = harness();
   const rejected = vi.fn();

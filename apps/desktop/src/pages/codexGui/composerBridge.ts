@@ -122,6 +122,13 @@ export class ComposerBridge {
     return threadId === undefined ? this.value : this.publishScope(threadId);
   }
 
+  /** Discovery is an explicit remote action, separate from passive reads and polling. */
+  async refreshModels(threadId?: string | null): Promise<ComposerSnapshot> {
+    if (!this.binding) throw new Error(guiText("电脑尚未就绪，请稍后重试。"));
+    await this.binding.modelCatalog.refresh();
+    return this.read(threadId);
+  }
+
   async update(input: unknown, threadId?: string | null): Promise<ComposerSnapshot> {
     const patch = composerPatch(input);
     const current = await this.read(threadId);

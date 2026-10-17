@@ -62,3 +62,31 @@ it('discards a late failure after disconnect instead of starting another retry',
   expect(state.settingsError).toBe('');
   expect(vi.getTimerCount()).toBe(0);
 });
+
+it('queues one explicit discovery behind a passive read and keeps automatic retries passive', async () => {
+  let finish!: (value: typeof response) => void;
+  request.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const loading = composer.load();
+  const refreshes = [composer.refreshModels(), composer.refreshModels()];
+  expect(request).toHaveBeenCalledExactlyOnceWith({ operation: 'models', threadId: null });
+  finish(response);
+  await loading;
+  await Promise.all(refreshes.map(pending => pending.catch(() => undefined)));
+  expect(request).toHaveBeenLastCalledWith({ operation: 'modelsRefresh', threadId: null });
+  expect(request).toHaveBeenCalledTimes(2);
+  request.mockResolvedValue(response);
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(request).toHaveBeenLastCalledWith({ operation: 'models', threadId: null });
+  expect(state).toMatchObject({ settingsBusy: false, settingsError: '' });
+});
+
+it('cancels a queued discovery when the connection is reset', async () => {
+  let finish!: (value: typeof response) => void;
+  request.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const loading = composer.load();
+  const refreshing = composer.refreshModels();
+  composer.reset();
+  finish(response);
+  await Promise.all([loading, refreshing]);
+  expect(request).toHaveBeenCalledOnce();
+});

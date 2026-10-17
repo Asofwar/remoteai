@@ -23,3 +23,11 @@ replace('ios/UdpSocketClient.m', 'BOOL reusePort = options[@"reusePort"] ?: NO;'
   'BOOL reusePort = [options[@"reusePort"] boolValue];');
 replace('ios/UdpSocketClient.m', 'struct sockaddr_in ip;',
   'struct sockaddr_in ip = {0};\n    ip.sin_len = sizeof(ip);');
+// Register callbacks before submitting, and bound native sends as well as the JS forwarding batch.
+replace('ios/UdpSocketClient.m', 'NSString *const RCTUDPErrorDomain = @"RCTUDPErrorDomain";',
+  'NSString *const RCTUDPErrorDomain = @"RCTUDPErrorDomain";\nstatic const NSTimeInterval RCTUDPSendTimeout = 5.0;');
+replace('ios/UdpSocketClient.m',
+  '  [_udpSocket sendData:data toHost:address port:port withTimeout:-1 tag:tag];\n  if (callback) {\n'
+    + '    [self setPendingSend:callback forKey:[NSNumber numberWithLong:tag]];\n  }',
+  '  if (callback) {\n    [self setPendingSend:callback forKey:[NSNumber numberWithLong:tag]];\n  }\n'
+    + '  [_udpSocket sendData:data toHost:address port:port withTimeout:RCTUDPSendTimeout tag:tag];');

@@ -64,6 +64,33 @@ test('uses the PC model picker and keeps the mobile settings unchanged', async (
   await modelPickerJourney(page, request, info);
 });
 
+test('refreshes an empty model catalog explicitly on mobile and desktop over relay',
+  async ({ page, request }, info) => {
+  await connect(page);
+  const input = page.getByRole('textbox', { name: '聊天消息' });
+  await input.fill('刷新后继续发送');
+  await expect(page.getByRole('button', { name: '发送消息', exact: true })).toBeEnabled({ timeout: 20_000 });
+  await request.post(`${fixtureUrl}/test/composer`, { data: { models: [] } });
+  await expect(page.getByRole('button', { name: '发送消息', exact: true })).toBeDisabled();
+  if (!isDesktop(page)) await openChatSettings(page);
+  const refresh = page.getByRole('button', { name: '刷新模型', exact: true });
+  await expect(refresh).toBeEnabled();
+  expect(await operationCount(request, 'modelsRefresh')).toBe(0);
+  await screenshot(page, info, 'empty-model-refresh');
+  await refresh.click();
+  await expect.poll(() => operationCount(request, 'modelsRefresh')).toBe(1);
+  if (!isDesktop(page)) await closeChatSettings(page);
+  await expect(page.getByRole('button', { name: '发送消息', exact: true })).toBeEnabled();
+  await expect(input).toHaveValue('刷新后继续发送');
+  if (isDesktop(page)) {
+    await page.getByRole('button', { name: /^模型与推理强度：/ }).click();
+    const panel = page.getByRole('dialog', { name: '模型与推理强度', exact: true });
+    await expect(panel.getByRole('button', { name: '刷新模型', exact: true })).toBeEnabled();
+    expect((await panel.boundingBox())!.width).toBeLessThanOrEqual(400);
+    await screenshot(page, info, 'recovered-model-picker');
+  }
+});
+
 test('automatically replaces an unavailable resumed session over relay', async ({ page, request }) => {
   await sessionRecoveryJourney(page, request);
 });

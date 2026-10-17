@@ -7,6 +7,7 @@ import type { DatagramEndpoint, UdpListenerFactory } from '../../../../../shared
 import { DatagramQueue, UDP_MAX_BATCH, UDP_MAX_BATCH_BYTES, UDP_MAX_DATAGRAM, UDP_MAX_PEERS,
   UDP_PEER_IDLE_MS } from '../../../../../shared/port-mapping/datagrams';
 import { retainPortMappingConnection } from '../backgroundConnection';
+import { completeUdpSend } from './udpSend';
 
 const LOOPBACK = '127.0.0.1';
 const START_TIMEOUT_MS = 10_000;
@@ -90,13 +91,13 @@ class NativeUdpEndpoint implements DatagramEndpoint {
       throw new Error('Invalid UDP batch');
     }
     // Submit the bounded batch together instead of paying a native bridge round trip for every reply.
-    await Promise.all(decoded.map(async ({ packet, bytes }) => {
+    await completeUdpSend(this.socket, () => Promise.all(decoded.map(async ({ packet, bytes }) => {
       const peer = this.peers.get(packet.peer);
       if (!peer || this.stopping) return;
       peer.seen = Date.now();
       await new Promise<void>((resolve, reject) => this.socket.send(bytes, 0, bytes.length, peer.port, peer.address,
         error => error ? reject(error) : resolve()));
-    }));
+    })));
   }
 
   close = () => {

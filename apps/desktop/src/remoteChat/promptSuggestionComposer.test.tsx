@@ -34,7 +34,7 @@ beforeEach(async () => {
     loadCatalog: vi.fn().mockResolvedValue({ data: [], plugins: [
       { id: 'github', name: 'GitHub', installed: true, enabled: true },
     ] }), loadConversations: vi.fn().mockResolvedValue({ data: threads, nextCursor: null }),
-    settingsBusy: false, settingsError: '', updateSettings: vi.fn(), active: true, ready: true,
+    settingsBusy: false, settingsError: '', updateSettings: vi.fn(), refreshModels: vi.fn(), active: true, ready: true,
     sending: false, running: false, threadId: 'current', send: vi.fn().mockResolvedValue(true), interrupt: vi.fn() };
   props.suggestions = { enabled: true,
     target: { threadId: 'current', sourceTurnId: 'turn', model: 'astra', effort: 'low' },

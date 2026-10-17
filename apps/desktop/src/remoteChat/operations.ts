@@ -235,8 +235,10 @@ export class ChatOperations {
       return guiComposer.update(body.settings, composerThreadId(body.threadId));
     }
     if (request.method === 'request' && body.operation === 'threadRead') return guiSidebar.markRead(body);
-    if (request.method === 'request' && body.operation === 'models') {
-      const composer = await guiComposer.read(composerThreadId(body.threadId));
+    if (request.method === 'request' && (body.operation === 'models' || body.operation === 'modelsRefresh')) {
+      const threadId = composerThreadId(body.threadId);
+      const composer = body.operation === 'modelsRefresh'
+        ? await guiComposer.refreshModels(threadId) : await guiComposer.read(threadId);
       return { data: composer.models, nextCursor: null, composer };
     }
     if (request.method === 'respond') {

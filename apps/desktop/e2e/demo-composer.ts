@@ -13,6 +13,11 @@ let snapshot: ComposerSnapshot = { revision: 1,
   })) };
 export const composerErrors: string[] = [];
 export const demoComposer = () => snapshot;
+const discoveredModels = snapshot.models;
+
+export function refreshDemoModels(link: Pick<ChatLink, 'send'>) {
+  return changeDemoComposer({ models: discoveredModels, syncing: false }, link);
+}
 
 export function changeDemoComposer(input: unknown, link: Pick<ChatLink, 'send'>) {
   const { syncing, models, ...settings } = object(input);

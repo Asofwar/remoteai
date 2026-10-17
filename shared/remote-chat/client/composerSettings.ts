@@ -27,6 +27,7 @@ export class RemoteComposerSettings {
   private scoped = false;
   private retryTimer?: ReturnType<typeof setTimeout>;
   private generation = 0;
+  private refreshing?: Promise<void>;
   private entries = new Map<string | null, Entry>();
   constructor(private readonly host: Host) {}
 
@@ -42,6 +43,7 @@ export class RemoteComposerSettings {
 
   reset() {
     this.generation++;
+    this.refreshing = undefined;
     clearTimeout(this.retryTimer);
     this.retryTimer = undefined;
     for (const entry of this.entries.values()) {
@@ -82,12 +84,12 @@ export class RemoteComposerSettings {
     }
   }
 
-  async load(): Promise<void> {
+  async load(refresh = false): Promise<void> {
     const threadId = this.host.snapshot().selected?.id ?? null;
     const entry = this.entry(this.scope());
     if (entry.reading) return entry.reading;
     const generation = this.generation;
-    const reading = this.read(threadId, generation).catch((error: unknown) => {
+    const reading = this.read(threadId, generation, refresh).catch((error: unknown) => {
       if (generation === this.generation) {
         entry.failed = errorMessage(error);
         entry.readFailed = true;
@@ -103,8 +105,22 @@ export class RemoteComposerSettings {
     return reading;
   }
 
-  private async read(threadId: string | null, generation: number) {
-    const result = await this.host.request<ComposerModelsResponse>({ operation: 'models', threadId });
+  /** Wait for an in-flight poll, then discover once; subsequent polls remain passive. */
+  refreshModels = (): Promise<void> => {
+    if (this.refreshing) return this.refreshing;
+    if (!this.host.ready()) return Promise.resolve();
+    const generation = this.generation;
+    clearTimeout(this.retryTimer);
+    this.retryTimer = undefined;
+    const refreshing = Promise.resolve(this.entry(this.scope()).reading).catch(() => undefined).then(() => {
+      if (generation === this.generation && this.host.ready()) return this.load(true);
+    }).finally(() => { if (this.refreshing === refreshing) this.refreshing = undefined; });
+    return this.refreshing = refreshing;
+  };
+
+  private async read(threadId: string | null, generation: number, refresh: boolean) {
+    const result = await this.host.request<ComposerModelsResponse>({
+      operation: refresh ? 'modelsRefresh' : 'models', threadId });
     if (generation !== this.generation) return;
     const wasScoped = this.scoped;
     if (result.composer) {

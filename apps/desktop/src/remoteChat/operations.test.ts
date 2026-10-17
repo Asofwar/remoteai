@@ -5,10 +5,27 @@ import { guiApi } from '../pages/codexGui/api';
 import { remoteQueue } from './queue';
 import { guiComposer } from '../pages/codexGui/composerBridge';
 vi.mock('../pages/codexGui/api', () => ({ guiApi: { connect: vi.fn(), request: vi.fn(), respond: vi.fn() } }));
-vi.mock('../pages/codexGui/composerBridge', () => ({ guiComposer: { validateSend: vi.fn() } }));
+vi.mock('../pages/codexGui/composerBridge', () => ({ guiComposer: {
+  validateSend: vi.fn(), read: vi.fn(), refreshModels: vi.fn(),
+} }));
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(guiComposer.validateSend).mockResolvedValue({ model: 'model', effort: 'high', access: 'workspace-write' });
+});
+
+it('discovers only on an explicit model refresh and deduplicates a retried refresh request', async () => {
+  const composer = { models: [], settings: { model: '', effort: '', access: 'workspace-write' as const }, revision: 1 };
+  vi.mocked(guiComposer.read).mockResolvedValue(composer);
+  vi.mocked(guiComposer.refreshModels).mockResolvedValue(composer);
+  const operations = new ChatOperations();
+  const request = { kind: 'request' as const, id: 'poll', method: 'request' as const,
+    body: { operation: 'models', threadId: null } };
+  expect(await operations.execute(request)).toMatchObject({ data: { composer } });
+  expect(guiComposer.refreshModels).not.toHaveBeenCalled();
+  const refresh = { ...request, id: 'refresh', body: { operation: 'modelsRefresh', threadId: null } };
+  await Promise.all([operations.execute(refresh), operations.execute(refresh)]);
+  expect(guiComposer.refreshModels).toHaveBeenCalledExactlyOnceWith(null);
+  expect(guiComposer.read).toHaveBeenCalledOnce();
 });
 
 it('passes scoped text previews to the desktop and retains safe failure messages', async () => {

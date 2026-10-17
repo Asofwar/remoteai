@@ -10,6 +10,7 @@ import './composerModelPicker.css';
 import { RequestSpeedButton } from '../../../../shared/remote-chat/RequestSpeedButton';
 import { requestSpeedSuffix } from '../../../../shared/remote-chat/requestSpeed';
 import { ComposerSpeedIndicator } from './ComposerSpeedIndicator';
+import { ModelRefreshButton } from './ModelRefreshButton';
 
 const EFFORT_ORDER = Object.keys(EFFORT_LABELS);
 const MODEL_SEARCH_THRESHOLD = 8;
@@ -49,8 +50,10 @@ function ModelList({ models, model, onSelect, onBack }: {
   </div>;
 }
 
-export function ComposerModelPicker({ models, selection, updateSettings, settingsBusy, beforeOpen }: Pick<ComposerProps,
-  'models' | 'selection' | 'updateSettings' | 'settingsBusy'> & { beforeOpen: () => void }) {
+export function ComposerModelPicker({ models, selection, updateSettings, settingsBusy, ready, refreshModels,
+  beforeOpen }: Pick<ComposerProps,
+  'models' | 'selection' | 'updateSettings' | 'settingsBusy' | 'ready' | 'refreshModels'>
+  & { beforeOpen: () => void }) {
   useLanguage();
   const [open, setOpen] = useState(false);
   const [choosingModel, setChoosingModel] = useState(false);
@@ -103,6 +106,7 @@ export function ComposerModelPicker({ models, selection, updateSettings, setting
         </div>
       </div> : <p className="composer-model-hint">{t('该模型不支持调整推理强度')}</p>}
     </div>}
+    <ModelRefreshButton ready={ready} refreshModels={refreshModels} />
   </div>;
   return <Popover trigger="click" placement="topRight" arrow={false} open={open && !!model}
     onOpenChange={changeOpen} content={panel} destroyOnHidden styles={{ root: { maxWidth: 400 },

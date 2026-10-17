@@ -94,7 +94,7 @@ export function ProviderGroupToolbar({
     <span>{t("providers.group.startLabel")}</span>
     <Space size={[6, 6]} wrap>{groups.map((group) => {
       const members = providers.filter((provider) => provider.kind === "custom" && provider.group === group);
-      const active = activeGroup === group || (members.length > 0 && members.every((provider) => provider.active));
+      const active = activeGroup === group;
       const count = members.length + enabledAccounts.filter(account => account.group === group).length;
       return <Tooltip key={group} title={t("providers.group.startHint", { count })}
         styles={{ root: { maxWidth: 400 } }}>

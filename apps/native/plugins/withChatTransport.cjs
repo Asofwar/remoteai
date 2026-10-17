@@ -5,6 +5,7 @@ module.exports = function withChatTransport(config) {
   require('../scripts/patch-tcp-punch.cjs').applyTcpPunchPatch();
   require('../scripts/patch-webrtc-audio.cjs').applyWebrtcAudioPatch();
   config = require('./withIosTcpPunch.cjs')(config);
+  config = require('./withIosUdp.cjs')(config);
   config = withAndroidManifest(config, (result) => {
     const application = result.modResults.manifest.application[0];
     // Expo does not map the existing android.usesCleartextTraffic setting into release manifests by itself.

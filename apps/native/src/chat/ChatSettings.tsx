@@ -15,6 +15,7 @@ import type { ReadConversationMetrics } from '../../../../shared/remote-chat/con
 import type { ContextSettingsApi } from '../../../../shared/remote-chat/contextSettings';
 import { ChatContextSettings } from './ChatContextSettings';
 import { ChatProfileMenu, type ChatConnectionProps } from './ChatProfileMenu';
+import { ModelRefreshButton } from './ModelRefreshButton';
 
 interface Props {
   connection: ChatConnectionProps;
@@ -30,10 +31,11 @@ interface Props {
   ready: boolean;
   error: string;
   updateSettings: (settings: Partial<ComposerSettings>) => Promise<void>;
+  refreshModels: () => Promise<void>;
   onClose: () => void;
 }
 
-export function ChatSettings({ models, selection, saving, ready, error, updateSettings, onClose,
+export function ChatSettings({ models, selection, saving, ready, error, updateSettings, refreshModels, onClose,
   readUsage, readConversationMetrics, usageActive, tokenUsage, threadId, contextSettings, connection }: Props) {
   const styles = useStyles();
   const menuStyles = useMenuStyles();
@@ -62,6 +64,7 @@ export function ChatSettings({ models, selection, saving, ready, error, updateSe
       </Pressable>)}
       {!!notice && <Text accessibilityRole={error ? 'alert' : undefined}
         style={error ? styles.error : styles.subtitle}>{t(notice)}</Text>}
+      <ModelRefreshButton ready={ready} refreshModels={refreshModels} />
       {!!error && <Pressable accessibilityRole="button" style={styles.button}
         onPress={() => { void updateSettings(selection); }}><Text style={styles.buttonText}>{t("重新保存")}</Text></Pressable>}
       <ChatUsage read={readUsage} active={usageActive && !nestedOpen} ready={ready} tokenUsage={tokenUsage}

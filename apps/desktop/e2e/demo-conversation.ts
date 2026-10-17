@@ -4,7 +4,7 @@ import { demoGuiTools } from './demo-gui-tools';
 import type { ChatLink } from '../../../shared/remote-chat/link';
 import type { GuiEvent, Item, Thread, Turn } from '../src/pages/codexGui/types';
 import previewImage from '../src-tauri/icons/32x32.png?inline';
-import { changeDemoComposer, composerErrors, demoComposer } from './demo-composer';
+import { changeDemoComposer, composerErrors, demoComposer, refreshDemoModels } from './demo-composer';
 import { guiSidebar } from '../src/pages/codexGui/sidebarBridge';
 import { SIDEBAR_EVENT } from '../../../shared/remote-chat/sidebar';
 import { readProjects, saveProject } from '../src/pages/codexGui/projectCatalog';
@@ -92,6 +92,10 @@ export function demoResponse(request: RpcRequest, link: DemoLink): unknown {
   if (input.operation === 'tokenSummary') return demoTokenSummary(input);
   if (request.method === 'respond') return respond(input);
   if (input.operation === 'models') return { data: demoComposer().models, nextCursor: null, composer: demoComposer() };
+  if (input.operation === 'modelsRefresh') {
+    const composer = refreshDemoModels(link);
+    return { data: composer.models, nextCursor: null, composer };
+  }
   if (input.operation === 'skills') return { ...demoSkills(), ...(input.includePlugins ? { plugins: demoPlugins } : {}) };
   if (input.operation === 'projectFiles') return demoProjectFiles(input);
   if (input.operation === 'projectDirectories') return demoProjectDirectories(input);

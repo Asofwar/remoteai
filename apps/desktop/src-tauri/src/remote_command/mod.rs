@@ -1,4 +1,5 @@
-//! Opt-in remote diagnostics for computers signed into the same cloud account.
+//! Remote diagnostics for computers signed into the same cloud account.
+mod automatic;
 mod bridge;
 mod client;
 pub(crate) mod commands;
@@ -13,6 +14,7 @@ mod state;
 #[cfg(windows)]
 mod windows_job;
 
+pub(crate) use automatic::setup_gui;
 pub(crate) use protocol::CommandRequest;
 use std::{path::PathBuf, sync::Mutex};
 

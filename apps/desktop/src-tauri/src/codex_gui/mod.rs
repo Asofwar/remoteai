@@ -131,7 +131,7 @@ pub(crate) async fn codex_gui_connect(
         .map_err(|error| error.to_string())
 }
 
-/// Browser connections do not opt the host into desktop control installation.
+/// Browser connections do not trigger installation of desktop plugins.
 pub(crate) async fn connect_web(
     app: AppHandle,
     state: State<'_, GuiState>,
@@ -146,23 +146,29 @@ async fn connect(
     app: AppHandle,
     state: &GuiState,
     reuse_existing: bool,
-    setup_computer_use: bool,
+    setup_desktop_plugins: bool,
 ) -> Result<Vec<GuiEvent>> {
     let _activity = state.activity.read().await;
     let mut current = state.client.lock().await;
     if let Some(client) = current.as_ref() {
         // A phone reconnect or transport switch must preserve idle, already loaded threads.
         if client.alive.load(Ordering::Acquire) && (reuse_existing || client.is_running().await) {
+            if setup_desktop_plugins {
+                crate::remote_command::setup_gui(client.home.clone()).await;
+            }
             return Ok(client.pending_approvals().await);
         }
         client.stop().await;
     }
     let (home, projectless_root) = prepare_paths(app.clone()).await?;
+    if setup_desktop_plugins {
+        crate::remote_command::setup_gui(home.clone()).await;
+    }
     let release_app = app.clone();
     let binary = tauri::async_runtime::spawn_blocking(move || releases::executable(&release_app))
         .await
         .map_err(|_| GuiError::Executable)??;
-    if setup_computer_use {
+    if setup_desktop_plugins {
         computer_use_setup::prepare(app.clone(), home.clone()).await;
     }
     *current = Some(Client::start(app, binary, home, projectless_root).await?);

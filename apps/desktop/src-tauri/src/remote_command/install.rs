@@ -126,6 +126,7 @@ pub(super) fn install(root: &Path, home: &Path) -> Result<()> {
 }
 
 pub(super) fn disable(root: &Path, home: &Path, remove: bool) -> Result<()> {
+    super::automatic::remember(root, home)?;
     if let Some(mut record) = state::read(root, &state::home_id(home))? {
         record.enabled = false;
         state::save(root, &record)?;

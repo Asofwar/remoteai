@@ -117,11 +117,20 @@ path limits. Stalled writes fail after 30 seconds. A link permits at most 24 str
 eight active requests, bounded idle connections and sockets awaiting cleanup. Resource/session closure
 releases the remote sockets, ciphers, timers and native receive routes.
 
-Hosts without `portStreamsV1`, or clients without an available binary path, retain `guiResourceLink`
-compatibility forwarding. Android requires a rebuilt APK containing the duplex connectivity and
-port-stream modules; an older APK keeps RPC forwarding. iOS uses bounded native IPC batches for mesh
-transport and the shared binary implementation for RTC/relay. These changes require updating the host
-and the viewer to obtain streaming performance; the compatibility path continues to work during rollout.
+Mobile port mappings require `portStreamsV1` and an available binary path. Unsupported peers report
+an update requirement; receiver failure requires reconnecting the authenticated link. There is no
+automatic RPC downgrade or legacy Android receiver. Startup probes the stream before opening the listener.
+Android requires a rebuilt APK containing the duplex connectivity and native stream decryption modules.
+The receive-only epoch key is handed to a native poll worker, which authenticates records and enforces
+a 4,096-entry replay window across direct/relay arrivals before returning plaintext frames to JS.
+Freshly encrypted retries of already delivered byte ranges are also discarded before Base64 conversion.
+This bounded per-socket history only tracks contiguous delivery; gaps and partial overlaps still reach
+the shared receiver, and evicting history cannot suppress new bytes. Base64 is decoded directly into
+a typed array to avoid the Buffer polyfill's repeated decoding and byte-by-byte copy.
+The exported key is cleared after registration, and route cleanup destroys the native key. Wire format,
+per-socket credit and authenticated resource scope are unchanged. iOS uses bounded native IPC batches
+for mesh transport and the shared binary implementation for RTC/relay. Web has no local port listener;
+its shared stream clients enforce the same capability requirement.
 
 `TerminalLinkTunnels` accepts a fixed local port for manual mappings while retaining automatic port
 allocation for previews. The asynchronous Rust listener command validates the requested port and
@@ -133,8 +142,8 @@ Native sockets pause while waiting to preserve their initial request bytes. Stop
 its queued connections without affecting other mappings.
 A failed listener or disconnected session requires restarting its mapping.
 
-The host's local socket bridge and compatibility RPC use a uniform 384 KiB read/write bound. The
-desktop viewer's local `TerminalLinkTunnels` currently retains this compatibility path. The host returns
+The host's local socket bridge uses a uniform 384 KiB read/write bound. The desktop viewer's local
+`TerminalLinkTunnels` uses the socket API directly and has no stream-to-RPC downgrade. The host returns
 as soon as data is available and drains only immediately readable bytes; small replies and WebSockets
 never wait for the larger buffer to fill.
 
@@ -152,12 +161,20 @@ never wait for the larger buffer to fill.
 - Playwright checks protocol selection, editing, persistence and the compact narrow-screen layout alongside TCP regressions.
 
 - `portForwarding/byteStream.test.ts`, `streamMux.test.ts`, `streamClient.test.ts` and
-  `streamIntegration.test.ts` cover bounded credit, cancellation, old-host fallback, encryption,
+  `streamIntegration.test.ts` cover bounded credit, cancellation, unsupported-peer rejection, encryption,
   replay/forgery, shrinking path limits, concurrent upload/download, shared file/port transport and live P2P/relay switching.
-- Android `ANDROID_SERIAL=<device> node apps/native/scripts/test-port-streams.cjs` checks routing,
+- Android `ANDROID_SERIAL=<device> node apps/native/scripts/test-port-streams.cjs` checks native decryption,
+  an independent Node crypto vector, replay, byte-range deduplication, reordered records, forged headers/tags, routing,
   ownership, queue limits, overflow cleanup, close/poll races and the duplex JNI entrypoint on hardware,
   without replacing the installed app. Build the arm64 APK/native library first. This is bridge-level
   device verification; full app WAN browsing and iOS device performance require separate measurement.
+- Android hardware performance (2026-10-17, 2109119BC, Chrome 155, cache disabled): the same development
+  page on port 3002 loaded in 62.42 s before optimization and 23.28 s after (532 requests, no failures).
+  Same-phone LAN controls were 4.16 s before and 4.64 s after. The page transfers roughly 50 MB of
+  uncompressed development assets; this is not a production bundle benchmark. A standalone 12,711,048-byte
+  asset through the phone mapping and ADB TCP forward fell from 14.84 s to 5.02 s. The Android app
+  runs in the background during browser verification. Native filtering removes repeated byte ranges
+  before they cross the JS bridge; it does not remove encryption or change remote resource authorization.
 - For actual duplex JNI bytes, first run `cargo test --lib bulk::android_fixture::android_duplex_bridge_fixture
   -- --ignored --nocapture` in `crates/chat-connectivity`, then run the Android script above with `--duplex`.
   On 2026-10-15, the phone received and echoed 4 MiB in 1.24 seconds through an ADB loopback fixture;

@@ -32,6 +32,10 @@ const compiler = ['org.jetbrains.kotlin/kotlin-compiler-embeddable/2.0.21', 'org
 const android = path.join(sdk, 'platforms/android-35/android.jar');
 const classes = path.join(work, 'checks.jar'), dex = path.join(work, 'checks-dex.jar');
 const sources = ['apps/native/plugins/downloads/PortStreamRecords.kt',
+  'apps/native/plugins/downloads/PortStreamCipher.kt', 'apps/native/plugins/chatPacketCipher/PacketCipher.kt',
+  'apps/native/plugins/downloads/PortStreamDelivery.kt',
+  'apps/native/e2e/port-mapping/PortStreamCipherChecks.kt',
+  'apps/native/e2e/port-mapping/PortStreamDeliveryChecks.kt',
   'apps/native/plugins/connectivity/NativeConnectivity.kt', 'apps/native/e2e/port-mapping/PortStreamChecks.kt']
   .map(file => path.join(root, file));
 sources.push(path.join(root, 'apps/native/e2e/port-mapping/PortStreamDuplex.kt'));

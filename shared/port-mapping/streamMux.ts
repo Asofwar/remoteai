@@ -70,8 +70,15 @@ export class MappingStreamMux {
     try {
       const decoded = this.options.cipher.decryptStream(record);
       if (!decoded) return;
-      this.streams.get(decoded.header.requestId)?.receive(decodeStreamFrame(decoded.bytes));
+      this.receiveAuthenticated(decoded.header.requestId, decoded.bytes);
     } catch { this.close(); }
+  }
+
+  /** Only for a local receiver that has authenticated the epoch and enforced the cipher replay window. */
+  receiveAuthenticated(id: string, bytes: Uint8Array) {
+    if (this.closed) return;
+    try { this.streams.get(id)?.receive(decodeStreamFrame(bytes)); }
+    catch { this.close(); }
   }
 
   close() {

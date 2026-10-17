@@ -1,6 +1,5 @@
 import type { ForwardingClient } from './service';
-import { decodeBase64, encodeBase64 } from './http';
-import { LINK_CHUNK_BYTES } from '../terminal/linkChunks';
+import { MAPPING_UPDATE_REQUIRED } from './errors';
 
 export interface MappingRead { data: Uint8Array; eof: boolean }
 export interface MappingSocket {
@@ -10,11 +9,12 @@ export interface MappingSocket {
 }
 export type MappingSocketFactory = (resource: string, url: string) => Promise<MappingSocket>;
 
-/** The fallback preserves the authenticated resource scope on peers without streaming support. */
+/** Port mappings require the encrypted byte stream on both peers. */
 export async function openMappingSocket(client: ForwardingClient, resource: string, url: string,
   signal?: AbortSignal): Promise<MappingSocket> {
   signal?.throwIfAborted();
-  const opened = client.stream ? client.stream(resource, url) : openRpcMappingSocket(client, resource, url);
+  if (!client.stream) throw new Error(MAPPING_UPDATE_REQUIRED);
+  const opened = client.stream(resource, url);
   if (!signal) return opened;
   return new Promise((resolve, reject) => {
     const abort = () => reject(new Error('Mapping request cancelled'));
@@ -24,34 +24,4 @@ export async function openMappingSocket(client: ForwardingClient, resource: stri
     }, reject).finally(() => signal.removeEventListener('abort', abort));
     if (signal.aborted) abort();
   });
-}
-
-export async function openRpcMappingSocket(client: ForwardingClient, resource: string,
-  url: string): Promise<MappingSocket> {
-  const opened = await client.link(resource, { type: 'connect', url });
-  if (opened.type !== 'socket') throw new Error('Unexpected socket response');
-  const id = opened.id;
-  let closed = false;
-  return {
-    read: async () => {
-      if (closed) throw new Error('Socket closed');
-      const reply = await client.link(resource, { type: 'read', id });
-      if (reply.type !== 'data') throw new Error('Unexpected read response');
-      return { data: decodeBase64(reply.data), eof: reply.eof };
-    },
-    write: async bytes => {
-      for (let offset = 0; offset < bytes.length; offset += LINK_CHUNK_BYTES) {
-        if (closed) throw new Error('Socket closed');
-        await client.link(resource, { type: 'write', id,
-          data: encodeBase64(bytes.subarray(offset, offset + LINK_CHUNK_BYTES)) });
-      }
-    },
-    close: () => {
-      if (closed) return;
-      closed = true;
-      void client.link(resource, { type: 'close', id }).catch(() => {
-        // Closing the owning resource also releases sockets after a disconnected request.
-      });
-    },
-  };
 }

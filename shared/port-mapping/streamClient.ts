@@ -1,10 +1,11 @@
-import { createGuiFilesClient } from '../remote-chat/files';
 import { MappingStreamMux, STREAM_MANIFEST, STREAM_OPERATION, type StreamIdentity,
   type MappingStreamLink } from './streamMux';
-import { openRpcMappingSocket, type MappingSocketFactory } from './socket';
+import type { MappingSocketFactory } from './socket';
+import { MAPPING_RECONNECT_REQUIRED, MAPPING_UPDATE_REQUIRED } from './errors';
 
 export type MappingStreamBridge = (options: { identity: StreamIdentity;
-  receive: (bytes: Uint8Array, path: 'direct' | 'relay') => void; failed: () => void }) => Promise<() => void>;
+  receiverKey: Uint8Array; authenticated: (id: string, bytes: Uint8Array) => void;
+  failed: () => void }) => Promise<() => void>;
 
 interface StreamSession {
   link: MappingStreamLink; mux: MappingStreamMux; identity: StreamIdentity;
@@ -21,13 +22,12 @@ export class MappingStreamClient {
 
   open: MappingSocketFactory = async (resource, url) => {
     const link = this.options.link();
-    if (!this.options.supported() || !link?.bulk?.path) {
-      return openRpcMappingSocket(createGuiFilesClient(this.options.request), resource, url);
-    }
+    if (!this.options.supported()) throw new Error(MAPPING_UPDATE_REQUIRED);
+    if (!link?.bulk?.path) throw new Error(MAPPING_RECONNECT_REQUIRED);
     const session = this.session(link);
     await session.ready.catch(() => session.mux.close());
     if (!this.isCurrent(session)) throw new Error('Mapping connection changed');
-    if (session.mux.closed) return this.fallback(session, resource, url);
+    if (session.mux.closed) { this.release(session); throw new Error(MAPPING_RECONNECT_REQUIRED); }
     const { mux, identity } = session;
     const id = this.uuid();
     const close = () => {
@@ -42,10 +42,7 @@ export class MappingStreamClient {
       return stream;
     } catch (error) {
       stream.close();
-      // No application bytes have been sent before open returns, so only this failed open can be retried.
-      if (mux.closed && this.isCurrent(session)) {
-        return this.fallback(session, resource, url);
-      }
+      if (mux.closed) this.release(session);
       throw error;
     }
   };
@@ -55,24 +52,27 @@ export class MappingStreamClient {
   }
 
   private session(link: MappingStreamLink) {
-    // The host retains its epoch until the authenticated chat link ends. A local receiver failure
-    // must not invent another epoch on that link: older hosts reject it forever.
+    // An epoch and nonce space live for the complete authenticated link. After receiver failure,
+    // reconnect instead of reusing keys or silently switching to request/response forwarding.
     if (this.current?.link === link) return this.current;
     this.close();
     const identity = { transferId: this.uuid(), epoch: this.uuid() };
     const cipher = link.createBulkCipher({ ...identity, manifestId: STREAM_MANIFEST });
     const mux = new MappingStreamMux({ transport: link.bulk!, cipher, identity });
-    const ready = this.options.register?.({ identity, receive: (bytes, path) => link.bulk?.receive(bytes, path),
-      failed: () => mux.close() })
-      ?? Promise.resolve(() => {});
+    const ready = this.register({ mux, identity, receiverKey: cipher.receiverMaterial().key });
     void ready.catch(() => mux.close());
     this.current = { link, mux, identity, ready, released: false };
     return this.current;
   }
 
-  private fallback(session: StreamSession, resource: string, url: string) {
-    this.release(session);
-    return openRpcMappingSocket(createGuiFilesClient(this.options.request), resource, url);
+  private async register({ mux, identity, receiverKey }: {
+    mux: MappingStreamMux; identity: StreamIdentity; receiverKey: Uint8Array;
+  }) {
+    try {
+      return await this.options.register?.({ identity, receiverKey,
+        authenticated: (id, bytes) => mux.receiveAuthenticated(id, bytes),
+        failed: () => mux.close() }) ?? (() => {});
+    } finally { receiverKey.fill(0); }
   }
 
   private release(session: StreamSession) {

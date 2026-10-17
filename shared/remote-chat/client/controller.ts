@@ -36,7 +36,8 @@ import { AsyncAnswers } from './asyncAnswers';
 import { createGuiAccountsClient } from './guiAccounts';
 import { createContextSettingsClient } from './contextSettings';
 import { createGuiToolsClient } from '../guiTools';
-import { openRpcMappingSocket, type MappingSocket } from '../../port-mapping/socket';
+import type { MappingSocket } from '../../port-mapping/socket';
+import { MAPPING_UPDATE_REQUIRED } from '../../port-mapping/errors';
 import { canSelectProject } from '../projects';
 import type { UsageSummary } from '../usage';
 import { CONVERSATION_METRICS_OPERATION, type ReadConversationMetrics } from '../conversationMetrics';
@@ -83,7 +84,7 @@ export class ChatController {
     viewId => this.connection.openNativeMedia?.(viewId) ?? Promise.resolve(undefined),
     (resource, url): Promise<MappingSocket> => this.connection.mappingStreams
       ? this.connection.mappingStreams.open(resource, url)
-      : openRpcMappingSocket(this.guiTools.files, resource, url));
+      : Promise.reject(new Error(MAPPING_UPDATE_REQUIRED)));
   private readonly listRequests = new ThreadListRequests(async () => {
     if (this.active && this.transportConnected) await this.list({ background: true });
   });

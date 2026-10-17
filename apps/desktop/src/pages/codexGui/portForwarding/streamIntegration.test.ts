@@ -65,7 +65,7 @@ async function fixture(server: net.Server) {
     } };
 }
 
-it('opens real TCP requests after receiver failure while the host retains its previous stream session', async () => {
+it('stops real TCP forwarding after receiver failure without silently downgrading', async () => {
   const service = await fixture(net.createServer(socket => socket.pipe(socket)));
   try {
     const first = await service.streams.open('resource', service.origin);
@@ -73,10 +73,7 @@ it('opens real TCP requests after receiver failure while the host retains its pr
     expect(Buffer.from((await first.read()).data).toString()).toBe('before');
     const pending = expect(first.read()).rejects.toThrow('closed');
     service.failReceiver(); await pending;
-    const recovered = await service.streams.open('resource', service.origin);
-    await recovered.write(Buffer.from('after'));
-    expect(Buffer.from((await recovered.read()).data).toString()).toBe('after');
-    recovered.close();
+    await expect(service.streams.open('resource', service.origin)).rejects.toThrow('重新连接');
   } finally { await service.close(); }
 });
 

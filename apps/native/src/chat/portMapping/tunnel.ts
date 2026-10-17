@@ -3,6 +3,7 @@ import type { ForwardingClient } from '../../../../../shared/port-mapping/servic
 import type { MappingTunnel, MappingTunnelOptions } from '../../../../../shared/port-mapping/types';
 import { retainPortMappingConnection } from '../backgroundConnection';
 import { bridgeSocket } from './socketBridge';
+import { openMappingSocket } from '../../../../../shared/port-mapping/socket';
 
 const START_TIMEOUT_MS = 10_000;
 const LOOPBACK = '127.0.0.1';
@@ -34,9 +35,8 @@ export class NativeMappingTunnel implements MappingTunnel {
   private async start(resource: string, url: string) {
     this.releaseBackground = await retainPortMappingConnection();
     if (this.closed) throw new Error('Mapping closed');
-    const probe = await this.client.link(resource, { type: 'connect', url });
-    if (probe.type !== 'socket') throw new Error('Unexpected socket response');
-    await this.client.link(resource, { type: 'close', id: probe.id });
+    const probe = await openMappingSocket(this.client, resource, url);
+    probe.close();
     if (this.closed) throw new Error('Mapping closed');
     return this.listen(resource, url);
   }

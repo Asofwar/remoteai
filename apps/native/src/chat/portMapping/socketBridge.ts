@@ -31,7 +31,9 @@ export function bridgeSocket(options: {
     while (!closed) {
       const reply = await stream.read();
       if (closed) break;
-      if (reply.data.length) await writeSocket(socket, Buffer.from(reply.data));
+      if (reply.data.length) {
+        await writeSocket(socket, Buffer.from(reply.data.buffer, reply.data.byteOffset, reply.data.byteLength));
+      }
       if (reply.eof) break;
     }
   }).catch(reason => {

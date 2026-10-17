@@ -4,6 +4,7 @@ import { MAX_PORT_MAPPINGS, MAPPING_PROTOCOLS, mappingConflicts, validPort,
   type MappingMode, type MappingProtocol, type PortMapping } from './settings';
 import { mappingOrigin, normalizeMappingHost } from './target';
 import { StreamBudget } from './streamBudget';
+import { MAPPING_RECONNECT_REQUIRED, MAPPING_UPDATE_REQUIRED } from './errors';
 
 export type ForwardingClient = Pick<GuiToolsClient['files'], 'openResource' | 'closeResource' | 'link'> & {
   stream?: import('./socket').MappingSocketFactory;
@@ -16,7 +17,7 @@ interface RunningMapping { tunnels: MappingTunnel; resource?: string }
 const START_ERROR = '映射未能启动，请确认远程服务已启动后重试。';
 const LOCAL_ERRORS = new Set(['本地端口已被占用，请换一个端口。', '无法监听本地端口，请换一个端口重试。',
   '请更新应用后使用端口映射。', '请返回应用后重新启动映射。',
-  'UDP 映射未能启动，请确认两端应用均已更新。']);
+  'UDP 映射未能启动，请确认两端应用均已更新。', MAPPING_UPDATE_REQUIRED, MAPPING_RECONNECT_REQUIRED]);
 type MappingTarget = Pick<PortMapping, 'remoteHost' | 'remotePort' | 'localPort' | 'protocol'>;
 
 /** One manager per authenticated computer; switching chat threads never releases its mappings. */
@@ -29,7 +30,7 @@ export class PortForwardingService {
   private readonly changes = new Set<(id: string, value: PortMapping | null) => void>();
   private readonly revisions = new Map<string, number>();
   private readonly restarting = new Set<string>();
-  // Bound active TCP work per computer, including the read RPCs used by compatibility peers.
+  // Bound active TCP work per computer so mappings leave capacity for chat and cleanup.
   private readonly bridgeBudget = new StreamBudget();
 
   constructor(private readonly client: ForwardingClient, saved: PortMapping[],

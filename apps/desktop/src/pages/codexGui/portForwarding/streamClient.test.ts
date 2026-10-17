@@ -5,6 +5,8 @@ import { BulkCipher } from '../../../../../../shared/remote-chat/bulkCipher';
 import { BulkTransport } from '../../../../../../shared/remote-chat/bulkTransport';
 import { STREAM_MANIFEST, type MappingStreamLink } from '../../../../../../shared/port-mapping/streamMux';
 import { openMappingSocket, type MappingSocket } from '../../../../../../shared/port-mapping/socket';
+import { encodeStreamFrame } from '../../../../../../shared/port-mapping/streamProtocol';
+import { MAPPING_RECONNECT_REQUIRED, MAPPING_UPDATE_REQUIRED } from '../../../../../../shared/port-mapping/errors';
 
 function fixture(register?: MappingStreamBridge, supported = true) {
   const transport = new BulkTransport({ available: () => true, send: async () => {} });
@@ -18,7 +20,7 @@ function fixture(register?: MappingStreamBridge, supported = true) {
     close: () => { client.close(); transport.close(); } };
 }
 
-it.each(['native', 'cipher'])('recovers from %s receiver failure without changing the live host epoch', async failure => {
+it.each(['native', 'cipher'])('requires reconnect after %s failure without downgrading or replacing the epoch', async failure => {
   let fail!: () => void;
   const release = vi.fn();
   const register = vi.fn(async (options: Parameters<MappingStreamBridge>[0]) => {
@@ -37,36 +39,32 @@ it.each(['native', 'cipher'])('recovers from %s receiver failure without changin
       cipher.destroy();
     }
     await reading;
-    const recovered = await Promise.all(Array.from({ length: 3 }, () =>
-      peer.client.open('resource', 'http://127.0.0.1:3002')));
+    for (let index = 0; index < 3; index++) {
+      await expect(peer.client.open('resource', 'http://127.0.0.1:3002')).rejects.toThrow(MAPPING_RECONNECT_REQUIRED);
+    }
     expect(register).toHaveBeenCalledTimes(1);
     expect(release).toHaveBeenCalledTimes(1);
-    expect(peer.request.mock.calls.filter(([body]) => 'request' in body)).toHaveLength(3);
-    recovered.forEach(socket => socket.close());
+    expect(peer.request.mock.calls.filter(([body]) => 'request' in body)).toHaveLength(0);
     peer.client.close(); await Promise.resolve();
     expect(release).toHaveBeenCalledTimes(1);
   } finally { peer.close(); }
 });
 
-it('recovers a pending open if its receiver fails before any application bytes are sent', async () => {
+it('fails a pending open if its receiver stops without falling back to RPC', async () => {
   let fail!: () => void;
   const peer = fixture(async options => { fail = options.failed; return vi.fn<() => void>(); });
   peer.request.mockImplementationOnce(async () => { fail(); return {}; });
   try {
-    const socket = await peer.client.open('resource', 'http://127.0.0.1:3002');
-    expect(peer.request).toHaveBeenCalledWith({ operation: 'guiResourceLink', id: 'resource',
-      request: { type: 'connect', url: 'http://127.0.0.1:3002' } });
-    socket.close();
+    await expect(peer.client.open('resource', 'http://127.0.0.1:3002')).rejects.toThrow('closed');
+    expect(peer.request.mock.calls.some(([body]) => 'request' in body)).toBe(false);
   } finally { peer.close(); }
 });
 
-it('falls back when native registration fails before a stream can open', async () => {
+it('requires reconnect when native registration fails before a stream can open', async () => {
   const peer = fixture(async () => { throw new Error('Native receiver unavailable'); });
   try {
-    const socket = await peer.client.open('resource', 'http://127.0.0.1:3002');
-    expect(peer.request).toHaveBeenCalledWith({ operation: 'guiResourceLink', id: 'resource',
-      request: { type: 'connect', url: 'http://127.0.0.1:3002' } });
-    socket.close();
+    await expect(peer.client.open('resource', 'http://127.0.0.1:3002')).rejects.toThrow(MAPPING_RECONNECT_REQUIRED);
+    expect(peer.request).not.toHaveBeenCalled();
   } finally { peer.close(); }
 });
 
@@ -79,7 +77,7 @@ it('only disables streams on the failed link and uses a fresh epoch after reconn
   try {
     const first = await peer.client.open('resource', 'http://127.0.0.1:3002');
     fail(); first.close();
-    (await peer.client.open('resource', 'http://127.0.0.1:3002')).close();
+    await expect(peer.client.open('resource', 'http://127.0.0.1:3002')).rejects.toThrow(MAPPING_RECONNECT_REQUIRED);
     peer.reconnect();
     (await peer.client.open('new-resource', 'http://127.0.0.1:3002')).close();
     expect(register).toHaveBeenCalledTimes(2);
@@ -98,15 +96,36 @@ it('does not retry an authorization or target error over RPC', async () => {
   } finally { peer.close(); }
 });
 
-it('keeps old hosts on RPC and does not register a binary receiver', async () => {
+it('asks unsupported peers to update without opening RPC sockets', async () => {
   const register = vi.fn();
   const peer = fixture(register, false);
   try {
-    const socket = await peer.client.open('resource', 'http://127.0.0.1:80');
-    expect(peer.request).toHaveBeenCalledWith({ operation: 'guiResourceLink', id: 'resource',
-      request: { type: 'connect', url: 'http://127.0.0.1:80' } });
-    expect(register).not.toHaveBeenCalled(); socket.close();
+    await expect(peer.client.open('resource', 'http://127.0.0.1:80')).rejects.toThrow(MAPPING_UPDATE_REQUIRED);
+    expect(peer.request).not.toHaveBeenCalled();
+    expect(register).not.toHaveBeenCalled();
   } finally { peer.close(); }
+});
+
+it('accepts authenticated native frames only for the active socket and wipes the exported receive key', async () => {
+  let bridge!: Parameters<MappingStreamBridge>[0];
+  const peer = fixture(async options => { bridge = options; return vi.fn<() => void>(); });
+  try {
+    const socket = await peer.client.open('resource', 'http://127.0.0.1:80');
+    expect(bridge.receiverKey).toEqual(new Uint8Array(32));
+    const opened = peer.request.mock.calls[0][0] as { id: string };
+    bridge.authenticated('unknown', encodeStreamFrame({ type: 'data', offset: 0, data: Uint8Array.of(99) }));
+    bridge.authenticated(opened.id, encodeStreamFrame({ type: 'data', offset: 0, data: Uint8Array.of(7, 8) }));
+    expect(await socket.read()).toEqual({ data: Uint8Array.of(7, 8), eof: false });
+    peer.client.close();
+    bridge.authenticated(opened.id, Uint8Array.of(0));
+    await expect(socket.read()).rejects.toThrow('closed');
+  } finally { peer.close(); }
+});
+
+it('rejects a missing stream adapter without opening a legacy socket', async () => {
+  const client = { openResource: vi.fn(), closeResource: vi.fn(), link: vi.fn() };
+  await expect(openMappingSocket(client, 'resource', 'http://127.0.0.1')).rejects.toThrow(MAPPING_UPDATE_REQUIRED);
+  expect(client.link).not.toHaveBeenCalled();
 });
 
 it('registers before opening and immediately fails pending reads if the native bridge stops', async () => {

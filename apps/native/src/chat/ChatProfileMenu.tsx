@@ -106,7 +106,7 @@ export function ChatProfileMenu(props: Props) {
           {!ready && <Text style={styles.subtitle}>{t("连接电脑后即可切换账户。")}</Text>}
           {accounts.loading && <ActivityIndicator color={color(palette.green, 'accent')} accessibilityLabel={t("正在同步账户")} />}
           {ready && accounts.snapshot && !accounts.snapshot.running &&
-            <Text style={styles.subtitle}>{t("请先在电脑上开启本地代理，再切换账户。")}</Text>}
+            <Text style={styles.subtitle}>{t("电脑上的聊天暂不可用，请在电脑上重新打开 Remote AI。")}</Text>}
           {!!accounts.error && <View style={styles.row}>
             <Text accessibilityRole="alert" style={[styles.error, styles.fill]}>{accounts.error}</Text>
             <Pressable accessibilityRole="button" accessibilityLabel={t("重试读取账户")}
@@ -135,7 +135,7 @@ export function ChatProfileMenu(props: Props) {
                 : selected && <Text style={styles.buttonText}>{t("当前")}</Text>}
             </Pressable>;
           })}
-          {!choices.length && accounts.snapshot && !accounts.loading && <Text style={pickerStyles.empty}>
+          {!choices.length && accounts.snapshot?.running && !accounts.loading && <Text style={pickerStyles.empty}>
             {accounts.snapshot.choices.length ? t("没有找到匹配的账户。") : t("暂无可选账户，请先在电脑上添加账户。")}</Text>}
         </SheetScrollView>
       </View>}

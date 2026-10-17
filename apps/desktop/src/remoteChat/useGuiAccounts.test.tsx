@@ -130,6 +130,42 @@ it('shows an update hint for an older computer without disrupting chat', async (
   expect(view.error).toBe('');
 });
 
+it('accepts the legacy background service response after the desktop becomes unavailable', async () => {
+  const legacy = { accounts: [], providers: [], selection: null };
+  vi.mocked(client.read).mockResolvedValue(legacy as unknown as GuiAccountsSnapshot);
+  await render();
+  expect(view.snapshot).toEqual({ selection: { kind: 'none' }, choices: [], running: false });
+  expect(view.error).toBe('');
+  await act(async () => { expect(await view.select({ kind: 'account', id: 'second' })).toBe(false); });
+  expect(client.select).not.toHaveBeenCalled();
+  await render(false);
+  vi.mocked(client.read).mockResolvedValue(snapshot());
+  await render();
+  expect(view.snapshot).toEqual(snapshot());
+});
+
+it.each([undefined, null, {}, { selection: { kind: 'none' }, running: false },
+  { ...snapshot(), choices: null }, { ...snapshot(), choices: {} },
+  { ...snapshot(), choices: [null] }, { ...snapshot(), choices: [{ kind: 'account', id: 'first' }] },
+  { ...snapshot(), selection: null }])('rejects malformed account data %j and recovers on retry', async value => {
+  vi.mocked(client.read).mockResolvedValueOnce(value as GuiAccountsSnapshot);
+  await render();
+  expect(view.snapshot).toBeNull();
+  expect(view.loading).toBe(false);
+  expect(view.error).toBe('暂时无法读取电脑的账户，请重试。');
+  await act(async () => view.refresh());
+  expect(view.snapshot).toEqual(snapshot());
+  expect(view.error).toBe('');
+});
+
+it('keeps the last valid accounts when a later refresh returns incomplete data', async () => {
+  await render();
+  vi.mocked(client.read).mockResolvedValueOnce({ running: true } as GuiAccountsSnapshot);
+  await act(async () => changed());
+  expect(view.snapshot).toEqual(snapshot());
+  expect(view.error).toContain('请重试');
+});
+
 it('does not overwrite a newer desktop selection with a delayed switch acknowledgement', async () => {
   await render();
   const switching = deferred<GuiAccountSelection>();

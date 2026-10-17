@@ -237,7 +237,8 @@ export const chat = {
   "搜索名称或备注": "Search names or notes",
   "连接电脑后即可切换账户。": "Connect to your computer to switch accounts.",
   "正在同步账户…": "Syncing accounts…",
-  "请先在电脑上开启本地代理，再切换账户。": "Enable the local proxy on your computer before switching accounts.",
+  "电脑上的聊天暂不可用，请在电脑上重新打开 Remote AI。":
+    "Chat is unavailable on your computer. Reopen Remote AI on that computer.",
   "重试读取账户": "Reload accounts",
   "此账户暂不可用": "This account is unavailable",
   "正在切换…": "Switching…",

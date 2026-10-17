@@ -2,6 +2,7 @@ import { RemoteDesktopHost } from '../src/remoteDesktop/host';
 import { NativeDesktopSession } from '../src/remoteDesktop/nativeSession';
 import { object, type RpcRequest, type RpcResponse } from '../../../shared/remote-chat/protocol';
 import { DEFAULT_COMPOSER } from '../../../shared/remote-chat/composer';
+import type { GuiAccountsSnapshot } from '../../../shared/remote-chat/guiAccounts';
 
 class ServiceDesktop extends NativeDesktopSession {
   async open() {
@@ -43,7 +44,9 @@ export class ServiceOperations {
     if (body.operation === 'models') return { data: [], nextCursor: null, composer };
     if (body.operation === 'list') return { data: [], nextCursor: null };
     if (body.operation === 'queueRead') return { revision: 0, threads: {} };
-    if (body.operation === 'guiAccountsRead') return { accounts: [], providers: [], selection: null };
+    if (body.operation === 'guiAccountsRead') {
+      return { choices: [], selection: { kind: 'none' }, running: false } satisfies GuiAccountsSnapshot;
+    }
     throw new Error('请先登录电脑，再继续聊天。');
   }
   release(owner?: string) {

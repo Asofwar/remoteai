@@ -70,7 +70,7 @@ export function ChatProfileMenu(props: Props) {
         {!ready && <p className="chat-muted">{t("连接电脑后即可切换账户。")}</p>}
         {accounts.loading && <p role="status">{t("正在同步账户…")}</p>}
         {ready && accounts.snapshot && !accounts.snapshot.running && <p className="chat-muted">
-          {t("请先在电脑上开启本地代理，再切换账户。")}</p>}
+          {t("电脑上的聊天暂不可用，请在电脑上重新打开 Remote AI。")}</p>}
         {accounts.error && <><p role="alert" className="chat-error">{t(accounts.error)}</p>
           <button type="button" className="chat-button" disabled={!ready || accounts.loading || Boolean(accounts.saving)}
             onClick={accounts.refresh}>{t("重试读取账户")}</button></>}
@@ -80,7 +80,7 @@ export function ChatProfileMenu(props: Props) {
           onClick={() => { void select(choice); }}><span className="chat-grow"><strong>{choice.name}</strong>
             <small>{choice.detail}</small>{!choice.available && <small>{t("此账户暂不可用")}</small>}</span>
           {accounts.saving === `${choice.kind}:${choice.id}` ? t("正在切换…") : choice === current && t("当前")}</button>)}
-          {!choices.length && accounts.snapshot && !accounts.loading && <p className="chat-muted">
+          {!choices.length && accounts.snapshot?.running && !accounts.loading && <p className="chat-muted">
             {accounts.snapshot.choices.length ? t("没有找到匹配的账户。") : t("暂无可选账户，请先在电脑上添加账户。")}</p>}
         </div>
       </div>}

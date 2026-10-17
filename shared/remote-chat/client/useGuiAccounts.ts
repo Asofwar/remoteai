@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { GuiAccountsClient, GuiAccountsSnapshot, SelectableGuiAccount } from '../guiAccounts';
+import { parseGuiAccountsSnapshot, type GuiAccountsClient, type GuiAccountsSnapshot,
+  type SelectableGuiAccount } from '../guiAccounts';
 
 function readError(error: unknown) {
   if (error instanceof Error && error.message.includes('暂不支持')) return '请更新电脑端 Remote AI 后重试。';
@@ -29,7 +30,7 @@ export function useGuiAccounts(client: GuiAccountsClient, active: boolean, refre
       if (reading) { queued = true; return; }
       reading = true; queued = false; setLoading(true);
       void client.read().then((next) => {
-        if (!disposed && request === revision) { setSnapshot(next); setError(''); }
+        if (!disposed && request === revision) { setSnapshot(parseGuiAccountsSnapshot(next)); setError(''); }
       }).catch((reason: unknown) => {
         if (!disposed && request === revision) setError(readError(reason));
       }).finally(() => {

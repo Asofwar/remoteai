@@ -3,9 +3,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ChatProfileMenu } from './ChatProfileMenu';
 import { ChatGuiUpdateSheet } from './ChatGuiUpdateSheet';
 import type { GuiToolsClient } from '../../../../shared/remote-chat/guiTools';
-import type { GuiAccountsClient } from '../../../../shared/remote-chat/guiAccounts';
+import { parseGuiAccountsSnapshot, type GuiAccountsClient, type GuiAccountsSnapshot }
+  from '../../../../shared/remote-chat/guiAccounts';
 
-const state = vi.hoisted(() => ({ panel: 'profile' as string | null }));
+const state = vi.hoisted(() => ({ panel: 'profile' as string | null, snapshot: null as GuiAccountsSnapshot | null }));
 vi.mock('react', async original => ({ ...await original<typeof React>(), useEffect: vi.fn(),
   useState: (initial: unknown) => initial === null
     ? [state.panel, (value: string | null) => { state.panel = value; }] : ['', vi.fn()] ,
@@ -16,7 +17,7 @@ vi.mock('react-native', () => ({ Pressable: 'Pressable', Text: 'Text', TextInput
 vi.mock('@expo/vector-icons/Feather', () => ({ default: 'Icon' }));
 vi.mock('../components/BottomSheet', () => ({ BottomSheet: 'BottomSheet' }));
 vi.mock('../../../../shared/remote-chat/client/useGuiAccounts', () => ({ useGuiAccounts: () => ({
-  loading: false, saving: false, snapshot: null, error: '', refresh: vi.fn(), select: vi.fn(),
+  loading: false, saving: false, snapshot: state.snapshot, error: '', refresh: vi.fn(), select: vi.fn(),
 }) }));
 interface NodeProps {
   children?: ReactNode; accessibilityLabel?: string; onPress?: () => void; client?: GuiToolsClient;
@@ -28,7 +29,7 @@ function nodes(tree: ReactNode): ReactElement<NodeProps>[] {
 }
 const props = { client: {} as GuiAccountsClient, guiTools: {} as GuiToolsClient, email: 'test@example.test',
   active: true, ready: false, running: true, chooseDevice: vi.fn(), openTokenSummary: vi.fn() };
-beforeEach(() => { state.panel = 'profile'; vi.stubGlobal('React', React); });
+beforeEach(() => { state.panel = 'profile'; state.snapshot = null; vi.stubGlobal('React', React); });
 afterEach(() => vi.unstubAllGlobals());
 
 it('opens GUI updates from the avatar and forwards this computer connection and task state', () => {
@@ -40,4 +41,15 @@ it('opens GUI updates from the avatar and forwards this computer connection and 
   const inactive = nodes(ChatProfileMenu({ ...props, active: false }));
   expect(inactive.some(node => node.type === ChatGuiUpdateSheet)).toBe(false);
   sheet?.props.onBack?.(); expect(state.panel).toBe('profile');
+});
+
+it('keeps the drawer avatar and account panel usable after the background service takes over', () => {
+  state.snapshot = parseGuiAccountsSnapshot({ accounts: [], providers: [], selection: null });
+  const profile = nodes(ChatProfileMenu({ ...props, ready: true }));
+  expect(profile.some(node => node.props.accessibilityLabel === '打开头像菜单')).toBe(true);
+  profile.find(node => node.props.accessibilityLabel === '切换账户')?.props.onPress?.();
+  const picker = nodes(ChatProfileMenu({ ...props, ready: true }));
+  expect(picker.some(node => node.props.children === '电脑上的聊天暂不可用，请在电脑上重新打开 Remote AI。')).toBe(true);
+  expect(picker.some(node => node.props.children === '请先在电脑上开启本地代理，再切换账户。')).toBe(false);
+  expect(picker.some(node => node.props.children === '暂无可选账户，请先在电脑上添加账户。')).toBe(false);
 });

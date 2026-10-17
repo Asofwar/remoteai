@@ -16,7 +16,6 @@ internal class PortStreamCipher(key: String, private val transfer: UUID, private
   data class Frame(val id: String, val bytes: ByteArray)
   private val cipher = PacketCipher(PacketCipher.fromHex(key), byteArrayOf())
   private val sequences = LongArray(REPLAY_WINDOW)
-  private val delivery = PortStreamDelivery()
   private var highest = 0L
   private var closed = false
 
@@ -42,13 +41,12 @@ internal class PortStreamCipher(key: String, private val transfer: UUID, private
     // Failed authentication must never advance the replay window.
     sequences[slot] = sequence
     highest = maxOf(highest, sequence)
-    return Frame(id, bytes).takeIf { delivery.keep(it) }
+    return Frame(id, bytes)
   }
 
   @Synchronized fun close() {
     closed = true
     cipher.destroy()
     sequences.fill(0)
-    delivery.clear()
   }
 }

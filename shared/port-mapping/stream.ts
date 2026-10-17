@@ -1,6 +1,7 @@
 import type { MappingRead, MappingSocket } from './socket';
 import { StreamReceive } from './streamReceive';
 import { STREAM_FRAME_BYTES, STREAM_WINDOW_BYTES, type StreamFrame, validatePosition } from './streamProtocol';
+import type { NativeStreamProgress } from './streamClient';
 
 const TICK_MS = 250;
 const RETRY_MS = 750;
@@ -13,6 +14,7 @@ interface Pending { frame: Extract<StreamFrame, { type: 'data' }>; sent: number 
 /** Continuous duplex bytes with bounded credit, ordered delivery, and replay after a transport switch. */
 export class MappingByteStream implements MappingSocket {
   private readonly incoming = new StreamReceive();
+  private readonly nativeIncoming = { consumed: 0, eof: false };
   private readonly pending = new Map<number, Pending>();
   private readonly waiters = new Set<() => void>();
   private readonly timer: ReturnType<typeof setInterval>;
@@ -30,7 +32,9 @@ export class MappingByteStream implements MappingSocket {
   private error?: Error;
   get closed() { return !!this.error; }
 
-  constructor(private readonly wire: { send: (frames: StreamFrame[]) => Promise<void>; closed: () => void }) {
+  constructor(private readonly wire: {
+    send: (frames: StreamFrame[]) => Promise<void>; closed: () => void; nativeReceive?: boolean;
+  }) {
     this.timer = setInterval(() => this.tick(), TICK_MS);
   }
 
@@ -39,10 +43,27 @@ export class MappingByteStream implements MappingSocket {
     try {
       if (frame.type === 'close') { this.stop(new Error('Socket closed')); return; }
       if (frame.type === 'ack') this.acknowledge(frame.offset, frame.eof);
+      if (this.wire.nativeReceive && (frame.type === 'data' || frame.type === 'end')) {
+        throw new Error('Native stream payload escaped its receiver');
+      }
       if (frame.type === 'data') this.incoming.push(frame.offset, frame.data);
       if (frame.type === 'end') this.incoming.finish(frame.offset);
       if (frame.type !== 'ack') this.scheduleAck();
       this.wake();
+    } catch { this.close(); }
+  }
+
+  /** Native progress replenishes credit only after bytes have reached the local TCP socket. */
+  receiveNativeProgress(progress: NativeStreamProgress) {
+    if (this.error) return;
+    try {
+      validatePosition(progress.consumed);
+      if (!this.wire.nativeReceive || progress.failed || progress.consumed < this.nativeIncoming.consumed
+        || this.nativeIncoming.eof && (!progress.eof || progress.consumed !== this.nativeIncoming.consumed)) {
+        throw new Error('Invalid native stream progress');
+      }
+      Object.assign(this.nativeIncoming, progress);
+      this.scheduleAck(); this.wake();
     } catch { this.close(); }
   }
 
@@ -52,7 +73,8 @@ export class MappingByteStream implements MappingSocket {
     try {
       for (;;) {
         this.check();
-        const result = this.incoming.read();
+        const result = this.wire.nativeReceive
+          ? (this.nativeIncoming.eof ? { data: new Uint8Array(), eof: true } : undefined) : this.incoming.read();
         if (result) { this.scheduleAck(); return result; }
         await this.wait();
       }
@@ -113,14 +135,16 @@ export class MappingByteStream implements MappingSocket {
   }
 
   private scheduleAck() {
-    if (this.incoming.consumed - this.lastAck >= ACK_BYTES || this.incoming.eof) { this.sendAck(); return; }
+    const incoming = this.wire.nativeReceive ? this.nativeIncoming : this.incoming;
+    if (incoming.consumed - this.lastAck >= ACK_BYTES || incoming.eof) { this.sendAck(); return; }
     this.ackTimer ??= setTimeout(() => this.sendAck(), ACK_DELAY_MS);
   }
   private sendAck() {
     clearTimeout(this.ackTimer); this.ackTimer = undefined;
     if (this.error) return;
-    this.lastAck = this.incoming.consumed;
-    void this.wire.send([{ type: 'ack', offset: this.lastAck, eof: this.incoming.eof }]).catch(() => {
+    const incoming = this.wire.nativeReceive ? this.nativeIncoming : this.incoming;
+    this.lastAck = incoming.consumed;
+    void this.wire.send([{ type: 'ack', offset: this.lastAck, eof: incoming.eof }]).catch(() => {
       // A retransmitted data/end frame or a new path prompts another cumulative acknowledgement.
     });
   }

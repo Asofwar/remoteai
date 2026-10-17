@@ -1,4 +1,5 @@
 import TcpSocket from 'react-native-tcp-socket';
+import { Platform } from 'react-native';
 import type { ForwardingClient } from '../../../../../shared/port-mapping/service';
 import type { MappingTunnel, MappingTunnelOptions } from '../../../../../shared/port-mapping/types';
 import { retainPortMappingConnection } from '../backgroundConnection';
@@ -77,7 +78,8 @@ export class NativeMappingTunnel implements MappingTunnel {
     target.socket.off('error', cancel);
     target.socket.off('close', cancel);
     if (!release || this.closed || target.socket.destroyed) { release?.(); cancel(); return; }
-    const bridge = bridgeSocket({ ...target, client: this.client });
+    const bridge = bridgeSocket({ ...target, client: this.client,
+      nativeSocketId: Platform.OS === 'android' ? target.socket.nativePortMappingSocketId : undefined });
     this.bridges.add(bridge.close);
     target.socket.resume();
     await bridge.done.finally(() => { this.bridges.delete(bridge.close); release(); });

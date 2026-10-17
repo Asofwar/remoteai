@@ -122,11 +122,17 @@ an update requirement; receiver failure requires reconnecting the authenticated 
 automatic RPC downgrade or legacy Android receiver. Startup probes the stream before opening the listener.
 Android requires a rebuilt APK containing the duplex connectivity and native stream decryption modules.
 The receive-only epoch key is handed to a native poll worker, which authenticates records and enforces
-a 4,096-entry replay window across direct/relay arrivals before returning plaintext frames to JS.
-Freshly encrypted retries of already delivered byte ranges are also discarded before Base64 conversion.
-This bounded per-socket history only tracks contiguous delivery; gaps and partial overlaps still reach
-the shared receiver, and evicting history cannot suppress new bytes. Base64 is decoded directly into
-a typed array to avoid the Buffer polyfill's repeated decoding and byte-by-byte copy.
+a 4,096-entry replay window across direct/relay arrivals. Before opening the host stream, Android binds
+its accepted loopback TCP socket to the authenticated stream identity. Download DATA/END frames stay
+native: a bounded reassembler handles overlaps and gaps, then a single-flight worker writes contiguous
+bytes directly to that socket. Only coalesced consumed offsets, EOF and small control frames cross JS.
+Credit advances after a socket write completes. Each receive window is 2 MiB, including any in-flight
+write, with at most 4,096 fragments and 384 KiB per write. At most 24 sockets can be bound across receivers;
+slow writes do not block other sockets or decrypt workers and close after 30 seconds. Closing a stream
+releases its binding, queued bytes and socket. The dependency patch exposes only accepted, connected,
+plaintext loopback sockets through a focused in-process API and rejects source/version drift.
+Uploads still use the bounded JS stream path. Shared consumers without a local TCP socket retain the
+authenticated frame API; byte-range deduplication and direct Base64 decoding bound their bridge overhead.
 The exported key is cleared after registration, and route cleanup destroys the native key. Wire format,
 per-socket credit and authenticated resource scope are unchanged. iOS uses bounded native IPC batches
 for mesh transport and the shared binary implementation for RTC/relay. Web has no local port listener;
@@ -168,6 +174,10 @@ never wait for the larger buffer to fill.
   ownership, queue limits, overflow cleanup, close/poll races and the duplex JNI entrypoint on hardware,
   without replacing the installed app. Build the arm64 APK/native library first. This is bridge-level
   device verification; full app WAN browsing and iOS device performance require separate measurement.
+- The same Android checks exercise encrypted direct/relay records written to a real loopback socket
+  without passing DATA through JS, overlapping/reordered retransmissions, early END, receive-window and
+  fragment limits, blocked-writer credit and write-timeout cleanup. Shared tests verify native bind/open
+  ordering, consumed-only ACKs, path-change ACK replay, failure isolation and EOF after drain.
 - Android hardware performance (2026-10-17, 2109119BC, Chrome 155, cache disabled): the same development
   page on port 3002 loaded in 62.42 s before optimization and 23.28 s after (532 requests, no failures).
   Same-phone LAN controls were 4.16 s before and 4.64 s after. The page transfers roughly 50 MB of
@@ -175,6 +185,13 @@ never wait for the larger buffer to fill.
   asset through the phone mapping and ADB TCP forward fell from 14.84 s to 5.02 s. The Android app
   runs in the background during browser verification. Native filtering removes repeated byte ranges
   before they cross the JS bridge; it does not remove encryption or change remote resource authorization.
+- A second optimization on the same phone writes authenticated downloads directly into the accepted
+  loopback socket. Two cache-disabled runs loaded the page in 10.92 s / 10.99 s, versus same-run LAN
+  controls of 4.23 s / 4.20 s (531 requests, roughly 50.7 MB, no failed requests, login rendered).
+  The standalone 12,711,048-byte asset took 1.94 s with the app foregrounded and 2.75 s with Chrome
+  foregrounded, versus 5.02 s after the first optimization. SHA-256 matched the direct download.
+  This is a substantial reduction in forwarding overhead, but
+  mapped page loading is still slower than direct LAN access. The host and development server were unchanged.
 - For actual duplex JNI bytes, first run `cargo test --lib bulk::android_fixture::android_duplex_bridge_fixture
   -- --ignored --nocapture` in `crates/chat-connectivity`, then run the Android script above with `--duplex`.
   On 2026-10-15, the phone received and echoed 4 MiB in 1.24 seconds through an ADB loopback fixture;

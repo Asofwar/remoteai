@@ -16,7 +16,7 @@ internal class PortStreamDelivery {
     override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>?) = size > MAX_TRACKED_STREAMS
   }
 
-  fun keep(frame: PortStreamCipher.Frame): Boolean {
+  @Synchronized fun keep(frame: PortStreamCipher.Frame): Boolean {
     val bytes = frame.bytes
     if (bytes.size == 1 && bytes[0].toInt() == CLOSE) delivered.remove(frame.id)
     if (bytes[0].toInt() != DATA) return true
@@ -32,5 +32,5 @@ internal class PortStreamDelivery {
     return true
   }
 
-  fun clear() { delivered.clear() }
+  @Synchronized fun clear() { delivered.clear() }
 }

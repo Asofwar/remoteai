@@ -3,13 +3,20 @@ import { MappingStreamMux, STREAM_MANIFEST, STREAM_OPERATION, type StreamIdentit
 import type { MappingSocketFactory } from './socket';
 import { MAPPING_RECONNECT_REQUIRED, MAPPING_UPDATE_REQUIRED } from './errors';
 
+export interface NativeStreamProgress { consumed: number; eof: boolean; failed?: boolean }
+export interface MappingStreamReceiver {
+  close(): void;
+  bind(id: string, socketId: number): Promise<void>;
+  unbind(id: string): void;
+}
 export type MappingStreamBridge = (options: { identity: StreamIdentity;
   receiverKey: Uint8Array; authenticated: (id: string, bytes: Uint8Array) => void;
-  failed: () => void }) => Promise<() => void>;
+  progress: (id: string, progress: NativeStreamProgress) => void;
+  failed: () => void }) => Promise<MappingStreamReceiver | undefined>;
 
 interface StreamSession {
   link: MappingStreamLink; mux: MappingStreamMux; identity: StreamIdentity;
-  ready: Promise<() => void>; released: boolean;
+  ready: Promise<MappingStreamReceiver | undefined>; released: boolean;
 }
 
 export class MappingStreamClient {
@@ -20,23 +27,27 @@ export class MappingStreamClient {
     register?: MappingStreamBridge;
   }) {}
 
-  open: MappingSocketFactory = async (resource, url) => {
+  open: MappingSocketFactory = async (resource, url, options) => {
     const link = this.options.link();
     if (!this.options.supported()) throw new Error(MAPPING_UPDATE_REQUIRED);
     if (!link?.bulk?.path) throw new Error(MAPPING_RECONNECT_REQUIRED);
     const session = this.session(link);
-    await session.ready.catch(() => session.mux.close());
+    const receiver = await session.ready.catch(() => { session.mux.close(); return undefined; });
     if (!this.isCurrent(session)) throw new Error('Mapping connection changed');
     if (session.mux.closed) { this.release(session); throw new Error(MAPPING_RECONNECT_REQUIRED); }
+    if (options?.nativeSocketId !== undefined && !receiver) throw new Error(MAPPING_UPDATE_REQUIRED);
     const { mux, identity } = session;
     const id = this.uuid();
     const close = () => {
+      receiver?.unbind(id);
       void this.options.request({ operation: STREAM_OPERATION, action: 'close', resource, id }).catch(() => {
         // Resource/session teardown is the final cleanup when control transport is disconnected.
       });
     };
-    const stream = mux.open(id, close);
+    const stream = mux.open(id, close, options?.nativeSocketId !== undefined);
     try {
+      if (options?.nativeSocketId !== undefined) await receiver!.bind(id, options.nativeSocketId);
+      if (stream.closed || !this.isCurrent(session)) throw new Error('Mapping connection closed');
       await this.options.request({ operation: STREAM_OPERATION, action: 'open', resource, url, id, ...identity });
       if (stream.closed || !this.isCurrent(session)) throw new Error('Mapping connection closed');
       return stream;
@@ -71,14 +82,15 @@ export class MappingStreamClient {
     try {
       return await this.options.register?.({ identity, receiverKey,
         authenticated: (id, bytes) => mux.receiveAuthenticated(id, bytes),
-        failed: () => mux.close() }) ?? (() => {});
+        progress: (id, progress) => mux.receiveNativeProgress(id, progress),
+        failed: () => mux.close() });
     } finally { receiverKey.fill(0); }
   }
 
   private release(session: StreamSession) {
     if (session.released) return;
     session.released = true;
-    void session.ready.then(release => release()).catch(() => {
+    void session.ready.then(receiver => receiver?.close()).catch(() => {
       // A failed registration has no native receiver to release.
     });
   }

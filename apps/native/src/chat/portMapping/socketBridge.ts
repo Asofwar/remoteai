@@ -8,7 +8,7 @@ const MAX_QUEUED_BYTES = 1024 * 1024;
 
 /** Preserve binary bytes and serialize writes; a slow peer must not accumulate unbounded data. */
 export function bridgeSocket(options: {
-  socket: Socket; client: ForwardingClient; resource: string; url: string;
+  socket: Socket; client: ForwardingClient; resource: string; url: string; nativeSocketId?: number;
 }): { close: () => void; done: Promise<void> } {
   const { socket, client, resource, url } = options;
   let remote: MappingSocket | undefined;
@@ -19,7 +19,7 @@ export function bridgeSocket(options: {
     socket.destroy();
     remote?.close();
   };
-  const opened = openMappingSocket(client, resource, url).then(stream => {
+  const opened = openMappingSocket(client, resource, url, { nativeSocketId: options.nativeSocketId }).then(stream => {
     remote = stream;
     if (closed) remote.close();
     return remote;

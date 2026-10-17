@@ -63,7 +63,7 @@ export class ChatConnection {
   readonly mappingStreams = new MappingStreamClient({
     link: () => this.link, supported: () => this.mappingStreamsSupported && this.options.mappingStreamsEnabled !== false,
     random: length => this.options.randomBytes(length), request: body => this.request('request', body),
-    register: options => this.options.registerMappingStream?.(options) ?? Promise.resolve(() => {}),
+    register: options => this.options.registerMappingStream?.(options) ?? Promise.resolve(undefined),
   });
   setBulkSupport(value: unknown) {
     this.mappingStreamsSupported = !!value && typeof value === 'object'

@@ -7,6 +7,7 @@ import { StreamBudget } from '../../../../../shared/port-mapping/streamBudget';
 import { LINK_CHUNK_BYTES } from '../../../../../shared/terminal/linkChunks';
 
 vi.mock('react-native-tcp-socket', () => ({ default: net }));
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
 vi.mock('buffer', async () => {
   const { createRequire } = await import('node:module');
   // Exercise the same Buffer polyfill that Metro ships, not Node's different subarray semantics.

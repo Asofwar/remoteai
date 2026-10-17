@@ -8,6 +8,8 @@ import { openMappingSocket, type MappingSocket } from '../../../../../../shared/
 import { encodeStreamFrame } from '../../../../../../shared/port-mapping/streamProtocol';
 import { MAPPING_RECONNECT_REQUIRED, MAPPING_UPDATE_REQUIRED } from '../../../../../../shared/port-mapping/errors';
 
+function receiver(close = vi.fn<() => void>()) { return { close, bind: vi.fn(async () => {}), unbind: vi.fn() }; }
+
 function fixture(register?: MappingStreamBridge, supported = true) {
   const transport = new BulkTransport({ available: () => true, send: async () => {} });
   transport.setMode('relay');
@@ -20,11 +22,57 @@ function fixture(register?: MappingStreamBridge, supported = true) {
     close: () => { client.close(); transport.close(); } };
 }
 
+it('binds the native receiver before sending open and releases it when the socket closes', async () => {
+  const native = receiver();
+  const peer = fixture(async () => native);
+  peer.request.mockImplementation(async body => {
+    if ('action' in body && body.action === 'open') {
+      if (!('id' in body)) throw new Error('Missing stream identity');
+      expect(native.bind).toHaveBeenCalledWith(body.id, 42);
+    }
+    return {};
+  });
+  try {
+    const socket = await peer.client.open('resource', 'http://127.0.0.1', { nativeSocketId: 42 });
+    socket.close(); expect(native.unbind).toHaveBeenCalledTimes(1);
+  } finally { peer.close(); }
+});
+
+it('fails native binding without opening a remote socket or falling back to the script receiver', async () => {
+  const native = receiver();
+  native.bind.mockRejectedValueOnce(new Error('Socket unavailable'));
+  const peer = fixture(async () => native);
+  try {
+    await expect(peer.client.open('resource', 'http://127.0.0.1', { nativeSocketId: 42 }))
+      .rejects.toThrow('Socket unavailable');
+    expect(peer.request.mock.calls.some(([body]) => 'action' in body && body.action === 'open')).toBe(false);
+    expect(native.unbind).toHaveBeenCalledTimes(1);
+  } finally { peer.close(); }
+});
+
+it('isolates a failed native socket while other streams keep their authenticated session', async () => {
+  let bridge!: Parameters<MappingStreamBridge>[0];
+  const native = receiver();
+  const peer = fixture(async options => { bridge = options; return native; });
+  try {
+    const failed = await peer.client.open('resource', 'http://127.0.0.1', { nativeSocketId: 42 });
+    const healthy = await peer.client.open('resource', 'http://127.0.0.1', { nativeSocketId: 43 });
+    const failedId = (peer.request.mock.calls[0][0] as { id: string }).id;
+    const healthyId = (peer.request.mock.calls[1][0] as { id: string }).id;
+    bridge.progress(failedId, { consumed: 0, eof: false, failed: true });
+    await expect(failed.read()).rejects.toThrow('closed');
+    bridge.progress(healthyId, { consumed: 1024, eof: true });
+    await expect(healthy.read()).resolves.toEqual({ data: new Uint8Array(), eof: true });
+    expect(native.unbind.mock.calls).toEqual([[failedId]]);
+    expect(native.close).not.toHaveBeenCalled();
+  } finally { peer.close(); }
+});
+
 it.each(['native', 'cipher'])('requires reconnect after %s failure without downgrading or replacing the epoch', async failure => {
   let fail!: () => void;
   const release = vi.fn();
   const register = vi.fn(async (options: Parameters<MappingStreamBridge>[0]) => {
-    fail = options.failed; return release;
+    fail = options.failed; return receiver(release);
   });
   const peer = fixture(register);
   try {
@@ -52,7 +100,7 @@ it.each(['native', 'cipher'])('requires reconnect after %s failure without downg
 
 it('fails a pending open if its receiver stops without falling back to RPC', async () => {
   let fail!: () => void;
-  const peer = fixture(async options => { fail = options.failed; return vi.fn<() => void>(); });
+  const peer = fixture(async options => { fail = options.failed; return receiver(); });
   peer.request.mockImplementationOnce(async () => { fail(); return {}; });
   try {
     await expect(peer.client.open('resource', 'http://127.0.0.1:3002')).rejects.toThrow('closed');
@@ -71,7 +119,7 @@ it('requires reconnect when native registration fails before a stream can open',
 it('only disables streams on the failed link and uses a fresh epoch after reconnecting', async () => {
   let fail!: () => void;
   const register = vi.fn(async (options: Parameters<MappingStreamBridge>[0]) => {
-    fail = options.failed; return vi.fn<() => void>();
+    fail = options.failed; return receiver();
   });
   const peer = fixture(register);
   try {
@@ -108,7 +156,7 @@ it('asks unsupported peers to update without opening RPC sockets', async () => {
 
 it('accepts authenticated native frames only for the active socket and wipes the exported receive key', async () => {
   let bridge!: Parameters<MappingStreamBridge>[0];
-  const peer = fixture(async options => { bridge = options; return vi.fn<() => void>(); });
+  const peer = fixture(async options => { bridge = options; return receiver(); });
   try {
     const socket = await peer.client.open('resource', 'http://127.0.0.1:80');
     expect(bridge.receiverKey).toEqual(new Uint8Array(32));
@@ -131,7 +179,7 @@ it('rejects a missing stream adapter without opening a legacy socket', async () 
 it('registers before opening and immediately fails pending reads if the native bridge stops', async () => {
   let fail!: () => void;
   const release = vi.fn();
-  const peer = fixture(async options => { fail = options.failed; return release; });
+  const peer = fixture(async options => { fail = options.failed; return receiver(release); });
   try {
     const socket = await peer.client.open('resource', 'http://127.0.0.1:80');
     const reading = expect(socket.read()).rejects.toThrow('closed');
@@ -143,11 +191,11 @@ it('registers before opening and immediately fails pending reads if the native b
 });
 
 it('releases a delayed registration when the session closes before stream creation', async () => {
-  let registered!: (release: () => void) => void;
+  let registered!: (value: ReturnType<typeof receiver>) => void;
   const release = vi.fn();
   const peer = fixture(() => new Promise(resolve => { registered = resolve; }));
   const opening = expect(peer.client.open('resource', 'http://127.0.0.1:80')).rejects.toThrow('changed');
-  peer.client.close(); registered(release);
+  peer.client.close(); registered(receiver(release));
   await opening;
   expect(release).toHaveBeenCalledTimes(1);
   expect(peer.request).not.toHaveBeenCalled(); peer.close();
@@ -158,7 +206,8 @@ it('cancels before socket open completes and closes the eventual socket without 
   const abort = new AbortController();
   const close = vi.fn();
   const opening = openMappingSocket({ openResource: vi.fn(), closeResource: vi.fn(), link: vi.fn(),
-    stream: () => new Promise(resolve => { connected = resolve; }) }, 'resource', 'http://127.0.0.1', abort.signal);
+    stream: () => new Promise(resolve => { connected = resolve; }) }, 'resource', 'http://127.0.0.1',
+  { signal: abort.signal });
   abort.abort(); await expect(opening).rejects.toThrow('cancelled');
   connected({ read: vi.fn(), write: vi.fn(), close }); await Promise.resolve();
   expect(close).toHaveBeenCalledTimes(1);

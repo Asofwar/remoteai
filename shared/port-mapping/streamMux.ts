@@ -5,6 +5,7 @@ import { MappingByteStream } from './stream';
 import { decodeStreamFrame, encodeStreamFrame, splitStreamFrames, type StreamFrame } from './streamProtocol';
 import { BULK_LIMITS } from '../remote-chat/bulkLimits';
 import type { ChatLink } from '../remote-chat/link';
+import type { NativeStreamProgress } from './streamClient';
 
 export type MappingStreamLink = Pick<ChatLink, 'bulk' | 'createBulkCipher'>;
 
@@ -33,13 +34,14 @@ export class MappingStreamMux {
     });
   }
 
-  open(id: string, closed: () => void) {
+  open(id: string, closed: () => void, nativeReceive = false) {
     if (this.abort.signal.aborted || this.streams.has(id) || this.streams.size >= MAX_MAPPING_STREAMS) {
       throw new Error('Port mapping connection unavailable');
     }
     const stream = new MappingByteStream({
       send: frames => this.send(id, frames),
       closed: () => { this.streams.delete(id); closed(); },
+      nativeReceive,
     });
     this.streams.set(id, stream);
     return stream;
@@ -79,6 +81,10 @@ export class MappingStreamMux {
     if (this.closed) return;
     try { this.streams.get(id)?.receive(decodeStreamFrame(bytes)); }
     catch { this.close(); }
+  }
+
+  receiveNativeProgress(id: string, progress: NativeStreamProgress) {
+    if (!this.closed) this.streams.get(id)?.receiveNativeProgress(progress);
   }
 
   close() {

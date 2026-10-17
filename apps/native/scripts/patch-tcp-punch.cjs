@@ -37,6 +37,7 @@ function applyTcpPunchPatch() {
   require('./patch-tcp-lifecycle.cjs').applyTcpLifecyclePatch(directory);
   require('./patch-ios-tcp-punch.cjs').applyIosTcpPunchPatch(path.dirname(manifest));
   require('./patch-tcp-server-close.cjs').applyServerClosePatch(path.dirname(manifest));
+  require('./patch-tcp-native-sink.cjs').applyNativeSinkPatch(path.dirname(manifest));
 }
 
 if (require.main === module) applyTcpPunchPatch();

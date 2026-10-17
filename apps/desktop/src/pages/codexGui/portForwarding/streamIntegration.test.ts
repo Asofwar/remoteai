@@ -46,7 +46,10 @@ async function fixture(server: net.Server) {
   const host = new RemoteMappingStreams(links[1]);
   let failReceiver = () => {};
   const streams = new MappingStreamClient({ link: () => links[0], random: randomBytes, supported: () => true,
-    register: async options => { failReceiver = options.failed; return () => {}; },
+    register: async options => {
+      failReceiver = options.failed;
+      return { close() {}, unbind() {}, bind: async () => {} };
+    },
     request: async <T>(body: object) => {
       await wait(30);
       const result = 'request' in body

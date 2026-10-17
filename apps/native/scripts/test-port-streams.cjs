@@ -34,6 +34,8 @@ const classes = path.join(work, 'checks.jar'), dex = path.join(work, 'checks-dex
 const sources = ['apps/native/plugins/downloads/PortStreamRecords.kt',
   'apps/native/plugins/downloads/PortStreamCipher.kt', 'apps/native/plugins/chatPacketCipher/PacketCipher.kt',
   'apps/native/plugins/downloads/PortStreamDelivery.kt',
+  'apps/native/plugins/downloads/PortStreamBuffer.kt', 'apps/native/plugins/downloads/PortStreamSink.kt',
+  'apps/native/plugins/downloads/PortStreamSinks.kt', 'apps/native/e2e/port-mapping/PortStreamSinkChecks.kt',
   'apps/native/e2e/port-mapping/PortStreamCipherChecks.kt',
   'apps/native/e2e/port-mapping/PortStreamDeliveryChecks.kt',
   'apps/native/plugins/connectivity/NativeConnectivity.kt', 'apps/native/e2e/port-mapping/PortStreamChecks.kt']

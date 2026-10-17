@@ -82,8 +82,8 @@ export class ChatController {
   readonly guiTools = createGuiToolsClient(<T>(body: object) => this.connection.request<T>('request', body),
     (event, fields) => this.connection.reportDiagnostic?.(event, fields),
     viewId => this.connection.openNativeMedia?.(viewId) ?? Promise.resolve(undefined),
-    (resource, url): Promise<MappingSocket> => this.connection.mappingStreams
-      ? this.connection.mappingStreams.open(resource, url)
+    (resource, url, options): Promise<MappingSocket> => this.connection.mappingStreams
+      ? this.connection.mappingStreams.open(resource, url, options)
       : Promise.reject(new Error(MAPPING_UPDATE_REQUIRED)));
   private readonly listRequests = new ThreadListRequests(async () => {
     if (this.active && this.transportConnected) await this.list({ background: true });

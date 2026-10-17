@@ -44,15 +44,19 @@ async function fixture(server: net.Server) {
     new BulkCipher(new Uint8Array(32).fill(37), { ...identity, desktop: side === 1,
       sessionId: 'authenticated-test-session', desktopKey: 'host', clientKey: 'viewer' }) }));
   const host = new RemoteMappingStreams(links[1]);
+  let failReceiver = () => {};
   const streams = new MappingStreamClient({ link: () => links[0], random: randomBytes, supported: () => true,
+    register: async options => { failReceiver = options.failed; return () => {}; },
     request: async <T>(body: object) => {
       await wait(30);
-      const result = await host.request(body as Record<string, unknown>);
+      const result = 'request' in body
+        ? await sockets.request(body.request as TerminalLinkRequest)
+        : await host.request(body as Record<string, unknown>);
       await wait(30); return result as T;
     } });
   const client: ForwardingClient = { openResource: async () => 'resource', closeResource: async () => {},
     link: (_resource, request) => sockets.request(request), stream: streams.open };
-  return { origin, client, host, streams,
+  return { origin, client, host, streams, failReceiver: () => failReceiver(),
     switchPath: () => { direct = false; transports.forEach(value => value.setMode('relay')); },
     close: async () => {
       streams.close(); host.close(); transports.forEach(value => value.close());
@@ -60,6 +64,21 @@ async function fixture(server: net.Server) {
       await new Promise<void>(resolve => server.close(() => resolve()));
     } };
 }
+
+it('opens real TCP requests after receiver failure while the host retains its previous stream session', async () => {
+  const service = await fixture(net.createServer(socket => socket.pipe(socket)));
+  try {
+    const first = await service.streams.open('resource', service.origin);
+    await first.write(Buffer.from('before'));
+    expect(Buffer.from((await first.read()).data).toString()).toBe('before');
+    const pending = expect(first.read()).rejects.toThrow('closed');
+    service.failReceiver(); await pending;
+    const recovered = await service.streams.open('resource', service.origin);
+    await recovered.write(Buffer.from('after'));
+    expect(Buffer.from((await recovered.read()).data).toString()).toBe('after');
+    recovered.close();
+  } finally { await service.close(); }
+});
 
 it('carries simultaneous binary upload/download through the mobile TCP bridge and closes pending reads', async () => {
   const service = await fixture(net.createServer(socket => socket.pipe(socket)));

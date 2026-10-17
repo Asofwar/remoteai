@@ -51,6 +51,29 @@ async function frame() {
 }
 async function older() { await act(async () => button().click()); await frame(); await frame(); }
 
+it('bounds a continually open conversation, keeps history stable, and returns to the latest window', async () => {
+  let value = conversation();
+  await render(value);
+  for (let index = 35; index < 135; index++) {
+    value = { ...value, turns: [{ ...value.turns[0], items: [...value.turns[0].items, item(index)] }] };
+    await render(value);
+    expect(count()).toBe(10);
+  }
+  await older(); await older(); await older();
+  expect(count()).toBe(30);
+  const first = container.querySelector('[data-message-id]')?.getAttribute('data-message-id');
+  value = { ...value, turns: [{ ...value.turns[0], items: [...value.turns[0].items, item(135)] }] };
+  await render(value);
+  expect(count()).toBe(30);
+  expect(container.querySelector('[data-message-id]')?.getAttribute('data-message-id')).toBe(first);
+  const latest = [...container.querySelectorAll('button')].find(entry => entry.textContent === '回到最新消息')!;
+  await act(async () => latest.click());
+  expect(count()).toBe(10);
+  expect(container.querySelector('[data-message-id="item-135"]')).not.toBeNull();
+  await render(value, false);
+  expect(count()).toBe(0);
+});
+
 it("mounts only ten rich messages, shows loading before the next batch, and never overlaps batches", async () => {
   await render(conversation());
   expect(count()).toBe(10);
@@ -66,8 +89,9 @@ it("mounts only ten rich messages, shows loading before the next batch, and neve
   expect(count()).toBe(20);
   expect(container.querySelector('[data-message-id="item-34"]')).toBe(last);
   await older(); expect(count()).toBe(30);
-  await older(); expect(count()).toBe(35);
+  await older(); expect(count()).toBe(30);
   expect(button()).toBeUndefined();
+  expect(container.textContent).toContain('加载更新的消息');
 });
 
 it("resets cached conversations to ten items on reentry and cancels pending work on navigation", async () => {

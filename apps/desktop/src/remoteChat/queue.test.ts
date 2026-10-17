@@ -6,6 +6,7 @@ import type { GuiEvent, Thread } from '../pages/codexGui/types';
 import { RemoteQueue } from './queue';
 import { AcknowledgedMessages } from './acknowledgedMessages';
 import { updateThread } from '../../../../shared/remote-chat/client/events';
+import * as sharedAcknowledgements from '../../../../shared/chat/acknowledgedMessages';
 
 vi.mock('../pages/codexGui/api', () => ({ guiApi: {
   connect: vi.fn(), request: vi.fn(), subscribe: vi.fn(),
@@ -37,7 +38,30 @@ beforeEach(async () => {
   controller = new GuiController(); queue = new RemoteQueue(() => controller);
   await controller.connect();
 });
-afterEach(() => controller.dispose());
+afterEach(() => { controller.dispose(); vi.useRealTimers(); vi.restoreAllMocks(); });
+
+it('does not scan acknowledgements on streaming frames or while no phone is connected', async () => {
+  const scan = vi.spyOn(sharedAcknowledgements, 'acknowledgedEvents');
+  let connected = false;
+  const events = vi.fn();
+  const stop = new AcknowledgedMessages(() => controller).subscribe(events, () => connected);
+  await queue.request(input);
+  expect(scan).not.toHaveBeenCalled();
+  connected = true;
+  await queue.request({ operation: 'queueSendNow', threadId: 'phone', id: queue.read().threads.phone[0].id });
+  expect(events).toHaveBeenCalledOnce();
+  scan.mockClear();
+  vi.useFakeTimers();
+  for (let index = 0; index < 100; index++) {
+    receive({ method: 'item/agentMessage/delta', params: {
+      threadId: 'phone', turnId: 'live', itemId: 'response', delta: 'streaming',
+    } });
+    await vi.advanceTimersByTimeAsync(32);
+  }
+  expect(scan).not.toHaveBeenCalled();
+  expect(events).toHaveBeenCalledOnce();
+  stop();
+});
 
 it('uses a remotely switched folder for both resume and the next queued turn', async () => {
   thread.turns = [];

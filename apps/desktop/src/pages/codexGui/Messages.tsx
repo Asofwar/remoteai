@@ -30,7 +30,7 @@ export function Messages({ value, selected, active = true, footer, pendingReques
 } & CapacityRetryControl) {
   const last = lastUserMessage(value);
   const { viewport, content, away, onScroll, jumpToLatest, pauseFollowing } = useFollowScroll(selected, active);
-  const history = useMessageWindow({ turns: value?.turns, selected, active, viewport, pauseFollowing });
+  const history = useMessageWindow({ turns: value?.turns, selected, active, viewport, pauseFollowing, away });
   const quote = useQuoteSelection({ root: content, selected, enabled: active && Boolean(onQuote) });
   const sending = pendingRequest && pendingRequest.threadId === selected && !value?.activeTurn;
   const processing = value?.processing;
@@ -46,7 +46,8 @@ export function Messages({ value, selected, active = true, footer, pendingReques
     }} />}
     <div ref={viewport} className={styles.messageViewport} aria-label={guiText("对话消息")}
       onWheel={history.onWheel} onScroll={() => {
-        onScroll();
+        if (history.hasNewer) pauseFollowing();
+        else onScroll();
         history.onScroll();
       }}>
       <div ref={content} className={styles.messageScrollBody}>
@@ -76,6 +77,10 @@ export function Messages({ value, selected, active = true, footer, pendingReques
               turnId: turn.id, itemId: last.item.id }) : undefined}
             followsInterruption={followsInterruption}
             running={value?.activeTurn === turn.id} active={active} />)}
+          {history.hasNewer && <div className={styles.historyLoader}>
+            <button type="button" onClick={history.loadNewer} disabled={history.loading}>
+              {guiText("加载更新的消息")}</button>
+          </div>}
           {value?.error && <p className={styles.turnError} role="status">{value.error}</p>}
           {value?.activeTurn && <WorkingStatus key={`${selected}:${value.activeTurn}`} active={active}
             turn={activeTurn} processing={processing} />}

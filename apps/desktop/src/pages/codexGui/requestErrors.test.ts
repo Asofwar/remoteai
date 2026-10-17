@@ -99,6 +99,16 @@ describe("request errors belong to their turn", () => {
     expect(value.turns[0].error?.additionalDetails).toBe("quota exceeded");
   });
 
+  it('keeps errors beyond the newer edge of a bounded window unmounted', () => {
+    const items = Array.from({ length: 100 }, (_, index) => ({ id: `item-${index}`, type: 'agentMessage' }));
+    const turn = { id: 'long', status: 'completed', items, requestErrors: items.map((item, index) => ({
+      id: `error-${index}`, afterItemId: item.id, itemCount: index + 1, willRetry: true,
+      error: { message: 'Retry' },
+    })) };
+    const groups = turnMessageGroups(turn, { visibleItems: items.slice(0, 10), followsInterruption: false });
+    expect(groups.filter(group => group.type === 'error')).toHaveLength(10);
+  });
+
   it("uses the active turn for older events and never assigns background errors to the selected conversation", () => {
     const value = conversation(thread);
     const notification = retry();

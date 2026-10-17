@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { guiText } from '../../i18n/guiText';
+import { useActivityWindow } from './useActivityWindow';
 import type { Item } from "./types";
 import { ActivitySummary } from "./ActivityRow";
 import { DeferredDetails } from "./DeferredDetails";
@@ -25,11 +27,19 @@ function ActivityGroup({ items, running, startedAt }: Props) {
 }
 
 export function WorkItems({ items, running, startedAt }: Props) {
-  const groups = useMemo(() => groupConsecutiveActivities(items), [items]);
-  return <div className={styles.workItems}>{groups.map((group) => group.activity && group.items.length > 1
+  const window = useActivityWindow(items);
+  const groups = useMemo(() => groupConsecutiveActivities(window.items), [window.items]);
+  return <div className={styles.workItems}>
+    {window.earlier && <button type="button" onClick={window.older}>{guiText("查看更早的活动")}</button>}
+    {groups.map((group) => group.activity && group.items.length > 1
     ? <ActivityGroup key={group.key} items={group.items} running={running} startedAt={startedAt} />
     : <div key={group.key} data-message-id={group.items[0].id}>
       <MessageItem item={group.items[0]} startedAt={startedAt}
         streaming={running && group.items[0].status !== "completed"} />
-    </div>)}</div>;
+    </div>)}
+    {window.later && <div>
+      <button type="button" onClick={window.newer}>{guiText("查看后续活动")}</button>
+      <button type="button" onClick={window.latest}>{guiText("回到最新活动")}</button>
+    </div>}
+  </div>;
 }

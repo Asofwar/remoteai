@@ -13,6 +13,7 @@ pub(crate) mod host_health;
 pub(crate) mod identity;
 mod ipc_ack;
 mod protocol;
+mod renderer_recovery;
 mod runtime;
 mod sessions;
 pub(crate) mod tcp;

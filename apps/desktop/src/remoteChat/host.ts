@@ -54,7 +54,7 @@ export class ChatHost {
     });
     this.unsubscribeMessages = acknowledgedMessages.subscribe((event) => {
       this.stream.receive(this.operations.prepareEvent(event));
-    });
+    }, () => this.links.size > 0);
     this.unsubscribeQueue = remoteQueue.subscribe((snapshot) => {
       this.broadcast({ method: QUEUE_EVENT, params: snapshot });
     });

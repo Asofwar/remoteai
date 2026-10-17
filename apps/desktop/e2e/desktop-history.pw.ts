@@ -55,7 +55,7 @@ for (const trigger of ["wheel", "button"] as const) {
 }
 
 test("paging a scrollable activity history preserves its collapsed summary as the reading anchor", async ({ page }) => {
-  const { viewport, anchor } = await collapsedHistory(page, 900);
+  const { viewport, anchor } = await collapsedHistory(page, 650);
   expect(await viewport.evaluate((node) => node.scrollHeight - node.clientHeight)).toBeGreaterThan(0);
   await older(page, 14, "[data-history-anchor]");
   await expect(anchor).toHaveAttribute("data-test-original", "true");
@@ -121,14 +121,14 @@ test("streamed replies and typing stay live while browsing older components", as
   await page.getByRole("button", { name: "开始回复" }).click();
   const live = page.locator('[data-message-id="live"]');
   await expect(live).toContainText("实时回复");
-  await older(page, 21);
+  await older(page, 20);
   const previous = await live.textContent();
   const before = Number(await page.getByLabel("刷新次数").textContent());
   await page.getByLabel("消息", { exact: true }).fill("加载历史时继续输入");
   await expect(page.getByLabel("消息", { exact: true })).toHaveValue("加载历史时继续输入");
   await expect.poll(() => live.textContent()).not.toBe(previous);
   await expect.poll(async () => Number(await page.getByLabel("刷新次数").textContent())).toBeGreaterThan(before + 3);
-  await expect(page.locator("[data-message-id]")).toHaveCount(21);
+  await expect(page.locator("[data-message-id]")).toHaveCount(20);
   await expect(page.getByRole("button", { name: "回到最新消息" })).toBeVisible();
   await page.getByRole("button", { name: "回到最新消息" }).click();
   await expect(live).toBeInViewport();

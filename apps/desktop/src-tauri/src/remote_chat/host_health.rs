@@ -1,4 +1,5 @@
 //! Recover failed IPC independently of renderer heartbeats and established mobile sessions.
+use super::renderer_recovery::RecoveryAttempt;
 use serde::Serialize;
 use std::{
     sync::{
@@ -16,6 +17,7 @@ pub(super) struct Health {
     active: AtomicBool,
     heartbeat: AtomicU64,
     restart_required: AtomicBool,
+    renderer: AtomicU64,
 }
 
 #[derive(Serialize)]
@@ -69,6 +71,7 @@ pub(crate) async fn remote_chat_host_alive(
     app: AppHandle,
     window: Webview,
     active: bool,
+    renderer_id: u64,
 ) -> Result<HostHealthStatus, String> {
     if window.label() != "main" {
         return Err("请在主窗口连接手机聊天。".into());
@@ -76,33 +79,68 @@ pub(crate) async fn remote_chat_host_alive(
     let state = app
         .try_state::<Arc<Health>>()
         .ok_or_else(|| "暂时无法检查连接状态，请稍后重试。".to_string())?;
+    if renderer_id == 0 || renderer_id > u32::MAX as u64 {
+        return Err("暂时无法检查连接状态，请稍后重试。".into());
+    }
+    state.renderer.store(renderer_id, Ordering::Release);
     Ok(state.heartbeat(active))
 }
 
 async fn watch<R: tauri::Runtime>(app: AppHandle<R>) {
     let mut interval = tokio::time::interval(Duration::from_secs(10));
+    let mut pending: Option<RecoveryAttempt> = None;
     loop {
         interval.tick().await;
         let state = app.state::<Arc<Health>>();
+        if let Some(attempt) = pending.as_mut() {
+            if attempt.completed(state.renderer.load(Ordering::Acquire)) {
+                attempt.progress.cancelled.store(true, Ordering::Release);
+                record_recovery("confirmed", &state, attempt.started_at);
+                pending = None;
+            } else if let Some(stage) = attempt.diagnostic(state.now()) {
+                record_recovery(stage, &state, attempt.started_at);
+            }
+            // Keep a failed attempt latched until a new page responds; never queue repeated reloads.
+            continue;
+        }
         if !state.stale() {
             continue;
         }
-        state.heartbeat.store(state.now(), Ordering::Relaxed);
-        eprintln!("remote chat: recovering an unresponsive host renderer");
-        let handle = app.clone();
-        if app
-            .run_on_main_thread(move || {
-                if let Some(window) = handle.get_webview("main") {
-                    if window.reload().is_err() {
-                        eprintln!("remote chat renderer recovery failed");
-                    }
-                }
-            })
-            .is_err()
-        {
+        let attempt = RecoveryAttempt::new(state.now(), state.renderer.load(Ordering::Acquire));
+        record_recovery("queued", &state, attempt.started_at);
+        queue_reload(&app, &attempt);
+        pending = Some(attempt);
+    }
+}
+
+fn queue_reload<R: tauri::Runtime>(app: &AppHandle<R>, attempt: &RecoveryAttempt) {
+    let handle = app.clone();
+    let progress = Arc::clone(&attempt.progress);
+    let queued = app.run_on_main_thread(move || {
+        if progress.cancelled.load(Ordering::Acquire) {
             return;
         }
+        progress.entered.store(true, Ordering::Release);
+        let succeeded = handle
+            .get_webview("main")
+            .is_some_and(|window| window.reload().is_ok());
+        progress.reloaded.store(succeeded, Ordering::Release);
+        progress.failed.store(!succeeded, Ordering::Release);
+    });
+    if queued.is_err() {
+        attempt.progress.failed.store(true, Ordering::Release);
     }
+}
+
+fn record_recovery(stage: &str, health: &Health, started_at: u64) {
+    // The bounded log worker persists numeric evidence even when the UI cannot execute a callback.
+    crate::error_logs::record_codex_error(&format!(
+        "remote chat renderer recovery: stage={stage}, elapsed_s={}, heartbeat_age_s={}, active={}, transport_failed={}",
+        health.now().saturating_sub(started_at),
+        health.now().saturating_sub(health.heartbeat.load(Ordering::Relaxed)),
+        health.active.load(Ordering::Relaxed),
+        health.needs_restart(),
+    ));
 }
 
 #[cfg(test)]

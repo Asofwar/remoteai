@@ -131,7 +131,7 @@ export function reduceConversation(value: Conversation, event: GuiEvent): Conver
 }
 
 function syncThreadPreview(state: GuiState, thread: Thread): Thread[] {
-  const update = (entry: Thread) => ({ ...entry, preview: thread.preview,
+  const update = (entry: Thread) => ({ ...entry, turns: undefined, preview: thread.preview,
     cwd: state.projectOverrides[entry.id] ?? entry.cwd });
   if (state.threads.some((entry) => entry.id === thread.id)) {
     return state.threads.map((entry) => entry.id === thread.id ? update(entry) : entry);

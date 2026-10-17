@@ -3,7 +3,8 @@ import { prepareImageEdit } from '../../../web/src/chat/prepareImageEdit';
 import { guiText } from "../i18n/guiText";
 import { useGuiLanguage } from '../i18n/useGuiLanguage';
 import { DiffTextContext } from "../../../../shared/chat/diffText";
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useVisibleGuiState } from './codexGui/useVisibleGuiState';
 import { Alert, Button, Popover, Tooltip } from "antd";
 import { PanelBottom, PanelLeftClose, PanelLeftOpen, RefreshCw } from "lucide-react";
 import { canManageCodexConnection, hasLocalBackend, isDesktopApp } from "../api/backend";
@@ -71,7 +72,8 @@ function Workspace({ active, accountPicker, windowControls, plugins, hostPicker,
   const skinStyle = useDreamSkin(active);
   const [controller] = useState(getGuiController);
   const [view, setView] = useState<GuiView>("conversation");
-  const conversationActive = active && view === "conversation";
+  const { state, visible } = useVisibleGuiState(controller, active);
+  const conversationActive = visible && view === "conversation";
   useConversationReadState(conversationActive, controller);
   const openTaskConversation = (threadId: string) => {
     setView("conversation");
@@ -79,7 +81,6 @@ function Workspace({ active, accountPicker, windowControls, plugins, hostPicker,
     void controller.select(threadId);
   };
   const composer = useRef<ComposerHandle>(null);
-  const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   useOpenNotifiedThread({ target: notificationTarget, ready: active && state.connection === "ready", controller,
     showConversation: () => setView("conversation") });
   const [collapsed, setCollapsed] = useState(() => window.innerWidth < 900);

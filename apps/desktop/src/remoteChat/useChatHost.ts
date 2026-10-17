@@ -5,6 +5,8 @@ import { mobileConnection } from './mobileConnection';
 import { invoke } from '@tauri-apps/api/core';
 
 const HOST_HEARTBEAT_MS = 10_000;
+// Stable across host/transport restarts, different after an actual page reload.
+const RENDERER_ID = crypto.getRandomValues(new Uint32Array(1))[0] || 1;
 interface HostHealthStatus { restartRequired: boolean }
 
 export function useChatHost() {
@@ -19,6 +21,7 @@ export function useChatHost() {
       try {
         const status = await invoke<HostHealthStatus>('remote_chat_host_alive', {
           active: mobileConnection.getSnapshot(),
+          rendererId: RENDERER_ID,
         });
         if (active && status.restartRequired) {
           host.close();
@@ -32,7 +35,7 @@ export function useChatHost() {
     void heartbeat();
     return () => {
       active = false; clearInterval(timer); host.close(); releaseSession();
-      void invoke('remote_chat_host_alive', { active: false }).catch(() => {
+      void invoke('remote_chat_host_alive', { active: false, rendererId: RENDERER_ID }).catch(() => {
         // During process shutdown the host no longer exists, so the lease cannot be explicitly cleared.
       });
     };

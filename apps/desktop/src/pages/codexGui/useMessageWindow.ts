@@ -10,6 +10,7 @@ interface Options {
   active: boolean;
   viewport: RefObject<HTMLDivElement>;
   pauseFollowing: () => void;
+  away: boolean;
 }
 
 function hasNestedScroller(target: EventTarget, viewport: Element): boolean {
@@ -22,7 +23,7 @@ function hasNestedScroller(target: EventTarget, viewport: Element): boolean {
   return false;
 }
 
-export function useMessageWindow({ turns = EMPTY_TURNS, selected, active, viewport, pauseFollowing }: Options) {
+export function useMessageWindow({ turns = EMPTY_TURNS, selected, active, viewport, pauseFollowing, away }: Options) {
   const [window, setWindow] = useState<{ selected: string | null; active: boolean; start?: MessageCursor }>(
     { selected, active });
   const [loading, setLoading] = useState(false);
@@ -30,8 +31,9 @@ export function useMessageWindow({ turns = EMPTY_TURNS, selected, active, viewpo
   const position = useRef(0);
   const anchor = useRef<{ node: Element; top: number }>();
   const current = window.selected === selected && window.active === active;
-  const start = current && active ? window.start : undefined;
-  const range = useMemo(() => messageWindow(turns, { start }), [turns, start]);
+  const start = current && active && away ? window.start : undefined;
+  const visibleTurns = active ? turns : EMPTY_TURNS;
+  const range = useMemo(() => messageWindow(visibleTurns, { start }), [visibleTurns, start]);
   const latest = useRef({ turns, range, selected, active });
   latest.current = { turns, range, selected, active };
 
@@ -61,9 +63,10 @@ export function useMessageWindow({ turns = EMPTY_TURNS, selected, active, viewpo
     if (!loading) anchor.current = undefined;
   }, [range, loading, viewport]);
 
-  const loadOlder = () => {
+  const loadPage = (direction: 'older' | 'newer') => {
     const node = viewport.current;
-    if (!node || !active || !range.hasMore || frame.current !== undefined) return;
+    const available = direction === 'older' ? range.hasMore : range.hasNewer;
+    if (!node || !active || !available || frame.current !== undefined) return;
     const top = node.getBoundingClientRect().top;
     const visible = [...node.querySelectorAll("[data-message-id], [data-history-anchor]")]
       .find((entry) => entry.getClientRects().length > 0 && entry.getBoundingClientRect().bottom > top);
@@ -76,25 +79,32 @@ export function useMessageWindow({ turns = EMPTY_TURNS, selected, active, viewpo
         frame.current = undefined;
         const next = latest.current;
         if (next.selected !== selected || !next.active) return;
-        setWindow({ selected, active, start: messageWindow(next.turns, { start: next.range.start, older: true }).start });
+        setWindow({ selected, active,
+          start: messageWindow(next.turns, { start: next.range.start, [direction]: true }).start });
         setLoading(false);
       });
     });
   };
+  const loadOlder = () => loadPage('older');
+  const loadNewer = () => loadPage('newer');
   const onScroll = () => {
-    const top = viewport.current?.scrollTop ?? 0;
+    const node = viewport.current;
+    const top = node?.scrollTop ?? 0;
     const upward = top < position.current;
+    const downward = top > position.current;
     position.current = top;
     if (upward && top < LOAD_DISTANCE) loadOlder();
+    if (downward && node && node.scrollHeight - top - node.clientHeight < LOAD_DISTANCE) loadNewer();
   };
   const onWheel = (event: WheelEvent<HTMLDivElement>) => {
-    if (event.defaultPrevented || event.ctrlKey || event.deltaY >= 0
+    if (event.defaultPrevented || event.ctrlKey || event.deltaY === 0
       || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
     const node = viewport.current;
-    if (!node || node.scrollTop > 0) return;
+    if (!node) return;
     if (hasNestedScroller(event.target, node)) return;
     // Collapsed activity can leave the viewport too short to emit a scroll event.
-    loadOlder();
+    if (event.deltaY < 0 && node.scrollTop <= 0) loadOlder();
+    if (event.deltaY > 0 && node.scrollHeight - node.scrollTop - node.clientHeight < LOAD_DISTANCE) loadNewer();
   };
-  return { entries: range.entries, hasMore: range.hasMore, loading, onScroll, onWheel, loadOlder };
+  return { ...range, loading, onScroll, onWheel, loadOlder, loadNewer };
 }

@@ -42,6 +42,7 @@ export async function selectRemoteProject(body: Record<string, unknown>): Promis
     throw new Error('项目正在处理中，请稍后重试。');
   }
   controller.setWorkspaceBusy(true);
+  const release = threadId ? controller.retainConversation(threadId) : undefined;
   try {
     if (controller.getSnapshot().connection !== 'ready') await controller.connect({ reuseExisting: true });
     if (controller.getSnapshot().connection !== 'ready') throw new Error('电脑暂未就绪，请稍后重试。');
@@ -52,5 +53,5 @@ export async function selectRemoteProject(body: Record<string, unknown>): Promis
       throw new Error('请等待当前任务和待发送消息处理完成后，再切换项目。');
     }
     return directoryProject(directory.directory);
-  } finally { controller.setWorkspaceBusy(false); }
+  } finally { controller.setWorkspaceBusy(false); release?.(); }
 }

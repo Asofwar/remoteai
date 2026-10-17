@@ -21,6 +21,31 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); vi.unstubAllGlobals(); });
 
+it('bounds an expanded long-running process and lets the reader browse every earlier activity', async () => {
+  let items = Array.from({ length: 300 }, (_, index) => explanation(`comment-${index}`));
+  await render(items);
+  expect(container.querySelectorAll('[data-message-id]')).toHaveLength(50);
+  expect(container.querySelector('[data-message-id="comment-299"]')).not.toBeNull();
+  const older = () => [...container.querySelectorAll('button')].find(entry => entry.textContent === '查看更早的活动');
+  await act(async () => older()!.click());
+  const first = container.querySelector('[data-message-id]');
+  items = [...items, explanation('new')];
+  await render(items);
+  expect(container.querySelector('[data-message-id]')).toBe(first);
+  while (older()) {
+    await act(async () => older()!.click());
+    expect(container.querySelectorAll('[data-message-id]').length).toBeLessThanOrEqual(50);
+  }
+  expect(container.querySelector('[data-message-id="comment-0"]')).not.toBeNull();
+  const latest = [...container.querySelectorAll('button')].find(entry => entry.textContent === '回到最新活动')!;
+  await act(async () => latest.click());
+  expect(container.querySelector('[data-message-id="new"]')).not.toBeNull();
+  // Consecutive tools share a disclosure, but expanding it must obey the same bound.
+  await render(Array.from({ length: 300 }, (_, index) => command(`cmd-${index}`)));
+  await toggle(container.querySelector('details')!);
+  expect(container.querySelectorAll('[data-message-id]')).toHaveLength(50);
+});
+
 it("shows one latest running operation while preserving explanations on either side", async () => {
   await render([explanation("before"), command("first"),
     { id: "edit", type: "fileChange", changes: [{ path: "sample.txt", kind: { type: "update" }, diff: "edit" }] },

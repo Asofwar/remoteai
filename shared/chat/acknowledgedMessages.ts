@@ -30,15 +30,21 @@ export function reconcileAcknowledgedItems(live: Item[], snapshot: Item[]): Item
   });
 }
 
+const acknowledgedTurns = new WeakMap<Turn, { threadId: string; events: GuiEvent[] }>();
+
 export function acknowledgedEvents(thread: Thread): GuiEvent[] {
   return (thread.turns ?? []).flatMap((turn) => {
+    const cached = acknowledgedTurns.get(turn);
+    if (cached?.threadId === thread.id) return cached.events;
     let userMessageIndex = 0;
-    return turn.items.flatMap((item, position): GuiEvent[] => {
+    const events = turn.items.flatMap((item, position): GuiEvent[] => {
       if (item.type !== 'userMessage') return [];
       const index = userMessageIndex++;
       return item.localEcho ? [{ method: MESSAGE_ACKNOWLEDGED,
         params: { threadId: thread.id, turnId: turn.id, item, userMessageIndex: index,
           afterItemId: turn.items[position - 1]?.id, beforeItemId: turn.items[position + 1]?.id } }] : [];
     });
+    acknowledgedTurns.set(turn, { threadId: thread.id, events });
+    return events;
   });
 }

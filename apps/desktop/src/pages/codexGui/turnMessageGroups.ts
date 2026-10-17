@@ -14,10 +14,12 @@ interface GroupOptions {
 
 function errorBoundaries(turn: Turn, visible: Set<string>): Map<string | null, TurnMessageGroup[]> {
   const firstVisible = turn.items.findIndex((item) => visible.has(item.id));
+  let lastVisible = turn.items.length - 1;
+  while (lastVisible >= 0 && !visible.has(turn.items[lastVisible].id)) lastVisible--;
   const boundaries = new Map<string | null, TurnMessageGroup[]>();
   for (const error of turnRequestErrors(turn)) {
     const position = requestErrorPosition(turn, error);
-    if (position < firstVisible) continue;
+    if (position < firstVisible || (lastVisible >= 0 && position > lastVisible + 1)) continue;
     const anchor = turn.items[position - 1]?.id ?? null;
     boundaries.set(anchor, [...(boundaries.get(anchor) ?? []), { type: "error", key: error.id, error }]);
   }

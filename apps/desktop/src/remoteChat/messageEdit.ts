@@ -12,6 +12,13 @@ export async function changeRemoteMessage(body: Record<string, unknown>): Promis
     throw new Error('请选择有效的对话。');
   }
   const controller = getGuiController();
+  const release = controller.retainConversation(threadId);
+  try { return await changeRetainedMessage(body, threadId); }
+  finally { release(); }
+}
+
+async function changeRetainedMessage(body: Record<string, unknown>, threadId: string): Promise<MessageChangeResult> {
+  const controller = getGuiController();
   if (controller.getSnapshot().connection !== 'ready') await controller.connect({ reuseExisting: true });
   await controller.loadRemoteThread(threadId);
   const state = controller.getSnapshot();

@@ -14,15 +14,16 @@ export class AcknowledgedMessages {
     return acknowledgedEvents({ ...current.thread, turns: current.turns }).reduce(updateThread, thread);
   }
 
-  subscribe(listener: (event: GuiEvent) => void) {
+  subscribe(listener: (event: GuiEvent) => void, enabled = () => true) {
     const controller = this.controller();
     let previous = controller.getSnapshot().conversations;
     const sent = new WeakSet<object>();
-    return controller.subscribe(() => {
+    return controller.subscribeMessageUpdates(() => {
       const conversations = controller.getSnapshot().conversations;
       if (conversations === previous) return;
       const before = previous;
       previous = conversations;
+      if (!enabled()) return;
       for (const [id, conversation] of Object.entries(conversations)) {
         if (conversation === before[id]) continue;
         for (const event of acknowledgedEvents({ ...conversation.thread, turns: conversation.turns })) {

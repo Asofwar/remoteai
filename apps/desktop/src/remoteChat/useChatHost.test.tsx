@@ -38,7 +38,9 @@ it('rebuilds stalled IPC even before the first mobile session without restarting
   await act(async () => root.render(<RemoteChatHost />));
   state.invoke.mockResolvedValueOnce({ restartRequired: true });
   await act(async () => vi.advanceTimersByTimeAsync(10_000));
-  expect(state.invoke).toHaveBeenLastCalledWith('remote_chat_host_alive', { active: false });
+  expect(state.invoke).toHaveBeenLastCalledWith('remote_chat_host_alive', {
+    active: false, rendererId: expect.any(Number),
+  });
   expect(state.hosts).toHaveLength(2);
   expect(state.hosts[0].close).toHaveBeenCalledOnce();
   expect(state.hosts[1].close).not.toHaveBeenCalled();
@@ -46,6 +48,8 @@ it('rebuilds stalled IPC even before the first mobile session without restarting
   expect(state.release).not.toHaveBeenCalled();
   await act(async () => vi.advanceTimersByTimeAsync(30_000));
   expect(state.hosts).toHaveLength(2);
+  const ids = state.invoke.mock.calls.map(([, request]) => request.rendererId);
+  expect(new Set(ids).size).toBe(1);
 });
 
 it('keeps a healthy active connection and only polls once while a health check is pending', async () => {
@@ -55,7 +59,9 @@ it('keeps a healthy active connection and only polls once while a health check i
   await act(async () => root.render(<RemoteChatHost />));
   await act(async () => vi.advanceTimersByTimeAsync(40_000));
   expect(state.invoke).toHaveBeenCalledOnce();
-  expect(state.invoke).toHaveBeenLastCalledWith('remote_chat_host_alive', { active: true });
+  expect(state.invoke).toHaveBeenLastCalledWith('remote_chat_host_alive', {
+    active: true, rendererId: expect.any(Number),
+  });
   await act(async () => finish({ restartRequired: false }));
   await act(async () => vi.advanceTimersByTimeAsync(10_000));
   expect(state.invoke).toHaveBeenCalledTimes(2);
@@ -72,6 +78,8 @@ it('ignores a late recovery reply after unmount and releases the host and sessio
   expect(state.hosts).toHaveLength(1);
   expect(state.hosts[0].close).toHaveBeenCalledOnce();
   expect(state.release).toHaveBeenCalledOnce();
-  expect(state.invoke).toHaveBeenLastCalledWith('remote_chat_host_alive', { active: false });
+  expect(state.invoke).toHaveBeenLastCalledWith('remote_chat_host_alive', {
+    active: false, rendererId: expect.any(Number),
+  });
   expect(vi.getTimerCount()).toBe(0);
 });

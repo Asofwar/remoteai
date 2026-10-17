@@ -17,12 +17,16 @@ it("limits the initial window to ten message groups, then includes ten older gro
   let range = messageWindow(turns);
   expect(ids(range)).toHaveLength(10);
   expect(ids(range)[0]).toBe("item-25");
-  for (const count of [20, 30, 35]) {
+  for (const [count, more] of [[20, true], [30, true], [30, false]] as const) {
     range = messageWindow(turns, { start: range.start, older: true });
     expect(ids(range)).toHaveLength(count);
-    expect(range.hasMore).toBe(count < 35);
+    expect(range.hasMore).toBe(more);
   }
   expect(range.entries[0].turn).toBe(turns[0]);
+  expect(range.hasNewer).toBe(true);
+  range = messageWindow(turns, { start: range.start, newer: true });
+  expect(ids(range)).toContain('item-34');
+  expect(range.hasNewer).toBe(false);
 });
 
 it("limits a single large turn without discarding its full data or prior interruption context", () => {
@@ -44,7 +48,7 @@ it("keeps the earliest loaded item when streaming appends new content and resets
   expect(ids(messageWindow(turns, { start: first.start, older: true }))).toHaveLength(21);
   turns[5].items = [];
   expect(ids(messageWindow(turns, { start: first.start }))).toHaveLength(10);
-  expect(messageWindow([])).toEqual({ entries: [], hasMore: false, start: undefined });
+  expect(messageWindow([])).toEqual({ entries: [], hasMore: false, hasNewer: false, start: undefined });
 });
 
 it("retains the empty active turn so processing remains visible before the first item", () => {

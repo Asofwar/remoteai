@@ -32,6 +32,8 @@ export class CapacityRetry {
 
   constructor(private host: RetryHost) {}
 
+  retainedThreads(): Iterable<string> { return this.entries.keys(); }
+
   cancel = (threadId = this.host.getSnapshot().selected) => {
     if (threadId) this.entries.delete(threadId);
     this.publish();

@@ -1,5 +1,7 @@
 import { guiApi } from "./api";
 import { CapacityRetry } from "./capacityRetry";
+import { ConversationCache } from "./conversationCache";
+import { ConversationHistory } from "./conversationHistory";
 import { sendCapacityRetry } from "./sendCapacityRetry";
 import { forkGuiConversation } from "./forkConversation";
 import { GuiMessageEditor } from "./editMessage";
@@ -9,14 +11,12 @@ import { GuiReadState } from "./threadReadState";
 import type { AttachmentReference } from "./attachmentTypes";
 import { deleteGuiThread } from "./deleteThread";
 import { conversation, reduceEvent } from "./events";
-import { completeTurnTiming, restoreTurnTiming } from "./turnTiming";
+import { acceptGuiTurn } from './acceptedTurn';
 import { MessageQueue } from "./messageQueue";
 import { QueueJournal, type QueueStorage } from './queueJournal';
-import { mergeMessageItems } from "./sentMessages";
 import { asyncAnswerText, pendingAsyncQuestions, withAsyncAnswer } from "./asyncQuestionState";
 import { compactUnavailableReason } from "./composerOptions";
 import { rememberTurnDetails } from "./turnDetailsStorage";
-import { restoreProcessing } from "./processing";
 import { trackProcessingApproval } from "./processingApprovals";
 import { initialState, savePreferences } from "./preferences";
 import { ThreadModelSettings } from "./threadModelSettings";
@@ -29,11 +29,14 @@ const STREAM_FRAME_MS = 32;
 
 export class GuiController {
   readonly queueJournal: QueueJournal;
-  constructor(storage?: QueueStorage) {
+  constructor(storage?: QueueStorage, cacheBytes?: number) {
+    this.conversationCache = new ConversationCache(cacheBytes);
     this.queueJournal = new QueueJournal(storage, queued => this.patch({ queued }), this.report);
   }
   private state = initialState();
   private listeners = new Set<() => void>();
+  private messageListeners = new Set<() => void>();
+  private readonly conversationCache: ConversationCache;
   private listGeneration = 0;
   private selectionGeneration = 0;
   private deletedThreads = new Set<string>();
@@ -54,20 +57,34 @@ export class GuiController {
     } });
   private streamEvents: GuiEvent[] = [];
   private streamTimer?: ReturnType<typeof setTimeout>;
-  private remoteReads = new Map<string, Promise<void>>();
-  private remoteTurnEvents = new Map<string, GuiEvent[]>();
   readonly titles = new GuiThreadTitles({ active: () => !this.disposed, receive: (event) => this.receive(event),
     currentName: (id) => this.state.conversations[id]?.thread.name
       ?? this.state.threads.find((thread) => thread.id === id)?.name });
   getSnapshot = () => this.state;
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
-  private patch = (patch: Partial<GuiState>, notify = true) => {
+  /** Text deltas cannot introduce acknowledged user messages. */
+  subscribeMessageUpdates = (listener: () => void) => {
+    this.messageListeners.add(listener); return () => this.messageListeners.delete(listener);
+  };
+  retainConversation = (id: string) => {
+    const release = this.conversationCache.retain(id);
+    return () => { release(); this.trimConversations(); };
+  };
+  private trimConversations() {
+    const conversations = this.conversationCache.trim(this.state, this.capacityRetry.retainedThreads());
+    if (conversations !== this.state.conversations) this.patch({ conversations });
+  }
+  private patch = (patch: Partial<GuiState>, notify = true, streaming = false) => {
     if (this.disposed) return;
     const previous = this.state;
     this.state = { ...this.state, ...patch };
+    if (!streaming) this.state.conversations = this.conversationCache.trim(this.state, this.capacityRetry.retainedThreads());
     if (previous.queued !== this.state.queued) this.queueJournal.remember(this.state.queued);
     this.capacityRetry.sync(previous, this.state);
     if (previous.selected !== this.state.selected) savePreferences(this.state);
+    if (!streaming && previous.conversations !== this.state.conversations) {
+      this.messageListeners.forEach(listener => listener());
+    }
     if (notify) this.listeners.forEach((listener) => listener());
   };
   report = (error: unknown) => {
@@ -91,6 +108,11 @@ export class GuiController {
   readonly goals = new GuiGoals({ getSnapshot: this.getSnapshot, patch: this.patch, report: this.report });
   readonly projectActions = new GuiProjects({ getSnapshot: this.getSnapshot, patch: this.patch, report: this.report });
   readonly readState = new GuiReadState({ getSnapshot: this.getSnapshot, patch: this.patch });
+  private history = new ConversationHistory({ getSnapshot: this.getSnapshot, patch: this.patch,
+    markRead: id => this.readState.markRead(id), loaded: id => {
+      void this.goals.load(id);
+      if (!this.state.archived) void this.queue.flush(id);
+    } });
   readonly queue = new MessageQueue({ getSnapshot: this.getSnapshot, patch: this.patch,
     catalogGuard: () => this.modelCatalog.guard(), selection: (id) => this.modelSettings.selection(id),
     saved: () => this.queueJournal.saved(),
@@ -101,37 +123,22 @@ export class GuiController {
     updateQueue: (threadId, selection) => this.queue.updateSettings(threadId, selection), report: this.report });
 
   private acceptTurn(threadId: string, turn: Turn) {
-    const current = this.state.conversations[threadId];
-    if (!current) return;
-    if (current.turns.some((entry) => entry.id === turn.id)) {
-      // Events may beat the acknowledgement; their newer content and final status must win.
-      this.patch({ conversations: { ...this.state.conversations, [threadId]: { ...current,
-        turns: current.turns.map((entry) => entry.id === turn.id
-          ? { ...entry, items: mergeMessageItems(turn.items ?? [], entry.items) } : entry) } } });
-      this.capacityRetry.receive({ method: "turn/completed", params: { threadId, turn } });
-      return;
-    }
-    const timedTurn = turn.status === "inProgress" ? restoreTurnTiming(turn) : completeTurnTiming(turn);
-    this.patch({ conversations: { ...this.state.conversations, [threadId]: { ...current,
-      turns: [...current.turns, timedTurn], activeTurn: turn.status === "inProgress" ? turn.id : null,
-      processing: turn.status === "inProgress" ? restoreProcessing(timedTurn) : undefined } } });
-    this.readState.receive({ method: turn.status === "inProgress" ? "turn/started" : "turn/completed",
-      params: { threadId, turn } });
-    if (turn.status !== "inProgress") this.capacityRetry.receive({ method: "turn/completed", params: { threadId, turn } });
+    const release = this.retainConversation(threadId);
+    try { acceptGuiTurn({ getSnapshot: this.getSnapshot, patch: this.patch,
+      readState: this.readState, capacityRetry: this.capacityRetry }, threadId, turn); }
+    finally { release(); }
   }
 
   private flushStream = () => {
     clearTimeout(this.streamTimer);
     this.streamTimer = undefined;
     if (!this.streamEvents.length) return;
-    this.patch(this.streamEvents.reduce(reduceEvent, this.state));
+    this.patch(this.streamEvents.reduce(reduceEvent, this.state), true, true);
     this.streamEvents = [];
   };
   private receive = (event: GuiEvent) => {
     const threadId = event.params.threadId ?? event.params.thread?.id;
-    if (threadId && ["turn/started", "turn/completed"].includes(event.method)) {
-      this.remoteTurnEvents.get(threadId)?.push(event);
-    }
+    this.history.receive(event);
     if (event.method === "thread/deleted" && threadId) {
       this.forgetThread(threadId);
       void this.refresh();
@@ -146,6 +153,12 @@ export class GuiController {
       return;
     }
     this.flushStream();
+    const release = threadId ? this.conversationCache.retain(threadId) : undefined;
+    try { this.receiveSettled(event); }
+    finally { release?.(); this.trimConversations(); }
+  };
+
+  private receiveSettled(event: GuiEvent) {
     this.patch(reduceEvent(this.state, event));
     this.capacityRetry.receive(event);
     this.readState.receive(event);
@@ -156,7 +169,7 @@ export class GuiController {
     }
     if (event.method === "turn/completed" && event.params.threadId) void this.queue.flush(event.params.threadId);
     if (event.method === "turn/completed" || event.method === "thread/name/updated") void this.refresh();
-  };
+  }
 
   connect = (options?: { reuseExisting: boolean }) => {
     if (this.connecting) return this.connecting;
@@ -225,7 +238,7 @@ export class GuiController {
       const listedIds = new Set(threads.map((thread) => thread.id));
       const grouped = [...new Map([...threads, ...live.filter((thread) => !listedIds.has(thread.id))]
         .map((thread) => [thread.id, thread])).values()]
-        .map((thread) => ({ ...thread, cwd: this.state.projectOverrides[thread.id] ?? thread.cwd,
+        .map((thread) => ({ ...thread, turns: undefined, cwd: this.state.projectOverrides[thread.id] ?? thread.cwd,
           // The list can lag behind the first user-message notification.
           preview: thread.preview || this.state.conversations[thread.id]?.thread.preview || "" }));
       this.patch({ threads: grouped,
@@ -276,21 +289,13 @@ export class GuiController {
   select = async (id: string) => {
     if (this.state.deleting === id) return;
     this.deletedThreads.delete(id);
+    this.conversationCache.touch(id);
     const generation = ++this.selectionGeneration;
     this.patch({ selected: id, error: "" });
     await this.modelSettings.select(id);
     if (generation !== this.selectionGeneration) return;
-    if (this.state.conversations[id]?.activeTurn) { this.readState.markRead(id); return; }
-    try {
-      const { thread } = await guiApi.request<{ thread: Thread }>({ operation: "read", threadId: id });
-      if (generation !== this.selectionGeneration || this.state.conversations[id]?.activeTurn) return;
-      this.patch({ conversations: { ...this.state.conversations,
-        [id]: conversation(thread, this.state.conversations[id]) } });
-      this.readState.markRead(id);
-      this.patch(this.state.approvals.reduce(trackProcessingApproval, this.state));
-      void this.goals.load(id);
-      if (!this.state.archived) void this.queue.flush(id);
-    } catch (error) { if (generation === this.selectionGeneration) this.report(error); }
+    try { await this.history.select(id, () => generation === this.selectionGeneration); }
+    catch (error) { if (generation === this.selectionGeneration) this.report(error); }
   };
 
   forkConversation = (threadId: string, turnId?: string): Promise<boolean> => forkGuiConversation({
@@ -300,27 +305,9 @@ export class GuiController {
 
   /** Load the phone's conversation without changing the conversation selected on the PC. */
   loadRemoteThread = (threadId: string): Promise<void> => {
-    const pending = this.remoteReads.get(threadId);
-    if (pending) return pending;
-    const reading = this.readRemoteThread(threadId).finally(() => {
-      this.remoteReads.delete(threadId); this.remoteTurnEvents.delete(threadId);
-    });
-    this.remoteReads.set(threadId, reading);
-    return reading;
+    this.conversationCache.touch(threadId);
+    return this.history.loadRemote(threadId);
   };
-
-  private async readRemoteThread(threadId: string) {
-    const before = this.state.conversations[threadId];
-    const events: GuiEvent[] = [];
-    this.remoteTurnEvents.set(threadId, events);
-    const { thread } = await guiApi.request<{ thread: Thread }>({ operation: "read", threadId });
-    // Lifecycle events received during the read are newer than its history response.
-    if (this.state.conversations[threadId] === before) {
-      const loaded = { ...this.state,
-        conversations: { ...this.state.conversations, [threadId]: conversation(thread, before) } };
-      this.patch(events.reduce(reduceEvent, loaded));
-    }
-  }
 
   private acceptSentThread(thread: Thread, context: {
     selected: string | null; startedAtMs: number; projectOverride?: string; settings: Settings;
@@ -524,6 +511,7 @@ export class GuiController {
     this.modelCatalog.suspend();
     this.capacityRetry.cancelAll();
     this.disposed = true; this.unlisten?.(); this.unlisten = undefined;
-    clearTimeout(this.streamTimer); this.streamTimer = undefined; this.streamEvents = []; this.listeners.clear();
+    clearTimeout(this.streamTimer); this.streamTimer = undefined; this.streamEvents = [];
+    this.listeners.clear(); this.messageListeners.clear();
   };
 }

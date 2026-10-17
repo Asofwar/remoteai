@@ -124,6 +124,14 @@ export class RemoteQueue {
 
   private async enqueue(controller: GuiController, threadId: string,
     body: Record<string, unknown>, mode: ConnectionMode): Promise<QueueEnqueueResult> {
+    const release = controller.retainConversation(threadId);
+    try { return await this.enqueueRetained({ controller, threadId, body, mode }); }
+    finally { release(); }
+  }
+
+  private async enqueueRetained({ controller, threadId, body, mode }: {
+    controller: GuiController; threadId: string; body: Record<string, unknown>; mode: ConnectionMode;
+  }): Promise<QueueEnqueueResult> {
     const input = messageInput(body, mode);
     const patch = composerPatch(Object.fromEntries(['model', 'effort', 'access']
       .filter((key) => body[key] !== undefined).map((key) => [key, body[key]])));

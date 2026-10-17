@@ -5,7 +5,7 @@ import type { StreamFrame } from '../../../../../../shared/port-mapping/streamPr
 function stream() {
   const sent: StreamFrame[] = [];
   const closed = vi.fn();
-  const socket = new MappingByteStream({ nativeReceive: true, closed,
+  const socket = new MappingByteStream({ reliable: () => true, nativeReceive: true, closed,
     send: async frames => { sent.push(...frames); } });
   return { socket, sent, closed };
 }

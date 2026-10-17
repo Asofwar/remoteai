@@ -9,7 +9,7 @@ const STALL_MS = 30_000;
 const ACK_DELAY_MS = 8;
 const ACK_BYTES = STREAM_WINDOW_BYTES / 4;
 const BATCH_FRAMES = 16;
-interface Pending { frame: Extract<StreamFrame, { type: 'data' }>; sent: number }
+interface Pending { frame: Extract<StreamFrame, { type: 'data' }>; sent?: number }
 
 /** Continuous duplex bytes with bounded credit, ordered delivery, and replay after a transport switch. */
 export class MappingByteStream implements MappingSocket {
@@ -19,13 +19,16 @@ export class MappingByteStream implements MappingSocket {
   private readonly waiters = new Set<() => void>();
   private readonly timer: ReturnType<typeof setInterval>;
   private ackTimer?: ReturnType<typeof setTimeout>;
+  private ackPending = false;
+  private ackSending = false;
+  private transportRevision = 0;
   private acknowledged = 0;
   private sent = 0;
   private lastAck = 0;
   private progress = Date.now();
   private ended = false;
   private endAcknowledged = false;
-  private endSent = 0;
+  private endSent?: number;
   private reading = false;
   private writing = false;
   private pumping = false;
@@ -34,6 +37,8 @@ export class MappingByteStream implements MappingSocket {
 
   constructor(private readonly wire: {
     send: (frames: StreamFrame[]) => Promise<void>; closed: () => void; nativeReceive?: boolean;
+    /** Reliable paths already retransmit packets; only explicit failures or path changes need replay. */
+    reliable: () => boolean;
   }) {
     this.timer = setInterval(() => this.tick(), TICK_MS);
   }
@@ -93,7 +98,7 @@ export class MappingByteStream implements MappingSocket {
         validatePosition(this.sent + count);
         if (!this.pending.size) this.progress = Date.now();
         const frame = { type: 'data' as const, offset: this.sent, data: new Uint8Array(bytes.subarray(offset, offset + count)) };
-        this.pending.set(this.sent, { frame, sent: 0 });
+        this.pending.set(this.sent, { frame });
         this.sent += count; offset += count;
         void this.pump();
       }
@@ -110,8 +115,9 @@ export class MappingByteStream implements MappingSocket {
 
   /** An authenticated path change keeps byte offsets and unacknowledged data intact. */
   retry() {
-    for (const pending of this.pending.values()) pending.sent = 0;
-    this.endSent = 0; this.scheduleAck(); void this.pump();
+    this.transportRevision++;
+    for (const pending of this.pending.values()) pending.sent = undefined;
+    this.endSent = undefined; this.scheduleAck(); void this.pump();
   }
 
   close() {
@@ -135,18 +141,45 @@ export class MappingByteStream implements MappingSocket {
   }
 
   private scheduleAck() {
+    this.ackPending = true;
     const incoming = this.wire.nativeReceive ? this.nativeIncoming : this.incoming;
     if (incoming.consumed - this.lastAck >= ACK_BYTES || incoming.eof) { this.sendAck(); return; }
     this.ackTimer ??= setTimeout(() => this.sendAck(), ACK_DELAY_MS);
   }
   private sendAck() {
     clearTimeout(this.ackTimer); this.ackTimer = undefined;
-    if (this.error) return;
+    if (this.error || this.ackSending) return;
     const incoming = this.wire.nativeReceive ? this.nativeIncoming : this.incoming;
     this.lastAck = incoming.consumed;
-    void this.wire.send([{ type: 'ack', offset: this.lastAck, eof: incoming.eof }]).catch(() => {
-      // A retransmitted data/end frame or a new path prompts another cumulative acknowledgement.
+    this.ackPending = false; this.ackSending = true;
+    void this.wire.send([{ type: 'ack', offset: this.lastAck, eof: incoming.eof }]).then(() => {
+      this.ackSending = false;
+      if (this.ackPending) this.scheduleAck();
+    }, () => {
+      // Reliable payloads are not replayed just to solicit another ACK. Retry failed credit independently.
+      this.ackSending = false; this.ackPending = true;
     });
+  }
+
+  private isSendDue(sent: number | undefined) {
+    return sent === undefined || !this.wire.reliable() && Date.now() - sent >= RETRY_MS;
+  }
+
+  private async sendBatch(batch: Pending[]) {
+    const revision = this.transportRevision;
+    for (const value of batch) value.sent = undefined;
+    await this.wire.send(batch.map(value => value.frame));
+    // Queueing time is not packet loss. A concurrent path change must still replay these bytes.
+    if (revision !== this.transportRevision) return;
+    const sent = Date.now();
+    for (const value of batch) value.sent = sent;
+  }
+
+  private async sendEnd() {
+    if (!this.ended || this.endAcknowledged || !this.isSendDue(this.endSent)) return;
+    const revision = this.transportRevision;
+    this.endSent = undefined; await this.wire.send([{ type: 'end', offset: this.sent }]);
+    if (revision === this.transportRevision) this.endSent = Date.now();
   }
 
   private async pump() {
@@ -155,16 +188,14 @@ export class MappingByteStream implements MappingSocket {
     try {
       for (;;) {
         this.check();
-        const now = Date.now();
-        const batch = [...this.pending.values()].filter(value => !value.sent || now - value.sent >= RETRY_MS)
+        const pending = [...this.pending.values()];
+        const unsent = pending.filter(value => value.sent === undefined);
+        const batch = (unsent.length ? unsent : pending.filter(value => this.isSendDue(value.sent)))
           .slice(0, BATCH_FRAMES);
         if (!batch.length) break;
-        for (const value of batch) value.sent = now;
-        await this.wire.send(batch.map(value => value.frame));
+        await this.sendBatch(batch);
       }
-      if (this.ended && !this.endAcknowledged && (!this.endSent || Date.now() - this.endSent >= RETRY_MS)) {
-        this.endSent = Date.now(); await this.wire.send([{ type: 'end', offset: this.sent }]);
-      }
+      await this.sendEnd();
     } catch { /* Retain the bounded window until the next path/retry or stall deadline. */ }
     finally { this.pumping = false; }
   }
@@ -173,6 +204,7 @@ export class MappingByteStream implements MappingSocket {
     if ((this.pending.size || this.ended && !this.endAcknowledged) && Date.now() - this.progress >= STALL_MS) {
       this.close(); return;
     }
+    if (this.ackPending) this.sendAck();
     void this.pump();
   }
   private stop(error: Error) {

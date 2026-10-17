@@ -43,6 +43,7 @@ export class MappingStreamMux {
       send: frames => this.send(id, frames),
       closed: () => { this.streams.delete(id); closed(); },
       nativeReceive,
+      reliable: () => this.options.transport.path === 'relay',
     });
     this.streams.set(id, stream);
     return stream;

@@ -14,7 +14,7 @@ function cipher(desktop: boolean) {
   });
 }
 
-function fixture() {
+function fixture(latency = 30) {
   const transports: BulkTransport[] = [];
   const receivers: ((bytes: Uint8Array) => void)[] = [];
   const wire: Uint8Array[] = [];
@@ -22,7 +22,7 @@ function fixture() {
   let recordLimit = 16 * 1024;
   for (let side = 0; side < 2; side++) {
     transports.push(new BulkTransport({ available: () => true, send: async bytes => {
-      wire.push(bytes); setTimeout(() => transports[1 - side].receive(bytes, 'relay'), 30);
+      wire.push(bytes); setTimeout(() => transports[1 - side].receive(bytes, 'relay'), latency);
     } }));
     const channel: BinaryChannel = {
       get maxRecordBytes() { return recordLimit; },
@@ -48,6 +48,24 @@ async function collect(stream: MappingByteStream) {
     if (result.eof) return Buffer.concat(parts);
   }
 }
+
+it('sends relay payloads once when delivery and consumption exceed the UDP retry interval', async () => {
+  vi.useFakeTimers();
+  const connection = fixture(1000);
+  connection.switchPath();
+  const body = Buffer.alloc(128 * 1024, 19);
+  const sending = connection.streams[0].write(body).then(() => connection.streams[0].end());
+  try {
+    await vi.advanceTimersByTimeAsync(3000);
+    const payloadRecords = connection.wire.filter(record => record.length > 100).length;
+    expect(payloadRecords).toBe(9);
+    const received = collect(connection.streams[1]);
+    await vi.advanceTimersByTimeAsync(1200);
+    expect((await received).equals(body)).toBe(true);
+    await sending;
+    expect(connection.wire.filter(record => record.length > 100)).toHaveLength(payloadRecords);
+  } finally { connection.close(); }
+});
 
 it('carries encrypted streaming bytes across P2P to relay without reopening the TCP stream', async () => {
   vi.useFakeTimers();

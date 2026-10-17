@@ -10,7 +10,7 @@ function pair(latency = 30) {
   const sent: { from: number; frame: StreamFrame }[] = [];
   const streams: MappingByteStream[] = [];
   for (let from = 0; from < 2; from++) {
-    streams.push(new MappingByteStream({ closed() {}, send: async frames => {
+    streams.push(new MappingByteStream({ reliable: () => false, closed() {}, send: async frames => {
       for (const frame of frames) {
         sent.push({ from, frame });
         if (!drop) setTimeout(() => streams[1 - from].receive(decodeStreamFrame(encodeStreamFrame(frame))), latency);
@@ -90,7 +90,7 @@ it('recovers unacknowledged bytes after a path switch without delivering duplica
 });
 
 it('reassembles reordered data and EOF, rejects oversized credit, and releases pending callers on close', async () => {
-  const stream = new MappingByteStream({ send: async () => {}, closed: vi.fn() });
+  const stream = new MappingByteStream({ reliable: () => false, send: async () => {}, closed: vi.fn() });
   try {
     stream.receive({ type: 'data', offset: 3, data: Buffer.from('def') });
     stream.receive({ type: 'end', offset: 6 });
@@ -101,7 +101,7 @@ it('reassembles reordered data and EOF, rejects oversized credit, and releases p
     stream.receive({ type: 'ack', offset: 100, eof: false });
     await expect(stream.read()).rejects.toThrow('closed');
   } finally { stream.close(); }
-  const idle = new MappingByteStream({ send: async () => {}, closed() {} });
+  const idle = new MappingByteStream({ reliable: () => false, send: async () => {}, closed() {} });
   const waiting = expect(idle.read()).rejects.toThrow('closed');
   idle.close(); await waiting;
 });

@@ -1,14 +1,42 @@
 import { test, expect, type Page } from '@playwright/test';
-const suggestion = '按照这个方案开始实现，先检查现有项目结构和相关测试，然后逐步完成修改';
-async function open(page: Page, options: { dark?: boolean; wait?: Promise<void> } = {}) {
+import samples from '../../../shared/chat/promptSuggestionFixture.json' with { type: 'json' };
+const suggestion = samples.wrapped;
+async function open(page: Page, options: { dark?: boolean; wait?: Promise<void>; text?: string } = {}) {
   const requests: unknown[] = [];
   await page.route('**/test-suggestion', async route => {
     requests.push(route.request().postDataJSON());
     await options.wait;
-    await route.fulfill({ json: { suggestion } });
+    await route.fulfill({ json: { suggestion: options.text ?? suggestion } });
   });
   await page.goto('e2e/composer-suggestion-harness.html' + (options.dark ? '?dark' : ''));
   return requests;
+}
+for (const [name, text] of Object.entries(samples)) {
+  test(`keeps every preview character inside the text column: ${name}`, async ({ page }, info) => {
+    if (info.project.use.hasTouch) await page.setViewportSize({ width: 320, height: 844 });
+    await open(page, { text });
+    const accept = page.getByRole('button', { name: '填入建议', exact: true });
+    await expect(accept.locator('span')).toHaveText(text);
+    const clipped = await accept.evaluate(button => {
+      const span = button.querySelector('span')!;
+      const bounds = span.getBoundingClientRect();
+      const hint = button.querySelector('small')!.getBoundingClientRect();
+      const node = span.firstChild!;
+      const range = document.createRange();
+      return Array.from({ length: node.textContent!.length }, (_, index) => {
+        range.setStart(node, index); range.setEnd(node, index + 1);
+        const rect = range.getBoundingClientRect();
+        return rect.left < bounds.left - 1 || rect.right > bounds.right + 1
+          || rect.top < bounds.top - 1 || rect.bottom > bounds.bottom + 1 || rect.right > hint.left;
+      }).some(Boolean);
+    });
+    expect(clipped).toBe(false);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(page.viewportSize()!.width);
+    await page.screenshot({ path: info.outputPath(`${name}.png`) });
+    await accept.click();
+    await expect(page.getByRole('textbox', { name: '聊天消息' })).toHaveValue(text);
+    await expect(page.getByLabel('已发送')).toHaveText('');
+  });
 }
 for (const dark of [false, true]) test('fills a wrapped suggestion only after acceptance: ' + dark,
   async ({ page }, info) => {

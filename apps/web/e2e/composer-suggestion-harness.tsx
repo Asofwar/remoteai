@@ -6,6 +6,7 @@ import { initialChatState } from '../../../shared/remote-chat/client/types';
 import { remotePromptSuggestion } from '../../../shared/remote-chat/client/promptSuggestion';
 import { testModels } from '../../desktop/src/pages/codexGui/testModels';
 import { setThemeMode } from '../src/theme/preference';
+import samples from '../../../shared/chat/promptSuggestionFixture.json';
 import 'antd-mobile/es/global';
 import '../src/styles.css';
 
@@ -17,6 +18,8 @@ const state = { ...initialChatState(), ready: true, models: testModels,
       { id: 'answer', type: 'agentMessage', phase: 'final_answer', text: '方案已准备好' },
     ] }] } };
 const suggestions = remotePromptSuggestion(state, async target => {
+  const sample = new URLSearchParams(location.search).get('sample') as keyof typeof samples | null;
+  if (sample && Object.hasOwn(samples, sample)) return { suggestion: samples[sample] };
   const response = await fetch('/web/test-suggestion', { method: 'POST', body: JSON.stringify(target) });
   if (!response.ok) throw new Error('Prediction unavailable');
   return response.json();

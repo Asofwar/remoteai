@@ -27,8 +27,8 @@ it('accepts a native tap once into a draft without a send action', () => {
 });
 it('keeps the native suggestion translucent, wrapping, and within a 400px touch target', () => {
   const button = ComposerSuggestion({ text: prediction.text, accept: vi.fn() })!;
-  expect(button.props.style).toMatchObject({ maxWidth: '100%', width: 400, minHeight: 44 });
-  expect(button.props.children[0].props.style[0]).toMatchObject({ opacity: 0.5, flexShrink: 1 });
+  expect(button.props.style).toMatchObject({ width: '100%', maxWidth: 400, minHeight: 44 });
+  expect(button.props.children[0].props.style[0]).toMatchObject({ opacity: 0.5, flex: 1, minWidth: 0 });
   expect(ComposerSuggestion({ text: '', accept: vi.fn() })).toBeNull();
 });
 it('discards acceptance immediately when native text entry starts', () => {

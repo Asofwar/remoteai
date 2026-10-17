@@ -14,8 +14,9 @@ export function ComposerSuggestion({ text, accept }: { text: string; accept: () 
 }
 const styles = StyleSheet.create({
   button: { flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'flex-start',
-    maxWidth: '100%', width: 400, minHeight: 44, paddingVertical: 6, paddingHorizontal: 8 },
-  text: { flexShrink: 1, fontSize: 16, lineHeight: 23, opacity: 0.5 },
+    width: '100%', maxWidth: 400, flexShrink: 0, minHeight: 44, paddingVertical: 6, paddingHorizontal: 8 },
+  // Give Android a bounded text column before it measures wrapping beside the hint.
+  text: { flex: 1, minWidth: 0, fontSize: 16, lineHeight: 23, opacity: 0.5 },
   hint: { flexShrink: 0, fontSize: 12, lineHeight: 18, opacity: 0.7, borderWidth: 1,
     borderRadius: 5, paddingVertical: 1, paddingHorizontal: 5 },
 });

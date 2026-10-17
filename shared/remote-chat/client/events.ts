@@ -28,6 +28,8 @@ export function updateThread(thread: Thread, event: GuiEvent): Thread {
   if (!id) return thread;
   const turns = [...(thread.turns ?? [])];
   const index = turns.findIndex((turn) => turn.id === id);
+  // A delayed error for unloaded history must not create a new active turn at the end of the conversation.
+  if (index < 0 && method === 'error') return thread;
   let turn: Turn = turns[index] ?? { id, status: 'inProgress', items: [] };
   if (params.turn) turn = { ...turn, ...params.turn, items: mergeItems(turn.items, params.turn.items ?? []) };
   if (method === MESSAGE_ACKNOWLEDGED) turn = acknowledgeMessage(turn, event);

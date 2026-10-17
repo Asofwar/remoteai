@@ -26,6 +26,7 @@ test.beforeEach(({}, info) => test.skip(info.project.name !== 'desktop'
   && !info.title.startsWith('preserves reading and typing')
   && !info.title.startsWith('shows conversation references')
   && !info.title.startsWith('clears obsolete running status')
+  && !info.title.startsWith('keeps processing with the latest turn')
   && !info.title.startsWith('hides automatic retry'), 'PC message presentation'));
 
 test('clears obsolete running status after the PC confirms a finished reply', async ({ page }, info) => {
@@ -43,6 +44,40 @@ test('clears obsolete running status after the PC confirms a finished reply', as
   await expect(page.getByText('测试成功', { exact: true })).toBeVisible();
   await expect(page.getByRole('textbox', { name: '消息', exact: true })).toBeEnabled();
   await screenshot(page, info, 'history-completion-recovered');
+});
+
+test('keeps processing with the latest turn when earlier history still says running', async ({ page }, info) => {
+  const value = fixture([{ ...command, status: 'completed' }], true);
+  const old = value.turns![0];
+  old.startedAt = Date.now() / 1000 - 3600;
+  old.diff = 'diff --git a/old.txt b/old.txt\n--- a/old.txt\n+++ b/old.txt\n@@ -1 +1 @@\n-old\n+new';
+  const latest = { id: 'latest', status: 'inProgress', startedAt: Date.now() / 1000 - 5, items: [
+    { id: 'continue', type: 'userMessage', text: CONTINUE_MESSAGE },
+    { ...command, id: 'latest-command', status: 'completed', command: 'echo continued' },
+  ], diff: '' };
+  value.turns!.push(latest);
+  await open(page, value);
+  const processing = page.locator('.chat-processing-status');
+  const lastMessage = page.locator('[data-message-id="latest-command"]');
+  await expect(processing).toHaveCount(1);
+  await expect(processing).toBeInViewport();
+  await expect(processing).toContainText(/共计\d+秒/);
+  expect((await processing.boundingBox())!.y).toBeGreaterThan((await lastMessage.boundingBox())!.y);
+  await screenshot(page, info, 'continued-turn-processing');
+  latest.diff = old.diff.replaceAll('old.txt', 'latest.txt');
+  await update(page, value);
+  const summary = page.locator('[data-message-id="latest:summary"]');
+  await expect(summary).toBeVisible();
+  await expect(processing).toHaveCount(1);
+  expect((await processing.boundingBox())!.y).toBeGreaterThan((await lastMessage.boundingBox())!.y);
+  expect((await processing.boundingBox())!.y).toBeLessThan((await summary.boundingBox())!.y);
+  await page.reload();
+  await expect(processing).toBeInViewport();
+  expect((await processing.boundingBox())!.y).toBeGreaterThan((await lastMessage.boundingBox())!.y);
+  latest.status = 'completed';
+  await update(page, value);
+  await expect(processing).toHaveCount(0);
+  await expect(page.locator('[data-message-id="turn:summary"]')).toBeVisible();
 });
 
 test('shows conversation references during send, after reload and without message text', async ({ page }, info) => {

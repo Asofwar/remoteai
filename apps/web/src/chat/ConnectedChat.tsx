@@ -13,6 +13,7 @@ import type { NativeFileDrop } from './composerProps';
 import { queueProps } from '../../../../shared/remote-chat/client/queueProps';
 import { ChatMessages, type RenderUserMessage } from './ChatMessages';
 import { ChatProcessing } from './ChatProcessing';
+import { currentRunningTurn } from '../../../../shared/chat/runningTurn';
 import { ChatImageContext } from './ChatImage';
 import { ChatFileContext } from './ChatFileLink';
 import { ChatThreads } from './ChatThreads';
@@ -82,7 +83,7 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
   const error = visibleChatError(state.error);
   const cwd = state.selected?.cwd ?? state.draftProject?.cwd ?? '';
   const catalog = useChatCatalog(controller, cwd, ready);
-  const runningTurn = state.selected?.turns?.find((turn) => turn.status === 'inProgress');
+  const runningTurn = currentRunningTurn(state.selected?.turns);
   const running = Boolean(runningTurn);
   const approvals = state.approvals.filter((event) => event.params.threadId === state.selected?.id);
   const newChat = (project?: ChatProject) => { if (!state.sending) { controller.back(project); setDrawer(false); } };

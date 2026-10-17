@@ -9,6 +9,7 @@ import { ConversationChangesButton } from '../../desktop/src/pages/codexGui/Conv
 import { useDesktopLayout } from '../src/useDesktopLayout';
 import type { Thread } from '../src/chat/types';
 import { mergeHistory } from '../../../shared/remote-chat/client/history';
+import { currentRunningTurn } from '../../../shared/chat/runningTurn';
 import '../src/styles.css';
 import '../src/chat/chat.css';
 
@@ -19,7 +20,7 @@ function Harness() {
   const [thread, setThread] = useState<Thread | null>(null);
   const [hasMore, setHasMore] = useState(new URLSearchParams(location.search).has('history'));
   const [loadingMore, setLoadingMore] = useState(false);
-  const runningTurn = thread?.turns?.find(turn => turn.status === 'inProgress');
+  const runningTurn = currentRunningTurn(thread?.turns);
   const loadOlder = async () => {
     setLoadingMore(true);
     try {

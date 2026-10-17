@@ -14,6 +14,7 @@ import { ChatTurnDetails } from './ChatTurnDetails';
 import { findWorkEntry } from './turnPresentation';
 import { activityTimeline, findActivityEntry, latestActivity, type TimelineEntry as Entry } from './activityTimeline';
 import { useConversationEntries } from './useConversationEntries';
+import { currentRunningTurn } from '../../../../shared/chat/runningTurn';
 import type { ChatMessagesProps } from '../../../../shared/remote-chat/client/messageProps';
 import { palette, useStyles } from './styles';
 
@@ -68,7 +69,8 @@ export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder,
     ? { ...turn, status: 'cached' } : turn), [thread?.turns, offline]);
   const { entries, hasObservedLiveTurn, setInline } = useConversationEntries(turns);
   const timeline = useMemo(() => activityTimeline(entries), [entries]);
-  const runningSummary = timeline.find(entry => entry.kind === 'summary' && entry.turn.status === 'inProgress');
+  const runningTurn = currentRunningTurn(turns);
+  const runningSummary = timeline.find(entry => entry.kind === 'summary' && entry.turn.id === runningTurn?.id);
   const { list, more, preservePosition, historyBottomSpace, initializing, onItemLayout, onFooterLayout,
     showScrollToBottom, scrollToBottom, ...scrollHandlers }
     = useChatScroll<Entry>({ hasMore, loading, loadingMore, loadOlder,

@@ -1,10 +1,11 @@
 import { processingApproval, restoreProcessing, trackProcessing } from '../../../apps/desktop/src/pages/codexGui/processing';
 import type { ChatState, GuiEvent } from './types';
+import { currentRunningTurn } from '../../chat/runningTurn';
 
 /** Share the desktop activity ordering and phase clock across mobile clients. */
 export function syncChatProcessing(state: ChatState, previous: ChatState, event?: GuiEvent): ChatState {
   const thread = state.selected;
-  const turn = thread?.turns?.find((entry) => entry.status === 'inProgress');
+  const turn = currentRunningTurn(thread?.turns);
   if (!thread || !turn || event?.method === 'connection/closed' || event?.method === 'codex/disconnected') {
     return { ...state, processing: undefined };
   }

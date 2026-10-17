@@ -83,6 +83,31 @@ it('preserves pending confirmation timing across refreshed snapshots', () => {
   expect(state.processing).toMatchObject({ phase: 'approval', startedAtMs: 100_000 });
 });
 
+it('tracks a continued turn instead of an earlier turn with a stale running status', () => {
+  let state = item(start(), 'old-command', 'commandExecution');
+  vi.advanceTimersByTime(5000);
+  state = applyChatEvent(state, event('turn/started', { turnId: 'continued',
+    turn: { id: 'continued', status: 'inProgress', startedAt: 105, items: [] } }));
+  expect(state.processing).toMatchObject({ turnId: 'continued', phase: 'request', startedAtMs: 105_000 });
+  vi.advanceTimersByTime(2000);
+  state = applyChatEvent(state, event('item/started', { turnId: 'continued',
+    item: { id: 'new-command', type: 'commandExecution', status: 'inProgress' } }));
+  expect(state.processing).toMatchObject({ turnId: 'continued', phase: 'command', startedAtMs: 107_000 });
+  const current = state.processing;
+  state = applyChatEvent(state, event('item/commandExecution/outputDelta', { itemId: 'old-command', delta: 'late' }));
+  expect(state.processing).toEqual(current);
+  state = applyChatEvent(state, event('turn/completed', { turnId: 'continued',
+    turn: { id: 'continued', status: 'completed', items: [] } }));
+  expect(state.processing).toBeUndefined();
+});
+
+it.each(['completed', 'interrupted', 'failed'])('ignores stale running history after the latest turn is %s', status => {
+  const previous = start();
+  const selected = { ...previous.selected!, turns: [...previous.selected!.turns!,
+    { id: 'latest', status, items: [] }] };
+  expect(syncChatProcessing({ ...previous, selected }, previous).processing).toBeUndefined();
+});
+
 it('ignores other threads and old turns, and clears status on completion, disconnect or selection change', () => {
   const state = item(start(), 'command', 'commandExecution');
   for (const params of [{ threadId: 'other' }, { turnId: 'old' }]) {

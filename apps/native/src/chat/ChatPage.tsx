@@ -17,6 +17,7 @@ import { queueProps } from '../../../../shared/remote-chat/client/queueProps';
 import { ChatMessages } from './ChatMessages';
 import { ChatQuotesProvider } from './ChatQuotes';
 import { ChatProcessing } from './ChatProcessing';
+import { currentRunningTurn } from '../../../../shared/chat/runningTurn';
 import { ChatImageContext } from './ChatImage';
 import { ChatImagePreviewProvider } from './ChatImagePreview';
 import { ChatFileProvider } from './ChatFilePreview';
@@ -111,7 +112,7 @@ function ConnectedChat({ session, device, devices, selected, active: pageActive,
   }, [notification]);
   const ready = state.ready;
   const error = visibleChatError(state.error);
-  const runningTurn = ready ? state.selected?.turns?.find((turn) => turn.status === 'inProgress') : undefined;
+  const runningTurn = ready ? currentRunningTurn(state.selected?.turns) : undefined;
   const running = Boolean(runningTurn);
   const openDrawer = useCallback(() => { Keyboard.dismiss(); setDrawer(true); drawerRef.current?.openDrawer(); }, []);
   const drawerSwipeHandlers = useChatDrawerSwipe(active && !drawer && !pickingDevice, openDrawer);

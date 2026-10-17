@@ -167,6 +167,26 @@ it('shows progress instead of the empty welcome and removes it when the reply co
   expect(completed.ListFooterComponent.props.children).toBeUndefined();
 });
 
+it.each([false, true])('keeps progress with the latest turn when its summary is %s', (hasSummary) => {
+  const processing = <span>等待响应</span>;
+  const old: Turn = { id: 'old', status: 'inProgress', items: [command('old-command')],
+    plan: [{ step: 'Earlier task', status: 'completed' }] };
+  const latest: Turn = { id: 'latest', status: 'inProgress', items: [
+    { id: 'continue', type: 'userMessage', text: CONTINUE_MESSAGE }, command('latest-command'),
+  ], plan: hasSummary ? [{ step: 'Continued task', status: 'inProgress' }] : undefined };
+  const tree = ChatMessages({ thread: { id: 'thread', cwd: '', preview: '', updatedAt: 0,
+    turns: [old, latest] }, processing });
+  const list = element<ListProps>(tree, 'FlatList').props;
+  const progressRows = list.data.filter(entry => {
+    const cell = list.renderItem({ item: entry }) as ReactElement<{ children: ReactElement }>;
+    const row = cell.props.children;
+    const component = row.type as (props: unknown) => ReactElement;
+    return Boolean(findElement(component(row.props), 'span'));
+  });
+  expect(progressRows.map(entry => entry.id)).toEqual(hasSummary ? ['latest:summary'] : []);
+  expect(list.ListFooterComponent.props.children).toBe(hasSummary ? null : processing);
+});
+
 function activityRow(tree: ReactNode): ActivityProps {
   const list = element<ListProps>(tree, 'FlatList').props;
   const group = list.data.find(entry => entry.kind === 'activities');

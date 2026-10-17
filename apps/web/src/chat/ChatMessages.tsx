@@ -4,6 +4,7 @@ import { ArrowDown, ChevronDown, ChevronRight, Terminal } from 'lucide-react';
 import type { ChatMessagesProps } from '../../../../shared/remote-chat/client/messageProps';
 import { useHistoryLoadNotice } from '../../../../shared/remote-chat/useHistoryLoadNotice';
 import { useConversationEntries } from '../../../../shared/chat/useConversationEntries';
+import { currentRunningTurn } from '../../../../shared/chat/runningTurn';
 import { findWorkEntry, type WorkEntry } from '../../../../shared/chat/turnPresentation';
 import { activityTimeline, findActivityEntry, latestActivity, type TimelineEntry as Entry }
   from '../../../../shared/chat/activityTimeline';
@@ -98,7 +99,8 @@ export function ChatMessages(props: ChatMessagesProps & {
     ? { ...turn, status: 'cached' } : turn), [thread?.turns, offline]);
   const { entries, setInline } = useConversationEntries(turns);
   const timeline = useMemo(() => activityTimeline(desktop ? desktopTimeline(entries) : entries), [desktop, entries]);
-  const runningSummary = timeline.find(entry => entry.kind === 'summary' && entry.turn.status === 'inProgress');
+  const runningTurn = currentRunningTurn(turns);
+  const runningSummary = timeline.find(entry => entry.kind === 'summary' && entry.turn.id === runningTurn?.id);
   const scroll = useHistoryScroll(props);
   const [selection, setSelection] = useState<Selection | null>(null);
   // Dismiss the previous layout's sheets before switching to inline work and docked reviews.

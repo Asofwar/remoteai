@@ -204,6 +204,40 @@ it('queues on the PC without steering or changing its selection, then sends afte
   expect(updates).toHaveBeenCalled();
 });
 
+it.each(['completed', 'inProgress'])('ignores an older unfinished turn when the latest turn is %s', async status => {
+  thread.turns = [{ id: 'abandoned', status: 'inProgress', items: [] },
+    { id: 'live', status, items: [] }];
+  await queue.request(input);
+  if (status === 'inProgress') {
+    expect(controller.getSnapshot().conversations.phone.activeTurn).toBe('live');
+    expect(queue.read().threads.phone).toHaveLength(1);
+    expect(guiApi.request).not.toHaveBeenCalledWith(expect.objectContaining({ operation: 'sendBatch' }));
+    thread.turns[1].status = 'completed';
+    receive({ method: 'turn/completed', params: { threadId: thread.id, turn: thread.turns[1] } });
+  }
+  await vi.waitFor(() => expect(queue.read().threads.phone).toBeUndefined());
+  expect(vi.mocked(guiApi.request).mock.calls.filter(([request]) => request.operation === 'sendBatch')).toHaveLength(1);
+  expect(controller.getSnapshot().conversations.phone.activeTurn).toBe('next');
+  expect(thread.turns[0].status).toBe('inProgress');
+});
+
+it('automatically sends a restored queue after resuming history with an older unfinished turn', async () => {
+  controller.dispose();
+  thread.turns = [{ id: 'abandoned', status: 'inProgress', items: [] },
+    { id: 'latest', status: 'completed', items: [] }];
+  controller = new GuiController({
+    read: async () => ({ revision: 1, threads: { phone: [{
+      id: 'saved-message', text: 'check udp', images: [], skills: [],
+      model: 'phone-model', effort: 'high', access: 'read-only',
+    }] } }),
+    save: async snapshot => ({ ...snapshot, revision: snapshot.revision + 1 }),
+  });
+  await controller.connect();
+  await vi.waitFor(() => expect(queue.read().threads.phone).toBeUndefined());
+  expect(guiApi.request).toHaveBeenCalledWith(expect.objectContaining({ operation: 'sendBatch',
+    messages: [{ text: 'check udp', images: [], skills: [] }] }));
+});
+
 it('sends only the chosen message now, retaining other PC and phone messages', async () => {
   await queue.request(input);
   controller.queue.enqueue('phone', { text: 'PC message', images: [], skills: [] });

@@ -6,6 +6,7 @@ import { restoreProcessing, trackProcessing } from "./processing";
 import { trackProcessingApproval } from "./processingApprovals";
 import { mergeMessageItems } from "./sentMessages";
 import { recordRequestError, restoreRequestErrors } from "./turnRequestErrors";
+import { currentRunningTurn } from "../../../../../shared/chat/runningTurn";
 
 export function conversation(thread: Thread, previous?: Conversation): Conversation {
   const previousTurns = new Map(previous?.turns.map((turn) => [turn.id, turn]));
@@ -20,7 +21,7 @@ export function conversation(thread: Thread, previous?: Conversation): Conversat
       items: mergeMessageItems(previousTurn?.items ?? [],
         restoreModelChanges(turn.items ?? [], cached.get(turn.id)?.modelChanges)) }, previousTurn);
   });
-  const active = turns.find((turn) => turn.status === "inProgress");
+  const active = currentRunningTurn(turns);
   return { thread, turns, activeTurn: active?.id ?? null,
     ...(active ? { processing: restoreProcessing(active, previous?.processing) } : {}),
     tokens: previous?.tokens ?? thread.tokenUsage?.total.totalTokens ?? 0,

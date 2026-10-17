@@ -32,6 +32,18 @@ it('does not hide connection failures or resend a failed queued message through 
   expect(request).toHaveBeenCalledExactlyOnceWith({ operation: 'queueEnqueue', threadId: thread.id, ...input });
 });
 
+it.each(['completed', 'inProgress'])('uses only the latest turn when sending to an older PC (%s)', async status => {
+  const request = vi.fn().mockRejectedValueOnce(unsupported).mockResolvedValue({});
+  const queue = new QueueConnection(request);
+  await queue.read();
+  const selected = { ...thread, turns: [{ id: 'abandoned', status: 'inProgress', items: [] },
+    { id: 'latest', status, items: [] }] };
+  await queue.enqueue(selected, input);
+  expect(request).not.toHaveBeenCalledWith(expect.objectContaining({ turnId: 'abandoned' }));
+  expect(request).toHaveBeenLastCalledWith(expect.objectContaining(status === 'inProgress'
+    ? { operation: 'steer', turnId: 'latest' } : { operation: 'send' }));
+});
+
 it('discards a late unsupported response after reconnecting to a queue-capable PC', async () => {
   let reject!: (reason: Error) => void;
   const request = vi.fn().mockImplementationOnce(() => new Promise((_, fail) => { reject = fail; }))

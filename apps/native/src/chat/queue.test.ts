@@ -2,6 +2,20 @@ import { expect, it, vi } from 'vitest';
 import { ChatController } from '../../../../shared/remote-chat/client/controller';
 import type { ConnectionEvents } from '../../../../shared/remote-chat/client/connection';
 import { QUEUE_EVENT, type QueueSnapshot } from '../../../../shared/remote-chat/queue';
+import { queueProps } from '../../../../shared/remote-chat/client/queueProps';
+import { initialChatState } from '../../../../shared/remote-chat/client/types';
+
+it.each(['completed', 'inProgress'])('matches native and web queue controls to the latest turn (%s)', status => {
+  const controller = new ChatController(() => ({ request: vi.fn(), start() {}, stop() {} }));
+  const state = { ...initialChatState(), ready: true, selected: {
+    id: 'chat', cwd: '', preview: '', updatedAt: 1,
+    turns: [{ id: 'abandoned', status: 'inProgress', items: [] }, { id: 'latest', status, items: [] }],
+  } };
+  const props = queueProps(state, controller);
+  expect(props.running).toBe(status === 'inProgress');
+  expect(props.disabled).toBe(false);
+  controller.stop();
+});
 
 it('uses PC snapshots for reconnects, ignores old responses and prevents duplicate queue actions', async () => {
   let events!: ConnectionEvents;

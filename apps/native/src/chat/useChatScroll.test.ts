@@ -47,7 +47,8 @@ beforeEach(() => {
 });
 afterEach(() => { hooks.cleanups.forEach(cleanup => cleanup()); vi.unstubAllGlobals(); });
 
-function render(options: { latestItemId?: string; loading?: boolean } = { latestItemId: 'last' }) {
+function render(options: { latestItemId?: string; loading?: boolean; loadOlder?: () => Promise<void>;
+  hasMore?: boolean; loadingMore?: boolean } = { latestItemId: 'last' }) {
   hooks.slot = 0;
   const scroll = useChatScroll<{ id: string }>({ ...options, bottomPadding: 16 });
   hooks.effects.splice(0).forEach(effect => effect());
@@ -93,6 +94,56 @@ it('reveals long history after two native bottom adjustments within the normal t
   const ready = render();
   expect(ready.initializing).toBe(false);
   expect(ready.scrollEventThrottle).toBe(100);
+});
+
+function touch(x: number, y: number, touches = 1): Parameters<Scroll['onTouchStart']>[0] {
+  return { nativeEvent: { pageX: x, pageY: y, touches: Array(touches).fill({}) } } as
+    Parameters<Scroll['onTouchStart']>[0];
+}
+
+it('loads short history once per downward pull without requiring a refresh control', async () => {
+  const loadOlder = vi.fn(async () => {});
+  const scroll = render({ latestItemId: 'last', loadOlder });
+  scroll.onTouchStart(touch(20, 20));
+  scroll.onTouchMove(touch(20, 45));
+  expect(loadOlder).not.toHaveBeenCalled();
+  scroll.onTouchMove(touch(20, 90));
+  await Promise.resolve();
+  scroll.onTouchMove(touch(20, 180));
+  scroll.onTouchEnd();
+  expect(loadOlder).toHaveBeenCalledOnce();
+});
+
+it('ignores sideways, upward, cancelled, multitouch and non-top pulls', () => {
+  const loadOlder = vi.fn(async () => {});
+  const scroll = render({ latestItemId: 'last', loadOlder });
+  for (const move of [touch(100, 100), touch(20, 10), touch(20, 100, 2)]) {
+    scroll.onTouchStart(touch(20, 20));
+    scroll.onTouchMove(move);
+    scroll.onTouchEnd();
+  }
+  scroll.onTouchStart(touch(20, 20));
+  scroll.onTouchCancel();
+  scroll.onTouchMove(touch(20, 100));
+  scroll.onScroll(scrollEvent(FIRST_CONTENT_HEIGHT));
+  scroll.onTouchStart(touch(20, 20));
+  scroll.onTouchMove(touch(20, 100));
+  expect(loadOlder).not.toHaveBeenCalled();
+});
+
+it('prevents overlapping pulls and still loads when scrolling lands exactly at the top', async () => {
+  let finish!: () => void;
+  const loadOlder = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
+  const scroll = render({ latestItemId: 'last', loadOlder, hasMore: true });
+  scroll.onScroll(scrollEvent(FIRST_CONTENT_HEIGHT));
+  scroll.onScrollBeginDrag();
+  scroll.onScroll(scrollEvent(FIRST_CONTENT_HEIGHT, FIRST_CONTENT_HEIGHT - VIEWPORT_HEIGHT));
+  expect(loadOlder).toHaveBeenCalledOnce();
+  scroll.onTouchStart(touch(20, 20));
+  scroll.onTouchMove(touch(20, 100));
+  expect(loadOlder).toHaveBeenCalledOnce();
+  finish();
+  await Promise.resolve();
 });
 
 it('keeps initial events unthrottled until the real latest cell replaces the virtualization spacer', () => {

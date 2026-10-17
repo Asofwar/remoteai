@@ -35,7 +35,8 @@ test('loads short history on upward wheel, prevents overlap and preserves the re
   expect(requests).toBe(0);
   const latest = page.locator('[data-message-id="latest"]');
   await wheel(page, -120);
-  await expect(page.getByRole('status')).toContainText('正在加载聊天记录');
+  await expect(page.getByRole('button', { name: '加载更早的消息' })).toBeDisabled();
+  await expect(page.getByText('正在加载聊天记录…')).toHaveCount(0);
   for (let step = 0; step < 3; step++) await wheel(page, -120);
   expect(requests).toBe(1);
   finish();
@@ -48,7 +49,8 @@ test('loads short history on upward wheel, prevents overlap and preserves the re
   await expect.poll(() => viewport.evaluate(node => node.scrollTop)).toBeGreaterThan(100);
   expect(requests).toBe(1);
   await wheel(page, -10000);
-  await expect(page.getByRole('status')).toContainText('正在加载聊天记录');
+  await expect(page.getByRole('button', { name: '加载更早的消息' })).toBeDisabled();
+  await expect(page.getByText('正在加载聊天记录…')).toHaveCount(0);
   const first = page.locator('[data-message-id="older-1-0"]');
   const top = (await first.boundingBox())!.y;
   finish();

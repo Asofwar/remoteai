@@ -2,6 +2,7 @@ import { t, useLanguage } from '../i18n';
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ArrowDown, ChevronDown, ChevronRight, Terminal } from 'lucide-react';
 import type { ChatMessagesProps } from '../../../../shared/remote-chat/client/messageProps';
+import { useHistoryLoadNotice } from '../../../../shared/remote-chat/useHistoryLoadNotice';
 import { useConversationEntries } from '../../../../shared/chat/useConversationEntries';
 import { findWorkEntry, type WorkEntry } from '../../../../shared/chat/turnPresentation';
 import { activityTimeline, findActivityEntry, latestActivity, type TimelineEntry as Entry }
@@ -92,6 +93,7 @@ export function ChatMessages(props: ChatMessagesProps & {
   useLanguage();
   const desktop = useDesktopLayout();
   const { thread, loading, loadingMore, hasMore, offline } = props;
+  const notice = useHistoryLoadNotice(props.historyLoad?.threadId === thread?.id ? props.historyLoad : undefined);
   const turns = useMemo(() => (thread?.turns ?? []).map(turn => offline && turn.status === 'inProgress'
     ? { ...turn, status: 'cached' } : turn), [thread?.turns, offline]);
   const { entries, setInline } = useConversationEntries(turns);
@@ -116,9 +118,10 @@ export function ChatMessages(props: ChatMessagesProps & {
         <div ref={scroll.content} className={`chat-message-content${!entries.length ? ' is-empty' : ''}`}
           onClickCapture={desktop ? scroll.pauseFollowing : undefined}>
           {(hasMore || (loading && !entries.length)) && <div className="chat-history-more">
-            {loadingMore || (loading && !entries.length)
+            {loading && !entries.length && !loadingMore
               ? <span role="status" className="chat-processing"><span className="chat-spinner" />{t("正在加载聊天记录…")}</span>
-              : <button type="button" className="chat-text-action" onClick={scroll.more}>{t("加载更早的消息")}</button>}
+              : <button type="button" className="chat-text-action" onClick={scroll.more}
+                disabled={loadingMore}>{t("加载更早的消息")}</button>}
           </div>}
           {timeline.map(entry => <Fragment key={entry.id}>
             {entry === runningSummary && props.processing}
@@ -137,6 +140,9 @@ export function ChatMessages(props: ChatMessagesProps & {
       </div>
       {scroll.showBottom && entries.length > 0 && <button type="button" className="chat-scroll-bottom"
         onClick={scroll.toBottom}><ArrowDown size={17} />{t("回到底部")}</button>}
+      {notice && <div className="chat-history-notice" role="status">
+        {t('已加载 {count} 条历史记录，用时 {seconds} 秒', notice)}
+      </div>}
     </div>
     {work && <AdaptiveSheet open title={work.turn.status === 'inProgress' ? t("正在处理") : t("处理过程")}
       subtitle={t("{value1} 项活动", { value1: work.items.length })} width={760} onClose={close}>

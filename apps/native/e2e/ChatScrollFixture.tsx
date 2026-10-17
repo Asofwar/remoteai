@@ -9,6 +9,7 @@ import { useFonts } from 'expo-font';
 import { ChatMessages } from '../src/chat/ChatMessages';
 import { ChatProcessing } from '../src/chat/ChatProcessing';
 import type { Item, Thread } from '../src/chat/types';
+import { historyLoadResult, type HistoryLoadResult } from '../../../shared/remote-chat/client/historyLoad';
 
 const STREAM_STEPS = 160;
 const STREAM_INTERVAL_MS = 100;
@@ -32,6 +33,7 @@ function App() {
   const [running, setRunning] = useState(false);
   const [older, setOlder] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [historyLoad, setHistoryLoad] = useState<HistoryLoadResult>();
   useEffect(() => {
     if (!running) return;
     const timer = setInterval(() => setStep((value) => Math.min(STREAM_STEPS, value + 1)), STREAM_INTERVAL_MS);
@@ -47,22 +49,27 @@ function App() {
   const thread: Thread = { id: 'scroll-fixture', cwd: '', preview: '', updatedAt: 1,
     turns: [{ id: 'turn', status: 'inProgress', items, ...(mode === 'long' ? { diff: DIFF } : {}) }] };
   const loadOlder = async () => {
+    const startedAt = Date.now();
+    setHistoryLoad(undefined);
     setLoadingMore(true);
     await new Promise((resolve) => setTimeout(resolve, HISTORY_DELAY_MS));
     setOlder(true);
+    const loaded = { ...thread, turns: [{ ...thread.turns![0],
+      items: [...history(older ? 0 : 25, 'older'), ...items] }] };
+    setHistoryLoad(historyLoadResult(thread, loaded, startedAt));
     setLoadingMore(false);
   };
   return <SafeAreaProvider><SafeAreaView style={{ flex: 1, backgroundColor: '#f4f4f4' }}>
     <View style={{ flexDirection: 'row', padding: 14, gap: 12 }}>
       {(['long', 'short', 'plain', 'progress'] as const).map((value) => <Pressable key={value}
         accessibilityRole="button" onPress={() => {
-          setMode(value); setRunning(false); setStep(0); setOlder(false);
+          setMode(value); setRunning(false); setStep(0); setOlder(false); setHistoryLoad(undefined);
         }}><Text>{value}</Text></Pressable>)}
       <Pressable accessibilityRole="button" accessibilityLabel="Start stream"
         onPress={() => { setStep(0); setRunning(true); }}><Text>Start {step}</Text></Pressable>
     </View>
     {fonts && <ChatMessages key={mode} thread={thread} hasMore={mode === 'short' && !older}
-      loadOlder={loadOlder} loadingMore={loadingMore}
+      loadOlder={loadOlder} loadingMore={loadingMore} historyLoad={historyLoad}
       processing={<ChatProcessing turn={thread.turns![0]} active />} />}
     <TextInput accessibilityLabel="Keyboard test" placeholder="Keyboard test"
       style={{ padding: 16, backgroundColor: 'white' }} />

@@ -4,6 +4,7 @@ import type { ChatMessagesProps } from '../../../../shared/remote-chat/client/me
 import { shouldShowScrollToBottom } from '../../../../shared/chat/scrollPosition';
 import type { Item } from './types';
 import { useNativeChatScroll } from './useNativeChatScroll';
+import { useHistoryPull } from './useHistoryPull';
 
 const SCROLL_EDGE_DISTANCE = 100;
 const SCROLL_OFFSET_TOLERANCE = 1;
@@ -137,7 +138,7 @@ export function useChatScroll<Entry extends { id: string } = Item>(
     // Image loads and keyboard resizing also emit scroll events; only a drag changes follow intent.
     if (scrolling.current) {
       updateFollowing(event);
-      if (hasMore && top > 0 && top < position.current && top < SCROLL_EDGE_DISTANCE) void more();
+      if (hasMore && top >= 0 && top < position.current && top < SCROLL_EDGE_DISTANCE) void more();
     }
     updatePosition(event);
   };
@@ -168,7 +169,8 @@ export function useChatScroll<Entry extends { id: string } = Item>(
     presentLatest();
   };
   const beginScroll = () => { scrolling.current = true; };
-  return { list, more, preservePosition: nativeScroll.available || preservePosition, historyBottomSpace,
+  const pull = useHistoryPull(() => position.current <= SCROLL_OFFSET_TOLERANCE, more);
+  return { ...pull, list, more, preservePosition: nativeScroll.available || preservePosition, historyBottomSpace,
     initializing: Boolean(latestItemId) && !initialPositionReady,
     // Native bottom following can move twice in one batch; throttling can drop the final offset forever.
     scrollEventThrottle: initialPositionReady ? SCROLL_EVENT_THROTTLE_MS : INITIAL_SCROLL_EVENT_THROTTLE_MS,

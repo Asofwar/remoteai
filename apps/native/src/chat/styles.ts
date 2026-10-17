@@ -54,6 +54,10 @@ export const useStyles = createThemedStyles((color) => ({
   // Leave room for Android's fallback font instead of relying on the exact measured text width.
   messageLoadingText: { width: '100%', maxWidth: 400, paddingHorizontal: 16, textAlign: 'center' },
   historyStatus: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 36 },
+  historyNotice: { position: 'absolute', top: 8, left: 16, right: 16, alignItems: 'center' },
+  historyNoticeText: { maxWidth: 400, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12,
+    overflow: 'hidden', backgroundColor: color(palette.pale, 'accentSoft'), color: color(palette.ink, 'ink'),
+    fontSize: 13, lineHeight: 20, textAlign: 'center' },
   userMessage: { alignSelf: 'flex-end', maxWidth: '90%', borderRadius: 16, borderBottomRightRadius: 4,
     backgroundColor: color(palette.pale, 'accentSoft'), paddingHorizontal: 19, paddingVertical: 15 },
   messageText: { color: color(palette.ink, 'ink'), fontSize: 14, lineHeight: 25 },

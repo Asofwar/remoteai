@@ -6,5 +6,6 @@ export interface ChatMessagesProps {
   offline?: boolean;
   loadingMore?: boolean;
   hasMore?: boolean;
+  historyLoad?: import('./historyLoad').HistoryLoadResult;
   loadOlder?: () => Promise<void>;
 }

@@ -5,6 +5,7 @@ import type { ProjectFilesRequest, ProjectFilesResponse } from '../projectFiles'
 import { applyChatEvent } from './events';
 import { syncChatProcessing } from './processing';
 import { mergeHistory } from './history';
+import { historyLoadResult } from './historyLoad';
 import { HISTORY_CHANGED } from '../historySync';
 import { contentStringHash } from '../stringHash';
 import type { HistoryPage } from '../historyPage';
@@ -104,6 +105,7 @@ export class ChatController {
   private historyTimer?: ReturnType<typeof setTimeout>;
   private historyDirty = false;
   private olderQueued = false;
+  private olderStartedAt?: number;
   private readonly composer = new RemoteComposerSettings({ snapshot: () => this.state,
     update: (patch) => this.update(patch), ready: () => this.active && this.state.ready,
     request: (body) => this.connection.request('request', body) });
@@ -202,6 +204,7 @@ export class ChatController {
     this.readGeneration += 1;
     this.refreshThreadId = null;
     this.olderQueued = false;
+    this.olderStartedAt = undefined;
     clearTimeout(this.syncTimer);
     clearTimeout(this.historyTimer);
     this.historyTimer = undefined;
@@ -311,6 +314,7 @@ export class ChatController {
     this.historyReader.reset();
     this.queueConnection.reset();
     this.olderQueued = false;
+    this.olderStartedAt = undefined;
     clearTimeout(this.syncTimer);
     clearTimeout(this.historyTimer);
     this.historyTimer = undefined;
@@ -497,12 +501,13 @@ export class ChatController {
     this.refreshThreadId = null;
     this.olderQueued = false;
     this.loadedThreadId = null;
+    this.olderStartedAt = undefined;
     const cached = this.histories.get(thread.id);
     if (cached) this.historyPages.set(thread.id, cached.page);
     else this.historyPages.delete(thread.id);
     this.update({ selected: cached?.thread ?? thread, draftProject: null,
       selectedArchived: this.state.archived, error: '', historyOffline: Boolean(this.offline),
-      historyHasMore: this.historyPages.get(thread.id)?.hasMore ?? false });
+      historyHasMore: this.historyPages.get(thread.id)?.hasMore ?? false, historyLoad: undefined });
     if (this.offline && !this.state.ready) await this.readOffline(false);
     if (this.state.selected?.id !== thread.id || (this.offline && !this.transportConnected)) return;
     await Promise.all([this.refreshSelected(), this.composer.select()]);
@@ -510,14 +515,13 @@ export class ChatController {
 
   async loadOlder() {
     // A manual pull retries even after the PC previously reported the beginning of history.
-    if (!this.state.selected) return;
+    if (!this.state.selected || this.state.historyLoadingMore || (!this.offline && !this.state.ready)) return;
     if (this.offline && !this.state.ready) { await this.readOffline(true); return; }
     if (!this.state.ready) return;
     if (this.refreshThreadId === this.state.selected?.id) {
-      if (!this.state.historyLoadingMore) {
-        this.olderQueued = true;
-        this.update({ historyLoadingMore: true });
-      }
+      this.olderQueued = true;
+      this.olderStartedAt ??= Date.now();
+      this.update({ historyLoadingMore: true, historyLoad: undefined });
       return;
     }
     await this.refreshSelected(true);
@@ -531,7 +535,9 @@ export class ChatController {
     this.refreshThreadId = selected.id;
     this.historyDirty = false;
     const generation = ++this.readGeneration;
-    this.update({ historyLoading: true, historyLoadingMore: older });
+    const startedAt = this.olderStartedAt ?? Date.now();
+    if (older) this.olderStartedAt = undefined;
+    this.update({ historyLoading: true, historyLoadingMore: older, ...(older && { historyLoad: undefined }) });
     try {
       const result = await this.historyReader.read(selected,
         { start: this.historyPages.get(selected.id)?.start, older });
@@ -540,7 +546,8 @@ export class ChatController {
         if (result.page) this.historyPages.set(selected.id, result.page);
         this.update({ selected: mergeHistory(result.thread, this.state.selected, selected, this.state.historyOffline),
           error: '', historyOffline: false,
-          historyHasMore: result.page.hasMore });
+          historyHasMore: result.page.hasMore,
+          ...(older && { historyLoad: historyLoadResult(selected, result.thread, startedAt) }) });
         this.rememberHistory();
         this.markViewed();
       }
@@ -562,7 +569,9 @@ export class ChatController {
     if (!this.offline || !selected || this.refreshThreadId === selected.id) return;
     const generation = ++this.readGeneration;
     this.refreshThreadId = selected.id;
-    this.update({ historyLoading: true, historyLoadingMore: older });
+    const startedAt = this.olderStartedAt ?? Date.now();
+    if (older) this.olderStartedAt = undefined;
+    this.update({ historyLoading: true, historyLoadingMore: older, ...(older && { historyLoad: undefined }) });
     try {
       await this.flushCache();
       const result = await this.offline.read(selected.id,
@@ -571,7 +580,8 @@ export class ChatController {
       if (result) {
         this.historyPages.set(selected.id, result.page);
         this.update({ selected: result.thread, selectedArchived: result.archived,
-          historyOffline: true, historyHasMore: result.page.hasMore });
+          historyOffline: true, historyHasMore: result.page.hasMore,
+          ...(older && { historyLoad: historyLoadResult(selected, result.thread, startedAt) }) });
       }
     } catch { this.cacheFailure(); }
     finally {
@@ -599,6 +609,7 @@ export class ChatController {
       : undefined;
     this.rememberHistory();
     this.olderQueued = false;
+    this.olderStartedAt = undefined;
     this.readGeneration += 1;
     this.refreshThreadId = null;
     this.loadedThreadId = null;
@@ -818,6 +829,7 @@ export class ChatController {
     if (operation !== 'rename' && this.state.selected?.id === threadId) {
       this.readGeneration += 1; this.refreshThreadId = null; this.loadedThreadId = null;
       this.olderQueued = false;
+      this.olderStartedAt = undefined;
       this.update({ selected: null, selectedArchived: false, historyLoading: false,
         historyLoadingMore: false, historyHasMore: false });
     }

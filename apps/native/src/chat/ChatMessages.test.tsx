@@ -30,7 +30,7 @@ vi.mock('./ChatToolDetails', () => ({ ChatToolDetails: 'ToolDetails' }));
 vi.mock('./ChatProcessSummary', () => ({ ChatProcessSummary: 'ProcessSummary' }));
 vi.mock('./ChatTurnSummary', () => ({ ChatTurnDuration: 'Duration', ChatTurnSummary: 'Summary' }));
 vi.mock('./ChatTurnDetails', () => ({ ChatTurnDetails: 'TurnDetails' }));
-vi.mock('./useHistoryRefresh', () => ({ useHistoryRefresh: () => ({}) }));
+vi.mock('../../../../shared/remote-chat/useHistoryLoadNotice', () => ({ useHistoryLoadNotice: () => undefined }));
 vi.mock('./useConversationEntries', () => ({ useConversationEntries: (turns: Turn[]) => ({
   entries: conversationEntries(turns, state.inline), hasObservedLiveTurn: true,
   setInline: (id: string, inline: boolean) => { state.inline.set(id, inline); },
@@ -45,6 +45,7 @@ interface ListProps {
   data: TimelineEntry[]; renderItem: (props: { item: TimelineEntry }) => ReactElement; scrollEventThrottle: number;
   ListFooterComponent: ReactElement<{ children?: ReactNode; onLayout: () => void; style: unknown }>;
   ListEmptyComponent: ReactNode; contentContainerStyle: unknown;
+  ListHeaderComponent: ReactNode; refreshControl?: ReactNode;
 }
 interface DrawerProps { entry: { items: Item[] }; onOpen: (id: string) => void; onClose: () => void }
 interface DetailProps { item: Item; onBack: () => void }
@@ -82,6 +83,18 @@ const render = (turn: Turn) => ChatMessages({ thread: { id: 'thread', cwd: '', p
 it('passes the initial positioning event frequency through to the native list', () => {
   const tree = render({ id: 'turn', status: 'completed', items: [command('single')] });
   expect(element<ListProps>(tree, 'FlatList').props.scrollEventThrottle).toBe(16);
+});
+
+it('keeps history readable during pagination without either loading spinner', () => {
+  const tree = ChatMessages({ thread: { id: 'chat', cwd: '', preview: '', updatedAt: 1,
+    turns: [{ id: 'turn', status: 'completed', items: [command('existing')] }] },
+    loading: true, loadingMore: true, hasMore: true });
+  const list = element<ListProps>(tree, 'FlatList').props;
+  expect(list.refreshControl).toBeUndefined();
+  expect(findElement(tree, 'Spinner')).toBeUndefined();
+  expect(findElement(list.ListHeaderComponent, 'Spinner')).toBeUndefined();
+  expect(element<{ disabled: boolean }>(list.ListHeaderComponent, 'Pressable').props.disabled).toBe(true);
+  expect(list.data.length).toBeGreaterThan(0);
 });
 
 it('removes obsolete running activities when completed PC history replaces a waiting turn', () => {

@@ -196,7 +196,7 @@ function ConnectedChat({ session, device, devices, selected, active: pageActive,
       <ChatRetryProvider controller={controller} state={state}>
       <ChatMessages key={state.selected?.id ?? 'new'} thread={state.selected} offline={!ready}
         loading={state.historyLoading} loadingMore={state.historyLoadingMore} hasMore={state.historyHasMore}
-        loadOlder={() => controller.loadOlder()}
+        loadOlder={() => controller.loadOlder()} historyLoad={state.historyLoad}
         processing={runningTurn && <ChatProcessing key={runningTurn.id} turn={runningTurn}
           processing={state.processing} active={active && ready && foreground} />} />
       </ChatRetryProvider></TaskReviewProvider>

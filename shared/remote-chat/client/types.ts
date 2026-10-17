@@ -61,6 +61,7 @@ export interface ChatState {
   historyLoading: boolean;
   historyLoadingMore: boolean;
   historyHasMore: boolean;
+  historyLoad?: import('./historyLoad').HistoryLoadResult;
   sending: boolean;
   workspaceBusy?: boolean;
   threadActionBusy?: string;

@@ -10,15 +10,15 @@ import { MAPPING_RECONNECT_REQUIRED, MAPPING_UPDATE_REQUIRED } from '../../../..
 
 function receiver(close = vi.fn<() => void>()) { return { close, bind: vi.fn(async () => {}), unbind: vi.fn() }; }
 
-function fixture(register?: MappingStreamBridge, supported = true) {
+function fixture(register?: MappingStreamBridge, supported = true, failed = vi.fn<() => void>()) {
   const transport = new BulkTransport({ available: () => true, send: async () => {} });
   transport.setMode('relay');
   let link: MappingStreamLink = { bulk: transport, createBulkCipher: identity => new BulkCipher(new Uint8Array(32),
     { ...identity, sessionId: 'one', desktopKey: 'host', clientKey: 'client', desktop: false }) };
   const request = vi.fn(async (body: object) => 'request' in body ? { type: 'socket', id: 'legacy' } : {});
   const client = new MappingStreamClient({ link: () => link, random: randomBytes, supported: () => supported,
-    request: async <T>(body: object) => await request(body) as T, register });
-  return { client, request, transport, reconnect: () => { client.close(); link = { ...link }; },
+    request: async <T>(body: object) => await request(body) as T, register, failed });
+  return { client, request, transport, failed, reconnect: () => { client.close(); link = { ...link }; },
     close: () => { client.close(); transport.close(); } };
 }
 
@@ -91,10 +91,28 @@ it.each(['native', 'cipher'])('requires reconnect after %s failure without downg
       await expect(peer.client.open('resource', 'http://127.0.0.1:3002')).rejects.toThrow(MAPPING_RECONNECT_REQUIRED);
     }
     expect(register).toHaveBeenCalledTimes(1);
+    expect(peer.failed).toHaveBeenCalledOnce();
     expect(release).toHaveBeenCalledTimes(1);
     expect(peer.request.mock.calls.filter(([body]) => 'request' in body)).toHaveLength(0);
     peer.client.close(); await Promise.resolve();
     expect(release).toHaveBeenCalledTimes(1);
+  } finally { peer.close(); }
+});
+
+it('reconnects the owner once after receiver failure and ignores callbacks from the retired link', async () => {
+  const register = vi.fn(async (_options: Parameters<MappingStreamBridge>[0]) => receiver());
+  const peer = fixture(register);
+  peer.failed.mockImplementation(peer.reconnect);
+  try {
+    const first = await peer.client.open('resource', 'http://127.0.0.1:3002', { nativeSocketId: 42 });
+    const retired = register.mock.calls[0][0];
+    retired.failed();
+    await expect(first.read()).rejects.toThrow('closed');
+    const second = await peer.client.open('resource', 'http://127.0.0.1:3002', { nativeSocketId: 43 });
+    retired.failed();
+    expect(peer.failed).toHaveBeenCalledOnce();
+    expect(register.mock.calls[1][0].identity).not.toEqual(retired.identity);
+    await expect(second.write(Uint8Array.of(1))).resolves.toBeUndefined();
   } finally { peer.close(); }
 });
 

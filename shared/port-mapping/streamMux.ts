@@ -21,6 +21,7 @@ export class MappingStreamMux {
   private readonly abort = new AbortController();
   private readonly unsubscribe: () => void;
   private sending = Promise.resolve();
+  private nativeReceive?: (record: Uint8Array) => void;
   get closed() { return this.abort.signal.aborted; }
 
   constructor(private readonly options: {
@@ -70,11 +71,14 @@ export class MappingStreamMux {
 
   private receive(record: Uint8Array) {
     try {
+      if (this.nativeReceive) { this.nativeReceive(record); return; }
       const decoded = this.options.cipher.decryptStream(record);
       if (!decoded) return;
       this.receiveAuthenticated(decoded.header.requestId, decoded.bytes);
     } catch { this.close(); }
   }
+
+  useNativeReceiver(receive: (record: Uint8Array) => void) { this.nativeReceive = receive; }
 
   /** Only for a local receiver that has authenticated the epoch and enforced the cipher replay window. */
   receiveAuthenticated(id: string, bytes: Uint8Array) {

@@ -7,6 +7,7 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 const flush = async () => { for (let index = 0; index < 80; index++) await Promise.resolve(); };
 const client: ForwardingClient = {
   openResource: vi.fn(async () => 'resource'), closeResource: vi.fn(async () => {}),
+  stream: vi.fn(async () => ({ read: vi.fn(), write: vi.fn(), close: vi.fn() })),
   link: vi.fn(async (_id, request): Promise<TerminalLinkReply> => {
     if (request.type === 'udpConnect' || request.type === 'connect') return { type: 'socket', id: request.type };
     if (request.type === 'udpRead') return new Promise(() => {});

@@ -296,6 +296,7 @@ fn start_peer_with_bulk(
                 cancelled: Arc::new(AtomicBool::new(false)),
                 tcp_authority: worker_authority,
                 bulk_events,
+                port_streams: Arc::default(),
             },
         )
     });

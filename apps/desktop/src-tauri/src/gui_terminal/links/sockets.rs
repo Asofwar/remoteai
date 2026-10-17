@@ -72,6 +72,26 @@ pub(crate) struct LinkState {
 }
 
 impl LinkState {
+    /// Transfer only a socket accepted by an active loopback listener to the native mapping sink.
+    pub(crate) async fn take_loopback_socket(
+        &self,
+        scope: &str,
+        id: &str,
+    ) -> Result<(OwnedReadHalf, OwnedWriteHalf)> {
+        let listeners = self.listeners.lock().await;
+        let listener = listeners.get(scope).ok_or(LinkError::Closed)?;
+        if listener.life.expired() {
+            return Err(LinkError::Closed);
+        }
+        let mut sockets = self.sockets.lock().await;
+        if sockets.get(id).is_none_or(|socket| socket.scope != scope) {
+            return Err(LinkError::Invalid);
+        }
+        let socket = sockets.remove(id).ok_or(LinkError::Closed)?;
+        let socket = Arc::try_unwrap(socket).map_err(|_| LinkError::Limit)?;
+        Ok((socket.reader.into_inner(), socket.writer.into_inner()))
+    }
+
     pub(in crate::gui_terminal) async fn perform(
         self: &Arc<Self>,
         request: LinkRequest,

@@ -8,6 +8,44 @@ use tokio::{
 
 const CHUNK_BYTES: usize = 384 * 1024;
 
+#[tokio::test]
+async fn native_mapping_claim_is_scoped_to_an_active_loopback_listener() {
+    let state = std::sync::Arc::new(super::LinkState::default());
+    let super::LinkReply::Listener { id: scope, port } = state
+        .perform(super::LinkRequest::Listen { port: None })
+        .await
+        .unwrap()
+    else {
+        panic!("listener");
+    };
+    let browser = tokio::net::TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, port))
+        .await
+        .unwrap();
+    let super::LinkReply::Socket { id } = state
+        .perform(super::LinkRequest::Accept {
+            scope: scope.clone(),
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("socket");
+    };
+    assert!(state
+        .take_loopback_socket("wrong-scope", &id)
+        .await
+        .is_err());
+    let halves = state.take_loopback_socket(&scope, &id).await.unwrap();
+    assert!(state.take_loopback_socket(&scope, &id).await.is_err());
+    state
+        .perform(super::LinkRequest::Stop { scope })
+        .await
+        .unwrap();
+    let rebound = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port))
+        .await
+        .unwrap();
+    drop((halves, browser, rebound));
+}
+
 async fn socket() -> (Arc<LinkState>, String, String, TcpStream) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let state = Arc::new(LinkState::default());

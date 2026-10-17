@@ -12,6 +12,7 @@ const MAX_BATCH_RECORDS: usize = 16;
 const BATCH_HEADER_BYTES: usize = 9;
 
 pub(super) struct ClientBulk {
+    port_streams: Option<std::sync::Arc<crate::port_mapping::State>>,
     channel: Option<Channel<Response>>,
     enabled: bool,
     queue: VecDeque<Vec<u8>>,
@@ -24,6 +25,7 @@ pub(super) struct ClientBulk {
 impl ClientBulk {
     pub fn new(channel: Option<Channel<Response>>) -> Self {
         Self {
+            port_streams: None,
             channel,
             enabled: false,
             queue: VecDeque::new(),
@@ -36,6 +38,14 @@ impl ClientBulk {
 
     pub fn negotiate(&mut self, enabled: bool) {
         self.enabled = enabled && self.channel.is_some();
+    }
+
+    pub fn with_port_streams(
+        mut self,
+        streams: std::sync::Arc<crate::port_mapping::State>,
+    ) -> Self {
+        self.port_streams = Some(streams);
+        self
     }
 
     pub fn enabled(&self) -> bool {
@@ -58,6 +68,14 @@ impl ClientBulk {
     pub fn enqueue(&mut self, bytes: Vec<u8>, session: Option<&str>) -> Result<(), ChatError> {
         if !self.enabled || session != Some(bulk::session_id(&bytes)?.as_str()) {
             return Err(ChatError::InvalidFrame);
+        }
+        let offset = 5 + usize::from(bytes[4]);
+        if self
+            .port_streams
+            .as_ref()
+            .is_some_and(|streams| streams.route(&bytes[offset..]))
+        {
+            return Ok(());
         }
         if self.buffered + bytes.len() > MAX_BUFFER_BYTES || self.queue.len() >= MAX_QUEUED_RECORDS
         {

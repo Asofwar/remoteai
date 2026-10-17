@@ -177,6 +177,7 @@ pub(crate) async fn remote_chat_detach(
 }
 
 pub(crate) fn start<R: tauri::Runtime>(app: tauri::AppHandle<R>) {
+    crate::port_mapping::start(&app);
     let (sender, receiver) = mpsc::channel(protocol::COMMAND_LIMIT);
     app.manage(ChatState(sender));
     let upload_policy =

@@ -30,34 +30,62 @@ pub(crate) async fn remote_native_bulk_receive(
         .cloned()
         .ok_or(UNAVAILABLE)?;
     let _reader = path.bulk_reader.try_lock().map_err(|_| UNAVAILABLE)?;
-    receive_batch(|| path.connection.receive_bulk())
-        .await
-        .map(Response::new)
-        .map_err(|_| UNAVAILABLE.into())
+    let streams = app.state::<std::sync::Arc<crate::port_mapping::State>>();
+    receive_routed_batch(
+        || path.connection.receive_bulk(),
+        |record| streams.route(record),
+    )
+    .await
+    .map(Response::new)
+    .map_err(|_| UNAVAILABLE.into())
 }
 
-async fn receive_batch<F, R>(mut receive: F) -> Result<Vec<u8>, ChatError>
+#[cfg(test)]
+async fn receive_batch<F, R>(receive: F) -> Result<Vec<u8>, ChatError>
 where
     F: FnMut() -> R,
     R: Future<Output = Option<Vec<u8>>>,
 {
-    let first = match tokio::time::timeout(POLL_TIMEOUT, receive()).await {
-        Ok(Some(record)) => record,
-        Ok(None) => return Err(ChatError::Transport),
-        Err(_) => return Ok(Vec::new()),
-    };
+    receive_routed_batch(receive, |_| false).await
+}
+
+async fn receive_routed_batch<F, R, C>(mut receive: F, consume: C) -> Result<Vec<u8>, ChatError>
+where
+    F: FnMut() -> R,
+    R: Future<Output = Option<Vec<u8>>>,
+    C: Fn(&[u8]) -> bool,
+{
+    let deadline = tokio::time::Instant::now() + POLL_TIMEOUT;
     let mut batch =
         Vec::with_capacity(BATCH_HEADER_BYTES + MAX_BATCH_RECORDS * (4 + MAX_RECORD_BYTES));
     batch.extend_from_slice(b"RAN1\0");
-    append_record(&mut batch, &first)?;
-    // Never wait to fill a batch: deliver the first bytes immediately and drain only queued records.
+    let mut routed = 0;
     while usize::from(batch[4]) < MAX_BATCH_RECORDS {
-        let Some(Some(record)) = receive().now_or_never() else {
-            break;
+        let record = if batch[4] == 0 {
+            match tokio::time::timeout_at(deadline, receive()).await {
+                Ok(Some(record)) => record,
+                Ok(None) => return Err(ChatError::Transport),
+                Err(_) => break,
+            }
+        } else {
+            let Some(Some(record)) = receive().now_or_never() else {
+                break;
+            };
+            record
         };
+        if consume(&record) {
+            routed += 1;
+            if routed % 64 == 0 {
+                tokio::task::yield_now().await;
+            }
+            if tokio::time::Instant::now() >= deadline {
+                break;
+            }
+            continue;
+        }
         append_record(&mut batch, &record)?;
     }
-    Ok(batch)
+    Ok(if batch[4] == 0 { Vec::new() } else { batch })
 }
 
 fn append_record(batch: &mut Vec<u8>, record: &[u8]) -> Result<(), ChatError> {

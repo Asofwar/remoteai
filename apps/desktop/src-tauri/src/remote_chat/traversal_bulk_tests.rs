@@ -70,3 +70,35 @@ async fn native_download_waits_do_not_block_control_work_or_allow_oversized_batc
     send.send(vec![1; MAX_RECORD_BYTES + 1]).await.unwrap();
     assert!(matches!(read.await.unwrap(), Err(ChatError::InvalidFrame)));
 }
+
+#[tokio::test]
+async fn native_mapping_records_are_consumed_without_entering_file_ipc_batches() {
+    let (send, receive) = records();
+    for _ in 0..20 {
+        send.send(vec![1; 128]).await.unwrap();
+    }
+    send.send(vec![2; 128]).await.unwrap();
+    let routed = std::sync::atomic::AtomicUsize::new(0);
+    let batch = receive_routed_batch(
+        || async { receive.lock().await.recv().await },
+        |record| {
+            if record[0] != 1 {
+                return false;
+            }
+            routed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            true
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(routed.load(std::sync::atomic::Ordering::Relaxed), 20);
+    assert_eq!(&batch[..5], b"RAN1\x01");
+    assert_eq!(&batch[9..], vec![2; 128]);
+    send.send(vec![1; 128]).await.unwrap();
+    assert!(
+        receive_routed_batch(|| async { receive.lock().await.recv().await }, |_| true)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+}

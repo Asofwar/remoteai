@@ -16,7 +16,7 @@ use tauri::{AppHandle, Manager, Window};
 pub(crate) use sockets::LinkState;
 
 #[derive(Debug, thiserror::Error)]
-pub(super) enum LinkError {
+pub(crate) enum LinkError {
     #[error("链接无效，请检查后重试。")]
     Invalid,
     #[error("连接较多，请稍后重试。")]

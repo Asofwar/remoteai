@@ -29,6 +29,7 @@ pub(super) struct Lifecycle {
     pub cancelled: Arc<AtomicBool>,
     pub tcp_authority: Arc<super::tcp::Authority>,
     pub bulk_events: Option<Channel<tauri::ipc::Response>>,
+    pub port_streams: Arc<crate::port_mapping::State>,
 }
 const POLL_INTERVAL: Duration = Duration::from_millis(20);
 const PING_INTERVAL: Duration = Duration::from_secs(20);
@@ -96,7 +97,8 @@ fn connect(
         socket,
         tcp: super::tcp::ClientSession::new(life.tcp_authority.clone(), request.client_id.clone()),
         binary_relay: false,
-        bulk: ClientBulk::new(life.bulk_events.clone()),
+        bulk: ClientBulk::new(life.bulk_events.clone())
+            .with_port_streams(life.port_streams.clone()),
         bridge,
         received: now,
         pinged: now,

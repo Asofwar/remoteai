@@ -5,6 +5,7 @@ export interface MappingRead { data: Uint8Array; eof: boolean }
 export interface MappingSocket {
   read(): Promise<MappingRead>;
   write(bytes: Uint8Array): Promise<void>;
+  end?(): Promise<void>;
   close(): void;
 }
 export interface MappingSocketOptions { nativeSocketId?: number }

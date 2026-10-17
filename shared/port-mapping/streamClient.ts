@@ -8,6 +8,8 @@ export interface MappingStreamReceiver {
   close(): void;
   bind(id: string, socketId: number): Promise<void>;
   unbind(id: string): void;
+  /** Route browser RTC arrivals to the same native authenticator used by direct/relay arrivals. */
+  receive?(record: Uint8Array): void;
 }
 export type MappingStreamBridge = (options: { identity: StreamIdentity;
   receiverKey: Uint8Array; authenticated: (id: string, bytes: Uint8Array) => void;
@@ -25,6 +27,7 @@ export class MappingStreamClient {
     link: () => MappingStreamLink | undefined; supported: () => boolean; random: (length: number) => Uint8Array;
     request: <T>(body: object) => Promise<T>;
     register?: MappingStreamBridge;
+    failed?: () => void;
   }) {}
 
   open: MappingSocketFactory = async (resource, url, options) => {
@@ -34,7 +37,7 @@ export class MappingStreamClient {
     const session = this.session(link);
     const receiver = await session.ready.catch(() => { session.mux.close(); return undefined; });
     if (!this.isCurrent(session)) throw new Error('Mapping connection changed');
-    if (session.mux.closed) { this.release(session); throw new Error(MAPPING_RECONNECT_REQUIRED); }
+    if (session.mux.closed) { this.invalidate(session); throw new Error(MAPPING_RECONNECT_REQUIRED); }
     if (options?.nativeSocketId !== undefined && !receiver) throw new Error(MAPPING_UPDATE_REQUIRED);
     const { mux, identity } = session;
     const id = this.uuid();
@@ -53,7 +56,7 @@ export class MappingStreamClient {
       return stream;
     } catch (error) {
       stream.close();
-      if (mux.closed) this.release(session);
+      if (mux.closed) this.invalidate(session);
       throw error;
     }
   };
@@ -80,11 +83,24 @@ export class MappingStreamClient {
     mux: MappingStreamMux; identity: StreamIdentity; receiverKey: Uint8Array;
   }) {
     try {
-      return await this.options.register?.({ identity, receiverKey,
+      const receiver = await this.options.register?.({ identity, receiverKey,
         authenticated: (id, bytes) => mux.receiveAuthenticated(id, bytes),
         progress: (id, progress) => mux.receiveNativeProgress(id, progress),
-        failed: () => mux.close() });
+        failed: () => {
+          mux.close();
+          if (this.current?.mux === mux) this.invalidate(this.current);
+        } });
+      if (receiver?.receive) mux.useNativeReceiver(receiver.receive);
+      return receiver;
     } finally { receiverKey.fill(0); }
+  }
+
+  private invalidate(session: StreamSession) {
+    if (session.released) return;
+    const current = this.isCurrent(session);
+    this.release(session);
+    // A broken receiver cannot reuse its nonce space. Let the owner replace the authenticated link.
+    if (current) this.options.failed?.();
   }
 
   private release(session: StreamSession) {

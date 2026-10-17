@@ -5,6 +5,7 @@ import { useActiveChatPolicy } from '../../../../../../shared/remote-chat/useAct
 import { createDesktopPeer } from '../../../remoteChat/peer';
 import { createDesktopNativePath } from '../../../remoteChat/nativePath';
 import { NativeGuiSocket } from './nativeSocket';
+import { registerDesktopMappingStream } from '../portForwarding/streamBridge';
 import type { GuiCloudIdentity } from './types';
 import { browserTrustStore, trustedHost, trustScope } from '../../../../../../shared/remote-chat/trustedHost';
 
@@ -19,6 +20,7 @@ export function useRemoteGui(identity: GuiCloudIdentity, deviceId: string, activ
     createSocket: () => new NativeGuiSocket(identity),
     createPeer: createDesktopPeer,
     createNativePath: createDesktopNativePath,
+    registerMappingStream: registerDesktopMappingStream,
   })), [identity.baseUrl, identity.userId, deviceId]);
   const state = useSyncExternalStore(controller.subscribe, controller.snapshot);
   useActiveChatPolicy(active, state.mode);

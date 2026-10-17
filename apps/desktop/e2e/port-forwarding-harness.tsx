@@ -20,6 +20,7 @@ const openedPorts = new Set<number>();
 const openedUdpPorts = new Set<number>();
 const targetUrls: string[] = [];
 const client: ForwardingClient = {
+  stream: async () => ({ read: async () => new Promise(() => {}), write: async () => {}, close() {} }),
   openResource: async url => {
     targetUrls.push(url); const id = crypto.randomUUID(); resources.add(id); return id;
   },

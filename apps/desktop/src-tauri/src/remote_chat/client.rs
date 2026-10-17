@@ -162,6 +162,10 @@ pub(crate) async fn gui_remote_open(
     let configs = state.configs.clone();
     let tcp_authority = app.state::<super::tcp::State>().client_authority.clone();
     let bulk_events = request.bulk_events.as_ref().map(|id| id.channel_on(window));
+    let port_streams = app
+        .state::<Arc<crate::port_mapping::State>>()
+        .inner()
+        .clone();
     std::thread::spawn(move || {
         super::client_runtime::run(
             request,
@@ -172,6 +176,7 @@ pub(crate) async fn gui_remote_open(
                 cancelled: cancelled.clone(),
                 tcp_authority,
                 bulk_events,
+                port_streams,
             },
         );
         connections.blocking_lock().finished(&client_id, &cancelled);

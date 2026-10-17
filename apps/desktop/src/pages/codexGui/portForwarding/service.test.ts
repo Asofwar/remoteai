@@ -13,6 +13,7 @@ const flush = async () => { for (let index = 0; index < 40; index++) await Promi
 beforeEach(() => {
   vi.clearAllMocks(); nextId = 0;
   client = { openResource: vi.fn(async () => `resource-${++nextId}`), closeResource: vi.fn(async () => undefined),
+    stream: vi.fn(async () => ({ read: vi.fn(), write: vi.fn(), close: vi.fn() })),
     link: vi.fn(async (_id, request): Promise<TerminalLinkReply> => request.type === 'connect'
       ? { type: 'socket', id: `remote-${++nextId}` } : { type: 'done' }) };
   vi.mocked(invoke).mockImplementation(async (_command, args) => {
@@ -47,7 +48,9 @@ it('connects to the selected IP and port, preserves it on restart, and keeps loc
   service.add(3000, 13001, '[::1]');
   await flush();
   expect(client.openResource).toHaveBeenCalledWith('http://192.168.1.20:3000');
-  expect(client.link).toHaveBeenCalledWith(expect.any(String), { type: 'connect', url: 'http://[::1]:3000' });
+  expect(client.stream).toHaveBeenCalledWith(expect.any(String), 'http://[::1]:3000',
+    expect.objectContaining({ signal: expect.any(AbortSignal) }));
+  expect(client.link).not.toHaveBeenCalled();
   expect(() => service.add(3000, 13000, '192.168.1.21')).toThrow('本地端口已有映射');
   const first = service.snapshot()[0];
   await service.stop(first.id); await service.start(first.id);

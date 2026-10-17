@@ -57,6 +57,7 @@ mod official_models;
 mod official_plugins;
 mod open_code;
 mod platform;
+mod port_mapping;
 mod preset_provider;
 mod prompt_plugins;
 mod provider_api_cache;
@@ -389,6 +390,11 @@ pub fn run() {
             remote_chat::traversal::remote_native_path_send,
             remote_chat::traversal::remote_native_bulk_send,
             remote_chat::traversal::remote_native_bulk_receive,
+            port_mapping::port_mapping_receiver,
+            port_mapping::port_mapping_poll,
+            port_mapping::port_mapping_socket,
+            port_mapping::port_mapping_read,
+            port_mapping::port_mapping_receive,
             remote_chat::traversal::remote_native_path_close,
             remote_chat::traversal::remote_native_media,
             remote_chat::traversal::remote_chat_local_addresses,

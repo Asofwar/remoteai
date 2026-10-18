@@ -5,12 +5,13 @@ import { prepareBackgroundPage, restoreBackgroundPage, settleRendering } from '.
 import { acquireConnection, assertConnected, finishConnection, releaseConnection,
   stopConnections, connectionOwner } from './debugger-connections.js';
 import { queueTarget } from './target-queue.js';
+import { withNewTabs } from './tab-groups.js';
 
 export function withTab(context, args, operation, options = {}) {
   return queueTarget({ tabId: args.tabId }, () => run(context, args, operation, options));
 }
 
-async function run(context, args, operation, { prepareInput = true }) {
+async function run(context, args, operation, { prepareInput = true, trackNewTabs = false }) {
   const tab = await chrome.tabs.get(args.tabId);
   await authorize(tab.url, context.clientId, context.signal);
   const target = { tabId: tab.id };
@@ -39,8 +40,7 @@ async function run(context, args, operation, { prepareInput = true }) {
     await sessions.initialize();
     const driver = { tab, send: sessions.send, documents: sessions.documents, listen: sessions.listen, context, guard,
       debuggee: sessions.debuggee, relatedFrames: sessions.relatedFrames };
-    const result = await operation(driver);
-    if (prepareInput) await settleRendering(driver);
+    const result = await performOperation(driver, operation, { prepareInput, trackNewTabs });
     await guard();
     return result;
   } finally {
@@ -52,6 +52,15 @@ async function run(context, args, operation, { prepareInput = true }) {
     await releaseConnection(connection, authorized && cleaned && restored, owner);
     context.signal?.removeEventListener('abort', abort);
   }
+}
+
+async function performOperation(driver, operation, { prepareInput, trackNewTabs }) {
+  const perform = async () => {
+    const result = await operation(driver);
+    if (prepareInput) await settleRendering(driver);
+    return result;
+  };
+  return trackNewTabs ? withNewTabs(driver.context, driver.tab.id, perform) : perform();
 }
 
 export async function stopDebugging() {

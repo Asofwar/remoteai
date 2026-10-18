@@ -10,6 +10,7 @@ import { queueTarget } from './target-queue.js';
 import * as actions from './actions.js';
 
 const MAX_SCREENSHOT_CHARACTERS = 12 * 1024 * 1024;
+const INPUT_OPERATIONS = new Set(['click', 'key', 'fill', 'type', 'select', 'check', 'drag']);
 
 export async function execute(context, request) {
   const { operation, args } = validate(request);
@@ -26,7 +27,7 @@ export async function execute(context, request) {
     return queueTarget({ tabId: args.tabId }, () => tabAction(context, operation, args));
   }
   return withTab(context, args, (driver) => pageAction(driver, operation, args),
-    { prepareInput: operation !== 'console_logs' });
+    { prepareInput: operation !== 'console_logs', trackNewTabs: INPUT_OPERATIONS.has(operation) });
 }
 
 async function listTabs() {

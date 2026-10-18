@@ -223,6 +223,23 @@ are masked in accessible snapshots; screenshots can still contain visible page c
 
 ## Verification
 
+### 2026-10-18 pages opened by assistant input
+
+Input operations register pages reported by `webNavigation.onCreatedNavigationTarget` for the
+operated source tab. The listener is active only through input and its rendering wait, and is removed
+on success, failure or cancellation. The navigation source is used instead of `tabs.Tab.openerTabId`:
+in background-tab tests the latter can point to the selected tab rather than the actual source.
+This requires the `webNavigation` permission; the extension does not persist navigation URLs.
+
+Child ownership is saved before grouping, so popup windows and grouping failures remain eligible
+for explicit completion. Existing user tabs, manual children outside input, other clients' pages,
+and requested keep tabs retain their previous protections. Completion still takes exact tab IDs.
+
+`node scripts/chrome-plugin-popup-tabs.e2e.mjs` covers background clicks, `noopener` links, script
+opens, chained pages, keyboard activation, iframe links, popup windows and user/keep protection
+in an isolated Chromium profile. Tab-group unit tests also cover concurrency, duplicate events,
+self-closing pages, failed/cancelled input, and ownership/grouping storage failures.
+
 ### 2026-10-14 task completion and Remote AI naming
 
 Extension 1.6.0 names its task groups Remote AI and migrates recorded groups still using the old

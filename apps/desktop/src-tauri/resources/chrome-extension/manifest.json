@@ -8,6 +8,7 @@
   "permissions": [
     "nativeMessaging",
     "tabs",
+    "webNavigation",
     "tabGroups",
     "debugger",
     "scripting",

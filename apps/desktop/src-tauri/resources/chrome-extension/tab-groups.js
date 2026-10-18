@@ -10,6 +10,47 @@ export function groupNewTab(clientId, tab) {
   return serialize(() => assignGroup(clientId, tab));
 }
 
+// Only capture children created during an assistant input operation. Watching an opener forever
+// would also claim pages the user later opens manually, including pages in the same work group.
+export async function withNewTabs(context, openerTabId, operation) {
+  const owner = await workTabOwner(openerTabId);
+  if (owner && owner !== context.clientId) return operation();
+  const created = new Set();
+  // tabs.Tab.openerTabId can point at the selected tab when input targets a background page.
+  // The navigation event identifies the actual source, including noopener links and frames.
+  const listener = details => {
+    if (details.sourceTabId === openerTabId) created.add(details.tabId);
+  };
+  chrome.webNavigation.onCreatedNavigationTarget.addListener(listener);
+  try {
+    return await operation();
+  } finally {
+    chrome.webNavigation.onCreatedNavigationTarget.removeListener(listener);
+    // Even failed/cancelled input can have opened a page. Save its ownership for explicit cleanup.
+    if (created.size) {
+      try { await serialize(() => registerCreatedTabs(context.clientId, created)); }
+      catch { throw new Error('新打开的页面未能完成整理，请检查后重试。'); }
+    }
+  }
+}
+
+async function registerCreatedTabs(clientId, created) {
+  const live = await chrome.tabs.query({});
+  const stored = await chrome.storage.session.get(WORK_TABS_KEY);
+  const records = stored[WORK_TABS_KEY] ?? [];
+  const tabs = live.filter(tab => created.has(tab.id) && !records.some(record => record.tabId === tab.id));
+  if (!tabs.length) return;
+  // Save before grouping: a popup window cannot be grouped, and a grouping failure must not
+  // make an already-opened task page indistinguishable from a user page at completion.
+  await chrome.storage.session.set({ [WORK_TABS_KEY]: [
+    ...records, ...tabs.map(tab => ({ clientId, tabId: tab.id })),
+  ] });
+  for (const tab of tabs) {
+    const window = await chrome.windows.get(tab.windowId);
+    if (window.type === 'normal') await assignGroup(clientId, tab);
+  }
+}
+
 function serialize(operation) {
   const next = changes.catch(() => {}).then(operation);
   changes = next;

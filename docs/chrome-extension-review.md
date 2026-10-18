@@ -67,6 +67,13 @@ Node.js is needed for Inspector, but is not required by the extension or its des
 9. Call `browser_finish` with `browserId` and the test tabs' `tabIds`. Temporary tabs and empty groups
    should close, and debugging should end. Existing user tabs stay open. To retain a test page,
    also include it in `keepTabIds`.
+   Include tabs opened by clicked links, keyboard actions, or page buttons in the same completion call.
+   These child pages should close as well, including links using `rel="noopener"` and popup windows.
+
+The `webNavigation` permission identifies pages opened from the tab being operated on. The extension
+listens to `onCreatedNavigationTarget` only during assistant input and the associated rendering wait,
+and stores child tab IDs with the task owner for cleanup. It does not retain navigation URLs or record
+normal browsing history. Existing user pages and children opened outside assistant input remain unowned.
 
 Normal AI use runs the same tools from a new Codex conversation after enabling the plugin.
 The assistant instructions require new background tabs in a Remote AI group unless the user explicitly

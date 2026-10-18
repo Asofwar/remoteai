@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 import { execute } from '../apps/desktop/src-tauri/resources/chrome-extension/operations.js';
-import { renameWorkGroups } from '../apps/desktop/src-tauri/resources/chrome-extension/tab-groups.js';
+import { renameWorkGroups, withNewTabs, workTabOwner }
+  from '../apps/desktop/src-tauri/resources/chrome-extension/tab-groups.js';
 
 let state;
+let navigationListeners;
 const USER_TAB_ID = 1;
 const USER_GROUP_ID = 10;
 const PAGE_URL = 'https://example.com/';
@@ -40,6 +42,7 @@ function tabApi() {
 }
 
 beforeEach(() => {
+  navigationListeners = new Set();
   state = { session: {}, windowId: 2, nextTab: 20, nextGroup: 100, updates: [],
     tabs: new Map([[USER_TAB_ID, { id: USER_TAB_ID, windowId: 2, groupId: USER_GROUP_ID,
       active: true, url: PAGE_URL }]]),
@@ -51,6 +54,11 @@ beforeEach(() => {
         set: async (value) => Object.assign(state.session, structuredClone(value)) },
     },
     permissions: { contains: async () => true },
+    webNavigation: { onCreatedNavigationTarget: {
+      addListener: listener => navigationListeners.add(listener),
+      removeListener: listener => navigationListeners.delete(listener),
+    } },
+    windows: { get: async () => ({ type: 'normal' }) },
     tabs: tabApi(),
     tabGroups: { query: async () => [...state.groups.values()],
       update: async (id, properties) => Object.assign(state.groups.get(id), properties) },
@@ -188,4 +196,123 @@ test('a requested operation on an existing page keeps its original group', async
   assert.equal(state.tabs.get(USER_TAB_ID).groupId, USER_GROUP_ID);
   assert.deepEqual([...state.groups.keys()], [USER_GROUP_ID]);
   assert.deepEqual([...state.tabs.keys()], [USER_TAB_ID]);
+});
+
+async function newNavigation(sourceTabId, properties = {}) {
+  const tab = await chrome.tabs.create({ url: PAGE_URL, active: false, ...properties });
+  for (const listener of navigationListeners) listener({ sourceTabId, tabId: tab.id });
+  return tab;
+}
+
+test('input children are owned and cleaned up without claiming manual or unrelated pages in the group', async () => {
+  const parent = await open();
+  const manual = await newNavigation(parent.tabId, { groupId: parent.groupId });
+  let child;
+  let unrelated;
+  const result = await withNewTabs({ clientId: 'first' }, parent.tabId, async () => {
+    // Chrome may expose the selected user tab as openerTabId for background input.
+    child = await newNavigation(parent.tabId, { openerTabId: USER_TAB_ID });
+    unrelated = await newNavigation(USER_TAB_ID, { groupId: parent.groupId });
+    return { clicked: true };
+  });
+  assert.deepEqual(result, { clicked: true });
+  assert.equal(navigationListeners.size, 0);
+  const later = await newNavigation(parent.tabId, { groupId: parent.groupId });
+  assert.equal(await workTabOwner(child.id), 'first');
+  assert.equal(state.tabs.get(child.id).groupId, parent.groupId);
+  const finished = await execute({ clientId: 'first' }, { operation: 'finish',
+    args: { tabIds: [parent.tabId, child.id, manual.id, unrelated.id, later.id, USER_TAB_ID] } });
+  assert.deepEqual(finished.closedTabIds, [parent.tabId, child.id]);
+  assert.deepEqual(finished.keptTabIds, [manual.id, unrelated.id, later.id, USER_TAB_ID]);
+  assert.deepEqual(finished.failedTabIds, []);
+});
+
+test('input on an existing user page claims only the new child and honors explicit keep on completion', async () => {
+  const child = await withNewTabs({ clientId: 'first' }, USER_TAB_ID, () => newNavigation(USER_TAB_ID));
+  assert.equal(await workTabOwner(USER_TAB_ID), undefined);
+  assert.equal(state.tabs.get(USER_TAB_ID).groupId, USER_GROUP_ID);
+  assert.equal(await workTabOwner(child.id), 'first');
+  const finish = keepTabIds => execute({ clientId: 'first' },
+    { operation: 'finish', args: { tabIds: [USER_TAB_ID, child.id], keepTabIds } });
+  assert.deepEqual((await finish([child.id])).closedTabIds, []);
+  assert.deepEqual((await finish([])).closedTabIds, []);
+  assert.ok(state.tabs.has(child.id));
+});
+
+test('failed or cancelled input still records pages already opened and removes the listener', async () => {
+  for (const cancelled of [false, true]) {
+    const controller = new AbortController();
+    let child;
+    await assert.rejects(withNewTabs({ clientId: 'first', signal: controller.signal }, USER_TAB_ID, async () => {
+      child = await newNavigation(USER_TAB_ID);
+      if (cancelled) controller.abort();
+      throw new Error('input interrupted');
+    }), /input interrupted/);
+    assert.equal(navigationListeners.size, 0);
+    const result = await execute({ clientId: 'first' }, { operation: 'finish', args: { tabIds: [child.id] } });
+    assert.deepEqual(result.closedTabIds, [child.id]);
+  }
+});
+
+test('parallel input on different sources records each client without lost writes or ownership transfer', async () => {
+  const first = await open('first');
+  const second = await open('second');
+  const children = await Promise.all([
+    withNewTabs({ clientId: 'first' }, first.tabId, () => newNavigation(first.tabId)),
+    withNewTabs({ clientId: 'second' }, second.tabId, () => newNavigation(second.tabId)),
+  ]);
+  assert.equal(await workTabOwner(children[0].id), 'first');
+  assert.equal(await workTabOwner(children[1].id), 'second');
+  assert.equal(state.session.browserWorkTabs.length, 4);
+  assert.equal(navigationListeners.size, 0);
+});
+
+test('a different client cannot claim children of an owned source or overwrite an owned child', async () => {
+  const other = await open('second');
+  const child = await withNewTabs({ clientId: 'first' }, other.tabId, () => newNavigation(other.tabId));
+  assert.equal(await workTabOwner(child.id), undefined);
+  await withNewTabs({ clientId: 'first' }, USER_TAB_ID, async () => {
+    for (const listener of navigationListeners) listener({ sourceTabId: USER_TAB_ID, tabId: other.tabId });
+  });
+  assert.equal(await workTabOwner(other.tabId), 'second');
+  assert.equal(navigationListeners.size, 0);
+});
+
+test('duplicate navigation events and self-closing pages leave no duplicate or stale ownership', async () => {
+  let live;
+  let closed;
+  await withNewTabs({ clientId: 'first' }, USER_TAB_ID, async () => {
+    live = await newNavigation(USER_TAB_ID);
+    for (const listener of navigationListeners) listener({ sourceTabId: USER_TAB_ID, tabId: live.id });
+    closed = await newNavigation(USER_TAB_ID);
+    await chrome.tabs.remove(closed.id);
+  });
+  assert.deepEqual(state.session.browserWorkTabs, [{ clientId: 'first', tabId: live.id }]);
+});
+
+test('popup windows are recorded for cleanup without trying to put them in a tab group', async () => {
+  chrome.windows.get = async () => ({ type: 'popup' });
+  const child = await withNewTabs({ clientId: 'first' }, USER_TAB_ID, () => newNavigation(USER_TAB_ID));
+  assert.equal(state.tabs.get(child.id).groupId, -1);
+  const result = await execute({ clientId: 'first' }, { operation: 'finish', args: { tabIds: [child.id] } });
+  assert.deepEqual(result.closedTabIds, [child.id]);
+});
+
+test('grouping failure keeps child ownership so completion can still close the page', async () => {
+  chrome.tabs.group = async () => { throw new Error('private browser details'); };
+  let child;
+  await assert.rejects(withNewTabs({ clientId: 'first' }, USER_TAB_ID, async () => {
+    child = await newNavigation(USER_TAB_ID);
+  }), /^Error: 新打开的页面未能完成整理，请检查后重试。$/);
+  assert.equal(navigationListeners.size, 0);
+  assert.equal(await workTabOwner(child.id), 'first');
+  const result = await execute({ clientId: 'first' }, { operation: 'finish', args: { tabIds: [child.id] } });
+  assert.deepEqual(result.closedTabIds, [child.id]);
+});
+
+test('ownership storage failure is reported and removes the listener instead of silently succeeding', async () => {
+  chrome.storage.session.set = async () => { throw new Error('private storage details'); };
+  await assert.rejects(withNewTabs({ clientId: 'first' }, USER_TAB_ID, () => newNavigation(USER_TAB_ID)),
+    /^Error: 新打开的页面未能完成整理，请检查后重试。$/);
+  assert.equal(navigationListeners.size, 0);
 });

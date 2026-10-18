@@ -56,16 +56,16 @@ pub(super) fn ensure(app: &tauri::AppHandle, root: &Path) -> Result<()> {
 }
 
 fn shared_download(app: &tauri::AppHandle, url: &str, digest: &str) -> Result<Arc<Vec<u8>>> {
-    let package = crate::update_peers::packages::Package::computer_use(VERSION, url, digest);
+    let mut package = crate::update_peers::packages::Package::computer_use(VERSION, url, digest);
     if let Some(bytes) = package
-        .as_ref()
+        .as_mut()
         .and_then(|package| package.read_shared(app, |_, _| {}))
     {
         return Ok(bytes);
     }
     let bytes = Arc::new(download(url)?);
     verify(&bytes, digest)?;
-    if let Some(package) = package {
+    if let Some(mut package) = package {
         package.remember(app, bytes.clone());
     }
     Ok(bytes)

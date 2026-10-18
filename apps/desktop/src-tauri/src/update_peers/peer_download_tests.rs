@@ -55,7 +55,8 @@ async fn exercise_peer(behavior: &'static str) {
     let origin = Origin::start();
     let update = origin.update().await;
     let directory = tempfile::tempdir().unwrap();
-    let service = service(directory.path(), &origin.key);
+    let mut service = service(directory.path(), &origin.key);
+    let reports = capture_reports(&mut service);
     let host = network_fixture::host(behavior).await;
     let mut listener = host
         .data_plane_tcp_bind(47777, Duration::from_secs(3))
@@ -102,6 +103,13 @@ async fn exercise_peer(behavior: &'static str) {
         usize::from(behavior != "valid"),
         "{behavior}"
     );
+    let reports = reports.lock().unwrap();
+    assert_eq!(reports.len(), 1, "{behavior}");
+    assert_eq!(reports[0]["outcome"], "success", "{behavior}");
+    if behavior != "valid" {
+        assert_eq!(reports[0]["originBytes"], b"signed installer".len());
+        assert!(!reports[0]["failures"].as_array().unwrap().is_empty());
+    }
 }
 
 async fn respond(stream: &mut (impl AsyncReadExt + AsyncWriteExt + Unpin), behavior: &str) {

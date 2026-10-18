@@ -1,11 +1,11 @@
 //! Blocking-worker adapter for GUI dependencies, using the existing peer transport and cache.
-use super::reporting::{Report, Source};
+use super::reporting::{Report, Session, Source};
 use super::{cache::Artifact, dependency, parallel, Error, Result, Service, TRANSFER_LIFETIME};
 use std::{path::Path, sync::Arc};
 use tauri::{AppHandle, Manager};
 
 /// Metadata must come from the upstream release API or a digest pinned in the application.
-pub(crate) struct Package(Artifact);
+pub(crate) struct Package(Artifact, Option<Session>);
 
 impl Package {
     pub(crate) fn codex(version: &str, url: &str, digest: &str, size: u64) -> Option<Self> {
@@ -20,27 +20,28 @@ impl Package {
         )
         .ok()?;
         artifact.size = size as usize;
-        Some(Self(artifact))
+        Some(Self(artifact, None))
     }
 
     pub(crate) fn computer_use(version: &str, url: &str, digest: &str) -> Option<Self> {
         Artifact::dependency(dependency::COMPUTER_USE, version, url, digest)
             .ok()
-            .map(Self)
+            .map(|artifact| Self(artifact, None))
     }
 
     /// Call only from a blocking installation worker. Missing/failed sharing falls back to origin.
     pub(crate) fn read_shared(
-        &self,
+        &mut self,
         app: &AppHandle,
         progress: impl FnMut(usize, Option<u64>),
     ) -> Option<Arc<Vec<u8>>> {
         let service = app.try_state::<Arc<Service>>()?;
-        tauri::async_runtime::block_on(shared(&service, &self.0, progress)).ok()
+        tauri::async_runtime::block_on(shared(&service, &self.0, progress, &mut self.1)).ok()
     }
 
     /// Cache failures never turn a verified upstream download into an installation failure.
-    pub(crate) fn remember(&self, app: &AppHandle, bytes: Arc<Vec<u8>>) {
+    pub(crate) fn remember(&mut self, app: &AppHandle, bytes: Arc<Vec<u8>>) {
+        self.complete_origin(bytes.len());
         let Some(service) = app.try_state::<Arc<Service>>() else {
             return;
         };
@@ -51,7 +52,9 @@ impl Package {
         }
     }
 
-    pub(crate) fn remember_file(&self, app: &AppHandle, path: &Path) {
+    pub(crate) fn remember_file(&mut self, app: &AppHandle, path: &Path) {
+        // The caller already verified this file; a later cache read cannot change that outcome.
+        self.complete_origin(self.0.size);
         // This is a generated installer staging path, never a path supplied by another computer.
         let bytes = std::fs::metadata(path).and_then(|metadata| {
             if metadata.len() != self.0.size as u64 {
@@ -66,12 +69,20 @@ impl Package {
             }
         }
     }
+
+    fn complete_origin(&mut self, bytes: usize) {
+        if let Some(mut session) = self.1.take() {
+            session.report.accepted(Source::Origin, bytes);
+            session.finish(true);
+        }
+    }
 }
 
 async fn shared(
     service: &Arc<Service>,
     artifact: &Artifact,
     mut progress: impl FnMut(usize, Option<u64>),
+    pending: &mut Option<Session>,
 ) -> Result<Arc<Vec<u8>>> {
     if let Ok(bytes) = service.cache.read(&artifact.id).await {
         let bytes = verify(service, artifact, bytes).await?;
@@ -84,7 +95,18 @@ async fn shared(
         .downloads
         .try_acquire()
         .map_err(|_| Error::Unavailable)?;
-    let bytes = download_peer(service, artifact, progress).await?;
+    if !service.policy.allows_download() {
+        return Err(Error::Unavailable);
+    }
+    let session = pending.insert(Session::new(service, &artifact.id));
+    let result = download_recorded(service, artifact, progress, &mut session.report).await;
+    if let Err(error) = &result {
+        session.report.interrupted(error);
+    }
+    let bytes = result?;
+    if let Some(session) = pending.take() {
+        session.finish(true);
+    }
     eprintln!("GUI dependency download source: peer");
     if let Err(error) = service.cache.save(artifact.clone(), bytes.clone()).await {
         eprintln!("could not cache the verified GUI dependency: {error}");
@@ -92,33 +114,15 @@ async fn shared(
     Ok(bytes)
 }
 
-pub(super) async fn download_peer(
-    service: &Arc<Service>,
-    artifact: &Artifact,
-    progress: impl FnMut(usize, Option<u64>),
-) -> Result<Arc<Vec<u8>>> {
-    if !service.policy.allows_download() {
-        return Err(Error::Unavailable);
-    }
-    let delivery = service.reporter.as_ref().and_then(|reporter| reporter());
-    let mut report = Report::new(&artifact.id);
-    let result = download_recorded(service, artifact, progress, &mut report).await;
-    if let Err(error) = &result {
-        report.interrupted(error);
-    }
-    report.finish(result.is_ok());
-    if let Some(deliver) = delivery {
-        deliver(report);
-    }
-    result
-}
-
-async fn download_recorded(
+pub(super) async fn download_recorded(
     service: &Arc<Service>,
     artifact: &Artifact,
     progress: impl FnMut(usize, Option<u64>),
     report: &mut Report,
 ) -> Result<Arc<Vec<u8>>> {
+    if !service.policy.allows_download() {
+        return Err(Error::Unavailable);
+    }
     let scope = service.policy.preferences().scope;
     let mut leases = match service.find_peers(&artifact.id).await {
         Ok(leases) => leases,

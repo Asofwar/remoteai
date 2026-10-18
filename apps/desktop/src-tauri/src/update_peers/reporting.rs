@@ -6,6 +6,42 @@ use std::sync::Arc;
 pub(super) type Delivery = Box<dyn FnOnce(Report) + Send>;
 pub(super) type Reporter = Arc<dyn Fn() -> Option<Delivery> + Send + Sync>;
 
+/// Owns one final report across shared downloads and their official fallback.
+pub(super) struct Session {
+    pub report: Report,
+    delivery: Option<Delivery>,
+}
+
+impl Session {
+    pub fn new(service: &super::Service, artifact: &str) -> Self {
+        Self {
+            report: Report::new(artifact),
+            delivery: service.reporter.as_ref().and_then(|reporter| reporter()),
+        }
+    }
+
+    pub fn finish(mut self, success: bool) {
+        self.report.finish(success);
+        self.deliver();
+    }
+
+    fn deliver(&mut self) {
+        if let Some(delivery) = self.delivery.take() {
+            // Moving the completed report avoids retaining a second copy of its accounting.
+            let report = std::mem::replace(&mut self.report, Report::new(""));
+            delivery(report);
+        }
+    }
+}
+
+impl Drop for Session {
+    fn drop(&mut self) {
+        // Early returns/cancellation must settle the original attempt, never create a second report.
+        self.report.finish(false);
+        self.deliver();
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub(super) enum Source {

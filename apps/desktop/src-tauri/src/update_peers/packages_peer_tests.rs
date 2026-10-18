@@ -60,7 +60,12 @@ async fn exercise(behavior: &'static str) {
     let mut progress = 0;
     let result = tokio::time::timeout(
         Duration::from_secs(25),
-        shared(&service, &package.0, |length, _| progress += length),
+        shared(
+            &service,
+            &package.0,
+            |length, _| progress += length,
+            &mut None,
+        ),
     )
     .await;
     host.stop().await;
@@ -71,7 +76,9 @@ async fn exercise(behavior: &'static str) {
         .unwrap();
     check_result(behavior, result.unwrap(), progress, (&service, &package)).await;
     if behavior == "valid" {
-        shared(&service, &package.0, |_, _| {}).await.unwrap();
+        shared(&service, &package.0, |_, _| {}, &mut None)
+            .await
+            .unwrap();
     }
     let reports = reports.lock().unwrap();
     assert_eq!(reports.len(), 1, "cached packages must not count again");

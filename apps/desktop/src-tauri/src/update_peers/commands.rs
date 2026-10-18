@@ -8,7 +8,12 @@ use tauri_plugin_updater::Update;
 use super::transfer;
 #[cfg(test)]
 use super::Error;
-use super::{cache::Artifact, packages, Result, Service};
+use super::{
+    cache::Artifact,
+    packages,
+    reporting::{Session, Source},
+    Service,
+};
 
 struct VerifiedPackage {
     artifact: String,
@@ -116,31 +121,67 @@ async fn download(
     artifact: &Artifact,
     progress: &mut Progress,
 ) -> std::result::Result<Arc<Vec<u8>>, String> {
-    if let Ok(bytes) = download_peer(service, artifact, progress).await {
-        eprintln!("update package download source: peer");
-        return Ok(bytes);
+    let mut session = Session::new(service, &artifact.id);
+    if service.policy.allows_download() {
+        let result = packages::download_recorded(
+            service,
+            artifact,
+            |length, total| progress.chunk(length, total),
+            &mut session.report,
+        )
+        .await;
+        match result {
+            Ok(bytes) => {
+                session.finish(true);
+                return Ok(bytes);
+            }
+            Err(error) => session.report.interrupted(&error),
+        }
     }
+    let result = download_official(update, progress, &mut session.report).await;
+    session.finish(result.is_ok());
+    result
+}
+
+async fn download_official(
+    update: &Update,
+    progress: &mut Progress,
+    report: &mut super::reporting::Report,
+) -> std::result::Result<Arc<Vec<u8>>, String> {
     eprintln!("update peer unavailable; downloading the package from GitHub");
     progress.started = false;
     let mut origin = update.clone();
     // The manifest's 10-second check timeout must not truncate an installer download.
     origin.timeout = Some(Duration::from_secs(30 * 60));
-    origin
-        .download(|length, total| progress.chunk(length, total), || {})
-        .await
+    let result = origin
+        .download(
+            |length, total| {
+                report.accepted(Source::Origin, length);
+                progress.chunk(length, total);
+            },
+            || {},
+        )
+        .await;
+    if let Err(error) = &result {
+        record_fallback_failure(report, error);
+    }
+    result
         .map(Arc::new)
         .map_err(|_| "Could not download the update. Please try again.".to_owned())
 }
 
-async fn download_peer(
-    service: &Arc<Service>,
-    artifact: &Artifact,
-    progress: &mut Progress,
-) -> Result<Arc<Vec<u8>>> {
-    packages::download_peer(service, artifact, |length, total| {
-        progress.chunk(length, total)
-    })
-    .await
+fn record_fallback_failure(
+    report: &mut super::reporting::Report,
+    error: &tauri_plugin_updater::Error,
+) {
+    use tauri_plugin_updater::Error as UpdaterError;
+    let (stage, error) = match error {
+        UpdaterError::Minisign(_) | UpdaterError::Base64(_) | UpdaterError::SignatureUtf8(_) => {
+            ("verify", super::Error::Invalid)
+        }
+        _ => ("transfer", super::Error::Unavailable),
+    };
+    report.failure(Source::Origin, stage, &error);
 }
 
 #[tauri::command]

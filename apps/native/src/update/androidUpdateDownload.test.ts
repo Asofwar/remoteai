@@ -7,6 +7,7 @@ const native = vi.hoisted(() => ({
   exists: vi.fn(), stat: vi.fn(), fetch: vi.fn(), config: vi.fn(), status: vi.fn(),
   modules: {} as Record<string, unknown>,
   listen: vi.fn(), remove: vi.fn(),
+  report: vi.fn(), session: vi.fn(), peers: vi.fn(),
 }));
 vi.mock('expo-application', () => ({ nativeApplicationVersion: '1.5.29', nativeBuildVersion: '10502999' }));
 vi.mock('expo-secure-store', () => ({
@@ -16,6 +17,9 @@ vi.mock('react-native', () => ({ Platform: { OS: 'android' }, NativeModules: nat
   DeviceEventEmitter: { addListener: native.listen } }));
 vi.mock('./androidUpdateNotifications', () => ({ prepareUpdateNotifications: vi.fn(),
   updateNotificationLabels: () => ({}) }));
+vi.mock('../api/client', () => ({ loadSession: native.session }));
+vi.mock('../../../../shared/app-update/peerLookup', () => ({ findUpdatePeers: native.peers }));
+vi.mock('../../../../shared/app-update/downloadReport', () => ({ reportDownload: native.report }));
 vi.mock('react-native-blob-util', () => ({ default: {
   fs: { exists: native.exists, stat: native.stat, dirs: { DownloadDir: '/storage/emulated/0/Download' } },
   config: native.config,
@@ -54,6 +58,39 @@ beforeEach(() => {
 });
 
 describe('Android update recovery after restarting the app', () => {
+  it.each(['success', 'transfer-failed', 'verify-failed'])(
+    'settles one report only after the official fallback and verification: %s', async outcome => {
+      const transfer = deferred<string>();
+      const official = vi.fn().mockReturnValue(transfer.promise);
+      const report = { id: 'same-report', artifact: 'b'.repeat(64), platform: 'android', outcome: 'failed',
+        peerBytes: 0, serverBytes: 0, originBytes: 0,
+        failures: [{ source: 'peer', stage: 'connect', code: 'unavailable', count: 3 }] };
+      const session = { baseUrl: 'https://example.test', accessToken: 'original-account' };
+      native.session.mockResolvedValue(session);
+      native.peers.mockResolvedValue({ configs: [], close: vi.fn() });
+      native.modules.AppUpdate = { artifactId: vi.fn().mockResolvedValue(report.artifact),
+        downloadPeers: vi.fn(), updatePath: () => Promise.resolve(stored.path),
+        downloadPeersReported: vi.fn().mockResolvedValue(JSON.stringify({ path: null, report })),
+        downloadOfficial: official,
+        verifyPackage: vi.fn().mockResolvedValue(outcome !== 'verify-failed') };
+      const update = await import('./appUpdate');
+      const signed = { ...release, androidAsset: { ...release.androidAsset!, sha256: 'a'.repeat(64) } };
+      const download = update.startAndroidUpdateDownload(signed);
+      const settled = download.then(() => true, () => false);
+      await vi.waitFor(() => expect(official).toHaveBeenCalledOnce());
+      expect(native.report).not.toHaveBeenCalled();
+      native.session.mockResolvedValue({ ...session, accessToken: 'different-account' });
+      if (outcome === 'transfer-failed') transfer.reject(new Error('private network details'));
+      else transfer.resolve(stored.path);
+      expect(await settled).toBe(outcome === 'success');
+      expect(native.report).toHaveBeenCalledOnce();
+      expect(native.report).toHaveBeenCalledWith(session, expect.objectContaining({
+        id: 'same-report', outcome: outcome === 'success' ? 'success' : 'failed',
+        originBytes: outcome === 'success' ? stored.expectedSize : 0,
+      }));
+      expect(JSON.stringify(native.report.mock.calls)).not.toContain('private network details');
+    },
+  );
   it.each(['failed', 'missing'])('allows retry when the system task is %s', async (status) => {
     native.status.mockResolvedValue(status);
     const update = await import('./appUpdate');

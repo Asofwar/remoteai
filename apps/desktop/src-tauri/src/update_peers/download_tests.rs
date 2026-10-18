@@ -12,6 +12,23 @@ mod parallel_tests;
 mod peer_tests;
 #[path = "block_pipeline_tests.rs"]
 mod pipeline_tests;
+#[path = "download_reporting_tests.rs"]
+mod reporting_tests;
+
+fn capture_reports(service: &mut Arc<Service>) -> Arc<std::sync::Mutex<Vec<serde_json::Value>>> {
+    let reports = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let captured = reports.clone();
+    Arc::get_mut(service).unwrap().reporter = Some(Arc::new(move || {
+        let captured = captured.clone();
+        Some(Box::new(move |report| {
+            captured
+                .lock()
+                .unwrap()
+                .push(serde_json::to_value(report).unwrap());
+        }))
+    }));
+    reports
+}
 
 struct Origin {
     url: url::Url,

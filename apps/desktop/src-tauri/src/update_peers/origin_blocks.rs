@@ -5,6 +5,8 @@ use reqwest::{
 };
 use std::time::Duration;
 
+const DOWNLOAD_USER_AGENT: &str = "RemoteAI-UpdateDownload";
+
 pub(super) struct Origin {
     client: Client,
     url: String,
@@ -30,6 +32,7 @@ impl Origin {
             offset: 0,
             end: 0,
             client: Client::builder()
+                .user_agent(DOWNLOAD_USER_AGENT)
                 .connect_timeout(Duration::from_secs(10))
                 .read_timeout(Duration::from_secs(8))
                 .build()
@@ -49,6 +52,7 @@ impl Origin {
     async fn request(&self, offset: usize, length: usize) -> Result<Response> {
         self.client
             .get(&self.url)
+            .header(reqwest::header::ACCEPT, "application/octet-stream")
             .header(RANGE, format!("bytes={offset}-{}", offset + length - 1))
             .header(reqwest::header::ACCEPT_ENCODING, "identity")
             .send()
@@ -163,6 +167,9 @@ mod tests {
                     assert!(request.len() < 4096);
                     request.push(socket.read_u8().await.unwrap());
                 }
+                let request = String::from_utf8(request).unwrap().to_ascii_lowercase();
+                assert!(request.contains("\r\nuser-agent: remoteai-updatedownload\r\n"));
+                assert!(request.contains("\r\naccept: application/octet-stream\r\n"));
                 let response = format!(
                     "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {range}/10\r\nContent-Length: 1\r\n\r\nx"
                 );

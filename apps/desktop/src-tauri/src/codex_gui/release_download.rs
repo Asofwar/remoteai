@@ -16,10 +16,10 @@ pub(super) fn shared_download(app: &AppHandle, path: &Path, request: Request<'_>
         asset,
         silent,
     } = request;
-    let package = asset.digest.as_deref().and_then(|digest| {
+    let mut package = asset.digest.as_deref().and_then(|digest| {
         Package::codex(version, &asset.browser_download_url, digest, asset.size)
     });
-    if let Some(package) = &package {
+    if let Some(package) = &mut package {
         let mut downloaded = 0u64;
         let mut last_percent = 0;
         let bytes = package.read_shared(app, |length, _| {
@@ -47,7 +47,7 @@ pub(super) fn shared_download(app: &AppHandle, path: &Path, request: Request<'_>
         asset,
         path,
     )?;
-    if let Some(package) = package {
+    if let Some(mut package) = package {
         package.remember_file(app, path);
     }
     Ok(())

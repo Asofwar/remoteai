@@ -9,6 +9,7 @@ import { downloadSharedAndroidUpdate, downloadOfficialAndroidUpdate,
 import { compareAppVersions, versionFromReleaseMetadata } from '../../../../shared/app-update/version';
 import { subscribeAndroidDownloadProgress, type AndroidDownloadProgress } from './androidDownloadProgress';
 import { prepareUpdateNotifications } from './androidUpdateNotifications';
+import { AndroidDownloadReporting } from './androidDownloadReporting';
 
 export { compareAppVersions } from '../../../../shared/app-update/version';
 export { versionFromReleaseMetadata } from './version';
@@ -265,24 +266,28 @@ export async function startAndroidUpdateDownload(release: AppRelease, options: {
   } });
   activeDownload = (async () => {
     let unsubscribe: (() => void) | undefined;
+    const reporting = new AndroidDownloadReporting(androidAsset.size);
     try {
       const stored = await prepareAndroidDownload(release, options.wifiOnly === true);
       unsubscribe = subscribeAndroidDownloadProgress(stored.path, progress => {
         publishDownloadState({ status: 'downloading', version: release.version, progress });
       });
       const downloadedPath = await downloadAndroidPackage({ release, path: stored.path,
-        wifiOnly: options.wifiOnly === true });
+        wifiOnly: options.wifiOnly === true, reporting });
       publishDownloadState({ status: 'downloading', version: release.version, progress: {
         receivedBytes: androidAsset.size, totalBytes: androidAsset.size, bytesPerSecond: 0, phase: 'verifying',
       } });
+      reporting.verify();
       if (!await verifyAndroidPackage({ path: downloadedPath, size: androidAsset.size, sha256: androidAsset.sha256 })) {
         throw new Error(t("下载未完成，请重新下载。"));
       }
+      reporting.finish(true);
       const completed = { ...stored, path: downloadedPath };
       await SecureStore.setItemAsync(UPDATE_METADATA_KEY, JSON.stringify(completed));
       publishDownloadState({ status: 'downloaded', version: release.version, path: downloadedPath });
       return downloadedPath;
     } catch (error) {
+      reporting.finish(false);
       const message = t("下载未完成，请重新下载。");
       await SecureStore.deleteItemAsync(UPDATE_METADATA_KEY).catch(() => undefined);
       publishDownloadState({ status: 'failed', version: release.version, message });
@@ -295,9 +300,12 @@ export async function startAndroidUpdateDownload(release: AppRelease, options: {
   return activeDownload;
 }
 
-async function downloadAndroidPackage(options: { release: AppRelease; path: string; wifiOnly: boolean }) {
+async function downloadAndroidPackage(options: {
+  release: AppRelease; path: string; wifiOnly: boolean; reporting: AndroidDownloadReporting;
+}) {
   const peerPath = await downloadSharedAndroidUpdate(options);
   if (peerPath) return peerPath;
+  options.reporting.useOrigin();
   const official = downloadOfficialAndroidUpdate(options);
   if (official) return official;
   // Older native binaries cannot enforce Wi-Fi on DownloadManager jobs: never auto-start those jobs.

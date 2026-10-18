@@ -4,7 +4,8 @@ import { findUpdatePeers } from '../../../../shared/app-update/peerLookup';
 import { watchUpdatePeers } from '../../../../shared/app-update/peerDiscovery';
 import { updateMirrorUrl } from '../../../../shared/app-update/mirrorUrl';
 import { updateNotificationLabels } from './androidUpdateNotifications';
-import { reportDownload, type DownloadReport } from '../../../../shared/app-update/downloadReport';
+import type { DownloadReport } from '../../../../shared/app-update/downloadReport';
+import type { AndroidDownloadReporting } from './androidDownloadReporting';
 
 interface UpdateModule {
   sharingProtocol?: number;
@@ -28,7 +29,7 @@ export async function verifyAndroidPackage(options: { path: string; size: number
 }
 
 export async function downloadSharedAndroidUpdate(options: {
-  release: AppRelease; path: string; wifiOnly: boolean;
+  release: AppRelease; path: string; wifiOnly: boolean; reporting: AndroidDownloadReporting;
 }): Promise<string | null> {
   const native = module();
   const asset = options.release.androidAsset;
@@ -59,7 +60,7 @@ export async function downloadSharedAndroidUpdate(options: {
     if (!lease && result.report.failures.length < 16) {
       result.report.failures.push({ source: 'peer', stage: 'lookup', code: 'unavailable', count: 1 });
     }
-    if (session) void reportDownload(session, result.report);
+    if (session) options.reporting.capture(session, result.report);
     return result.path;
   } catch {
     // Peer lookup, transport, file and integrity failures all return to the original GitHub URL.

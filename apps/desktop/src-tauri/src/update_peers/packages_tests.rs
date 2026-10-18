@@ -84,22 +84,31 @@ async fn dependencies_reuse_restart_cache_and_reject_corruption_or_size_changes(
     service.cache.restore().await.unwrap();
     let mut downloaded = 0;
     assert_eq!(
-        shared(&service, &package.0, |length, _| downloaded += length)
-            .await
-            .unwrap()
-            .as_slice(),
+        shared(
+            &service,
+            &package.0,
+            |length, _| downloaded += length,
+            &mut None
+        )
+        .await
+        .unwrap()
+        .as_slice(),
         BYTES
     );
     assert_eq!(downloaded, BYTES.len());
     let mut wrong_size = package.0.clone();
     wrong_size.size += 1;
-    assert!(shared(&service, &wrong_size, |_, _| {}).await.is_err());
+    assert!(shared(&service, &wrong_size, |_, _| {}, &mut None)
+        .await
+        .is_err());
     std::fs::write(
         root.path().join(format!("{}.pkg", package.0.id)),
         b"corrupted",
     )
     .unwrap();
-    assert!(shared(&service, &package.0, |_, _| {}).await.is_err());
+    assert!(shared(&service, &package.0, |_, _| {}, &mut None)
+        .await
+        .is_err());
     assert!(service.cache.artifacts().is_empty());
 }
 
@@ -108,11 +117,15 @@ async fn unavailable_or_busy_sharing_leaves_origin_download_available() {
     let root = tempfile::tempdir().unwrap();
     let service = service(root.path());
     let package = package();
-    assert!(shared(&service, &package.0, |_, _| {}).await.is_err());
+    assert!(shared(&service, &package.0, |_, _| {}, &mut None)
+        .await
+        .is_err());
     let (sender, mut receiver) = mpsc::channel(2);
     service.broker.send_replace(Some(sender));
     let permit = service.downloads.acquire().await.unwrap();
-    assert!(shared(&service, &package.0, |_, _| {}).await.is_err());
+    assert!(shared(&service, &package.0, |_, _| {}, &mut None)
+        .await
+        .is_err());
     assert!(receiver.try_recv().is_err());
     drop(permit);
     let lookup = tokio::spawn(async move {
@@ -121,9 +134,52 @@ async fn unavailable_or_busy_sharing_leaves_origin_download_available() {
         };
         assert!(reply.send(Err(Error::Unavailable)).is_ok());
     });
-    assert!(shared(&service, &package.0, |_, _| {}).await.is_err());
+    assert!(shared(&service, &package.0, |_, _| {}, &mut None)
+        .await
+        .is_err());
     lookup.await.unwrap();
 }
 
 #[path = "packages_peer_tests.rs"]
 mod peer;
+
+#[tokio::test]
+async fn dependency_reports_wait_for_the_official_fallback_outcome() {
+    for success in [true, false] {
+        let root = tempfile::tempdir().unwrap();
+        let mut service = service(root.path());
+        let reports = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let captured = reports.clone();
+        Arc::get_mut(&mut service).unwrap().reporter = Some(Arc::new(move || {
+            let captured = captured.clone();
+            Some(Box::new(move |report| {
+                captured
+                    .lock()
+                    .unwrap()
+                    .push(serde_json::to_value(report).unwrap());
+            }))
+        }));
+        let mut package = package();
+        assert!(shared(&service, &package.0, |_, _| {}, &mut package.1)
+            .await
+            .is_err());
+        assert!(
+            reports.lock().unwrap().is_empty(),
+            "fallback has not finished"
+        );
+        if success {
+            package.complete_origin(BYTES.len());
+        }
+        drop(package);
+        let reports = reports.lock().unwrap();
+        assert_eq!(reports.len(), 1);
+        assert_eq!(
+            reports[0]["outcome"],
+            if success { "success" } else { "failed" }
+        );
+        assert_eq!(
+            reports[0]["originBytes"],
+            if success { BYTES.len() } else { 0 }
+        );
+    }
+}

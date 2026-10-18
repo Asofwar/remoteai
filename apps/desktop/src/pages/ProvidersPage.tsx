@@ -121,6 +121,7 @@ export function ProvidersPage({
   const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>([]);
   const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false);
   const [topbarHost, setTopbarHost] = useState<HTMLElement | null>(null);
+  const [groupToolbarHost, setGroupToolbarHost] = useState<HTMLElement | null>(null);
   const proxyRunning = Boolean(localProxy?.running);
   const activeAggregateId = aggregateApis.find((aggregate) => aggregate.active)?.id;
   const groups = [...new Set([
@@ -131,6 +132,7 @@ export function ProvidersPage({
 
   useEffect(() => {
     setTopbarHost(active ? document.getElementById("provider-topbar-actions") : null);
+    setGroupToolbarHost(active ? document.getElementById("provider-topbar-groups") : null);
   }, [active]);
 
   useEffect(() => {
@@ -233,6 +235,17 @@ export function ProvidersPage({
 
   return (
     <>
+      {groupToolbarHost && createPortal(
+        <>
+          <ProviderGroupToolbar providers={providers} accounts={accounts} busyProviderId={busyProviderId}
+            activeGroup={localProxy?.activeProviderGroup}
+            proxyRunning={proxyRunning} onSwitchGroup={onSwitchGroup} t={t} />
+          <ProviderGroupManager groups={groups} providers={providers} busy={Boolean(busyProviderId)}
+            additionalMembers={accounts} onChangeGroupMembers={onChangeGroupMembers}
+            onChangeMany={onGroupChangeMany} onGroupsChange={onProviderGroupsChange} t={t} />
+        </>,
+        groupToolbarHost,
+      )}
       {topbarHost && createPortal(
         <Space size={[8, 8]} wrap>
           <ProviderAddMenu onAddPreset={() => setShowPresetModal(true)} onAddOpenAi={openCreateOpenAi}
@@ -241,12 +254,6 @@ export function ProvidersPage({
             onClick={() => setShowAggregateManager(true)}>
             {t("providers.aggregate.manage")}
           </Button>
-          <ProviderGroupToolbar providers={providers} accounts={accounts} busyProviderId={busyProviderId}
-            activeGroup={localProxy?.activeProviderGroup}
-            proxyRunning={proxyRunning} onSwitchGroup={onSwitchGroup} t={t} />
-          <ProviderGroupManager groups={groups} providers={providers} busy={Boolean(busyProviderId)}
-            additionalMembers={accounts} onChangeGroupMembers={onChangeGroupMembers}
-            onChangeMany={onGroupChangeMany} onGroupsChange={onProviderGroupsChange} t={t} />
         </Space>,
         topbarHost,
       )}

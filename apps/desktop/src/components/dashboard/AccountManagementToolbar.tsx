@@ -51,6 +51,7 @@ export function AccountManagementToolbar({
         </div>
       </div>
       <div className={`topbar-actions ${styles.actions}`}>
+        {section === "providers" && <div id="provider-topbar-groups" className={styles.leadingActions} />}
         <div className={styles.sectionActions}>{children}</div>
         {sharedActions && <div className={styles.sharedActions}>{sharedActions}</div>}
       </div>

@@ -28,13 +28,33 @@ fn shared_group_includes_only_enabled_valid_accounts_from_the_same_group() {
     assert!(members[1].api_key.is_empty());
     let model = members[1].models.first().unwrap();
     let visible = provider_group_model_name(&members[1], model);
+    assert_eq!(visible, format!("{model}-included@example.test-{included}"));
     let selected = provider_for_group_model(&members, Some(&visible)).unwrap();
     assert_eq!(selected.id, members[1].id);
     assert_eq!(&selected.model, model);
+    let legacy_name = format!("included@example.test-{included}-{model}");
+    let legacy = provider_for_group_model(&members, Some(&legacy_name)).unwrap();
+    assert_eq!(legacy.id, selected.id);
+    assert_eq!(legacy.model, selected.model);
     assert!(provider_for_group_model(&members, Some("outside-model")).is_err());
     let catalog = model_catalog_for_provider_group(&members);
-    assert!(catalog["models"].as_array().unwrap().iter().any(|entry| entry["slug"] == visible));
+    assert!(catalog["models"].as_array().unwrap().iter().any(|entry|
+        entry["slug"] == visible && entry["display_name"] == visible));
     fs::remove_dir_all(paths.codex_home.parent().unwrap()).unwrap();
+}
+
+#[test]
+fn shared_group_current_model_names_take_precedence_over_legacy_names() {
+    let mut legacy = provider();
+    legacy.name = "model".into();
+    legacy.model = "gateway".into();
+    let mut current = provider();
+    current.id = "current".into();
+    current.name = "gateway".into();
+    current.model = "model".into();
+    let selected = provider_for_group_model(&[legacy, current], Some("model-gateway")).unwrap();
+    assert_eq!(selected.id, "current");
+    assert_eq!(selected.model, "model");
 }
 
 #[test]

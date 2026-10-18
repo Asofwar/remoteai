@@ -15,7 +15,7 @@
     }
 
     #[test]
-    fn provider_group_catalog_uses_api_and_model_names() {
+    fn provider_group_catalog_starts_with_model_names() {
         let mut first = provider();
         first.name = "API One".to_string();
         first.group = "Work".to_string();
@@ -39,14 +39,20 @@
 
         assert_eq!(
             slugs,
-            vec!["API One-model-a", "API One-model-b", "API Two-model-c"]
+            vec!["model-a-API One", "model-b-API One", "model-c-API Two"]
         );
+        for entry in catalog["models"].as_array().unwrap() {
+            assert_eq!(entry["display_name"], entry["slug"]);
+        }
         let selected =
-            provider_for_group_model(&[first.clone(), second.clone()], Some("API Two-model-c"))
+            provider_for_group_model(&[first.clone(), second.clone()], Some("model-c-API Two"))
                 .expect("group model should resolve to its API");
         assert_eq!(selected.id, "p2");
         assert_eq!(selected.model, "model-c");
         assert!(!selected.model_selection_controlled_by_codex);
+        let legacy = provider_for_group_model(&[first.clone(), second.clone()], Some("API Two-model-c")).unwrap();
+        assert_eq!(legacy.id, selected.id);
+        assert_eq!(legacy.model, selected.model);
         assert!(provider_for_group_model(&[provider()], Some("unknown-model")).is_err());
 
         second.name = first.name.clone();

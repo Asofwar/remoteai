@@ -27,8 +27,14 @@ for (const width of [900, 1440]) {
     await page.goto("/");
     await openProviders();
     const toolbar = page.locator("#provider-topbar-actions");
-    await expect(toolbar.locator(".provider-group-start-button").filter({ hasText: "Work" })).toHaveText(/Work\s*2/);
-    await toolbar.getByRole("button", { name: "分组管理", exact: true }).click();
+    const groups = page.locator("#provider-topbar-groups");
+    await expect(groups.locator(".provider-group-start-button").filter({ hasText: "Work" })).toHaveText(/Work\s*2/);
+    const groupBounds = await groups.boundingBox();
+    const toolbarBounds = await toolbar.boundingBox();
+    expect(groupBounds!.x).toBeLessThan(toolbarBounds!.x);
+    expect(await groups.locator(".provider-group-toolbar").evaluate(element =>
+      getComputedStyle(element).justifyContent)).toBe("flex-start");
+    await groups.getByRole("button", { name: "分组管理", exact: true }).click();
     const manager = page.getByRole("dialog");
     await expect(manager.getByText("Official", { exact: true })).toBeVisible();
     const row = manager.locator(".provider-group-manager-row").filter({ hasText: "Work" });
@@ -41,7 +47,7 @@ for (const width of [900, 1440]) {
     expect(await page.evaluate(() => localStorage.getItem("codex-switch:local-proxy-concurrent-group"))).toBe("Shared");
     await manager.getByRole("button", { name: "Close", exact: true }).click();
     await expect(manager).toBeHidden();
-    const start = toolbar.locator(".provider-group-start-button").filter({ hasText: "Shared" });
+    const start = groups.locator(".provider-group-start-button").filter({ hasText: "Shared" });
     await expect(start).toHaveText(/Shared\s*2/);
     await start.click();
     await expect(start).toBeDisabled();
@@ -51,7 +57,7 @@ for (const width of [900, 1440]) {
     expect(assignments["demo-1"]).toBe("Shared");
     await page.reload();
     await openProviders();
-    await expect(toolbar.locator(".provider-group-start-button").filter({ hasText: "Shared" })).toBeDisabled();
+    await expect(groups.locator(".provider-group-start-button").filter({ hasText: "Shared" })).toBeDisabled();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: `../../.codex-tmp/shared-groups-${width}.png`, animations: "disabled" });
     expect(errors).toEqual([]);

@@ -97,30 +97,42 @@ fn validate_provider_group_models(providers: &[ProviderProfile]) -> Result<(), S
     Ok(())
 }
 
-pub(crate) fn provider_group_model_name(provider: &ProviderProfile, model: &str) -> String {
+fn provider_group_member_name(provider: &ProviderProfile) -> String {
     // Email addresses can be shared by multiple workspaces; the stored account ID includes workspace identity.
     if let Some(id) = crate::aggregate_api::member_account_id(&provider.id) {
-        return format!("{}-{id}-{model}", provider.name);
+        return format!("{}-{id}", provider.name);
     }
-    format!("{}-{model}", provider.name)
+    provider.name.clone()
+}
+
+/// Keep the model first in Codex pickers while retaining the member identity for routing.
+pub(crate) fn provider_group_model_name(provider: &ProviderProfile, model: &str) -> String {
+    format!("{model}-{}", provider_group_member_name(provider))
+}
+
+fn legacy_provider_group_model_name(provider: &ProviderProfile, model: &str) -> String {
+    format!("{}-{model}", provider_group_member_name(provider))
 }
 
 pub(crate) fn provider_for_group_model(
     providers: &[ProviderProfile],
     requested_model: Option<&str>,
 ) -> Result<ProviderProfile, String> {
-    let matching_provider = |requested: &str| {
+    let matching_provider = |requested: &str, model_name: fn(&ProviderProfile, &str) -> String| {
         providers.iter().find_map(|provider| {
             group_visible_models(provider)
                 .into_iter()
-                .find(|model| provider_group_model_name(provider, model) == requested)
+                .find(|model| model_name(provider, model) == requested)
                 .map(|model| (provider, model.to_string()))
         })
     };
     let selected = match requested_model {
-        Some(requested) => matching_provider(requested).ok_or_else(|| {
-            "The selected model is not available in this Provider group".to_string()
-        })?,
+        Some(requested) => matching_provider(requested, provider_group_model_name)
+            // Existing conversations can retain the previous member-first name. Current catalog names take precedence.
+            .or_else(|| matching_provider(requested, legacy_provider_group_model_name))
+            .ok_or_else(|| {
+                "The selected model is not available in this Provider group".to_string()
+            })?,
         None => providers
             .first()
             .and_then(|provider| {

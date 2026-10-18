@@ -188,7 +188,12 @@ impl Drop for Surface {
 
 fn transparent_rgba(black: &[u8], white: &[u8]) -> Vec<u8> {
     let mut rgba = Vec::with_capacity(black.len());
-    for (dark, light) in black.chunks_exact(4).zip(white.chunks_exact(4)) {
+    for (dark, light) in black
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .zip(white.as_chunks::<4>().0)
+    {
         // Two backgrounds recover alpha for both modern RGBA icons and legacy mask icons.
         let transparency = (0..3)
             .map(|i| light[i].saturating_sub(dark[i]))

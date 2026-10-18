@@ -15,7 +15,7 @@ const items: Item[] = [
 const fixture: Conversation = { thread: { id: "heavy", cwd: "", preview: "", updatedAt: 1 },
   activeTurn: null, tokens: 0, error: "", turns: [{ id: "turn", status: "completed", items }] };
 
-test("defers closed history and appends long tool output as the mouse scrolls", async ({ page }) => {
+test("defers closed history and renders complete tool output on expansion", async ({ page }) => {
   await page.route("**/history-fixture.json", (route) => route.fulfill({ json: fixture }));
   await page.goto("/e2e/tool-history-harness.html");
   await expect(page.getByText("检查完成。", { exact: true })).toBeVisible();
@@ -30,20 +30,18 @@ test("defers closed history and appends long tool output as the mouse scrolls", 
   await expect(page.getByAltText("工具返回的图片")).toHaveCount(1);
   await expect(page.locator("pre")).toHaveCount(0);
   await page.getByText("结构化结果", { exact: true }).click();
-  expect((await page.locator("pre").textContent())!.length).toBeLessThanOrEqual(8_000);
+  expect((await page.locator("pre").textContent())!.length).toBeGreaterThan(100_000);
   await page.locator('[data-message-id="long"] > details > summary').click();
   const log = page.locator('[data-message-id="long"]');
   const content = log.getByRole("region", { name: "工具内容" });
-  await expect(content).toHaveText(output.slice(0, 8_000));
+  await expect.poll(() => content.evaluate((node, text) => node.textContent === text, output)).toBe(true);
   await expect(log.getByRole("button", { name: "下一段", exact: true })).toHaveCount(0);
-  expect((await log.textContent())!.length).toBeLessThan(8_200);
   await content.hover();
   await page.mouse.wheel(0, 20_000);
-  await expect(content).toHaveText(output.slice(0, 16_000));
-  expect(await content.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
-  await page.mouse.wheel(0, -20_000);
+  await expect.poll(() => content.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  await page.mouse.wheel(0, -100_000);
   await expect.poll(() => content.evaluate((node) => node.scrollTop)).toBe(0);
-  await expect(content).toHaveText(output.slice(0, 16_000));
+  await expect.poll(() => content.evaluate((node, text) => node.textContent === text, output)).toBe(true);
   await page.getByLabel("消息", { exact: true }).fill("展开日志后仍可输入");
   await expect(page.getByLabel("消息", { exact: true })).toHaveValue("展开日志后仍可输入");
   await page.screenshot({ path: "../../.codex-tmp/tool-output-scroll.png", animations: "disabled" });
@@ -70,13 +68,12 @@ test("mouse scrolling reads a command's complete output without paging or losing
   const preview = activity.locator(":scope > summary > span");
   expect(await preview.evaluate((node) => getComputedStyle(node).animationName)).toContain("activeTextSweep");
   const output = activity.getByRole("region", { name: "工具内容" }).nth(1);
-  await expect(output).toHaveText(commandOutput.slice(0, 8_000));
+  await expect(output).toHaveText(commandOutput);
   await expect(activity.getByRole("button", { name: "下一段", exact: true })).toHaveCount(0);
-  for (let loaded = 8_000; loaded < commandOutput.length; loaded += 8_000) {
-    await output.hover();
-    await page.mouse.wheel(0, 100_000);
-    await expect(output).toHaveText(commandOutput.slice(0, loaded + 8_000));
-  }
+  await output.hover();
+  await page.mouse.wheel(0, 100_000);
+  await expect.poll(() => output.evaluate(node => node.scrollHeight - node.scrollTop - node.clientHeight))
+    .toBeLessThan(2);
   await page.mouse.wheel(0, -100_000);
   await expect.poll(() => output.evaluate((node) => node.scrollTop)).toBe(0);
   expect(await output.textContent()).toBe(commandOutput);

@@ -1,20 +1,31 @@
 import { guiText } from "../../i18n/guiText";
 import { CopyButton } from "./CopyButton";
 import { RichText } from "./RichText";
-import { OUTPUT_BATCH_CHARACTERS, useProgressiveToolText } from "./useProgressiveToolText";
 import styles from "./ActivityRow.module.less";
 
-/** Load long tool output progressively while keeping it one continuous document. */
+const COPY_ACTION_THRESHOLD = 8_000;
+const MAX_FORMATTED_TOOL_CHARACTERS = 100_000;
+const TEXT_NODE_CHARACTERS = 10_000;
+
+function completePlainText(text: string) {
+  // Mount every span immediately; a single million-character text node can stall Chromium on expansion.
+  return Array.from({ length: Math.ceil(text.length / TEXT_NODE_CHARACTERS) }, (_, index) => (
+    <span key={index}>{text.slice(index * TEXT_NODE_CHARACTERS, (index + 1) * TEXT_NODE_CHARACTERS)}</span>
+  ));
+}
+
+/** The enclosing disclosure owns mounting; an open output always contains the complete text. */
 export function ToolText({ text, markdown = false, className }: {
   text: string; markdown?: boolean; className?: string;
 }) {
-  const { viewport, loadNearEnd, visible } = useProgressiveToolText(text);
+  // Keep very large logs complete without blocking the UI on Markdown parsing.
+  const formatMarkdown = markdown && text.length <= MAX_FORMATTED_TOOL_CHARACTERS;
   return <>
-    <div ref={viewport} className={styles.textViewport} onScroll={loadNearEnd}
+    <div className={styles.textViewport}
       tabIndex={0} role="region" aria-label={guiText("工具内容")}>
-      {markdown ? <RichText text={visible} /> : <pre className={className}>{visible}</pre>}
+      {formatMarkdown ? <RichText text={text} /> : <pre className={className}>{completePlainText(text)}</pre>}
     </div>
-    {text.length > OUTPUT_BATCH_CHARACTERS && <div className={styles.outputActions}>
+    {text.length > COPY_ACTION_THRESHOLD && <div className={styles.outputActions}>
       <CopyButton text={text} label={guiText("复制完整内容")} />
     </div>}
   </>;

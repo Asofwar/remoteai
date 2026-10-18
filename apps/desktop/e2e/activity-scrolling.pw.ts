@@ -10,71 +10,88 @@ function fixture(): Conversation {
     }] };
 }
 
-async function scrollPage(page: Page, direction: 'older' | 'newer') {
+async function scrollHistory(page: Page, direction: 'older' | 'newer') {
   const viewport = page.getByLabel('对话消息');
-  const rows = viewport.locator('[data-message-id]');
-  const before = await rows.first().getAttribute('data-message-id');
-  const anchor = await viewport.evaluate((node, direction) => {
-    node.scrollTop = direction === 'older' ? 0 : node.scrollHeight;
-    const bounds = node.getBoundingClientRect();
-    const visible = [...node.querySelectorAll<HTMLElement>('[data-message-id]')]
-      .filter(row => row.getBoundingClientRect().bottom > bounds.top
-        && row.getBoundingClientRect().top < bounds.bottom);
-    const row = visible[Math.floor(visible.length / 2)];
-    return { id: row.dataset.messageId!, top: row.getBoundingClientRect().top };
-  }, direction);
-  await expect.poll(() => rows.first().getAttribute('data-message-id')).not.toBe(before);
-  await expect(rows).toHaveCount(50);
-  await expect.poll(async () => page.locator(`[data-message-id="${anchor.id}"]`)
-    .evaluate((node, top) => Math.abs(node.getBoundingClientRect().top - top), anchor.top)).toBeLessThan(3);
+  const bounds = (await viewport.boundingBox())!;
+  // Use the gutter so the wheel belongs to the conversation, not a nested command output.
+  await page.mouse.move(bounds.x + bounds.width - 20, bounds.y + bounds.height / 2);
+  await page.mouse.wheel(0, direction === 'older' ? -100_000 : 100_000);
+  await expect.poll(() => viewport.evaluate((node, direction) => direction === 'older'
+    ? node.scrollTop : node.scrollHeight - node.scrollTop - node.clientHeight, direction)).toBeLessThan(2);
 }
 
 for (const width of [390, 1280]) {
-  test(`activity history scrolls both ways without buttons or reading jumps at ${width}px`, async ({ page }) => {
+  test(`expanded process keeps all activities while scrolling and streaming at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 850 });
     await page.route('**/history-fixture.json', route => route.fulfill({ json: fixture() }));
     await page.goto('/e2e/tool-history-harness.html');
     const rows = page.locator('[data-message-id]');
-    await expect(rows).toHaveCount(50);
-    await expect(rows.last()).toHaveAttribute('data-message-id', 'activity-179');
-    await expect(page.getByRole('button', { name: /查看更早的活动|查看后续活动|回到最新活动/ })).toHaveCount(0);
-    for (let index = 0; index < 6; index++) await scrollPage(page, 'older');
-    await expect(rows.first()).toHaveAttribute('data-message-id', 'activity-0');
-    for (let index = 0; index < 6; index++) await scrollPage(page, 'newer');
-    await expect(rows.last()).toHaveAttribute('data-message-id', 'activity-179');
-    await scrollPage(page, 'older');
-    const first = await rows.first().getAttribute('data-message-id');
+    await expect(rows).toHaveCount(ACTIVITY_COUNT);
+    await scrollHistory(page, 'older');
+    await expect(rows.first()).toBeInViewport();
+    const viewport = page.getByLabel('对话消息');
+    const top = await viewport.evaluate(node => node.scrollTop);
     await page.evaluate(value => window.dispatchEvent(new CustomEvent('conversation-fixture', { detail: value })), {
       ...fixture(), turns: [{ ...fixture().turns[0], items: [...fixture().turns[0].items,
         { id: 'new', type: 'agentMessage', phase: 'commentary', text: '新活动已到达。' }] }],
     });
-    await expect(rows.first()).toHaveAttribute('data-message-id', first!);
+    await expect(rows).toHaveCount(ACTIVITY_COUNT + 1);
+    expect(await viewport.evaluate(node => node.scrollTop)).toBe(top);
+    await expect(rows.first()).toBeInViewport();
     await page.getByLabel('消息', { exact: true }).fill('翻阅时可以继续输入');
     await expect(page.getByLabel('消息', { exact: true })).toHaveValue('翻阅时可以继续输入');
-    await page.getByRole('button', { name: '回到最新消息', exact: true }).click();
-    await expect(page.locator('[data-message-id="new"]')).toBeInViewport();
+    await scrollHistory(page, 'newer');
+    await expect(rows.last()).toBeInViewport();
+    await scrollHistory(page, 'older');
+    const process = page.locator('summary[data-history-anchor]');
+    await process.click();
+    await expect(rows).toHaveCount(0);
+    await process.click();
+    await expect(rows).toHaveCount(ACTIVITY_COUNT + 1);
+  });
+
+  test(`expanded commands scroll to both ends and unmount when collapsed at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 850 });
+    const value = fixture();
+    value.activeTurn = null;
+    value.turns[0].status = 'completed';
+    value.turns[0].items = Array.from({ length: ACTIVITY_COUNT }, (_, index) => ({ id: `activity-${index}`,
+      type: 'commandExecution', status: 'completed', command: `echo ${index}`, aggregatedOutput: `output-${index}` }));
+    await page.route('**/history-fixture.json', route => route.fulfill({ json: value }));
+    await page.goto('/e2e/tool-history-harness.html');
+    const process = page.locator('summary[data-history-anchor]');
+    await expect(page.locator('[data-message-id]')).toHaveCount(0);
+    await process.click();
+    const group = page.locator('[data-activity-group="activity-0"] > details');
+    await expect(page.locator('[data-message-id]')).toHaveCount(0);
+    await group.locator(':scope > summary').click();
+    await expect(page.locator('[data-message-id]')).toHaveCount(ACTIVITY_COUNT);
+    const command = page.locator('[data-message-id="activity-150"] > details');
+    await command.locator('summary').click();
+    await expect(command).toContainText('output-150');
+    await scrollHistory(page, 'older');
+    await expect(page.locator('[data-message-id="activity-0"]')).toBeInViewport();
+    await scrollHistory(page, 'newer');
+    await expect(page.locator('[data-message-id="activity-179"]')).toBeInViewport();
+    await expect(command).toHaveAttribute('open');
+    await scrollHistory(page, 'older');
+    await group.locator(':scope > summary').click();
+    await expect(page.locator('[data-message-id], pre')).toHaveCount(0);
+    await group.locator(':scope > summary').click();
+    await expect(page.locator('[data-message-id]')).toHaveCount(ACTIVITY_COUNT);
+    await scrollHistory(page, 'older');
+    await process.click();
+    await expect(page.locator('[data-message-id], [data-activity-group], pre')).toHaveCount(0);
+    await process.click();
+    await expect(group).not.toHaveAttribute('open');
+    await group.locator(':scope > summary').click();
+    await expect(page.locator('[data-message-id]')).toHaveCount(ACTIVITY_COUNT);
+    await scrollHistory(page, 'older');
     await page.screenshot({ path: `../../.codex-tmp/activity-scrolling-${width}.png` });
   });
 }
 
-test('scrolling an expanded command run retains its disclosure and overlapping command output', async ({ page }) => {
-  const value = fixture();
-  value.turns[0].items = Array.from({ length: ACTIVITY_COUNT }, (_, index) => ({ id: `activity-${index}`,
-    type: 'commandExecution', status: 'completed', command: `echo ${index}`, aggregatedOutput: `output-${index}` }));
-  await page.route('**/history-fixture.json', route => route.fulfill({ json: value }));
-  await page.goto('/e2e/tool-history-harness.html');
-  const group = page.locator('[data-activity-group="activity-0"] > details');
-  await group.locator(':scope > summary').click();
-  const command = page.locator('[data-message-id="activity-150"] > details');
-  await command.locator('summary').click();
-  await expect(command).toHaveAttribute('open');
-  await scrollPage(page, 'older');
-  await expect(group).toHaveAttribute('open');
-  await expect(command).toHaveAttribute('open');
-  await expect(command).toContainText('output-150');
-});
-
-test('one upward wheel reaches explanations before a collapsed run without visible pagination', async ({ page }) => {
+test('earlier explanations remain visible beside a collapsed command run', async ({ page }) => {
   const value = fixture();
   value.turns[0].items = [{ id: 'before', type: 'agentMessage', phase: 'commentary', text: '开始检查。' },
     ...Array.from({ length: ACTIVITY_COUNT }, (_, index) => ({ id: `activity-${index}`,
@@ -82,8 +99,6 @@ test('one upward wheel reaches explanations before a collapsed run without visib
   await page.route('**/history-fixture.json', route => route.fulfill({ json: value }));
   await page.goto('/e2e/tool-history-harness.html');
   const group = page.locator('[data-activity-group="activity-0"] > details');
-  await group.hover();
-  await page.mouse.wheel(0, -200);
   await expect(page.locator('[data-message-id="before"]')).toBeInViewport();
   await expect(group).not.toHaveAttribute('open');
   await expect(group.locator('summary')).toContainText('echo 179');

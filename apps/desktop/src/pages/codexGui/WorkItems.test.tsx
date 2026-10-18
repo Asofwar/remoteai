@@ -3,71 +3,68 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { WorkItems } from "./WorkItems";
-import { ActivityWindowContext, type ActivityPager, type ActivityWindowControl } from './activityWindowContext';
 import type { Item } from "./types";
 
 let container: HTMLDivElement;
 let root: Root;
-let control: ActivityWindowControl;
-let pagers: Set<ActivityPager>;
 const command = (id: string, status = "completed"): Item => ({ id, type: "commandExecution", status,
   command: `echo ${id}`, aggregatedOutput: `output-${id}` });
 const explanation = (id: string): Item => ({ id, type: "agentMessage", phase: "commentary", text: id,
   status: "completed" });
 const render = (items: Item[], running = true) => act(async () => root.render(
-  <ActivityWindowContext.Provider value={control}><WorkItems items={items} running={running} />
-  </ActivityWindowContext.Provider>));
-async function page(direction: 'older' | 'newer') {
-  let loaded = false;
-  await act(async () => { loaded = [...pagers].some(pager => pager(direction)); });
-  return loaded;
-}
+  <WorkItems items={items} running={running} />));
 async function toggle(node: HTMLDetailsElement, open = true) {
   await act(async () => { node.open = open; node.dispatchEvent(new Event("toggle")); });
 }
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   container = document.createElement("div"); root = createRoot(container);
-  pagers = new Set();
-  control = { viewport: { current: container }, following: false,
-    register: pager => { pagers.add(pager); return () => { pagers.delete(pager); }; },
-    load: update => { update(); return true; } };
 });
 afterEach(async () => { await act(async () => root.unmount()); vi.unstubAllGlobals(); });
 
-it('bounds an expanded long-running process and lets the reader browse every earlier activity', async () => {
+it('renders the entire open process and retains earlier activities while streaming', async () => {
   let items = Array.from({ length: 300 }, (_, index) => explanation(`comment-${index}`));
   await render(items);
-  expect(container.querySelectorAll('[data-message-id]')).toHaveLength(50);
+  expect(container.querySelectorAll('[data-message-id]')).toHaveLength(300);
+  expect(container.querySelector('[data-message-id="comment-0"]')).not.toBeNull();
   expect(container.querySelector('[data-message-id="comment-299"]')).not.toBeNull();
   expect(container.querySelectorAll('button')).toHaveLength(0);
-  await page('older');
   const first = container.querySelector('[data-message-id]');
   items = [...items, explanation('new')];
   await render(items);
   expect(container.querySelector('[data-message-id]')).toBe(first);
-  while (await page('older')) {
-    expect(container.querySelectorAll('[data-message-id]').length).toBeLessThanOrEqual(50);
-  }
-  expect(container.querySelector('[data-message-id="comment-0"]')).not.toBeNull();
-  while (await page('newer')) {
-    expect(container.querySelectorAll('[data-message-id]').length).toBeLessThanOrEqual(50);
-  }
+  expect(container.querySelectorAll('[data-message-id]')).toHaveLength(301);
   expect(container.querySelector('[data-message-id="new"]')).not.toBeNull();
-  // Consecutive tools share a disclosure, but expanding it must obey the same bound.
-  await render(Array.from({ length: 300 }, (_, index) => command(`cmd-${index}`)));
-  await toggle(container.querySelector('details')!);
-  expect(container.querySelectorAll('[data-message-id]')).toHaveLength(50);
 });
 
-it('retains an expanded command run and overlapping command details while paging', async () => {
+it('mounts every command on expansion, unmounts them on collapse, and reopens in full', async () => {
+  await render(Array.from({ length: 300 }, (_, index) => command(`cmd-${index}`)));
+  const group = container.querySelector('details')!;
+  expect(container.querySelectorAll('[data-message-id]')).toHaveLength(0);
+  await toggle(group);
+  expect(container.querySelectorAll('[data-message-id]')).toHaveLength(300);
+  expect(container.querySelector('[data-message-id="cmd-0"]')).not.toBeNull();
+  expect(container.querySelector('[data-message-id="cmd-299"]')).not.toBeNull();
+  await toggle(container.querySelector('[data-message-id="cmd-0"] details')!);
+  expect(container.textContent).toContain('output-cmd-0');
+  await toggle(group, false);
+  expect(container.querySelectorAll('[data-message-id], pre')).toHaveLength(0);
+  await toggle(group);
+  expect(container.querySelectorAll('[data-message-id]')).toHaveLength(300);
+  expect(container.textContent).not.toContain('output-cmd-0');
+});
+
+it('retains an expanded command run and command details while scrolling', async () => {
   await render(Array.from({ length: 100 }, (_, index) => command(`cmd-${index}`)));
   const group = container.querySelector('details')!;
   expect(group.querySelector('summary')?.getAttribute('aria-label')).toContain('全部 100 项活动');
   await toggle(group);
   const commandDetails = container.querySelector<HTMLDetailsElement>('[data-message-id="cmd-60"] details')!;
   await toggle(commandDetails);
-  await page('older');
+  await act(async () => {
+    group.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: -120 }));
+    container.dispatchEvent(new Event('scroll'));
+  });
   expect(container.querySelector('details')).toBe(group);
   expect(group.open).toBe(true);
   expect(container.querySelector('[data-message-id="cmd-60"] details')).toBe(commandDetails);
@@ -75,23 +72,11 @@ it('retains an expanded command run and overlapping command details while paging
   expect(container.querySelector('[data-message-id="cmd-25"]')).not.toBeNull();
 });
 
-it('skips a collapsed command run to reach earlier explanations', async () => {
+it('shows earlier explanations alongside a collapsed command run', async () => {
   await render([explanation('before'), ...Array.from({ length: 300 }, (_, index) => command(`cmd-${index}`))]);
-  await page('older');
   expect(container.querySelector('[data-message-id="before"]')).not.toBeNull();
   expect(container.querySelectorAll('[data-message-id]')).toHaveLength(1);
   expect(container.querySelector('summary')?.textContent).toBe('已运行 echo cmd-299');
-});
-
-it('keeps a reading window stable during streaming and resets it when following resumes', async () => {
-  const items = Array.from({ length: 100 }, (_, index) => explanation(`comment-${index}`));
-  await render(items);
-  await render([...items, explanation('new')]);
-  expect(container.querySelector('[data-message-id="comment-50"]')).not.toBeNull();
-  expect(container.querySelector('[data-message-id="new"]')).toBeNull();
-  control = { ...control, following: true };
-  await render([...items, explanation('new')]);
-  expect(container.querySelector('[data-message-id="new"]')).not.toBeNull();
 });
 
 it("shows one latest running operation while preserving explanations on either side", async () => {

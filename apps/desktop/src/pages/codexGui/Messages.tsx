@@ -7,6 +7,7 @@ import { lastUserMessage, type EditMessage, type DeleteMessage } from "./editMes
 import { TurnMessage } from "./TurnMessage";
 import { useFollowScroll } from "./useFollowScroll";
 import { useMessageWindow } from "./useMessageWindow";
+import { ActivityWindowContext } from './activityWindowContext';
 import { WorkingStatus } from "./WorkingStatus";
 import type { PendingRequest } from "./processing";
 import { useQuoteSelection } from "./useQuoteSelection";
@@ -46,9 +47,9 @@ export function Messages({ value, selected, active = true, footer, pendingReques
     }} />}
     <div ref={viewport} className={styles.messageViewport} aria-label={guiText("对话消息")}
       onWheel={history.onWheel} onScroll={() => {
+        if (history.onScroll()) return;
         if (history.hasNewer) pauseFollowing();
         else onScroll();
-        history.onScroll();
       }}>
       <div ref={content} className={styles.messageScrollBody}>
         <div className={styles.messageContent}>
@@ -62,6 +63,7 @@ export function Messages({ value, selected, active = true, footer, pendingReques
             {history.loading ? <span role="status"><Spin size="small" />{guiText("正在加载更早的消息…")}</span>
               : <button type="button" onClick={history.loadOlder}>{guiText("加载更早的消息")}</button>}
           </div>}
+          <ActivityWindowContext.Provider value={history.activityControl}>
           {history.entries.map(({ turn, items, followsInterruption }) => <TurnMessage
             key={`${selected}:${turn.id}`} turn={turn} visibleItems={items}
             threadId={selected ?? undefined}
@@ -77,6 +79,7 @@ export function Messages({ value, selected, active = true, footer, pendingReques
               turnId: turn.id, itemId: last.item.id }) : undefined}
             followsInterruption={followsInterruption}
             running={value?.activeTurn === turn.id} active={active} />)}
+          </ActivityWindowContext.Provider>
           {history.hasNewer && <div className={styles.historyLoader}>
             <button type="button" onClick={history.loadNewer} disabled={history.loading}>
               {guiText("加载更新的消息")}</button>

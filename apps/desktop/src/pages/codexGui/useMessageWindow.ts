@@ -1,5 +1,6 @@
-import { useLayoutEffect, useMemo, useRef, useState, type RefObject, type WheelEvent } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type RefObject, type WheelEvent } from "react";
 import { messageWindow, type MessageCursor } from "./messageWindow";
+import type { ActivityDirection, ActivityPager, ActivityWindowControl } from './activityWindowContext';
 import type { Turn } from "./types";
 
 const LOAD_DISTANCE = 100;
@@ -30,6 +31,11 @@ export function useMessageWindow({ turns = EMPTY_TURNS, selected, active, viewpo
   const frame = useRef<number>();
   const position = useRef(0);
   const anchor = useRef<{ node: Element; top: number }>();
+  const activityPagers = useRef(new Set<ActivityPager>());
+  const registerActivity = useCallback((pager: ActivityPager) => {
+    activityPagers.current.add(pager);
+    return () => { activityPagers.current.delete(pager); };
+  }, []);
   const current = window.selected === selected && window.active === active;
   const start = current && active && away ? window.start : undefined;
   const visibleTurns = active ? turns : EMPTY_TURNS;
@@ -63,12 +69,11 @@ export function useMessageWindow({ turns = EMPTY_TURNS, selected, active, viewpo
     if (!loading) anchor.current = undefined;
   }, [range, loading, viewport]);
 
-  const loadPage = (direction: 'older' | 'newer') => {
+  const load = (update: () => void, retained?: Element): boolean => {
     const node = viewport.current;
-    const available = direction === 'older' ? range.hasMore : range.hasNewer;
-    if (!node || !active || !available || frame.current !== undefined) return;
+    if (!node || !active || frame.current !== undefined) return false;
     const top = node.getBoundingClientRect().top;
-    const visible = [...node.querySelectorAll("[data-message-id], [data-history-anchor]")]
+    const visible = retained ?? [...node.querySelectorAll("[data-message-id], [data-history-anchor]")]
       .find((entry) => entry.getClientRects().length > 0 && entry.getBoundingClientRect().bottom > top);
     if (visible) anchor.current = { node: visible, top: visible.getBoundingClientRect().top };
     pauseFollowing();
@@ -79,12 +84,21 @@ export function useMessageWindow({ turns = EMPTY_TURNS, selected, active, viewpo
         frame.current = undefined;
         const next = latest.current;
         if (next.selected !== selected || !next.active) return;
-        setWindow({ selected, active,
-          start: messageWindow(next.turns, { start: next.range.start, [direction]: true }).start });
+        update();
         setLoading(false);
       });
     });
+    return true;
   };
+  const loadPage = (direction: ActivityDirection) => {
+    if (!(direction === 'older' ? range.hasMore : range.hasNewer)) return false;
+    return load(() => {
+      const next = latest.current;
+      setWindow({ selected, active,
+        start: messageWindow(next.turns, { start: next.range.start, [direction]: true }).start });
+    });
+  };
+  const loadActivity = (direction: ActivityDirection) => [...activityPagers.current].some(pager => pager(direction));
   const loadOlder = () => loadPage('older');
   const loadNewer = () => loadPage('newer');
   const onScroll = () => {
@@ -93,8 +107,11 @@ export function useMessageWindow({ turns = EMPTY_TURNS, selected, active, viewpo
     const upward = top < position.current;
     const downward = top > position.current;
     position.current = top;
-    if (upward && top < LOAD_DISTANCE) loadOlder();
-    if (downward && node && node.scrollHeight - top - node.clientHeight < LOAD_DISTANCE) loadNewer();
+    if (frame.current !== undefined) return true;
+    if (upward && loadActivity('older') || downward && loadActivity('newer')) return true;
+    if (upward && top < LOAD_DISTANCE) return loadOlder();
+    if (downward && node && node.scrollHeight - top - node.clientHeight < LOAD_DISTANCE) return loadNewer();
+    return false;
   };
   const onWheel = (event: WheelEvent<HTMLDivElement>) => {
     if (event.defaultPrevented || event.ctrlKey || event.deltaY === 0
@@ -102,9 +119,11 @@ export function useMessageWindow({ turns = EMPTY_TURNS, selected, active, viewpo
     const node = viewport.current;
     if (!node) return;
     if (hasNestedScroller(event.target, node)) return;
+    if (frame.current !== undefined || loadActivity(event.deltaY < 0 ? 'older' : 'newer')) return;
     // Collapsed activity can leave the viewport too short to emit a scroll event.
     if (event.deltaY < 0 && node.scrollTop <= 0) loadOlder();
     if (event.deltaY > 0 && node.scrollHeight - node.scrollTop - node.clientHeight < LOAD_DISTANCE) loadNewer();
   };
-  return { ...range, loading, onScroll, onWheel, loadOlder, loadNewer };
+  const activityControl: ActivityWindowControl = { viewport, following: !away, register: registerActivity, load };
+  return { ...range, loading, onScroll, onWheel, loadOlder, loadNewer, activityControl };
 }

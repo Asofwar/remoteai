@@ -94,6 +94,7 @@ it('keeps history readable during pagination without either loading spinner', ()
   expect(findElement(tree, 'Spinner')).toBeUndefined();
   expect(findElement(list.ListHeaderComponent, 'Spinner')).toBeUndefined();
   expect(element<{ disabled: boolean }>(list.ListHeaderComponent, 'Pressable').props.disabled).toBe(true);
+  expect(element<{ children: string }>(list.ListHeaderComponent, 'Text').props.children).toBe('加载中…');
   expect(list.data.length).toBeGreaterThan(0);
 });
 

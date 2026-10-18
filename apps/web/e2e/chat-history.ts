@@ -23,7 +23,7 @@ export async function historyJourney({ page, request, info, relay }: {
     const first = items.first();
     const id = await first.getAttribute('data-message-id');
     await page.locator('.chat-messages').evaluate((node) => { node.scrollTop = 0; });
-    await expect(page.getByRole('button', { name: '加载更早的消息' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: '加载中…', exact: true })).toBeDisabled();
     await expect(page.getByText('正在加载聊天记录…')).toHaveCount(0);
     const top = (await first.boundingBox())!.y;
     await expect(items).toHaveCount(count);

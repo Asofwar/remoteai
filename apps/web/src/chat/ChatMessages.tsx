@@ -123,7 +123,7 @@ export function ChatMessages(props: ChatMessagesProps & {
             {loading && !entries.length && !loadingMore
               ? <span role="status" className="chat-processing"><span className="chat-spinner" />{t("正在加载聊天记录…")}</span>
               : <button type="button" className="chat-text-action" onClick={scroll.more}
-                disabled={loadingMore}>{t("加载更早的消息")}</button>}
+                disabled={loadingMore}>{loadingMore ? t("加载中…") : t("加载更早的消息")}</button>}
           </div>}
           {timeline.map(entry => <Fragment key={entry.id}>
             {entry === runningSummary && props.processing}

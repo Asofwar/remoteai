@@ -111,7 +111,7 @@ export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder,
     ListHeaderComponent={<View style={hasMore && [styles.historyStatus, styles.messageHeader]}>
       {hasMore && <Pressable accessibilityRole="button" onPress={more} disabled={loadingMore}
         accessibilityState={{ disabled: Boolean(loadingMore) }}>
-        <Text style={styles.subtitle}>{t("加载更早的消息")}</Text>
+        <Text style={styles.subtitle}>{loadingMore ? t("加载中…") : t("加载更早的消息")}</Text>
       </Pressable>}
     </View>}
     ListEmptyComponent={showInitialLoading || processing ? null : <View style={styles.empty}>

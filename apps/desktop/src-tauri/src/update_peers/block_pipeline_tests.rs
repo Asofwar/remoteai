@@ -2,8 +2,11 @@ use super::*;
 use crate::update_peers::{
     block_download, block_protocol, signaling::Lease, tests::network_fixture,
 };
-use csw_chat_connectivity::{Config, Connection, Event};
+use csw_chat_connectivity::Connection;
 use tokio::sync::oneshot;
+
+#[path = "tests/pipeline_fixture.rs"]
+mod pipeline_fixture;
 
 const PIPELINE_SETUP_TIMEOUT: Duration = Duration::from_secs(45);
 const PIPELINE_TRANSFER_TIMEOUT: Duration = Duration::from_secs(15);
@@ -34,12 +37,17 @@ async fn exercise_pipeline(session: &str, seed_delay: Duration) {
         .await
         .unwrap();
     let snapshot = service.cache.snapshot(&artifact.id).unwrap();
-    let coordinator = network_fixture::coordinator(session).await;
-    let mut config = network_fixture::client(&coordinator, session);
-    config.desktop = true;
+    // Exercise the real encrypted stream over loopback. Coordinator discovery has separate
+    // integration coverage and must not consume this protocol fixture's preparation budget.
+    let host = network_fixture::host(session).await;
+    let config = network_fixture::client(&host, session);
     let (ready, prepared) = oneshot::channel();
-    let worker = tokio::spawn(pipeline_seed(config.clone(), snapshot, seed_delay, ready));
-    config.desktop = false;
+    let worker = tokio::spawn(pipeline_fixture::serve(
+        host.clone(),
+        snapshot,
+        seed_delay,
+        ready,
+    ));
     let (sender, _receiver) = mpsc::channel(16);
     let mut leases = vec![Lease::binary(config, sender).unwrap()];
     artifact.url = "http://127.0.0.1:9/unavailable".into();
@@ -49,7 +57,7 @@ async fn exercise_pipeline(session: &str, seed_delay: Duration) {
     if let Err(error) = worker.await {
         assert!(error.is_cancelled(), "pipeline seed failed: {error}");
     }
-    coordinator.stop().await;
+    host.stop().await;
     assert_eq!(result.unwrap(), bytes);
     assert_eq!(
         service.policy.metrics.origin_bytes.load(Ordering::Relaxed),
@@ -74,62 +82,6 @@ async fn download_after_preparation(
     .await
     .map_err(|_| "pipeline transfer timed out after the seed became ready".to_owned())?
     .map_err(|error| format!("pipeline transfer failed after the seed became ready: {error}"))
-}
-
-async fn pipeline_seed(
-    config: Config,
-    snapshot: Arc<crate::update_peers::snapshot::Snapshot>,
-    delay: Duration,
-    ready: oneshot::Sender<FixtureResult<()>>,
-) {
-    tokio::time::sleep(delay).await;
-    let host = Connection::start_with_packets(config).unwrap();
-    let preparation = network_fixture::wait_for_stream(&host).await;
-    let connected = preparation.is_ok();
-    if ready.send(preparation).is_err() || !connected {
-        return;
-    }
-    let mut queued = Vec::new();
-    while let Some(event) = host.receive().await {
-        let Event::Data { text } = event else {
-            continue;
-        };
-        let frame: serde_json::Value = serde_json::from_str(&text).unwrap();
-        if frame["type"] == "describe" {
-            host.send(
-                serde_json::json!({"type":"manifest", "size":snapshot.manifest.size,
-                "hashes":snapshot.manifest.hashes, "requestWindow":8})
-                .to_string(),
-            )
-            .await
-            .unwrap();
-        } else if frame["type"] == "read" {
-            queued.push(frame["index"].as_u64().unwrap() as usize);
-            // A stop-and-wait client cannot get any payload from this fixture.
-            if queued.len() == 2 {
-                send_early_headers(&host, &snapshot, &queued).await;
-                queued.clear();
-            }
-        }
-    }
-}
-
-async fn send_early_headers(
-    connection: &Connection,
-    snapshot: &Arc<crate::update_peers::snapshot::Snapshot>,
-    indices: &[usize],
-) {
-    for &index in indices {
-        connection
-            .send(serde_json::json!({"type":"block", "index":index, "length":512*1024}).to_string())
-            .await
-            .unwrap();
-    }
-    for &index in indices {
-        for packet in snapshot.block(index).await.unwrap().chunks(64 * 1024) {
-            connection.send_packet(packet.to_vec()).await.unwrap();
-        }
-    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

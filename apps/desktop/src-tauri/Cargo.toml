@@ -20,6 +20,10 @@ test = false
 name = "codex_switch_lib_tests"
 path = "src/test_main.rs"
 
+[[test]]
+name = "windows_input_reentrancy"
+path = "tests/windows_input_reentrancy.rs"
+
 [build-dependencies]
 sha2 = "0.10"
 serde_json = "1"
@@ -94,6 +98,12 @@ default-features = false
 # See vendor/hyper-util/CODEX_SWITCH_PATCH.md for the narrow patch and removal criteria.
 [patch.crates-io]
 hyper-util = { path = "vendor/hyper-util" }
+# Backport Tao's Windows/RDP input deadlock fix without changing Tauri's Tao API.
+# See vendor/tao/CODEX_SWITCH_PATCH.md for provenance and regression coverage.
+tao = { path = "vendor/tao" }
+
+[target.'cfg(windows)'.dev-dependencies]
+tao = { version = "0.35.3", default-features = false, features = ["rwh_06"] }
 
 [patch."https://github.com/EasyTier/EasyTier"]
 easytier-core = { path = "../../../crates/chat-connectivity/vendor/easytier-core" }

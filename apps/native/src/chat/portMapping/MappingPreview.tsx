@@ -4,12 +4,16 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { t } from '../../i18n';
 import { useStyles } from '../styles';
+import { MappingPreviewActivity } from './MappingPreviewActivity';
+import { PREVIEW_NETWORK_SCRIPT } from './previewNetworkActivity';
+import { usePreviewActivity } from './usePreviewActivity';
 
 export function MappingPreview({ port, close }: { port: number; close: () => void }) {
   const styles = useStyles();
   const webview = useRef<WebView>(null);
   const [error, setError] = useState('');
   const [canGoBack, setCanGoBack] = useState(false);
+  const activity = usePreviewActivity();
   const url = `http://127.0.0.1:${port}`;
   return <Modal visible animationType="slide" onRequestClose={close}
     supportedOrientations={['portrait', 'landscape-left', 'landscape-right']}>
@@ -17,13 +21,16 @@ export function MappingPreview({ port, close }: { port: number; close: () => voi
       <View style={styles.header}>
         <Pressable accessibilityRole="button" onPress={close} style={styles.button}>
           <Text style={styles.buttonText}>{t('关闭')}</Text></Pressable>
-        <Text selectable numberOfLines={1} style={[styles.subtitle, { flex: 1 }]}>{url}</Text>
+        <Text selectable numberOfLines={1} style={[styles.subtitle, { flex: 1, minWidth: 0 }]}>{url}</Text>
+        <MappingPreviewActivity active={activity.active} />
       </View>
       <View style={[styles.row, { paddingHorizontal: 16, paddingBottom: 12, flexWrap: 'wrap' }]}>
-        <Pressable accessibilityRole="button" onPress={() => webview.current?.goBack()}
+        <Pressable accessibilityRole="button" onPress={() => { activity.onLoadStart(); webview.current?.goBack(); }}
           disabled={!canGoBack} style={[styles.button, !canGoBack && styles.disabled]}>
           <Text style={styles.buttonText}>{t('返回')}</Text></Pressable>
-        <Pressable accessibilityRole="button" onPress={() => { setError(''); webview.current?.reload(); }}
+        <Pressable accessibilityRole="button" onPress={() => {
+          setError(''); activity.onLoadStart(); webview.current?.reload();
+        }}
           style={styles.button}><Text style={styles.buttonText}>{t('刷新')}</Text></Pressable>
         <Pressable accessibilityRole="button" style={styles.button}
           onPress={() => { void Linking.openURL(url).catch(() => setError(t('无法打开浏览器，请重试。'))); }}>
@@ -39,12 +46,15 @@ export function MappingPreview({ port, close }: { port: number; close: () => voi
         javaScriptCanOpenWindowsAutomatically={false} setSupportMultipleWindows={false}
         // Android enforces this through patch-webview-permissions.cjs, including after redirects.
         geolocationEnabled={false} mediaCapturePermissionGrantType="deny"
+        injectedJavaScriptBeforeContentLoaded={PREVIEW_NETWORK_SCRIPT}
+        injectedJavaScript={PREVIEW_NETWORK_SCRIPT}
+        onMessage={activity.onMessage} onLoadStart={activity.onLoadStart} onLoadEnd={activity.onLoadEnd}
         onShouldStartLoadWithRequest={request => /^https?:\/\//i.test(request.url)}
         onNavigationStateChange={state => setCanGoBack(state.canGoBack)}
         renderError={() => <View style={styles.empty}>
           <Text style={[styles.subtitle, { maxWidth: 400 }]}>
             {t('网页未能加载，请确认服务已启动后刷新。')}</Text></View>}
-        onError={() => setError(t('网页未能加载，请确认服务已启动后刷新。'))} />
+        onError={() => { activity.reset(); setError(t('网页未能加载，请确认服务已启动后刷新。')); }} />
     </SafeAreaView></SafeAreaProvider>
   </Modal>;
 }

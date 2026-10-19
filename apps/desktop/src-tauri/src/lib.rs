@@ -10,6 +10,7 @@ mod auth;
 mod autostart;
 mod browser;
 mod ccs_import;
+mod chatgpt_launch;
 mod chrome_plugin;
 mod claude_code;
 mod claude_code_provider;
@@ -468,6 +469,8 @@ pub fn run() {
             commands::consume_reset_credit,
             commands::restart_chatgpt,
             commands::launch_chatgpt,
+            chatgpt_launch::get_chatgpt_launch_path,
+            chatgpt_launch::set_chatgpt_launch_path,
             codex_connection::get_codex_connection_status,
             codex_connection::connect_codex,
             codex_notification::sync_codex_notification,

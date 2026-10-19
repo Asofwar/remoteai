@@ -37,6 +37,10 @@ fn dispatch_command(app: AppHandle, command: &str, args: Value) -> Result<Value,
         "get_app_info" => serialize(block_on(crate::commands::get_app_info(app))),
         "list_accounts" => serialize(block_on(crate::commands::list_accounts(app))),
         "get_app_settings" => serialize(block_on(crate::floating_bubble::get_app_settings(app))),
+        "get_chatgpt_launch_path" => serialize(block_on(crate::chatgpt_launch::get_chatgpt_launch_path(app))),
+        "set_chatgpt_launch_path" => serialize(block_on(crate::chatgpt_launch::set_chatgpt_launch_path(
+            app, argument(&args, "path")?,
+        ))),
         "set_non_proxy_enhancements" => serialize(block_on(
             crate::client_integration::set_non_proxy_enhancements(app, argument(&args, "enabled")?),
         )),

@@ -132,6 +132,7 @@ fn prepare_migration_client<R: Runtime>(
     let was_running = has_eligible_threads && crate::commands::chatgpt_or_codex_is_running()?;
     let launch_target = was_running
         .then(|| crate::commands::refresh_and_get_chatgpt_launch_target(&app.app))
+        .transpose()?
         .flatten();
     if was_running {
         crate::commands::stop_chatgpt_processes()?;

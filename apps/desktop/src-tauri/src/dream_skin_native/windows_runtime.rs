@@ -242,6 +242,18 @@ fn remembered_codex_install() -> Option<CodexInstall> {
 }
 
 fn find_runtime_launch_install() -> Result<CodexInstall, String> {
+    if let Some(app) = crate::codex_runtime::runtime_app_handle() {
+        if let Some(executable) = crate::chatgpt_launch::configured_executable(&app)
+            .map_err(|error| error.to_string())?
+        {
+            #[cfg(target_os = "windows")]
+            return resolve_runtime_install(executable).ok_or_else(|| {
+                "无法启动指定的 ChatGPT，请检查设置中的启动路径。".to_string()
+            });
+            #[cfg(target_os = "macos")]
+            return Ok(CodexInstall { executable });
+        }
+    }
     // Theme actions have no captured launch target. Prefer the running package
     // after an update rather than a still-readable path from the previous session.
     #[cfg(target_os = "windows")]
@@ -251,6 +263,11 @@ fn find_runtime_launch_install() -> Result<CodexInstall, String> {
     remembered_codex_install()
         .map(Ok)
         .unwrap_or_else(find_codex_install)
+}
+
+/// Discover an installed client without consulting the manual launch preference.
+pub(crate) fn detect_chatgpt_executable() -> Option<PathBuf> {
+    find_codex_install().ok().map(|install| install.executable)
 }
 
 #[cfg(target_os = "windows")]

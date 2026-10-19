@@ -63,6 +63,7 @@ fn start_local_proxy_blocking<R: Runtime>(
     let client_was_running = write_codex && crate::commands::chatgpt_or_codex_is_running()?;
     let launch_target = client_was_running
         .then(|| crate::commands::refresh_and_get_chatgpt_launch_target(&app))
+        .transpose()?
         .flatten();
     if client_was_running {
         // Preserve the path of a running client before ending all ChatGPT/Codex
@@ -196,6 +197,7 @@ fn stop_local_proxy_blocking<R: Runtime>(
     let client_was_running = write_codex && crate::commands::chatgpt_or_codex_is_running()?;
     let launch_target = client_was_running
         .then(|| crate::commands::refresh_and_get_chatgpt_launch_target(&app))
+        .transpose()?
         .flatten();
     emit_stop_progress(&app, "stoppingClient", 5, None, None);
     if client_was_running {

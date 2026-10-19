@@ -57,7 +57,11 @@ fn is_dir_named(path: &Path, expected: &str) -> bool {
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
-fn start_unmanaged_chatgpt(_target: Option<&ChatGptLaunchTarget>) -> Result<(), String> {
+fn start_unmanaged_chatgpt(target: Option<&ChatGptLaunchTarget>) -> Result<(), String> {
+    if let Some(target) = target {
+        return Command::new(&target.executable).spawn().map(|_| ())
+            .map_err(|_| "无法启动指定的 ChatGPT，请检查设置中的启动路径。".to_string());
+    }
     let terminals: &[(&str, &[&str])] = &[
         (
             "x-terminal-emulator",

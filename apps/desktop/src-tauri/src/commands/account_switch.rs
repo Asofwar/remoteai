@@ -87,6 +87,7 @@ fn deactivate_account_and_restart_chatgpt_blocking<R: Runtime>(
     let client_was_running = !proxy_running && chatgpt_or_codex_is_running()?;
     let launch_target = client_was_running
         .then(|| refresh_and_get_chatgpt_launch_target(&app))
+        .transpose()?
         .flatten();
     if client_was_running {
         stop_chatgpt_processes()?;
@@ -196,7 +197,7 @@ pub(crate) fn switch_account_and_restart_chatgpt_blocking<R: Runtime>(
     let paths = resolve_paths(&app)?;
     load_validated_managed_auth(&paths, &id)?;
 
-    let launch_target = refresh_and_get_chatgpt_launch_target(&app);
+    let launch_target = refresh_and_get_chatgpt_launch_target(&app)?;
     if chatgpt_or_codex_is_running()? {
         stop_chatgpt_processes()?;
         wait_for_chatgpt_processes_to_exit(Duration::from_secs(10))?;
@@ -238,6 +239,7 @@ pub(crate) fn reapply_active_account_after_login<R: Runtime>(
     let client_was_running = chatgpt_or_codex_is_running()?;
     let launch_target = client_was_running
         .then(|| refresh_and_get_chatgpt_launch_target(&app))
+        .transpose()?
         .flatten();
     if client_was_running {
         stop_chatgpt_processes()?;

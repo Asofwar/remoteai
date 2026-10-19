@@ -22,14 +22,10 @@ pub(crate) fn initialize_local_state<R: Runtime>(app: &tauri::AppHandle<R>) {
     refresh_local_codex_path(app);
 }
 
-#[cfg(any(target_os = "windows", target_os = "macos"))]
 #[derive(Clone)]
 pub(crate) struct ChatGptLaunchTarget {
     executable: std::path::PathBuf,
 }
-
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
-pub(crate) type ChatGptLaunchTarget = String;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]

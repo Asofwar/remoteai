@@ -84,7 +84,7 @@ pub(crate) fn restart_chatgpt_blocking<R: Runtime>(app: tauri::AppHandle<R>) -> 
 pub(crate) fn restart_chatgpt_unlocked<R: Runtime>(
     app: &tauri::AppHandle<R>,
 ) -> Result<(), String> {
-    let launch_target = refresh_and_get_chatgpt_launch_target(app);
+    let launch_target = refresh_and_get_chatgpt_launch_target(app)?;
     #[cfg(any(target_os = "windows", target_os = "macos"))]
     let prepared = crate::codex_runtime::prepare_managed_session(
         launch_target.as_ref().map(|target| target.executable.as_path()),
@@ -116,7 +116,7 @@ fn launch_chatgpt_blocking<R: Runtime>(app: tauri::AppHandle<R>) -> Result<bool,
         return Ok(false);
     }
 
-    let launch_target = refresh_and_get_chatgpt_launch_target(&app);
+    let launch_target = refresh_and_get_chatgpt_launch_target(&app)?;
     sync_active_proxy_auth_for_restart(&app)?;
     restart_chatgpt_from_target(&app, launch_target.as_ref())?;
     Ok(true)

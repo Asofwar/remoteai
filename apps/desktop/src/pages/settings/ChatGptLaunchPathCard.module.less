@@ -1,0 +1,22 @@
+.card :global(.settings-card-content) {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form {
+  min-width: 0;
+  width: 100%;
+  label { display: block; margin-bottom: 6px; font-size: 12px; }
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  :global(.ant-input-affix-wrapper) { min-width: 0; flex: 1; }
+  button { flex: 0 0 auto; }
+}
+
+.status { max-width: 400px; font-size: 12px; overflow-wrap: anywhere; }
+.status:not(:empty) { margin-top: 8px; }
+.error { color: var(--ant-color-error, #d9363e); }

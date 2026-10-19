@@ -52,6 +52,7 @@ fn restore_non_proxy_conversations_blocking<R: Runtime>(
     let client_was_running = chatgpt_or_codex_is_running()?;
     let launch_target = client_was_running
         .then(|| refresh_and_get_chatgpt_launch_target(&app))
+        .transpose()?
         .flatten();
     if client_was_running {
         stop_chatgpt_processes()?;

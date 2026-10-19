@@ -12,6 +12,8 @@ import { ProjectPicker } from '../src/pages/codexGui/ProjectPicker';
 import { DetailsWorkspace } from '../src/pages/codexGui/DetailsWorkspace';
 import { guiFontStyle, useGuiFontSize } from '../src/pages/codexGui/guiAppearance';
 import { createAsyncGitFixture } from '../../../shared/remote-chat/testing/gitFixture';
+import { WindowControls } from '../src/components/WindowControls';
+import { translate } from '../src/i18n';
 import 'antd/dist/reset.css';
 
 const localGit = createAsyncGitFixture();
@@ -20,11 +22,12 @@ function Harness() {
   const fontSize = useGuiFontSize();
   const [localDraft, setLocalDraft] = useState('Local unsent draft');
   const [project, setProject] = useState('/local/workspace');
+  const [focused, setFocused] = useState(false);
   const computers = useGuiComputers({ active: true, identity: { baseUrl: 'https://fixture.test', userId: 'owner' },
     login: () => {} });
   const device = computers.current;
-  return <ConfigProvider><header style={{ height: 48 }}>Codex GUI</header>
-    <main style={{ ...guiFontStyle(fontSize), height: 'calc(100vh - 48px)' }}>
+  return <ConfigProvider><header hidden={focused} style={{ height: 48 }}>Codex GUI</header>
+    <main style={{ ...guiFontStyle(fontSize), height: focused ? '100vh' : 'calc(100vh - 48px)' }}>
     <div hidden={Boolean(device)} style={{ height: '100%' }}>
       <DetailsWorkspace active={!device} selected={project}>
       <div className={`${styles.page} local-workspace`}><aside className={styles.sidebar}>
@@ -43,7 +46,10 @@ function Harness() {
         </div>
       </div></div></DetailsWorkspace></div>
     {computers.identity && <RemoteGuiWorkspaces active identity={computers.identity}
-      current={device} computers={computers} privacyMode={false} focusMode={{ focused: false, onToggleFocus() {} }} />}
+      current={device} computers={computers} privacyMode={false}
+      focusMode={{ focused, onToggleFocus: () => setFocused(value => !value) }}
+      windowControls={<WindowControls t={(key, values) => translate('zh', key, values)}
+        onError={error => { throw new Error(error); }} />} />}
   </main></ConfigProvider>;
 }
 

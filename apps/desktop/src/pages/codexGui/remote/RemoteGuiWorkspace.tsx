@@ -51,7 +51,7 @@ export default function RemoteGuiWorkspace(props: {
     <ConnectedChat chat={chat} active={active} device={device} devices={computers.devices} email="" desktopDiffs
       renderUserMessage={props => <RemoteUserMessage {...props} state={chat.state}
         controller={chat.controller} active={active} />}
-      scope={scope}
+      scope={scope} draggableHeader={isDesktopApp} scrollableComposer
       chooseLocal={() => computers.choose(null)}
       chooseDevice={(id) => { const device = computers.devices.find((entry) => entry.deviceId === id);
         if (device) computers.choose(device); }}
@@ -63,7 +63,8 @@ export default function RemoteGuiWorkspace(props: {
       headerActions={<><RemoteGuiTools controller={chat.controller} state={chat.state} active={active}
         terminal={terminal} />
         <span className="gui-remote-focus"><FocusModeButton {...props.focusMode} /></span></>}
-      headerEnd={props.focusMode.focused && props.windowControls}
+      headerEnd={props.focusMode.focused && props.windowControls
+        && <div className={styles.focusWindowControls}>{props.windowControls}</div>}
       conversationFooter={terminal.tabs.length > 0 && <Suspense fallback={null}>
         <TerminalPanel panel={terminal} active={active} api={terminalApi} notice={terminal.error} />
       </Suspense>}

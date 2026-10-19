@@ -39,7 +39,9 @@ export async function checkGitDiffReview(page: Page, screenshotName: string) {
 async function checkCommitDiff(page: Page) {
   const git = page.getByRole('dialog', { name: 'Git', exact: true });
   await git.getByRole('tab', { name: '提交记录', exact: true }).click();
-  await git.locator('.git-history-row').first().click();
+  const rows = git.locator('.git-history-row');
+  const loadedCommits = await rows.allTextContents();
+  await rows.first().click();
   await expect(git.locator('.git-commit-file')).toHaveCount(4);
   await git.getByRole('button', { name: '查看 src/chat/tools.ts', exact: true }).click();
   const diff = git.getByRole('complementary', { name: '文件更改详情', exact: true });
@@ -48,5 +50,6 @@ async function checkCommitDiff(page: Page) {
   await diff.getByRole('button', { name: '关闭详情抽屉', exact: true }).click();
   await expect(git.locator('.git-commit-file')).toHaveCount(4);
   await git.getByRole('button', { name: '返回提交记录', exact: true }).click();
-  await expect(git.locator('.git-history-row')).toHaveCount(3);
+  // A tall drawer may load another page while opening the commit; keep every previously loaded row.
+  await expect(rows).toContainText(loadedCommits);
 }

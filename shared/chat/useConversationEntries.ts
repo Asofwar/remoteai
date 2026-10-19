@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { conversationEntries } from './turnPresentation';
 import type { Turn } from '../remote-chat/client/types';
 
-// ChatMessages is keyed by conversation, so this state never carries into another conversation.
+// The history component is keyed by conversation, so this state never carries into another conversation.
 export function useConversationEntries(turns: Turn[]) {
   const observedLive = useRef(false);
   if (turns.some((turn) => turn.status === 'inProgress')) observedLive.current = true;

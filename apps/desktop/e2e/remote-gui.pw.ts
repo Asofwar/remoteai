@@ -11,6 +11,7 @@ import { checkGitDiffReview } from './git-diff-checks';
 import { checkRemoteFileDrop } from './file-drop-checks';
 import { checkThreadSidebarResize } from './thread-sidebar-resize';
 import { checkRemoteTiming } from './remote-timing-checks';
+import { checkRemoteWindowLayout } from './remote-window-layout';
 
 declare global { interface Window { desktopTest: typeof desktopTest } }
 
@@ -59,10 +60,16 @@ async function chooseHost(page: Page, name: string) {
 
 test('remote chat sidebar resizes and restores its width after hiding and mobile layout',
   async ({ context, page }) => {
+    test.setTimeout(90_000);
     const host = await context.newPage();
-    await host.goto(`/e2e/chat-harness.html?role=desktop&demo&device=computer-one&blocked=false`
+    await host.goto(`/e2e/chat-harness.html?role=desktop&demo&device=computer-one&blocked=false&title=Window%20layout`
       + `&socket=${encodeURIComponent(endpoint)}`);
     await expect(host.locator('#status')).toHaveText('registered');
+    await host.evaluate(() => {
+      window.chatTest.demoState().threads[0].turns![0].items.push({
+        type: 'agentMessage', id: 'window-layout-long-message', text: '窗口布局检查。\n\n'.repeat(50),
+      });
+    });
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(`/e2e/remote-gui-harness.html?socket=${encodeURIComponent(endpoint)}`);
     await chooseHost(page, 'Office PC');
@@ -81,6 +88,8 @@ test('remote chat sidebar resizes and restores its width after hiding and mobile
     await expect(remotePort).toBeFocused();
     await page.screenshot({ path: '../../.codex-tmp/port-forwarding-workspace.png', animations: 'disabled' });
     await ports.click();
+    await page.getByRole('button', { name: 'Window layout', exact: true }).click();
+    await checkRemoteWindowLayout(page);
     await checkThreadSidebarResize(page);
     const handle = page.getByRole('separator', { name: '调整聊天列表宽度' });
     await page.getByRole('button', { name: '收起聊天列表', exact: true }).click();

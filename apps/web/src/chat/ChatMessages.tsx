@@ -88,20 +88,46 @@ function TimelineEntry({ entry, open, inline, desktop, renderUserMessage }: {
     running={entry.turn.status === 'inProgress' && entry.item.status !== 'completed'} />;
 }
 
-export function ChatMessages(props: ChatMessagesProps & {
+type MessageProps = ChatMessagesProps & {
   processing?: ReactNode; renderUserMessage?: RenderUserMessage;
+};
+
+export function ChatMessages(props: MessageProps & { footer?: ReactNode }) {
+  useLanguage();
+  const desktop = useDesktopLayout();
+  const scroll = useHistoryScroll(props);
+  const notice = useHistoryLoadNotice(props.historyLoad?.threadId === props.thread?.id ? props.historyLoad : undefined);
+  const jump = scroll.showBottom && <button type="button" className="chat-scroll-bottom"
+    onClick={scroll.toBottom}><ArrowDown size={17} />{t("回到底部")}</button>;
+  return <div className={`chat-message-region${props.footer ? ' has-scroll-footer' : ''}`}>
+    <ChatSelectionQuote root={scroll.content} selected={props.thread?.id ?? null} enabled={desktop} />
+    <div ref={scroll.list} className="chat-scroll chat-messages" aria-label={t("聊天记录")}
+      onScroll={scroll.onScroll} onWheel={scroll.onWheel}>
+      <div ref={scroll.body} className="chat-message-scroll-body">
+        {/* Reset history details on selection changes without remounting the composer during its first send. */}
+        <ChatMessageHistory key={props.thread?.id ?? 'new'} props={props} scroll={scroll} />
+        {props.footer && <div className="chat-message-footer">{jump}{props.footer}</div>}
+      </div>
+    </div>
+    {!props.footer && jump}
+    {notice && <div className="chat-history-notice" role="status">
+      {t('已加载 {count} 条历史记录，用时 {seconds} 秒', notice)}
+    </div>}
+  </div>;
+}
+
+function ChatMessageHistory({ props, scroll }: {
+  props: MessageProps; scroll: ReturnType<typeof useHistoryScroll>;
 }) {
   useLanguage();
   const desktop = useDesktopLayout();
   const { thread, loading, loadingMore, hasMore, offline } = props;
-  const notice = useHistoryLoadNotice(props.historyLoad?.threadId === thread?.id ? props.historyLoad : undefined);
   const turns = useMemo(() => (thread?.turns ?? []).map(turn => offline && turn.status === 'inProgress'
     ? { ...turn, status: 'cached' } : turn), [thread?.turns, offline]);
   const { entries, setInline } = useConversationEntries(turns);
   const timeline = useMemo(() => activityTimeline(desktop ? desktopTimeline(entries) : entries), [desktop, entries]);
   const runningTurn = currentRunningTurn(turns);
   const runningSummary = timeline.find(entry => entry.kind === 'summary' && entry.turn.id === runningTurn?.id);
-  const scroll = useHistoryScroll(props);
   const [selection, setSelection] = useState<Selection | null>(null);
   // Dismiss the previous layout's sheets before switching to inline work and docked reviews.
   useEffect(() => { setSelection(null); }, [desktop]);
@@ -113,38 +139,27 @@ export function ChatMessages(props: ChatMessagesProps & {
   const back = selection?.type === 'item' ? selection.back : undefined;
   const close = () => setSelection(null);
   return <>
-    <div className="chat-message-region">
-      <ChatSelectionQuote root={scroll.content} selected={thread?.id ?? null} enabled={desktop} />
-      <div ref={scroll.list} className="chat-scroll chat-messages" aria-label={t("聊天记录")}
-        onScroll={scroll.onScroll} onWheel={scroll.onWheel}>
-        <div ref={scroll.content} className={`chat-message-content${!entries.length ? ' is-empty' : ''}`}
-          onClickCapture={desktop ? scroll.pauseFollowing : undefined}>
-          {(hasMore || (loading && !entries.length)) && <div className="chat-history-more">
-            {loading && !entries.length && !loadingMore
-              ? <span role="status" className="chat-processing"><span className="chat-spinner" />{t("正在加载聊天记录…")}</span>
-              : <button type="button" className="chat-text-action" onClick={scroll.more}
-                disabled={loadingMore}>{loadingMore ? t("加载中…") : t("加载更早的消息")}</button>}
-          </div>}
-          {timeline.map(entry => <Fragment key={entry.id}>
-            {entry === runningSummary && props.processing}
-            <div data-message-id={'item' in entry ? entry.item.id : entry.id} className={`chat-entry-${entry.kind}`}>
-              <TimelineEntry entry={entry} open={setSelection} inline={setInline} desktop={desktop}
-                renderUserMessage={props.renderUserMessage} />
-            </div>
-          </Fragment>)}
-          {!runningSummary && props.processing}
-          {!entries.length && !loading && !props.processing && <div className="chat-empty">
-            <Terminal size={28} className="chat-empty-glyph" />
-            <h2>{t("想一起完成什么？")}</h2><p className="chat-muted">{t("直接提问，或选择一个项目开始任务。")}</p>
-            {desktop && <div className="chat-empty-suggestions"><span>{t("理解代码")}</span><span>{t("实现功能")}</span>
-              <span>{t("排查问题")}</span></div>}</div>}
-        </div>
-      </div>
-      {scroll.showBottom && entries.length > 0 && <button type="button" className="chat-scroll-bottom"
-        onClick={scroll.toBottom}><ArrowDown size={17} />{t("回到底部")}</button>}
-      {notice && <div className="chat-history-notice" role="status">
-        {t('已加载 {count} 条历史记录，用时 {seconds} 秒', notice)}
+    <div ref={scroll.content} className={`chat-message-content${!entries.length ? ' is-empty' : ''}`}
+      onClickCapture={desktop ? scroll.pauseFollowing : undefined}>
+      {(hasMore || (loading && !entries.length)) && <div className="chat-history-more">
+        {loading && !entries.length && !loadingMore
+          ? <span role="status" className="chat-processing"><span className="chat-spinner" />{t("正在加载聊天记录…")}</span>
+          : <button type="button" className="chat-text-action" onClick={scroll.more}
+            disabled={loadingMore}>{loadingMore ? t("加载中…") : t("加载更早的消息")}</button>}
       </div>}
+      {timeline.map(entry => <Fragment key={entry.id}>
+        {entry === runningSummary && props.processing}
+        <div data-message-id={'item' in entry ? entry.item.id : entry.id} className={`chat-entry-${entry.kind}`}>
+          <TimelineEntry entry={entry} open={setSelection} inline={setInline} desktop={desktop}
+            renderUserMessage={props.renderUserMessage} />
+        </div>
+      </Fragment>)}
+      {!runningSummary && props.processing}
+      {!entries.length && !loading && !props.processing && <div className="chat-empty">
+        <Terminal size={28} className="chat-empty-glyph" />
+        <h2>{t("想一起完成什么？")}</h2><p className="chat-muted">{t("直接提问，或选择一个项目开始任务。")}</p>
+        {desktop && <div className="chat-empty-suggestions"><span>{t("理解代码")}</span><span>{t("实现功能")}</span>
+          <span>{t("排查问题")}</span></div>}</div>}
     </div>
     {work && <AdaptiveSheet open title={work.turn.status === 'inProgress' ? t("正在处理") : t("处理过程")}
       subtitle={t("{value1} 项活动", { value1: work.items.length })} width={760} onClose={close}>

@@ -19,6 +19,14 @@
   }
   &:has(.chat-sidebar) .gui-remote-focus { display: none; }
   .chat-messages { padding: 0; }
+  .has-scroll-footer {
+    .chat-message-content { min-height: 0; }
+    .chat-message-footer { position: sticky; bottom: 0; z-index: 1; display: flex;
+      flex-direction: column; flex-shrink: 0; background: var(--panel); }
+    .chat-scroll-bottom { bottom: calc(100% + 12px); }
+    .chat-approvals { max-height: 45vh; }
+  }
+  &[data-dream-skin='true'] .chat-message-footer { background: transparent; }
   .chat-message-content { max-width: 900px; padding: 28px 32px; }
   .chat-markdown { font-size: var(--gui-font-size, 14px); line-height: 1.8;
     p { margin: 12px 0; }

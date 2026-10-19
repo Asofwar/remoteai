@@ -1,4 +1,6 @@
 .chat-message-region { position: relative; display: flex; flex: 1; min-height: 0; }
+.chat-message-scroll-body { display: flex; flex-direction: column; min-height: 100%; }
+.chat-message-scroll-body > .chat-message-content { flex: 1 0 auto; width: 100%; }
 .chat-message-content { min-height: 100%; padding-bottom: 28px; gap: 22px; }
 .chat-message-content.is-empty { justify-content: center; }
 .chat-message-content .chat-empty { flex: 1; }

@@ -16,11 +16,20 @@ function canScrollUp(target: EventTarget, container: HTMLElement) {
 export function useHistoryScroll({ thread, loadingMore, hasMore, loadOlder }: ChatMessagesProps) {
   const list = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
+  const body = useRef<HTMLDivElement>(null);
   const following = useRef(true);
   const [showBottom, setShowBottom] = useState(false);
   const fetching = useRef(false);
   const position = useRef(0);
   const anchor = useRef<{ element: Element; top: number }>();
+  const scope = useRef(thread?.id);
+  useLayoutEffect(() => {
+    scope.current = thread?.id;
+    following.current = true;
+    fetching.current = false;
+    anchor.current = undefined;
+    position.current = 0;
+  }, [thread?.id]);
   const updateScrollButton = useCallback(() => {
     const node = list.current;
     if (node) setShowBottom(shouldShowScrollToBottom({
@@ -35,7 +44,8 @@ export function useHistoryScroll({ thread, loadingMore, hasMore, loadOlder }: Ch
       .find((item) => item.getBoundingClientRect().bottom > top);
     if (element) anchor.current = { element, top: element.getBoundingClientRect().top };
     fetching.current = true;
-    void loadOlder().finally(() => { fetching.current = false; });
+    const current = scope.current;
+    void loadOlder().finally(() => { if (scope.current === current) fetching.current = false; });
   };
   useLayoutEffect(() => {
     const node = list.current;
@@ -56,7 +66,7 @@ export function useHistoryScroll({ thread, loadingMore, hasMore, loadOlder }: Ch
       updateScrollButton();
     };
     const observer = new ResizeObserver(follow);
-    if (content.current) observer.observe(content.current, { box: 'border-box' });
+    if (body.current) observer.observe(body.current, { box: 'border-box' });
     if (list.current) observer.observe(list.current);
     follow();
     return () => observer.disconnect();
@@ -71,8 +81,10 @@ export function useHistoryScroll({ thread, loadingMore, hasMore, loadOlder }: Ch
     if (upward && node.scrollTop < EDGE_DISTANCE) more();
   };
   const onWheel = (event: WheelEvent<HTMLDivElement>) => {
-    if (event.deltaY >= 0 || event.ctrlKey || event.defaultPrevented || event.currentTarget.scrollTop > 0) return;
+    if (event.deltaY >= 0 || event.ctrlKey || event.defaultPrevented) return;
     if (canScrollUp(event.target, event.currentTarget)) return;
+    following.current = false;
+    if (event.currentTarget.scrollTop > 0) return;
     // At the top (including short histories), upward wheels do not produce a scroll event.
     more();
   };
@@ -82,5 +94,5 @@ export function useHistoryScroll({ thread, loadingMore, hasMore, loadOlder }: Ch
     list.current?.scrollTo({ top: list.current.scrollHeight, behavior: 'smooth' });
   };
   const pauseFollowing = () => { following.current = false; };
-  return { list, content, onScroll, onWheel, more, showBottom, toBottom, pauseFollowing };
+  return { list, content, body, onScroll, onWheel, more, showBottom, toBottom, pauseFollowing };
 }

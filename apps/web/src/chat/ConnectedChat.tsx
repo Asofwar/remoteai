@@ -45,6 +45,8 @@ export interface ConnectedChatProps {
   scope: string; email: string; chooseDevice: (id: string) => void;
   chooseLocal?: () => void; accountPicker?: ReactNode; headerActions?: ReactNode;
   headerConnectionActions?: ReactNode; headerEnd?: ReactNode;
+  draggableHeader?: boolean;
+  scrollableComposer?: boolean;
   renderSidebar?: (actions: ChatSidebarActions) => ReactNode;
   renderUserMessage?: RenderUserMessage;
   composerHeader?: ReactNode;
@@ -63,7 +65,7 @@ export interface ChatSidebarActions {
 /** Conversation UI shared by the web client and the desktop's remote workspace. */
 export function ConnectedChat({ chat, device, devices, active, scope, email, chooseDevice,
   chooseLocal, accountPicker, headerActions, headerConnectionActions, headerEnd, renderSidebar, composerHeader,
-  conversationFooter, renderUserMessage,
+  conversationFooter, renderUserMessage, draggableHeader, scrollableComposer,
   readClipboardImages, nativeFileDrop, desktopDiffs }: ConnectedChatProps) {
   useLanguage();
   const { state, controller, foreground } = chat;
@@ -94,45 +96,7 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
     if (!active) { setDrawer(false); setPickingDevice(false); setSearching(false); setTokenSummary(false); }
   }, [active]);
   const showDesktopDiffs = desktopDiffs ?? desktop;
-  return <ImageAiContext.Provider value={{ enabled: active && ready && !state.selectedArchived
-    && !state.sending && !state.settingsBusy && !state.workspaceBusy && !state.compacting,
-    send: imageAiSender(controller, prepareImageEdit) }}>
-    <ChatImageContext.Provider value={{ threadId: state.selected?.id ?? null, ready,
-      load: controller.imagePreview, save: controller.managedPreviews ? controller.savePreviewImage : undefined }}>
-    <ChatFileContext.Provider value={{ threadId: state.selected?.id ?? null, ready, client: controller.files,
-      load: controller.textPreview }}>
-    <ChatDetailsWorkspace selected={state.selected?.id ?? null} active={active} enabled={showDesktopDiffs}>
-    <ChatQuotesProvider scope={state.selected?.id ?? null} sending={state.sending}
-    enabled={active && !state.selectedArchived}>
-    <div className="chat-conversation">
-    <header className="chat-header">
-      <button type="button" className="chat-back" aria-label={listOpen ? t("收起聊天列表") : t("打开聊天列表")}
-        aria-expanded={listOpen} onClick={() => { if (desktop) setSidebar(!sidebar); else setDrawer(!drawer); }}>
-        <ListToggleIcon size={21} /></button>
-      <div className="chat-grow"><h2>{state.selected ? threadPresentation(state.selected, state.sidebar, t).title : t("新聊天")}</h2>
-        {headerConnectionActions}</div>
-      {state.selected && state.selectedArchived && <button type="button" className="chat-button"
-        disabled={!ready || running}
-        onClick={() => { void controller.archive().then(() => setDrawer(true)); }}>
-        {t("恢复")}</button>}
-      {headerActions}
-      {showDesktopDiffs && <ConversationChangesButton
-        value={state.selected?.turns ? { turns: state.selected.turns } : undefined} />}
-      {headerEnd}
-    </header>
-    <ChatTaskStatus state={state} />
-    {!!error && <p role="alert" className="chat-error">{t(error)}</p>}
-    {state.desktopOnly && <p className="chat-muted" style={{ maxWidth: 400 }}>
-      {t('桌面已就绪。打开远程桌面，登录电脑后即可继续聊天。')}</p>}
-      <TaskReviewProvider controller={controller} state={state} active={active && foreground}>
-      <ChatRetryProvider controller={controller} state={state}>
-      <ChatMessages key={state.selected?.id ?? 'new'} thread={state.selected} offline={!ready}
-        renderUserMessage={renderUserMessage}
-        loading={state.historyLoading} loadingMore={state.historyLoadingMore} hasMore={state.historyHasMore}
-        loadOlder={() => controller.loadOlder()} historyLoad={state.historyLoad}
-        processing={runningTurn && <ChatProcessing key={runningTurn.id} turn={runningTurn}
-          processing={state.processing} active={active && ready} />} />
-      </ChatRetryProvider></TaskReviewProvider>
+  const composer = <>
     {!!approvals.length && <div className="chat-approvals chat-scroll">
       {approvals.map((event) => <ChatApproval key={String(event.id)} event={event}
         ready={ready} respond={(reply) => controller.respond(reply)} />)}
@@ -168,6 +132,50 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
       active={active} ready={ready && !state.selectedArchived} sending={state.sending} running={running}
       interrupted={state.selected?.turns?.at(-1)?.status === 'interrupted'}
       send={(input) => controller.send(input)} interrupt={() => controller.interrupt()} />
+  </>;
+  return <ImageAiContext.Provider value={{ enabled: active && ready && !state.selectedArchived
+    && !state.sending && !state.settingsBusy && !state.workspaceBusy && !state.compacting,
+    send: imageAiSender(controller, prepareImageEdit) }}>
+    <ChatImageContext.Provider value={{ threadId: state.selected?.id ?? null, ready,
+      load: controller.imagePreview, save: controller.managedPreviews ? controller.savePreviewImage : undefined }}>
+    <ChatFileContext.Provider value={{ threadId: state.selected?.id ?? null, ready, client: controller.files,
+      load: controller.textPreview }}>
+    <ChatDetailsWorkspace selected={state.selected?.id ?? null} active={active} enabled={showDesktopDiffs}>
+    <ChatQuotesProvider scope={state.selected?.id ?? null} sending={state.sending}
+    enabled={active && !state.selectedArchived}>
+    <div className="chat-conversation">
+    <header className="chat-header" data-tauri-drag-region={draggableHeader || undefined}>
+      <button type="button" className="chat-back" aria-label={listOpen ? t("收起聊天列表") : t("打开聊天列表")}
+        aria-expanded={listOpen} onClick={() => { if (desktop) setSidebar(!sidebar); else setDrawer(!drawer); }}>
+        <ListToggleIcon size={21} /></button>
+      <div className="chat-grow" data-tauri-drag-region={draggableHeader || undefined}>
+        <h2 data-tauri-drag-region={draggableHeader || undefined}>
+          {state.selected ? threadPresentation(state.selected, state.sidebar, t).title : t("新聊天")}</h2>
+        {headerConnectionActions}</div>
+      {state.selected && state.selectedArchived && <button type="button" className="chat-button"
+        disabled={!ready || running}
+        onClick={() => { void controller.archive().then(() => setDrawer(true)); }}>
+        {t("恢复")}</button>}
+      {headerActions}
+      {showDesktopDiffs && <ConversationChangesButton
+        value={state.selected?.turns ? { turns: state.selected.turns } : undefined} />}
+      {headerEnd}
+    </header>
+    <ChatTaskStatus state={state} />
+    {!!error && <p role="alert" className="chat-error">{t(error)}</p>}
+    {state.desktopOnly && <p className="chat-muted" style={{ maxWidth: 400 }}>
+      {t('桌面已就绪。打开远程桌面，登录电脑后即可继续聊天。')}</p>}
+      <TaskReviewProvider controller={controller} state={state} active={active && foreground}>
+      <ChatRetryProvider controller={controller} state={state}>
+      <ChatMessages thread={state.selected} offline={!ready}
+        footer={scrollableComposer ? composer : undefined}
+        renderUserMessage={renderUserMessage}
+        loading={state.historyLoading} loadingMore={state.historyLoadingMore} hasMore={state.historyHasMore}
+        loadOlder={() => controller.loadOlder()} historyLoad={state.historyLoad}
+        processing={runningTurn && <ChatProcessing key={runningTurn.id} turn={runningTurn}
+          processing={state.processing} active={active && ready} />} />
+      </ChatRetryProvider></TaskReviewProvider>
+    {!scrollableComposer && composer}
     {conversationFooter}
     </div>
     <ChatSidebar desktop={desktop} open={listOpen} onClose={closeList} customHeading={Boolean(renderSidebar)}>

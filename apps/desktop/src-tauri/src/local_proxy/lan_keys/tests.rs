@@ -171,7 +171,7 @@ fn buffered_and_streaming_captures_persist_usage_and_charge_each_terminal_event_
     let first_cost = fixture.usage().cost_usd;
     assert!(first_cost > 0.0);
     let event = concat!(
-        "data: {\"type\":\"response.completed\",\"response\":{\"usage\":",
+        "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_test\",\"usage\":",
         "{\"input_tokens\":20,\"output_tokens\":5,\"total_tokens\":25}}}\n\n"
     )
     .as_bytes();

@@ -1,6 +1,7 @@
 use serde_json::Value;
 
 use super::error_capture_diagnostics::{CaptureDiagnostics, Observation};
+use super::stream_completion::{CompletionEvent, StreamCompletion};
 
 const MAX_CAPTURE_BYTES: usize = 64 * 1024;
 const MAX_ERROR_MESSAGE_CHARS: usize = 1000;
@@ -30,7 +31,7 @@ pub(super) struct ErrorCapture {
     line_length: usize,
     last_byte: Option<u8>,
     reported: bool,
-    terminal: bool,
+    completion: StreamCompletion,
     finished: bool,
     diagnostics: CaptureDiagnostics,
 }
@@ -46,7 +47,7 @@ impl ErrorCapture {
             line_length: 0,
             last_byte: None,
             reported: false,
-            terminal: false,
+            completion: StreamCompletion::default(),
             finished: false,
             diagnostics: CaptureDiagnostics::default(),
         }
@@ -61,7 +62,18 @@ impl ErrorCapture {
     }
 
     pub(super) fn terminal_seen(&self) -> bool {
-        self.terminal
+        self.completion.seen()
+    }
+
+    pub(super) fn for_endpoint(mut self, path: &str) -> Self {
+        if super::is_responses_endpoint(super::request_path(path)) {
+            self.completion.require_responses();
+        }
+        self
+    }
+
+    pub(super) fn completion_unverified(&self) -> bool {
+        self.completion.unverified()
     }
 
     pub(super) fn error_seen(&self) -> bool {
@@ -72,6 +84,7 @@ impl ErrorCapture {
         let mut summary = self.diagnostics.summary();
         summary["pendingBytes"] = self.buffer_bytes.into();
         summary["pendingCaptureTruncated"] = (self.buffer_bytes > self.buffer.len() as u64).into();
+        summary["completionUnverified"] = self.completion_unverified().into();
         summary
     }
 
@@ -112,7 +125,10 @@ impl ErrorCapture {
         self.finished = true;
         if self.event_stream {
             self.finish_event(&mut errors);
-            if !self.reported && (self.http_status >= 400 || !self.terminal) {
+            if !self.reported
+                && (self.http_status >= 400
+                    || (!self.terminal_seen() && !self.completion_unverified()))
+            {
                 let message = if self.http_status >= 400 {
                     http_error_message(self.http_status)
                 } else {
@@ -134,7 +150,9 @@ impl ErrorCapture {
             value.as_ref().map(json_event_type).unwrap_or_default(),
             value.as_ref(),
         );
-        self.terminal |= expected_incomplete;
+        if expected_incomplete {
+            self.completion.complete();
+        }
         let message = if self.http_status >= 400 {
             Some(
                 value
@@ -202,10 +220,12 @@ impl ErrorCapture {
         } else {
             payload_type
         };
-        let terminal = data.trim() == "[DONE]"
-            || is_terminal_event(event)
-            || is_terminal_event(event_type)
-            || value.as_ref().is_some_and(chat_completion_finished);
+        self.completion.observe(CompletionEvent {
+            name: event,
+            data: &data,
+            value: value.as_ref(),
+            truncated: self.buffer_bytes > self.buffer.len() as u64,
+        });
         let expected_incomplete = self.health_incomplete_is_terminal(event_type, value.as_ref());
         let failure = if expected_incomplete {
             None
@@ -213,7 +233,9 @@ impl ErrorCapture {
             sse_error_message(event_type, value.as_ref())
         };
         let status = value.as_ref().and_then(structured_error_status);
-        self.terminal |= terminal || expected_incomplete;
+        if expected_incomplete {
+            self.completion.complete();
+        }
         self.diagnostics.observe(Observation {
             event_type: if data.trim() == "[DONE]" {
                 "[DONE]"
@@ -272,29 +294,6 @@ fn sse_event_data(block: &str) -> String {
         .map(str::trim_start)
         .collect::<Vec<_>>()
         .join("\n")
-}
-
-fn is_terminal_event(event_type: &str) -> bool {
-    matches!(
-        event_type,
-        "response.completed"
-            | "message_stop"
-            | "image_generation.completed"
-            | "image_edit.completed"
-    )
-}
-
-fn chat_completion_finished(value: &Value) -> bool {
-    value
-        .get("choices")
-        .and_then(Value::as_array)
-        .is_some_and(|choices| {
-            choices.iter().any(|choice| {
-                choice
-                    .get("finish_reason")
-                    .is_some_and(|reason| !reason.is_null())
-            })
-        })
 }
 
 fn json_event_type(value: &Value) -> &str {

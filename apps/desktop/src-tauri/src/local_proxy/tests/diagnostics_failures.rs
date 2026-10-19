@@ -11,7 +11,7 @@ fn diagnostics_record_http_200_json_failures_and_export_the_details() {
         body.to_vec(),
     ))));
     payload.content_type = None;
-    let payload = attach_diagnostic_response(payload);
+    let payload = attach_diagnostic_test_response(payload);
     let UpstreamBody::Streaming(mut reader) = payload.body else {
         panic!("expected stream")
     };
@@ -51,7 +51,7 @@ fn diagnostics_record_buffered_soft_failures_without_changing_the_response() {
     let body = br#"{"error":{"message":"failed","code":"server_error"}}"#;
     let mut payload = diagnostic_test_payload(UpstreamBody::Buffered(body.to_vec()));
     payload.content_type = Some("application/json".into());
-    let payload = attach_diagnostic_response(payload);
+    let payload = attach_diagnostic_test_response(payload);
     let UpstreamBody::Buffered(received) = payload.body else {
         panic!("expected buffered response")
     };
@@ -70,9 +70,9 @@ fn diagnostics_keep_unterminated_upstream_errors_when_transport_also_fails() {
     let body =
         b"event: error\ndata: {\"error\":{\"message\":\"unavailable\",\"code\":\"server_error\"}}";
     let reader = io::Cursor::new(body.to_vec()).chain(DiagnosticBrokenReader);
-    let payload = attach_diagnostic_response(diagnostic_test_payload(UpstreamBody::Streaming(
-        Box::new(reader),
-    )));
+    let payload = attach_diagnostic_test_response(diagnostic_test_payload(
+        UpstreamBody::Streaming(Box::new(reader)),
+    ));
     let UpstreamBody::Streaming(mut reader) = payload.body else {
         panic!("expected stream")
     };
@@ -123,9 +123,9 @@ fn diagnostics_keep_partial_position_without_treating_cancellation_as_upstream_f
     let directory = DiagnosticTestDirectory::new();
     let _scope = DiagnosticScope::enter(directory.log());
     let body = b"data: {\"type\":\"response.output_text.delta\",\"delta\":\"private text\"}";
-    let payload = attach_diagnostic_response(diagnostic_test_payload(UpstreamBody::Streaming(
-        Box::new(io::Cursor::new(body.to_vec())),
-    )));
+    let payload = attach_diagnostic_test_response(diagnostic_test_payload(
+        UpstreamBody::Streaming(Box::new(io::Cursor::new(body.to_vec()))),
+    ));
     let UpstreamBody::Streaming(mut reader) = payload.body else {
         panic!("expected stream")
     };

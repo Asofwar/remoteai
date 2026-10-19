@@ -126,3 +126,97 @@ fn unknown_incomplete_and_truncated_streams_remain_failures() {
         assert!(!capture.terminal_seen());
     }
 }
+
+#[test]
+fn responses_require_a_parsed_completion_even_when_done_or_other_markers_arrive() {
+    for ending in [
+        "data: [DONE]\n\n",
+        "event: response.completed\ndata: {broken\n\n",
+        "event: response.completed\ndata: {}\n\n",
+        "event: response.completed\ndata: {\"type\":\"response\"}\n\n",
+        "data: {\"type\":\"response.completed\"}\n\n",
+        "data: {\"type\":\"response.completed\",\"response\":{}}\n\n",
+        "data: {\"type\":\"message_stop\"}\n\n",
+        "data: {\"choices\":[{\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n",
+    ] {
+        for prefix in ["", "data: {\"type\":\"response.created\"}\n\n"] {
+            let mut capture = ErrorCapture::new_for_health(true, 200).for_endpoint("/v1/responses");
+            let body = format!("{prefix}{ending}");
+            assert_eq!(
+                observe_chunks(&mut capture, body.as_bytes()).len(),
+                1,
+                "{body}"
+            );
+            assert!(!capture.terminal_seen());
+            assert!(capture.error_seen());
+        }
+    }
+}
+
+#[test]
+fn inferred_responses_cannot_finish_with_chat_done() {
+    let mut capture = ErrorCapture::new(true, 200);
+    let body = b"data: {\"type\":\"response.created\"}\n\ndata: [DONE]\n\n";
+    assert_eq!(observe_chunks(&mut capture, body).len(), 1);
+    assert!(!capture.terminal_seen());
+}
+
+#[test]
+fn fragmented_valid_response_completion_is_healthy_with_or_without_done() {
+    for suffix in ["", "data: [DONE]\r\n\r\n"] {
+        let mut capture =
+            ErrorCapture::new_for_health(true, 200).for_endpoint("/v1/responses?stream=true");
+        let body = format!(
+            "event: response.completed\r\ndata: {}\r\n\r\n{suffix}",
+            json!({"type": "response.completed", "response": {"id": "resp_test", "status": "completed"}})
+        );
+        assert!(observe_chunks(&mut capture, body.as_bytes()).is_empty());
+        assert!(capture.terminal_seen());
+        assert!(!capture.error_seen());
+    }
+}
+
+#[test]
+fn oversized_terminal_capture_is_unknown_instead_of_successful_or_failed() {
+    let value = json!({
+        "type": "response.completed", "response": {"id": "resp_test", "output": "x".repeat(MAX_CAPTURE_BYTES * 2)}
+    });
+    for prefix in ["", "event: response.completed\n"] {
+        let body = format!("{prefix}data: {value}\n\ndata: [DONE]\n\n");
+        let mut capture = ErrorCapture::new_for_health(true, 200).for_endpoint("/v1/responses");
+        assert!(observe_chunks(&mut capture, body.as_bytes()).is_empty());
+        assert!(!capture.terminal_seen());
+        assert!(capture.completion_unverified());
+        assert!(capture.diagnostic_summary().to_string().len() < 2000);
+    }
+}
+
+#[test]
+fn oversized_nonterminal_events_still_require_completion() {
+    let output = "x".repeat(MAX_CAPTURE_BYTES * 2);
+    for (name, data) in [
+        (
+            "response.output_text.delta",
+            format!(r#"{{"delta":"{output}","type":"response.output_text.delta"}}"#),
+        ),
+        (
+            "",
+            format!(r#"{{"type":"response.output_text.delta","delta":"{output}"}}"#),
+        ),
+        (
+            "response.completed",
+            format!(r#"{{"type":"response.output_text.delta","delta":"{output}"}}"#),
+        ),
+    ] {
+        let body = format!("event: {name}\ndata: {data}\n\ndata: [DONE]\n\n");
+        let mut capture = ErrorCapture::new_for_health(true, 200).for_endpoint("/v1/responses");
+        assert_eq!(
+            observe_chunks(&mut capture, body.as_bytes()).len(),
+            1,
+            "{name}"
+        );
+        assert!(!capture.terminal_seen());
+        assert!(!capture.completion_unverified());
+        assert!(capture.error_seen());
+    }
+}

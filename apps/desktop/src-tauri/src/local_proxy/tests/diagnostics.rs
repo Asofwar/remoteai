@@ -1,5 +1,9 @@
 struct DiagnosticTestDirectory(PathBuf);
 
+fn attach_diagnostic_test_response(payload: UpstreamPayload) -> UpstreamPayload {
+    attach_diagnostic_response(payload, "/v1/responses")
+}
+
 impl DiagnosticTestDirectory {
     fn new() -> Self {
         let path = std::env::temp_dir().join(format!("proxy-diagnostics-{}", uuid::Uuid::new_v4()));
@@ -41,10 +45,14 @@ fn diagnostic_test_payload(body: UpstreamBody) -> UpstreamPayload {
 fn diagnostics_capture_stream_completion_without_conversation_text() {
     let directory = DiagnosticTestDirectory::new();
     let scope = DiagnosticScope::enter(directory.log());
-    let body = b"data: {\"type\":\"response.output_text.delta\",\"delta\":\"private conversation\"}\n\ndata: {\"type\":\"response.completed\"}\n\n";
-    let payload = attach_diagnostic_response(diagnostic_test_payload(UpstreamBody::Streaming(
-        Box::new(io::Cursor::new(body.to_vec())),
-    )));
+    let body = concat!(
+        "data: {\"type\":\"response.output_text.delta\",\"delta\":\"private conversation\"}\n\n",
+        "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_test\"}}\n\n"
+    )
+    .as_bytes();
+    let payload = attach_diagnostic_test_response(diagnostic_test_payload(
+        UpstreamBody::Streaming(Box::new(io::Cursor::new(body.to_vec()))),
+    ));
     let UpstreamBody::Streaming(mut reader) = payload.body else {
         panic!("expected stream")
     };
@@ -75,10 +83,11 @@ fn diagnostics_distinguish_truncated_streams_and_consumer_drop() {
     let directory = DiagnosticTestDirectory::new();
     let _scope = DiagnosticScope::enter(directory.log());
     for consume in [true, false] {
-        let payload =
-            attach_diagnostic_response(diagnostic_test_payload(UpstreamBody::Streaming(Box::new(
-                io::Cursor::new(b"data: {\"type\":\"response.created\"}\n\n".to_vec()),
-            ))));
+        let payload = attach_diagnostic_test_response(diagnostic_test_payload(
+            UpstreamBody::Streaming(Box::new(io::Cursor::new(
+                b"data: {\"type\":\"response.created\"}\n\n".to_vec(),
+            ))),
+        ));
         let UpstreamBody::Streaming(mut reader) = payload.body else {
             panic!("expected stream")
         };
@@ -244,9 +253,9 @@ fn diagnostics_export_and_session_poll_remain_available_during_active_stream() {
     let worker_path = path.clone();
     let stream = thread::spawn(move || {
         let _scope = DiagnosticScope::enter(worker_path);
-        let payload = attach_diagnostic_response(diagnostic_test_payload(UpstreamBody::Streaming(
-            Box::new(DiagnosticWaitingReader(receiver)),
-        )));
+        let payload = attach_diagnostic_test_response(diagnostic_test_payload(
+            UpstreamBody::Streaming(Box::new(DiagnosticWaitingReader(receiver))),
+        ));
         ready.send(()).unwrap();
         let UpstreamBody::Streaming(mut reader) = payload.body else {
             panic!("expected stream")
@@ -284,9 +293,9 @@ impl Read for DiagnosticBrokenReader {
 fn diagnostics_preserve_read_failures_and_do_not_read_on_empty_buffers() {
     let directory = DiagnosticTestDirectory::new();
     let _scope = DiagnosticScope::enter(directory.log());
-    let payload = attach_diagnostic_response(diagnostic_test_payload(UpstreamBody::Streaming(
-        Box::new(DiagnosticBrokenReader),
-    )));
+    let payload = attach_diagnostic_test_response(diagnostic_test_payload(
+        UpstreamBody::Streaming(Box::new(DiagnosticBrokenReader)),
+    ));
     let UpstreamBody::Streaming(mut reader) = payload.body else {
         panic!("expected stream")
     };

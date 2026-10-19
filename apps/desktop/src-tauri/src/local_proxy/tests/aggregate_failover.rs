@@ -31,9 +31,18 @@ impl AggregateTestServer {
                     continue;
                 };
                 let mut input = Vec::new();
-                worker_headers.lock().unwrap().push(request.headers().iter().map(|header| (
-                    header.field.as_str().to_string().to_lowercase(), header.value.to_string(),
-                )).collect());
+                worker_headers.lock().unwrap().push(
+                    request
+                        .headers()
+                        .iter()
+                        .map(|header| {
+                            (
+                                header.field.as_str().to_string().to_lowercase(),
+                                header.value.to_string(),
+                            )
+                        })
+                        .collect(),
+                );
                 request.as_reader().read_to_end(&mut input).unwrap();
                 worker_requests.lock().unwrap().push((
                     request.url().to_string(),
@@ -108,14 +117,17 @@ fn aggregate_test_target(urls: &[&str]) -> AggregateTarget {
 
 fn send_aggregate_fixture(target: &AggregateTarget) -> Result<UpstreamPayload, String> {
     let app = breakdown_responsiveness_test_app();
-    forward_aggregate_request(app.handle(), AggregateForwardRequest {
-        method: &Method::Post,
-        url: "/v1/responses",
-        headers: &[],
-        body: br#"{"input":"hello","stream":false}"#.to_vec(),
-        session_id: Some("conversation"),
-        target,
-    })
+    forward_aggregate_request(
+        app.handle(),
+        AggregateForwardRequest {
+            method: &Method::Post,
+            url: "/v1/responses",
+            headers: &[],
+            body: br#"{"input":"hello","stream":false}"#.to_vec(),
+            session_id: Some("conversation"),
+            target,
+        },
+    )
 }
 
 #[test]
@@ -303,7 +315,10 @@ fn aggregate_native_messages_follow_the_same_failover_policy() {
 #[test]
 fn aggregate_stream_drop_uses_observed_terminal_events_but_keeps_cancellation_neutral() {
     for (event, failures) in [
-        (r#"{"type":"response.completed"}"#, 0),
+        (
+            r#"{"type":"response.completed","response":{"id":"resp_test"}}"#,
+            0,
+        ),
         (
             r#"{"type":"response.incomplete","response":{"incomplete_details":{"reason":"max_output_tokens"}}}"#,
             0,
@@ -342,6 +357,7 @@ fn aggregate_stream_drop_uses_observed_terminal_events_but_keeps_cancellation_ne
                 token_usage_service_tier: None,
             },
             select(),
+            "/v1/responses",
         );
         let UpstreamBody::Streaming(reader) = &mut payload.body else {
             panic!("expected stream")
@@ -356,4 +372,33 @@ fn aggregate_stream_drop_uses_observed_terminal_events_but_keeps_cancellation_ne
         assert_eq!(states["member-0"].consecutive_failures, failures, "{event}");
         aggregate_scheduler::reset(&target.config.id);
     }
+}
+
+#[test]
+fn aggregate_responses_eof_does_not_reward_done_or_malformed_completion() {
+    for body in [
+        "data: [DONE]\n\n",
+        "event: response.completed\ndata: {broken\n\n",
+    ] {
+        let mut capture =
+            error_capture::ErrorCapture::new_for_health(true, 200).for_endpoint("/v1/responses");
+        drop(capture.observe(body.as_bytes()));
+        assert!(matches!(
+            aggregate_response_outcome(&mut capture),
+            aggregate_scheduler::MemberOutcome::Failure { .. }
+        ));
+    }
+    let mut capture =
+        error_capture::ErrorCapture::new_for_health(true, 200).for_endpoint("/v1/responses");
+    let body = format!(
+        "event: response.completed\ndata: {}\n\n",
+        json!({
+            "type": "response.completed", "response": {"id": "resp_large", "output": "x".repeat(128 * 1024)}
+        })
+    );
+    drop(capture.observe(body.as_bytes()));
+    assert!(matches!(
+        aggregate_response_outcome(&mut capture),
+        aggregate_scheduler::MemberOutcome::Neutral
+    ));
 }

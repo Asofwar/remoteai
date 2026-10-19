@@ -124,18 +124,15 @@ fn sse_headers_and_multiline_data_preserve_explicit_failure_events() {
 
 #[test]
 fn all_normal_terminal_events_avoid_eof_errors_and_private_output() {
-    for terminal in [
-        "data: [DONE]\n\n",
-        "event: message_stop\n\ndata: {}\n\n",
-        "event: response.completed\ndata: {\"type\":\"response\"}\n\n",
-        "data: {\"type\":\"message_stop\"}\n\n",
-        "data: {\"type\":\"response.completed\"}\n\n",
-        "data: {\"choices\":[{\"finish_reason\":\"stop\"}]}\n\n",
+    for (output, terminal) in [
+        ("data: {\"choices\":[{\"delta\":{\"content\":\"private conversation\"}}]}\n\n",
+         "data: [DONE]\n\n"),
+        ("", "event: message_stop\ndata: {}\n\n"),
+        ("", "data: {\"type\":\"message_stop\"}\n\n"),
+        ("data: {\"type\":\"response.output_text.delta\",\"delta\":\"private conversation\"}\n\n",
+         "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_test\"}}\n\n"),
+        ("", "data: {\"choices\":[{\"finish_reason\":\"stop\"}]}\n\n"),
     ] {
-        let output = concat!(
-            "data: {\"type\":\"response.output_text.delta\",",
-            "\"delta\":\"private conversation\",\"message\":\"do not log\",\"error\":null}\n\n",
-        );
         let bytes = format!("{output}{terminal}");
         let errors = collect_chunks(&mut ErrorCapture::new(true, 200), bytes.as_bytes(), 5);
         assert!(
@@ -197,7 +194,7 @@ fn oversized_output_events_are_bounded_and_do_not_hide_a_later_terminal() {
         .is_empty());
     assert_eq!(capture.buffer.len(), MAX_CAPTURE_BYTES);
     assert!(capture
-        .observe(b"\"}\r\n\r\ndata: [DONE]\r\n\r\n")
+        .observe(b"\"}\r\n\r\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_test\"}}\r\n\r\n")
         .is_empty());
     assert!(capture.finish().is_empty());
 }

@@ -171,7 +171,8 @@ impl Request {
             })?;
             sent_before_redirect |= !target.body.is_empty();
             if !target.follow(&response)? {
-                return Ok(Response::new(response, self.timeouts).with_deadline(self.deadline));
+                return Ok(Response::new(response, self.timeouts, &target.headers)
+                    .with_deadline(self.deadline));
             }
         }
     }

@@ -45,7 +45,7 @@ fn error_logging_keeps_buffered_error_payloads_unchanged() {
         panic!("buffered response")
     };
     let expected = expected.clone();
-    let captured = attach_proxy_error_capture(original);
+    let captured = attach_proxy_error_capture(original, "/v1/responses");
 
     assert_eq!(captured.status, 429);
     assert_eq!(

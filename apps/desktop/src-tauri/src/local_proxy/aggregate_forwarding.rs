@@ -65,7 +65,7 @@ fn send_aggregate_attempt<R: Runtime>(
         .is_ok_and(|payload| status_ok(payload.status))
     {
         return (
-            result.map(|payload| watch_aggregate_response(payload, lease)),
+            result.map(|payload| watch_aggregate_response(payload, lease, request.url)),
             false,
         );
     }
@@ -162,11 +162,13 @@ fn aggregate_failure_decision(
 fn watch_aggregate_response(
     mut payload: UpstreamPayload,
     lease: aggregate_scheduler::MemberLease,
+    endpoint: &str,
 ) -> UpstreamPayload {
     let mut capture = error_capture::ErrorCapture::new_for_health(
         is_event_stream(payload.content_type.as_deref()),
         payload.status,
-    );
+    )
+    .for_endpoint(endpoint);
     payload.body = match payload.body {
         UpstreamBody::Buffered(body) => {
             // The outer response capture owns error reporting; only health flags are needed here.
@@ -215,7 +217,10 @@ impl Read for AggregateResponseReader {
 impl Drop for AggregateResponseReader {
     fn drop(&mut self) {
         // Clients may stop reading after a terminal frame without asking for EOF.
-        if self.capture.terminal_seen() || self.capture.error_seen() {
+        if self.capture.terminal_seen()
+            || self.capture.error_seen()
+            || self.capture.completion_unverified()
+        {
             if let Some(lease) = self.lease.take() {
                 lease.finish(aggregate_response_outcome(&mut self.capture));
             }
@@ -229,6 +234,8 @@ fn aggregate_response_outcome(
     drop(capture.finish());
     if capture.error_seen() {
         aggregate_scheduler::MemberOutcome::Failure { retry_after: None }
+    } else if capture.completion_unverified() {
+        aggregate_scheduler::MemberOutcome::Neutral
     } else {
         aggregate_scheduler::MemberOutcome::Success
     }

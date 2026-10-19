@@ -14,9 +14,14 @@ fn delayed_response(
         let (mut socket, _) = listener.accept().unwrap();
         read_headers(&mut socket);
         let length: usize = chunks.iter().map(|(chunk, _)| chunk.len()).sum();
+        let type_header = if content_type.is_empty() {
+            String::new()
+        } else {
+            format!("Content-Type: {content_type}\r\n")
+        };
         write!(
             socket,
-            "HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\nContent-Length: {length}\r\n\r\n"
+            "HTTP/1.1 200 OK\r\n{type_header}Content-Length: {length}\r\n\r\n"
         )
         .unwrap();
         socket.flush().unwrap();
@@ -57,6 +62,44 @@ fn longer_sse_timeout_allows_long_silence_and_completion() {
 }
 
 #[test]
+fn missing_content_type_uses_the_requested_sse_timeout_before_reading() {
+    for timeout in [None, Some(IDLE * 4)] {
+        let (url, server) =
+            delayed_response("", vec![(HEARTBEAT, Duration::ZERO), (COMPLETED, IDLE * 2)]);
+        let mut request = prepared_request(url, Vec::new());
+        request.headers.insert(
+            header::ACCEPT,
+            "application/json, text/event-stream".parse().unwrap(),
+        );
+        request.timeouts.sse_response_idle = timeout;
+        let response = request.send().unwrap();
+        assert_eq!(
+            response.headers()[header::CONTENT_TYPE],
+            "text/event-stream"
+        );
+        assert_eq!(
+            response.bytes().unwrap(),
+            format!("{HEARTBEAT}{COMPLETED}").as_bytes()
+        );
+        server.join().unwrap();
+    }
+}
+
+#[test]
+fn missing_content_type_without_sse_request_keeps_the_normal_timeout() {
+    let (url, server) = delayed_response("", vec![("{}", IDLE * 2)]);
+    let mut request = prepared_request(url, Vec::new());
+    request.timeouts.sse_response_idle = None;
+    let response = request.send().unwrap();
+    assert!(!response.headers().contains_key(header::CONTENT_TYPE));
+    assert_eq!(
+        response.bytes().unwrap_err().kind(),
+        std::io::ErrorKind::TimedOut
+    );
+    server.join().unwrap();
+}
+
+#[test]
 fn upstream_comments_keep_sse_alive_without_deltas() {
     let mut chunks = vec![(HEARTBEAT, STEP); 8];
     chunks.push((COMPLETED, STEP));
@@ -71,6 +114,9 @@ fn upstream_comments_keep_sse_alive_without_deltas() {
 fn disabling_sse_timeout_preserves_json_idle_timeout() {
     let (url, server) = delayed_response("application/json", vec![("{}", IDLE * 2)]);
     let mut request = prepared_request(url, Vec::new());
+    request
+        .headers
+        .insert(header::ACCEPT, "text/event-stream".parse().unwrap());
     request.timeouts.sse_response_idle = None;
     let error = request.send().unwrap().bytes().unwrap_err();
     assert_eq!(error.kind(), std::io::ErrorKind::TimedOut);

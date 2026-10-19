@@ -1,4 +1,4 @@
-fn attach_diagnostic_response(mut payload: UpstreamPayload) -> UpstreamPayload {
+fn attach_diagnostic_response(mut payload: UpstreamPayload, endpoint: &str) -> UpstreamPayload {
     let Some(context) = current_diagnostic_context() else {
         return payload;
     };
@@ -6,7 +6,8 @@ fn attach_diagnostic_response(mut payload: UpstreamPayload) -> UpstreamPayload {
     let mut capture = error_capture::ErrorCapture::new(
         is_event_stream(payload.content_type.as_deref()),
         payload.status,
-    );
+    )
+    .for_endpoint(endpoint);
     payload.body = match payload.body {
         UpstreamBody::Streaming(inner) => {
             UpstreamBody::Streaming(Box::new(DiagnosticStreamReader {

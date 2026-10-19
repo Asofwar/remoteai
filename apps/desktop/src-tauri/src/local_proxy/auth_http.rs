@@ -146,9 +146,7 @@ fn send_with_timeout_retries(
             attempt += 1;
             let result = request.send();
             diagnostic_http_result(&result, attempt);
-            if result
-                .as_ref()
-                .is_err_and(|error| request.can_retry(error))
+            if result.as_ref().is_err_and(|error| request.can_retry(error))
                 && attempt < UPSTREAM_TIMEOUT_ATTEMPT_LIMIT
             {
                 diagnostic_retry("transport_timeout", Duration::ZERO);
@@ -401,7 +399,10 @@ fn attach_first_response_capture(
 
 fn respond_payload(request: Request, payload: UpstreamPayload) {
     let payload = restore_stream_content_type(&request, payload);
-    let payload = attach_proxy_error_capture(attach_diagnostic_response(payload));
+    let payload = attach_proxy_error_capture(
+        attach_diagnostic_response(payload, request.url()),
+        request.url(),
+    );
     let UpstreamPayload {
         status,
         content_type,

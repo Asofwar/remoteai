@@ -54,6 +54,10 @@ fn failed_buffered_and_streamed_events_do_not_charge_even_with_reported_usage() 
         "event: error\ndata: {\"message\":\"failure\"}\n\n",
         "data: {\"type\":\"response.failed\",\"response\":{\"usage\":{\"input_tokens\":20,\"output_tokens\":5}}}\n\n",
         "data: {\"type\":\"response.incomplete\"}\n\n",
+        "data: [DONE]\n\n",
+        "event: response.completed\ndata: {broken\n\n",
+        "data: {\"type\":\"response.completed\"}\n\n",
+        "data: {\"type\":\"response.completed\",\"response\":{}}\n\n",
         "",
     ] {
         let bytes = format!("{partial}{ending}").into_bytes();
@@ -104,7 +108,7 @@ fn read_errors_and_client_cancellations_do_not_charge() {
 #[test]
 fn completed_stream_without_usage_counts_once() {
     let fixture = Fixture::new();
-    let event = b"data: {\"type\":\"response.completed\",\"response\":{\"output\":[]}}\n\n";
+    let event = b"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_test\",\"output\":[]}}\n\n";
     let mut payload = attach(&fixture, streaming(Cursor::new(event)));
     let proxy::UpstreamBody::Streaming(reader) = &mut payload.body else {
         panic!("expected stream")
@@ -114,4 +118,31 @@ fn completed_stream_without_usage_counts_once() {
     reader.read_to_end(&mut Vec::new()).unwrap();
     drop(payload);
     assert_eq!(fixture.usage().unconfirmed_requests, 1);
+}
+
+#[test]
+fn valid_chat_and_anthropic_streams_still_charge_once_before_eof() {
+    for body in [
+        concat!(
+            "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":20,\"completion_tokens\":5}}\n\n",
+            "data: [DONE]\n\n"
+        ),
+        concat!(
+            "data: {\"type\":\"message_start\",",
+            "\"message\":{\"usage\":{\"input_tokens\":20,\"output_tokens\":5}}}\n\n",
+            "data: {\"type\":\"message_stop\"}\n\n"
+        ),
+    ] {
+        let fixture = Fixture::new();
+        let mut payload = attach(&fixture, streaming(Cursor::new(body)));
+        let proxy::UpstreamBody::Streaming(reader) = &mut payload.body else {
+            panic!("expected stream")
+        };
+        reader.read_exact(&mut vec![0; body.len()]).unwrap();
+        assert_eq!(fixture.usage().tokens, 25);
+        reader.read_to_end(&mut Vec::new()).unwrap();
+        drop(payload);
+        assert_eq!(fixture.usage().tokens, 25);
+        assert_eq!(fixture.usage().unconfirmed_requests, 0);
+    }
 }

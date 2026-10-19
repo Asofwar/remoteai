@@ -273,12 +273,43 @@ fn sse_transport_read_error_reports_failure_and_finishes_chunk_framing() {
     worker.join().unwrap();
 }
 
+#[test]
+fn responses_read_timeout_sends_a_codex_failure_and_keeps_connection_usable() {
+    let server = Server::http("127.0.0.1:0").unwrap();
+    let mut client = SseWireClient::new(server.server_addr().to_ip().unwrap());
+    let (sender, receiver) = mpsc::channel();
+    sender.send(b"data: {\"unfinished\"".to_vec()).unwrap();
+    drop(sender);
+    let worker = thread::spawn(move || {
+        serve_untyped_stream_test(server, receiver, None);
+    });
+    client
+        .send("GET /v1/responses HTTP/1.1\r\nHost: localhost\r\nAccept: text/event-stream\r\n\r\n");
+    assert!(client.headers().contains("Transfer-Encoding: chunked"));
+    let body = client.remaining_chunks();
+    let failure = sse_event(&body, "response.failed");
+    assert_eq!(failure["type"], "response.failed");
+    assert_eq!(failure["response"]["status"], "failed");
+    assert_eq!(failure["response"]["error"]["code"], "server_error");
+    assert_eq!(
+        failure["response"]["error"]["message"],
+        "The response timed out. Please try again."
+    );
+    assert!(!body.contains("response.completed"));
+    client.send("GET /next HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+    assert!(client.headers().starts_with("HTTP/1.1 204"));
+    worker.join().unwrap();
+}
+
 fn serve_untyped_stream_test(
     server: Server,
     receiver: mpsc::Receiver<Vec<u8>>,
     content_type: Option<&str>,
 ) {
-    let request = server.recv_timeout(Duration::from_secs(5)).unwrap().unwrap();
+    let request = server
+        .recv_timeout(Duration::from_secs(5))
+        .unwrap()
+        .unwrap();
     let mut payload = transport_test_payload(SseTransportTestReader {
         chunks: receiver,
         current: Cursor::new(Vec::new()),
@@ -299,7 +330,8 @@ fn http_streaming_flushes_when_upstream_omits_content_type() {
         let server = Server::http("127.0.0.1:0").unwrap();
         let mut client = SseWireClient::new(server.server_addr().to_ip().unwrap());
         let (sender, receiver) = mpsc::channel();
-        let worker = thread::spawn(move || serve_untyped_stream_test(server, receiver, content_type));
+        let worker =
+            thread::spawn(move || serve_untyped_stream_test(server, receiver, content_type));
         client.send("GET /stream HTTP/1.1\r\nHost: localhost\r\nAccept: text/event-stream\r\n\r\n");
         sender.send(b"first fragment".to_vec()).unwrap();
         assert!(client.headers().contains("Transfer-Encoding: chunked"));
@@ -320,7 +352,8 @@ fn http_streaming_read_error_without_content_type_finishes_promptly() {
         let (sender, receiver) = mpsc::channel();
         sender.send(b"data: {\"unfinished\"".to_vec()).unwrap();
         drop(sender);
-        let worker = thread::spawn(move || serve_untyped_stream_test(server, receiver, content_type));
+        let worker =
+            thread::spawn(move || serve_untyped_stream_test(server, receiver, content_type));
         client.send("GET /stream HTTP/1.1\r\nHost: localhost\r\nAccept: text/event-stream\r\n\r\n");
         assert!(client.headers().contains("Transfer-Encoding: chunked"));
         let body = client.remaining_chunks();

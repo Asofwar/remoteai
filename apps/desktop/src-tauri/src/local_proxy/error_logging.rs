@@ -23,11 +23,12 @@ fn record_retried_proxy_response(payload: &UpstreamPayload) {
     record_captured_proxy_errors(capture.finish());
 }
 
-fn attach_proxy_error_capture(mut payload: UpstreamPayload) -> UpstreamPayload {
+fn attach_proxy_error_capture(mut payload: UpstreamPayload, endpoint: &str) -> UpstreamPayload {
     let mut capture = error_capture::ErrorCapture::new(
         is_event_stream(payload.content_type.as_deref()),
         payload.status,
-    );
+    )
+    .for_endpoint(endpoint);
     payload.body = match payload.body {
         UpstreamBody::Buffered(body) => {
             record_captured_proxy_errors(capture.observe(&body));

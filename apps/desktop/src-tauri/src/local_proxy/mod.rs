@@ -54,6 +54,7 @@ pub(crate) mod session_metrics;
 mod session_titles;
 pub(crate) mod sse_idle_timeout;
 mod sse_transport;
+mod stream_completion;
 mod upstream_transport;
 mod usage_service_tier;
 

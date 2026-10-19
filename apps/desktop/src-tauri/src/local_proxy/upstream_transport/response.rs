@@ -17,7 +17,12 @@ pub(in crate::local_proxy) struct Response {
 }
 
 impl Response {
-    pub(super) fn new(response: reqwest::Response, timeouts: super::Timeouts) -> Self {
+    pub(super) fn new(
+        mut response: reqwest::Response,
+        timeouts: super::Timeouts,
+        request_headers: &reqwest::header::HeaderMap,
+    ) -> Self {
+        restore_stream_content_type(&mut response, request_headers);
         let content_type = response
             .headers()
             .get(reqwest::header::CONTENT_TYPE)
@@ -91,6 +96,29 @@ impl Response {
                 })?
                 .map_err(io::Error::other)
         })
+    }
+}
+
+fn restore_stream_content_type(
+    response: &mut reqwest::Response,
+    request_headers: &reqwest::header::HeaderMap,
+) {
+    use reqwest::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
+    if !response.status().is_success() || response.headers().contains_key(CONTENT_TYPE) {
+        return;
+    }
+    let accepts_sse = request_headers.get_all(ACCEPT).iter().any(|value| {
+        value.to_str().is_ok_and(|value| {
+            value
+                .split(',')
+                .any(|media| media.trim().eq_ignore_ascii_case("text/event-stream"))
+        })
+    });
+    if accepts_sse {
+        // Infer framing before choosing timeouts or constructing health/diagnostic observers.
+        response
+            .headers_mut()
+            .insert(CONTENT_TYPE, HeaderValue::from_static("text/event-stream"));
     }
 }
 

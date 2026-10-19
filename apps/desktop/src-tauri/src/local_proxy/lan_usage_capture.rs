@@ -11,17 +11,17 @@ pub(super) enum LanUsageAccounting {
 pub(super) struct LanUsageCapture {
     errors: ErrorCapture,
     read_failed: bool,
+    event_stream: bool,
 }
 
 impl LanUsageCapture {
     pub(super) fn new(context: &TokenUsageContext) -> Self {
+        let event_stream = captures_event_stream(context);
         Self {
             // Only successful HTTP responses reach token capture. Failures can still arrive in the body.
-            errors: ErrorCapture::new(
-                captures_event_stream(context),
-                reqwest::StatusCode::OK.as_u16(),
-            ),
+            errors: ErrorCapture::new(event_stream, reqwest::StatusCode::OK.as_u16()),
             read_failed: false,
+            event_stream,
         }
     }
 
@@ -37,8 +37,17 @@ impl LanUsageCapture {
 
     pub(super) fn accounting(&self, usage_complete: bool) -> LanUsageAccounting {
         if self.read_failed || self.errors.error_seen() {
-            LanUsageAccounting::Failed
-        } else if usage_complete {
+            return LanUsageAccounting::Failed;
+        }
+        if self.event_stream && !self.errors.terminal_seen() {
+            // Accounting can run before EOF. A usage marker alone must not authorize a charge.
+            return if self.errors.completion_unverified() {
+                LanUsageAccounting::Incomplete
+            } else {
+                LanUsageAccounting::Failed
+            };
+        }
+        if usage_complete {
             LanUsageAccounting::Complete
         } else {
             LanUsageAccounting::Incomplete

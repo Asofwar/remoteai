@@ -1,14 +1,10 @@
 //! Flush each SSE read to HTTP/1.1 clients instead of buffering tiny_http's 8 KiB chunks.
 
+use serde_json::json;
 use std::io::{self, Read, Write};
 use tiny_http::{Method, Request, Response};
 
 const STREAM_COPY_BUFFER_BYTES: usize = 8192;
-const INTERRUPTED_STREAM_EVENT: &[u8] = concat!(
-    "\n\nevent: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"api_error\",",
-    "\"message\":\"The connection was interrupted. Please try again.\"}}\n\n"
-)
-.as_bytes();
 
 pub(super) fn respond<R: Read>(request: Request, response: Response<R>) -> io::Result<()> {
     if *request.method() == Method::Head
@@ -20,11 +16,12 @@ pub(super) fn respond<R: Read>(request: Request, response: Response<R>) -> io::R
     let Some(headers) = chunked_headers(&request, &response)? else {
         return request.respond(response);
     };
+    let responses = super::is_responses_endpoint(super::request_path(request.url()));
     // Keep tiny_http's writer ownership: dropping it releases the next pipelined response.
     let mut writer = request.into_writer();
     writer.write_all(&headers)?;
     writer.flush()?;
-    write_chunks(&mut response.into_reader(), &mut writer)
+    write_chunks(&mut response.into_reader(), &mut writer, responses)
 }
 
 fn chunked_headers<R: Read>(
@@ -57,7 +54,11 @@ fn chunked_headers<R: Read>(
     Ok(chunked.then_some(headers))
 }
 
-fn write_chunks(reader: &mut impl Read, writer: &mut impl Write) -> io::Result<()> {
+fn write_chunks(
+    reader: &mut impl Read,
+    writer: &mut impl Write,
+    responses: bool,
+) -> io::Result<()> {
     let mut buffer = [0_u8; STREAM_COPY_BUFFER_BYTES];
     loop {
         match reader.read(&mut buffer) {
@@ -66,12 +67,35 @@ fn write_chunks(reader: &mut impl Read, writer: &mut impl Write) -> io::Result<(
             Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
             Err(error) => {
                 // A read failure must remain visible while preserving framing for the next response.
-                write_chunk(writer, INTERRUPTED_STREAM_EVENT)?;
+                write_chunk(writer, interruption_event(responses, &error).as_bytes())?;
                 finish_chunks(writer)?;
                 return Err(error);
             }
         }
     }
+}
+
+fn interruption_event(responses: bool, error: &io::Error) -> String {
+    let message = if error.kind() == io::ErrorKind::TimedOut {
+        "The response timed out. Please try again."
+    } else {
+        "The connection was interrupted. Please try again."
+    };
+    let (event, data) = if responses {
+        // Codex consumes response.failed; a generic api_error is ignored by its SSE parser.
+        (
+            "response.failed",
+            json!({"type": "response.failed", "response": {
+                "status": "failed", "error": {"code": "server_error", "message": message}
+            }}),
+        )
+    } else {
+        (
+            "error",
+            json!({"type": "error", "error": {"type": "api_error", "message": message}}),
+        )
+    };
+    format!("\n\nevent: {event}\ndata: {data}\n\n")
 }
 
 fn write_chunk(writer: &mut impl Write, bytes: &[u8]) -> io::Result<()> {

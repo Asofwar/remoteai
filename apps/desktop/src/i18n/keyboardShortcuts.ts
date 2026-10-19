@@ -1,7 +1,8 @@
 export const shortcutZH = {
   "settings.sections.shortcuts.title": "快捷键",
   "settings.sections.shortcuts.description": "设置常用操作的全局快捷键，应用在后台运行时也可使用。",
-  "settings.shortcuts.screenshot": "系统截屏",
+  "settings.shortcuts.screenshot": "截屏",
+  "settings.shortcuts.screenshotHint": "截取主屏幕并复制到剪贴板。",
   "settings.shortcuts.showMainWindow": "显示主窗口",
   "settings.shortcuts.openSettings": "打开设置",
   "settings.shortcuts.openTokenUsage": "打开用量统计",
@@ -30,7 +31,8 @@ export const shortcutEN = {
   "settings.sections.shortcuts.title": "Keyboard shortcuts",
   "settings.sections.shortcuts.description":
     "Set global shortcuts for common actions, including while the app runs in the background.",
-  "settings.shortcuts.screenshot": "System screenshot",
+  "settings.shortcuts.screenshot": "Screenshot",
+  "settings.shortcuts.screenshotHint": "Capture the primary display and copy it to the clipboard.",
   "settings.shortcuts.showMainWindow": "Show main window",
   "settings.shortcuts.openSettings": "Open settings",
   "settings.shortcuts.openTokenUsage": "Open token usage",
@@ -60,7 +62,8 @@ export const shortcutRU = {
   "settings.sections.shortcuts.title": "Горячие клавиши",
   "settings.sections.shortcuts.description":
     "Настройте сочетания для частых действий. Они работают и в фоновом режиме.",
-  "settings.shortcuts.screenshot": "Системный снимок экрана",
+  "settings.shortcuts.screenshot": "Снимок экрана",
+  "settings.shortcuts.screenshotHint": "Снимок главного экрана будет скопирован в буфер обмена.",
   "settings.shortcuts.showMainWindow": "Показать главное окно",
   "settings.shortcuts.openSettings": "Открыть настройки",
   "settings.shortcuts.openTokenUsage": "Открыть статистику токенов",

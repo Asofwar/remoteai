@@ -1,29 +1,20 @@
-use tauri::{AppHandle, Runtime};
+use std::borrow::Cow;
 
-#[cfg(windows)]
-pub(super) fn capture<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
-    use tauri_plugin_opener::OpenerExt;
-    // The legacy URI also works on Windows 10, where the newer /capture path is unavailable.
-    app.opener()
-        .open_url("ms-screenclip:", None::<&str>)
-        .map_err(|error| error.to_string())
-}
-
-#[cfg(target_os = "macos")]
-pub(super) fn capture<R: Runtime>(_app: &AppHandle<R>) -> Result<(), String> {
-    let status = std::process::Command::new("/usr/sbin/screencapture")
-        .args(["-i", "-c"])
-        .status()
-        .map_err(|error| error.to_string())?;
-    // Escape cancels interactive capture and exits with status 1.
-    if status.success() || status.code() == Some(1) {
-        Ok(())
-    } else {
-        Err("System screenshot tool failed".to_string())
-    }
-}
-
-#[cfg(not(any(windows, target_os = "macos")))]
-pub(super) fn capture<R: Runtime>(_app: &AppHandle<R>) -> Result<(), String> {
-    Err("System screenshot is unavailable".to_string())
+pub(super) fn capture() -> Result<(), String> {
+    let monitors = xcap::Monitor::all().map_err(|_| "Screen capture is unavailable")?;
+    let monitor = monitors
+        .into_iter()
+        .find(|monitor| monitor.is_primary().unwrap_or(false))
+        .ok_or("No display is available")?;
+    let image = monitor
+        .capture_image()
+        .map_err(|_| "Screen capture is unavailable")?;
+    let mut clipboard = arboard::Clipboard::new().map_err(|_| "Clipboard is unavailable")?;
+    clipboard
+        .set_image(arboard::ImageData {
+            width: image.width() as usize,
+            height: image.height() as usize,
+            bytes: Cow::Owned(image.into_raw()),
+        })
+        .map_err(|_| "Could not copy the screenshot to the clipboard".to_string())
 }

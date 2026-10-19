@@ -48,7 +48,7 @@ fn dispatch<R: Runtime>(app: AppHandle<R>, action: Action) {
                 .await
                 .map(|_| ()),
             _ => tauri::async_runtime::spawn_blocking(move || match action {
-                Action::Screenshot => super::screenshot::capture(&app),
+                Action::Screenshot => super::screenshot::capture(),
                 Action::ShowMainWindow => {
                     crate::system_tray::show_dashboard(&app);
                     Ok(())

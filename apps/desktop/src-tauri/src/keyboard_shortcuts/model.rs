@@ -27,7 +27,7 @@ impl Action {
     ];
 
     pub(super) fn supported(self) -> bool {
-        self != Self::Screenshot || cfg!(any(windows, target_os = "macos"))
+        self != Self::Screenshot || cfg!(any(windows, target_os = "macos", target_os = "linux"))
     }
 }
 

@@ -20,6 +20,7 @@ function DesktopShortcuts({ t }: { t: Translate }) {
       {settings.map(setting => <div key={setting.action} className={styles.row}>
         <div className={styles.copy}>
           <h3>{t(`settings.shortcuts.${setting.action}`)}</h3>
+          {setting.action === 'screenshot' && <p>{t('settings.shortcuts.screenshotHint')}</p>}
           <p>{setting.supported ? shortcutLabel(setting.shortcut) || t('settings.shortcuts.unassigned')
             : t('settings.shortcuts.error.unsupported')}</p>
           {setting.error && <p role="alert" className={styles.error}>

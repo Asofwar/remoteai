@@ -1,18 +1,5 @@
+use super::home_migration_error::{MigrationFailure, MigrationStage};
 use super::*;
-
-#[derive(Debug, thiserror::Error)]
-pub(super) enum MigrationPlanError {
-    #[error("required conversation history is missing")]
-    MissingHistory,
-    #[error("{0}")]
-    Storage(String),
-}
-
-impl From<String> for MigrationPlanError {
-    fn from(error: String) -> Self {
-        Self::Storage(error)
-    }
-}
 
 /// A migration includes connected, available sessions so hidden descendants do
 /// not force users to find and select every thread by hand.
@@ -20,17 +7,19 @@ pub(super) fn plan_home_migration(
     source: &Path,
     target: &Path,
     requested: &HashSet<String>,
-) -> Result<Vec<RolloutSnapshot>, MigrationPlanError> {
-    let all = merge_bin_snapshots(gather_snapshots(source)?);
-    let edges = super::thread_relations::edges(source, &all)?;
+) -> Result<Vec<RolloutSnapshot>, MigrationFailure> {
+    let read_source = |error| MigrationFailure::new(MigrationStage::ReadSource, error);
+    let read_target = |error| MigrationFailure::new(MigrationStage::ReadDestination, error);
+    let all = merge_bin_snapshots(gather_snapshots(source).map_err(read_source)?);
+    let edges = super::thread_relations::edges(source, &all).map_err(read_source)?;
     let selected = connected_sessions(&all, &edges, requested);
-    let existing = target_session_ids(target)?;
-    let target_history = live_bin_thread_ids(target)?;
+    let existing = target_session_ids(target).map_err(read_target)?;
+    let target_history = live_bin_thread_ids(target).map_err(read_target)?;
     let mut moving = HashSet::new();
     for item in &all {
         if selected.contains(&item.session_id)
             && !existing.contains(&item.session_id)
-            && !has_target_path(item, source, target)?
+            && !has_target_path(item, source, target).map_err(read_target)?
         {
             moving.insert(item.session_id.clone());
         }
@@ -39,7 +28,11 @@ pub(super) fn plan_home_migration(
     for item in all.iter().filter(|item| moving.contains(&item.session_id)) {
         if let Some(base) = &item.history_base_thread_id {
             if !moving.contains(base) && !target_history.contains(base) {
-                return Err(MigrationPlanError::MissingHistory);
+                return Err(MigrationFailure::new(
+                    MigrationStage::ReadSource,
+                    format!("required conversation history is missing: {base}"),
+                )
+                .for_session(&item.session_id));
             }
         }
     }

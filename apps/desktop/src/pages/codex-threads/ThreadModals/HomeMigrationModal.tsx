@@ -3,6 +3,7 @@ import { homeLabel } from "../../../components/CodexHomeScope";
 import { MIGRATION_MODEL_PROVIDERS } from "../../../types/conversationMigration";
 import type { ThreadCopy } from "../copy";
 import type { useHomeMigration } from "../useHomeMigration";
+import { HomeMigrationError } from "./HomeMigrationError";
 
 export function HomeMigrationModal({ migration, busy, text }: {
   migration: ReturnType<typeof useHomeMigration>;
@@ -40,7 +41,7 @@ export function HomeMigrationModal({ migration, busy, text }: {
           options={MIGRATION_MODEL_PROVIDERS.map((value) => ({ value, label: value }))} />
         <p style={{ marginTop: 8 }}>{text.homeMigrationModelProviderHint}</p>
       </div>
-      {migration.error && <Alert type="error" message={migration.error} style={{ marginTop: 12 }} />}
+      {migration.error && <HomeMigrationError key={migration.error} error={migration.error} text={text} />}
       {migration.fixedTarget && !migration.targetHome && <Alert type="warning" message={text.migrationHomeUnavailable} />}
       {!migration.fixedTarget && !migration.homes.length && <p>{text.noMigrationHome}</p>}
     </div>

@@ -112,14 +112,29 @@ fn sanitize_export_errors(value: &mut Value) {
 }
 
 fn append_export_errors(output: &mut String) {
-    match crate::error_logs::export_proxy_errors() {
+    use crate::error_logs::ErrorLogSource;
+    for (source, event) in [(ErrorLogSource::Proxy, "proxy_error_history"),
+        (ErrorLogSource::Codex, "codex_error_history")] {
+        append_error_history(output, event, crate::error_logs::export_errors(source));
+    }
+}
+
+fn append_error_history(
+    output: &mut String,
+    event: &str,
+    page: Result<crate::error_logs::ErrorLogPage, String>,
+) {
+    match page {
         Ok(page) => {
             for entry in page.entries.into_iter().rev() {
-                let entry = json!({ "event": "proxy_error_history", "record": entry });
+                let entry = json!({ "event": event, "record": entry });
                 output.push_str(&entry.to_string());
                 output.push('\n');
             }
         }
-        Err(_) => output.push_str("{\"event\":\"proxy_error_history_unavailable\"}\n"),
+        Err(_) => {
+            output.push_str(&json!({ "event": format!("{event}_unavailable") }).to_string());
+            output.push('\n');
+        }
     }
 }

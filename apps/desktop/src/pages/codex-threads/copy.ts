@@ -8,6 +8,8 @@ export const threadCopy = {
     moveToHome: "Перенести чаты", homeMigrationTarget: "Выберите папку назначения Codex Home",
     confirmHomeMigration: "Перенести чаты?", homeMigrationSource: "Откуда", homeMigrationDestination: "Куда",
     homeMigrationSelection: "Выбранные чаты", homeMigrationCount: "{count}",
+    homeMigrationCopyError: "Скопировать ошибку", homeMigrationErrorCopied: "Скопировано",
+    homeMigrationCopyFailed: "Не удалось скопировать. Выделите и скопируйте текст ошибки вручную.",
     homeMigrationModelProvider: "Провайдер модели",
     homeMigrationModelProviderHint: "Перенесённые чаты будут использовать выбранного провайдера. "
       + "Он должен быть настроен в папке назначения.",
@@ -70,6 +72,9 @@ export const threadCopy = {
     homeMigrationDestination: "目标",
     homeMigrationSelection: "所选对话",
     homeMigrationCount: "{count} 条",
+    homeMigrationCopyError: "复制错误信息",
+    homeMigrationErrorCopied: "已复制",
+    homeMigrationCopyFailed: "复制失败，请选中上方错误信息手动复制。",
     homeMigrationModelProvider: "模型提供方（model provider）",
     homeMigrationModelProviderHint: "迁移后的对话将使用所选提供方，请选择目标中已配置的提供方。",
     homeMigrationConfirmHint: "迁移后可在 Codex GUI 中继续对话，对话记录和项目路径会保留。"
@@ -167,6 +172,9 @@ export const threadCopy = {
     homeMigrationDestination: "Destination",
     homeMigrationSelection: "Selected conversations",
     homeMigrationCount: "{count}",
+    homeMigrationCopyError: "Copy error details",
+    homeMigrationErrorCopied: "Copied",
+    homeMigrationCopyFailed: "Could not copy. Select the error above and copy it manually.",
     homeMigrationModelProvider: "Model provider",
     homeMigrationModelProviderHint: "Migrated conversations will use this provider. "
       + "Choose one configured in the destination.",

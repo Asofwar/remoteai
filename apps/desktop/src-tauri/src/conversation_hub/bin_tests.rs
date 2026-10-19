@@ -8,6 +8,8 @@ mod recovery;
 
 #[path = "home_migration_tests.rs"]
 mod home_migration;
+#[path = "home_migration_error_tests.rs"]
+mod home_migration_errors;
 
 #[path = "home_migration_relation_tests.rs"]
 mod home_migration_relations;

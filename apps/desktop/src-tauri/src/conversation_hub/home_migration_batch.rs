@@ -1,3 +1,4 @@
+use super::home_migration_error::{MigrationFailure, MigrationRecovery, MigrationStage};
 use super::home_migration_provider::MigrationDestination;
 use super::*;
 
@@ -18,38 +19,48 @@ pub(super) fn migrate_home_batch(
     target: MigrationDestination<'_>,
     batch: &Path,
     snapshots: Vec<RolloutSnapshot>,
-) -> Result<(), String> {
+) -> Result<(), MigrationFailure> {
     let mut prepared = Vec::new();
     for snapshot in snapshots {
+        let id = snapshot.session_id.clone();
         match prepare_session(source, target.path, batch, snapshot) {
             Ok(item) => prepared.push(item),
-            Err(error) => return Err(cleanup_batch_error(batch, error)),
+            Err(error) => return Err(cleanup_batch_error(batch, error.for_session(&id))),
         }
     }
     let result = restore_batch_target(target, &mut prepared)
         .and_then(|()| remove_batch_source(source, &mut prepared));
-    if let Err(error) = result {
+    if let Err(mut error) = result {
         let rollback = rollback_batch(source, target.path, &prepared);
         return Err(match rollback {
-            Ok(()) => cleanup_batch_error(batch, error),
-            Err(rollback) => format!("{error}；还原未完成，迁移备份已保留：{rollback}"),
+            Ok(()) => {
+                error.recovery = MigrationRecovery::Restored;
+                cleanup_batch_error(batch, error)
+            }
+            Err(rollback) => {
+                error.recovery = MigrationRecovery::Incomplete;
+                error.rollback_error = Some(rollback);
+                error
+            }
         });
     }
     // A cleanup failure must not misreport a committed migration as a failure.
     if let Err(error) = fs::remove_dir_all(batch) {
-        eprintln!("Could not clean completed home migration backup: {error}");
+        crate::error_logs::record_codex_error(&format!(
+            "Conversation migration completed; backup cleanup failed: {error}"
+        ));
     }
     Ok(())
 }
 
-fn cleanup_batch_error(batch: &Path, error: String) -> String {
+fn cleanup_batch_error(batch: &Path, mut error: MigrationFailure) -> MigrationFailure {
     if !batch.exists() {
         return error;
     }
-    with_bin_rollback_error(
-        error,
-        fs::remove_dir_all(batch).map_err(|error| error.to_string()),
-    )
+    error.cleanup_error = fs::remove_dir_all(batch)
+        .err()
+        .map(|error| error.to_string());
+    error
 }
 
 fn prepare_session(
@@ -57,20 +68,25 @@ fn prepare_session(
     target: &Path,
     batch: &Path,
     snapshot: RolloutSnapshot,
-) -> Result<PreparedSession, String> {
+) -> Result<PreparedSession, MigrationFailure> {
+    let backup_error = |error| MigrationFailure::new(MigrationStage::Backup, error);
     let folder = batch.join(Uuid::new_v4().to_string());
     let mut source_files = Vec::new();
     for path in &snapshot.physical_paths {
-        let relative = bin_rollout_relative(path, source)?;
+        let relative = bin_rollout_relative(path, source).map_err(backup_error)?;
         let backup = folder.join("files").join(relative);
-        copy_verified_file(path, &backup)?;
+        copy_verified_file(path, &backup).map_err(backup_error)?;
         source_files.push((path.clone(), backup));
     }
-    let manifest = bin_manifest_for_snapshot(source, snapshot)?;
-    write_bin_manifest(&folder, &manifest)?;
+    let manifest = bin_manifest_for_snapshot(source, snapshot).map_err(backup_error)?;
+    write_bin_manifest(&folder, &manifest).map_err(backup_error)?;
     let mut target_before = manifest.clone();
-    target_before.state_backup = Some(snapshot_bin_state(target, &manifest.session_id)?);
-    let target_index = index_values(target)?.remove(&manifest.session_id);
+    let target_error = |error| MigrationFailure::new(MigrationStage::ReadDestination, error);
+    target_before.state_backup =
+        Some(snapshot_bin_state(target, &manifest.session_id).map_err(target_error)?);
+    let target_index = index_values(target)
+        .map_err(target_error)?
+        .remove(&manifest.session_id);
     Ok(PreparedSession {
         backup: BinSnapshot {
             folder,
@@ -116,41 +132,64 @@ fn copy_verified_file(source: &Path, target: &Path) -> Result<(), String> {
 fn restore_batch_target(
     destination: MigrationDestination<'_>,
     prepared: &mut [PreparedSession],
-) -> Result<(), String> {
+) -> Result<(), MigrationFailure> {
     let target = destination.path;
-    let mut available = super::home_migration_plan::target_session_ids(target)?;
+    let mut available = super::home_migration_plan::target_session_ids(target)
+        .map_err(|error| MigrationFailure::new(MigrationStage::ReadDestination, error))?;
     available.extend(
         prepared
             .iter()
             .map(|item| item.backup.manifest.session_id.clone()),
     );
     for item in prepared.iter_mut() {
-        for (source, path) in bin_restore_targets(target, &item.backup)? {
-            copy_verified_file(&source, &path)?;
-            // Register the copy before rewriting so a failed rewrite is rolled back too.
-            item.created_files.push(path.clone());
-            if let Some(provider) = destination.model_provider {
-                rewrite_rollout_provider(&path, provider.as_str())?;
-            }
-        }
+        copy_target_session(destination, item).map_err(|error| {
+            MigrationFailure::new(MigrationStage::WriteDestinationFiles, error)
+                .for_session(&item.backup.manifest.session_id)
+        })?;
     }
     // Every history file must exist before a thread becomes visible in the
     // destination database, including bases stored in another rollout.
     for item in prepared {
-        let mut manifest = relocated_bin_manifest(target, &item.backup.manifest)?;
-        if let Some(provider) = destination.model_provider {
-            provider.apply_to_manifest(&mut manifest);
-        }
-        if snapshot_thread_row(latest_state_db(target).as_deref(), &manifest.session_id)?.is_some()
-        {
-            return Err("目标会话列表发生变化，请刷新后重试".to_string());
-        }
-        retain_available_edges(&mut manifest, &available);
-        item.target_touched = true;
-        restore_bin_state(target, &manifest)?;
-        append_index_entry(target, &manifest.session_id, &manifest.session_index_entry)?;
+        restore_target_session(destination, item, &available).map_err(|error| {
+            MigrationFailure::new(MigrationStage::WriteDestinationHistory, error)
+                .for_session(&item.backup.manifest.session_id)
+        })?;
     }
     Ok(())
+}
+
+fn copy_target_session(
+    destination: MigrationDestination<'_>,
+    item: &mut PreparedSession,
+) -> Result<(), String> {
+    for (source, path) in bin_restore_targets(destination.path, &item.backup)? {
+        copy_verified_file(&source, &path)?;
+        // Register before rewriting so a failed rewrite is rolled back too.
+        item.created_files.push(path.clone());
+        if let Some(provider) = destination.model_provider {
+            rewrite_rollout_provider(&path, provider.as_str())?;
+        }
+    }
+    Ok(())
+}
+
+fn restore_target_session(
+    destination: MigrationDestination<'_>,
+    item: &mut PreparedSession,
+    available: &HashSet<String>,
+) -> Result<(), String> {
+    let target = destination.path;
+    let mut manifest = relocated_bin_manifest(target, &item.backup.manifest)?;
+    if let Some(provider) = destination.model_provider {
+        provider.apply_to_manifest(&mut manifest);
+    }
+    if snapshot_thread_row(latest_state_db(target).as_deref(), &manifest.session_id)?.is_some() {
+        return Err("目标会话列表发生变化，请刷新后重试".to_string());
+    }
+    retain_available_edges(&mut manifest, available);
+    item.target_touched = true;
+    restore_bin_state(target, &manifest)?;
+    append_index_entry(target, &manifest.session_id, &manifest.session_index_entry)
 }
 
 fn retain_available_edges(manifest: &mut BinManifest, available: &HashSet<String>) {
@@ -170,24 +209,42 @@ fn retain_available_edges(manifest: &mut BinManifest, available: &HashSet<String
     }
 }
 
-fn remove_batch_source(source: &Path, prepared: &mut [PreparedSession]) -> Result<(), String> {
+fn remove_batch_source(
+    source: &Path,
+    prepared: &mut [PreparedSession],
+) -> Result<(), MigrationFailure> {
     // Verify every source again before the first removal; an active session may
     // have appended records while the destination was being prepared.
     for item in prepared.iter() {
-        for (path, backup) in &item.source_files {
-            if sha256(path)? != sha256(backup)? {
-                return Err("会话内容发生变化，请结束任务后重试".to_string());
-            }
-        }
+        verify_source_session(item).map_err(|error| {
+            MigrationFailure::new(MigrationStage::VerifySource, error)
+                .for_session(&item.backup.manifest.session_id)
+        })?;
     }
     for item in prepared {
         item.source_touched = true;
-        for (path, _) in &item.source_files {
-            fs::remove_file(path).map_err(|error| error.to_string())?;
-        }
-        finish_bin_removal(source, &item.backup.manifest.session_id)?;
+        remove_source_session(source, item).map_err(|error| {
+            MigrationFailure::new(MigrationStage::RemoveSource, error)
+                .for_session(&item.backup.manifest.session_id)
+        })?;
     }
     Ok(())
+}
+
+fn verify_source_session(item: &PreparedSession) -> Result<(), String> {
+    for (path, backup) in &item.source_files {
+        if sha256(path)? != sha256(backup)? {
+            return Err("会话内容发生变化，请结束任务后重试".to_string());
+        }
+    }
+    Ok(())
+}
+
+fn remove_source_session(source: &Path, item: &PreparedSession) -> Result<(), String> {
+    for (path, _) in &item.source_files {
+        fs::remove_file(path).map_err(|error| error.to_string())?;
+    }
+    finish_bin_removal(source, &item.backup.manifest.session_id)
 }
 
 fn rollback_batch(
@@ -200,12 +257,18 @@ fn rollback_batch(
     // sessions is restored from the original, complete snapshot.
     for item in prepared.iter().filter(|item| item.source_touched) {
         if let Err(error) = restore_source(source, item) {
-            failures.push(error);
+            failures.push(format!(
+                "restore source session {}: {error}",
+                item.backup.manifest.session_id
+            ));
         }
     }
     for item in prepared.iter().rev() {
         if let Err(error) = rollback_target(target, item) {
-            failures.push(error);
+            failures.push(format!(
+                "restore target session {}: {error}",
+                item.backup.manifest.session_id
+            ));
         }
     }
     if failures.is_empty() {

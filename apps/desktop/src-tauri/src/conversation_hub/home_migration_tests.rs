@@ -74,7 +74,15 @@ fn failed_target_history_restore_returns_original_session_to_source() {
     let before = source.dump(THREAD);
     let bytes = fs::read(source.snapshot().path).unwrap();
     target.sql(HISTORY, "ALTER TABLE thread_items RENAME TO suspended");
-    assert!(migrate(&source, &target, &[THREAD]).is_err());
+    let error = migrate(&source, &target, &[THREAD]).unwrap_err();
+    assert!(error.to_string().contains("保存目标对话"));
+    assert!(error.to_string().contains("数据格式不兼容"));
+    assert!(error.to_string().contains("本次更改已撤销"));
+    let HomeMigrationError::Failed(failure) = error else {
+        panic!("expected failure")
+    };
+    assert_eq!(failure.session_id.as_deref(), Some(THREAD));
+    assert!(failure.detail.contains("数据格式已变化"));
     assert_eq!(source.dump(THREAD), before);
     assert_eq!(fs::read(source.snapshot().path).unwrap(), bytes);
     assert!(index_values(&source.home).unwrap().contains_key(THREAD));
@@ -125,16 +133,19 @@ fn uninitialized_target_keeps_original_conversation() {
     let target = source.root.join("new-home");
     fs::create_dir_all(&target).unwrap();
     let before = source.dump(THREAD);
-    assert!(migrate_between_homes(
+    let error = migrate_between_homes(
         &source.home,
         MigrationDestination {
             path: &target,
-            model_provider: None
+            model_provider: None,
         },
         &source.bin,
-        vec![THREAD.into()]
+        vec![THREAD.into()],
     )
-    .is_err());
+    .unwrap_err();
+    assert!(error.to_string().contains("目标尚未准备好"));
+    assert!(error.to_string().contains("启动一次 Codex"));
+    assert!(!error.to_string().contains("关闭"));
     assert_eq!(source.dump(THREAD), before);
     assert!(source.snapshot().path.exists());
 }

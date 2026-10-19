@@ -45,7 +45,7 @@ pub(crate) fn record_proxy_error(message: &str, status_code: Option<u16>) {
     }
 }
 
-/// Queue installer diagnostics without blocking the UI; the worker redacts sensitive values.
+/// Queue Codex operation diagnostics without blocking the UI; the worker redacts sensitive values.
 pub(crate) fn record_codex_error(message: &str) {
     if let Some(service) = SERVICE.get() {
         service.record_codex(message);
@@ -64,13 +64,13 @@ pub(crate) fn sanitize_diagnostic_message(message: &str) -> String {
 }
 
 /// Returns a bounded snapshot after preceding queued writes, entirely on the database worker.
-pub(crate) fn export_proxy_errors() -> Result<ErrorLogPage, String> {
+pub(crate) fn export_errors(source: ErrorLogSource) -> Result<ErrorLogPage, String> {
     service()
         .and_then(|service| {
             service.list(ListQuery {
                 limit: models::MAX_ENTRIES as u32,
                 before_id: None,
-                source: Some(ErrorLogSource::Proxy),
+                source: Some(source),
                 offset: 0,
                 snapshot_id: None,
             })

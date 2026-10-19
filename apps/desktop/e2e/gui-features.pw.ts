@@ -17,7 +17,7 @@ const sourceThread = { sessionId: "source-conversation", sessionKind: "conversat
   cwd: "D:/projects/example", updatedAt: Math.floor(Date.now() / 1000), sizeBytes: 1024, matchExcerpt: null,
   accountId: null, accountEmail: null, accountActive: false };
 
-async function mockCommands(page: Page) {
+async function mockCommands(page: Page, migrationError?: string) {
   const calls: { command: string; args: Record<string, unknown> }[] = [];
   let migrated = false;
   await page.route("https://fonts.googleapis.com/**", (route) => route.abort());
@@ -34,6 +34,10 @@ async function mockCommands(page: Page) {
     if (command === "measure_codex_thread_tokens") result = [];
     if (command === "migrate_codex_threads_to_home") {
       await new Promise((resolve) => setTimeout(resolve, 800));
+      if (migrationError) {
+        await route.fulfill({ json: { ok: false, error: migrationError } });
+        return;
+      }
       migrated = true;
       result = { requestedCount: 1, migratedCount: 1, skippedCount: 0, message: "已迁移 1 条会话" };
     }
@@ -255,3 +259,39 @@ test("migration list fits a narrow dark chat pane", async ({ page }) => {
   expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   await page.screenshot({ path: "../../.codex-tmp/gui-migration-provider-dark-narrow.png", animations: "disabled" });
 });
+
+for (const width of [390, 1280]) {
+  test(`migration failure shows a copyable reason and keeps the selection at ${width}px`, async ({ page }) => {
+    const failure = "迁移未完成：保存目标对话时，目标尚未准备好。请先用目标目录启动一次 Codex，再重试迁移。"
+      + "\n本次更改已撤销，原对话已保留。\n错误编号：abc123456789";
+    await mockCommands(page, failure);
+    let copied = "";
+    await page.exposeFunction("captureMigrationError", (value: string) => { copied = value; });
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", { value: {
+        writeText: (value: string) => Reflect.get(window, "captureMigrationError")(value),
+      } });
+    });
+    await page.setViewportSize({ width, height: 1000 });
+    await openGui(page);
+    await page.getByRole("navigation").getByRole("button", { name: "对话迁移", exact: true }).click();
+    if (width < 500) await page.getByRole("button", { name: "收起对话列表" }).click();
+    const pane = page.getByRole("region", { name: "对话迁移", exact: true });
+    await expect(pane.getByText("example", { exact: true })).toBeVisible();
+    await pane.getByRole("checkbox", { name: "全选全部会话" }).check();
+    await pane.getByRole("button", { name: "对话迁移", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "确认迁移对话？", exact: true });
+    await dialog.getByRole("button", { name: "开始迁移", exact: true }).click();
+    const alert = dialog.getByRole("alert");
+    await expect(alert).toContainText("目标尚未准备好");
+    await expect(alert).toContainText("错误编号：abc123456789");
+    await expect(dialog.getByRole("button", { name: "开始迁移", exact: true })).toBeEnabled();
+    await expect(pane.getByRole("checkbox", { name: "全选全部会话" })).toBeChecked();
+    expect((await alert.boundingBox())!.width).toBeLessThanOrEqual(400);
+    expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await alert.getByRole("button", { name: "复制错误信息", exact: true }).click();
+    await expect(alert.getByRole("button", { name: "已复制", exact: true })).toBeVisible();
+    expect(copied).toBe(failure);
+    await page.screenshot({ path: `../../.codex-tmp/gui-migration-error-${width}.png`, animations: "disabled" });
+  });
+}

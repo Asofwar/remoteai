@@ -63,3 +63,137 @@ async fn each_thread_has_its_own_serialization_guard() {
     assert!(same.applied.try_lock().is_err());
     assert!(other.applied.try_lock().is_ok());
 }
+
+#[tokio::test]
+async fn unloading_requires_reapplying_unchanged_capacity_without_blocking_the_rpc_reader() {
+    let state = ContextCapacity::default();
+    let first = state.thread("one").await;
+    let other = state.thread("two").await;
+    let settings = ContextSettings {
+        capacity: Some(400_000),
+    };
+    let mut applied = first.applied.lock().await;
+    *applied = settings.clone();
+    *other.applied.lock().await = settings.clone();
+    assert!(first.is_applied(&applied, &settings));
+
+    for status in ["unsubscribed", "notSubscribed", "notLoaded"] {
+        tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            state.response(
+                "thread/unsubscribe",
+                &json!({"threadId": "one"}),
+                &json!({"status": status}),
+            ),
+        )
+        .await
+        .expect("the event reader must not wait for the capacity guard");
+        assert!(!first.is_applied(&applied, &settings));
+        assert!(other.is_applied(&*other.applied.lock().await, &settings));
+        // A model lookup can resume with defaults before the next send. That is not confirmation.
+        state
+            .response("thread/resume", &json!({"threadId": "one"}), &snapshot())
+            .await;
+        assert!(!first.is_applied(&applied, &settings));
+        first.confirm();
+        assert!(first.is_applied(&applied, &settings));
+    }
+}
+
+#[tokio::test]
+async fn engine_closure_invalidates_capacity_but_normal_turn_completion_does_not() {
+    let state = ContextCapacity::default();
+    let thread = state.thread("one").await;
+    let settings = ContextSettings {
+        capacity: Some(1_000_000),
+    };
+    let mut applied = thread.applied.lock().await;
+    *applied = settings.clone();
+    for method in [
+        "turn/completed",
+        "thread/tokenUsage/updated",
+        "thread/status/changed",
+    ] {
+        state
+            .event(
+                method,
+                &json!({"threadId": "one", "status": {"type": "idle"}}),
+            )
+            .await;
+        assert!(thread.is_applied(&applied, &settings));
+    }
+    for method in [
+        "thread/closed",
+        "thread/archived",
+        "thread/deleted",
+        "thread/status/changed",
+    ] {
+        state
+            .event(
+                method,
+                &json!({"threadId": "one", "status": {"type": "notLoaded"}}),
+            )
+            .await;
+        assert!(!thread.is_applied(&applied, &settings));
+        thread.confirm();
+    }
+    state
+        .response(
+            "thread/unsubscribe",
+            &json!({"threadId": "one"}),
+            &json!({"status": "busy"}),
+        )
+        .await;
+    assert!(thread.is_applied(&applied, &settings));
+    assert!(!thread.is_applied(&applied, &ContextSettings::default()));
+}
+
+#[tokio::test]
+#[ignore = "Set CODEX_CONTEXT_TEST_CLI to an installed Codex binary; requires Node and local HTTP only"]
+async fn real_cli_context_capacity_survives_idle_unload_and_model_discovery() {
+    let executable =
+        std::env::var_os("CODEX_CONTEXT_TEST_CLI").expect("CODEX_CONTEXT_TEST_CLI is required");
+    let state = ContextCapacity::default();
+    let thread = state.thread("one").await;
+    let mut applied = thread.applied.lock().await;
+    let settings = ContextSettings {
+        capacity: Some(400_000),
+    };
+    *applied = settings.clone();
+    state
+        .response(
+            "thread/unsubscribe",
+            &json!({"threadId": "one"}),
+            &json!({"status": "unsubscribed"}),
+        )
+        .await;
+    state
+        .response("thread/resume", &json!({"threadId": "one"}), &snapshot())
+        .await;
+    let mut configurations =
+        json!({"reapplyAfterRelease": !thread.is_applied(&applied, &settings)});
+    for (name, capacity) in [
+        ("large", Some(1_000_000)),
+        ("small", Some(400_000)),
+        ("default", None),
+    ] {
+        let mut params = json!({});
+        context_settings::apply_capacity(&mut params, &ContextSettings { capacity });
+        configurations[name] = params["config"].clone();
+    }
+    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../scripts/codex-gui-context-compaction-smoke.mjs");
+    let output = std::process::Command::new("node")
+        .arg(script)
+        .arg(executable)
+        .arg(configurations.to_string())
+        .output()
+        .expect("run idle context lifecycle fixture");
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    println!("{}", String::from_utf8_lossy(&output.stdout));
+}

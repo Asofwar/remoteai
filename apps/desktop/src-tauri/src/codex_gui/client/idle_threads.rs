@@ -198,6 +198,7 @@ impl Client {
         match inspect_thread(id, |method, params| self.request_raw(method, params)).await? {
             ReleaseDecision::Wait => return Ok(()),
             ReleaseDecision::NotLoaded => {
+                capacity.invalidate();
                 self.idle_threads.forget(id).await;
                 return Ok(());
             }

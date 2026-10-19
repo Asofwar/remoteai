@@ -28,7 +28,7 @@ impl Client {
         let stops = state.stops.load(Ordering::Acquire);
         let snapshot = self.context_snapshot(id).await?;
         let effective = self.effective_context(settings, &snapshot).await?;
-        if *applied == effective && previous == *settings {
+        if state.is_applied(&applied, &effective) && previous == *settings {
             return Ok(ContextUpdate::Applied);
         }
         let continuation =
@@ -39,6 +39,7 @@ impl Client {
         }
         self.persist_context_change(id, settings, &applied).await?;
         *applied = effective;
+        state.confirm();
         if !interrupted {
             return Ok(ContextUpdate::Applied);
         }

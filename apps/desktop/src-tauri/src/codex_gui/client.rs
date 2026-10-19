@@ -267,6 +267,9 @@ impl Client {
             .map_err(|_| GuiError::Timeout)?
             .map_err(|_| GuiError::Disconnected)??;
         self.idle_threads.response(method, &params, &result).await;
+        self.context_capacity
+            .response(method, &params, &result)
+            .await;
         Ok(result)
     }
 
@@ -291,6 +294,7 @@ impl Client {
                 .event(&self.notification_session, method, &value["params"])
                 .await;
             self.idle_threads.event(method, &value["params"]).await;
+            self.context_capacity.event(method, &value["params"]).await;
             let mut event = GuiEvent {
                 method: method.to_owned(),
                 params: value["params"].clone(),

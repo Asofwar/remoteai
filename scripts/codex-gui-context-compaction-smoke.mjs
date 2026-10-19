@@ -58,7 +58,7 @@ async function checkUsage({ client, threadId, provider, used = REPORTED_USAGE, c
   const usage = client.events.find((event) => event.method === "thread/tokenUsage/updated"
     && event.params.tokenUsage.last.totalTokens === used)?.params.tokenUsage;
   assert.ok(usage, "Missing reported usage");
-  assert.deepEqual(contextUsage(usage), { used, capacity, percent: Math.round(used / capacity * 100) });
+  assert.deepEqual(contextUsage(usage), { used, capacity, percent: Math.min(100, Math.round(used / capacity * 100)) });
   await turn(client, threadId);
   const compacted = client.events.some((event) => event.method === "item/completed"
     && event.params.item.type === "contextCompaction");
@@ -71,7 +71,7 @@ async function configure({ home, port, source }) {
   if (source === "catalog") catalog.models[0].auto_compact_token_limit = STALE_LIMIT;
   await writeFile(catalogPath, JSON.stringify(catalog));
   await writeFile(join(home, "config.toml"), `model = "gpt-5.4"
-model_context_window = 400000
+model_context_window = 272000
 model_provider = "codex-switch-gui"
 model_catalog_json = ${JSON.stringify(catalogPath.replaceAll("\\", "/"))}
 approval_policy = "never"
@@ -97,11 +97,34 @@ async function checkChanges({ client, threadId, provider }) {
   await check({ capacity: 380_000, compact: false });
   await check({ used: 365_000, capacity: 380_000, compact: true });
   await rejoin(client, threadId, configurations.default);
-  await check({ capacity: 380_000, compact: true });
+  await check({ capacity: 258_400, compact: true });
   const { thread } = await client.rpc("thread/start", { sandbox: "read-only", config: configurations.large });
   await checkUsage({ client, threadId: thread.id, provider, capacity: 950_000, compact: false });
   const { thread: other } = await client.rpc("thread/start", { sandbox: "read-only" });
-  await checkUsage({ client, threadId: other.id, provider, capacity: 380_000, compact: true });
+  await checkUsage({ client, threadId: other.id, provider, capacity: 258_400, compact: true });
+  await rejoin(client, threadId, configurations.large);
+}
+
+async function checkIdleReload({ client, threadId, provider }) {
+  const used = 264_600;
+  const check = (options) => checkUsage({ client, threadId, provider, used, ...options });
+  await rejoin(client, threadId, configurations.small);
+  await check({ capacity: 380_000, compact: false });
+  // An empty config forces a fresh load, reproducing the expired engine grace period without
+  // waiting thirty minutes. Model discovery then sees a thread loaded with global defaults.
+  await rejoin(client, threadId, {});
+  await client.rpc("thread/resume", { threadId, excludeTurns: true });
+  // Config on another resume of an already subscribed thread cannot repair the lost override.
+  await client.rpc("thread/resume", { threadId, config: configurations.small });
+  await check({ capacity: 258_400, compact: true });
+  for (let cycle = 0; cycle < 2; cycle += 1) {
+    await rejoin(client, threadId, {});
+    await client.rpc("thread/resume", { threadId, excludeTurns: true });
+    // Rust supplies the decision from the same capacity cache used by the GUI request path.
+    if (configurations.reapplyAfterRelease ?? true) await rejoin(client, threadId, configurations.small);
+    await check({ capacity: 380_000, compact: false });
+  }
+  await checkUsage({ client, threadId, provider, used: 365_000, capacity: 380_000, compact: true });
   await rejoin(client, threadId, configurations.large);
 }
 
@@ -119,12 +142,13 @@ async function exercise(source) {
     const { thread } = await client.rpc("thread/start", { cwd: root, sandbox: "read-only",
       config: { model_context_window: 1_000_000 } });
     await checkChanges({ client, threadId: thread.id, provider });
+    await checkIdleReload({ client, threadId: thread.id, provider });
     await client.close();
     client = connectAppServer({ executable, home, cwd: root });
     await client.initialize();
     await client.rpc("thread/resume", { threadId: thread.id, sandbox: "read-only", config: configurations.large });
     await checkUsage({ client, threadId: thread.id, provider, capacity: 950_000, compact: false });
-    console.log(`PASS ${source}: 30% regression, 1M/400K thresholds, default, new/other threads, restart`);
+    console.log(`PASS ${source}: 1M/400K thresholds, idle reload 258.4K -> 380K, other threads, restart`);
   } finally {
     await client.close();
     provider.server.closeAllConnections();

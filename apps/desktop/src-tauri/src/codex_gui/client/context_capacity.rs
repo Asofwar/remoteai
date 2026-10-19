@@ -1,7 +1,10 @@
 //! Rejoin only the idle conversation whose capacity changed; keep the app server and phone connected.
 use std::{
     collections::HashMap,
-    sync::{atomic::AtomicU64, Arc},
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc,
+    },
 };
 
 use serde_json::{json, Value};
@@ -16,8 +19,23 @@ use crate::codex_gui::{
 #[derive(Default)]
 pub(super) struct ThreadCapacity {
     pub(super) applied: Mutex<ContextSettings>,
+    invalidated: AtomicBool,
     pub(super) stops: AtomicU64,
     pub(super) last_start: Mutex<Option<Value>>,
+}
+
+impl ThreadCapacity {
+    pub(super) fn is_applied(&self, applied: &ContextSettings, settings: &ContextSettings) -> bool {
+        !self.invalidated.load(Ordering::Acquire) && applied == settings
+    }
+
+    pub(super) fn invalidate(&self) {
+        self.invalidated.store(true, Ordering::Release);
+    }
+
+    pub(super) fn confirm(&self) {
+        self.invalidated.store(false, Ordering::Release);
+    }
 }
 
 type SharedCapacity = Arc<ThreadCapacity>;
@@ -33,6 +51,32 @@ impl ContextCapacity {
             .entry(id.to_owned())
             .or_default()
             .clone()
+    }
+
+    pub(super) async fn response(&self, method: &str, params: &Value, result: &Value) {
+        if method == "thread/unsubscribe" && super::idle_threads::released(result) {
+            self.invalidate(params).await;
+        }
+    }
+
+    pub(super) async fn event(&self, method: &str, params: &Value) {
+        if matches!(
+            method,
+            "thread/closed" | "thread/archived" | "thread/deleted"
+        ) || (method == "thread/status/changed" && params["status"]["type"] == "notLoaded")
+        {
+            self.invalidate(params).await;
+        }
+    }
+
+    async fn invalidate(&self, params: &Value) {
+        let Some(id) = params["threadId"].as_str() else {
+            return;
+        };
+        if let Some(state) = self.0.lock().await.get(id) {
+            // The RPC caller can hold applied while waiting for this event. Never wait on that guard here.
+            state.invalidate();
+        }
     }
 }
 
@@ -53,8 +97,11 @@ impl Client {
             .map_err(|_| GuiError::ContextSettings)?;
         let model_params = self.context_model_params(id, &params).await?;
         let settings = self.effective_context(&settings, &model_params).await?;
-        if *applied != settings && self.reload_context(id, &settings, &applied).await? {
+        if !state.is_applied(&applied, &settings)
+            && self.reload_context(id, &settings, &applied).await?
+        {
             *applied = settings;
+            state.confirm();
         }
         if method == "thread/resume" {
             context_settings::apply_capacity(&mut params, &applied);

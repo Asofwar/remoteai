@@ -48,6 +48,7 @@ mod grok_provider;
 mod gui_terminal;
 #[cfg(windows)]
 mod installer_lifecycle;
+mod keyboard_shortcuts;
 mod launch_options;
 mod local_proxy;
 mod main_window;
@@ -243,6 +244,9 @@ pub fn run() {
             official_models::setup(app.handle().clone());
             if !launch_options.headless {
                 system_tray::setup(app)?;
+                if let Err(error) = keyboard_shortcuts::setup(app.handle()) {
+                    eprintln!("failed to initialize keyboard shortcuts: {error}");
+                }
                 floating_bubble::setup(app.handle())?;
             }
             if let Err(error) = web_server::setup(app.handle(), launch_options.port) {
@@ -302,6 +306,8 @@ pub fn run() {
             system_tray::quick_menu::handle_window_event(window, event);
         })
         .invoke_handler(tauri::generate_handler![
+            keyboard_shortcuts::get_keyboard_shortcuts,
+            keyboard_shortcuts::set_keyboard_shortcut,
             download_files::download_file_action,
             coze::commands::coze_status,
             coze::commands::coze_install,

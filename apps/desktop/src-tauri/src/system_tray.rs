@@ -128,7 +128,7 @@ pub(crate) fn show_dashboard<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-fn show_settings<R: Runtime>(app: &AppHandle<R>) {
+pub(crate) fn show_settings<R: Runtime>(app: &AppHandle<R>) {
     show_dashboard(app);
     let Some(window) = app.get_webview("main") else {
         return;

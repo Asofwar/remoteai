@@ -1,4 +1,5 @@
 import { interpolate } from '../../../shared/i18n/translate';
+import { shortcutEN, shortcutZH } from './i18n/keyboardShortcuts';
 import { DEFAULT_LANGUAGE } from '../../../shared/i18n/language';
 export { DEFAULT_LANGUAGE, systemLanguage as defaultLanguage } from '../../../shared/i18n/language';
 
@@ -15,6 +16,7 @@ export type Language = (typeof LANGUAGE_OPTIONS)[number]["value"];
 const translations = {
   ru: russian,
   en: {
+    ...shortcutEN,
     "downloads.title": "Downloads",
     "logDiagnostics.title": "Log diagnostics",
     "errorLogs.title": "Error logs",
@@ -2665,6 +2667,7 @@ const translations = {
     "dreamSkin.theme.starlightNoodleStall.description": "A tiny futuristic noodle stall beneath a crowded starfield. Original science-fiction art with a calm left UI area.",
   },
   zh: {
+    ...shortcutZH,
     "downloads.title": "下载管理",
     "logDiagnostics.title": "日志诊断",
     "errorLogs.title": "错误日志",

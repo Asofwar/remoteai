@@ -16,6 +16,7 @@ import { TotpSyncSettingsCard } from "../settings/TotpSyncSettingsCard";
 import { NetworkProxySettingsCard } from "../settings/NetworkProxySettings";
 import { RemoteDesktopSettingsCard } from '../settings/RemoteDesktopSettingsCard';
 import { ChatGptEnhancementsCard } from "../settings/ChatGptEnhancementsCard";
+import { KeyboardShortcutsCard } from "../settings/KeyboardShortcutsCard";
 import styles from "./index.module.less";
 import { TokenCostSettingsCard } from "../../components/TokenCostUnitSettings";
 
@@ -29,6 +30,7 @@ interface SettingsSectionProps {
 const SETTINGS_SECTIONS = [
   "appearance",
   "system",
+  "shortcuts",
   "usage",
   "connection",
   "privacy",
@@ -74,6 +76,10 @@ export function SettingsPage(settings: SettingsPageProps) {
         description={settings.t("settings.sections.system.description")}>
         <SystemSettingsCards settings={settings} />
         <ChatGptEnhancementsCard t={settings.t} />
+      </SettingsSection>
+      <SettingsSection id="settings-shortcuts" title={settings.t("settings.sections.shortcuts.title")}
+        description={settings.t("settings.sections.shortcuts.description")}>
+        <KeyboardShortcutsCard t={settings.t} />
       </SettingsSection>
       <SettingsSection id="settings-usage" title={settings.t("settings.sections.usage.title")}
         description={settings.t("settings.sections.usage.description")}>

@@ -1,4 +1,5 @@
 import { messages1 } from "./messages1";
+import { shortcutRU } from '../keyboardShortcuts';
 import { messages2 } from "./messages2";
 import { messages3 } from "./messages3";
 import { messages4 } from "./messages4";
@@ -7,6 +8,7 @@ import { messages6 } from "./messages6";
 import { messages7 } from "./messages7";
 
 export const russian = {
+  ...shortcutRU,
   "settings.chatGptEnhancements.title": "Дополнительные функции ChatGPT",
   "settings.chatGptEnhancements.label": "Включить дополнительные функции",
   "settings.chatGptEnhancements.description": "Действует вне режима прокси. При отключении смена аккаунта "

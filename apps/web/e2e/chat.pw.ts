@@ -72,20 +72,37 @@ test('refreshes an empty model catalog explicitly on mobile and desktop over rel
   await expect(page.getByRole('button', { name: '发送消息', exact: true })).toBeEnabled({ timeout: 20_000 });
   await request.post(`${fixtureUrl}/test/composer`, { data: { models: [] } });
   await expect(page.getByRole('button', { name: '发送消息', exact: true })).toBeDisabled();
-  if (!isDesktop(page)) await openChatSettings(page);
+  if (!isDesktop(page)) {
+    await openChatSettings(page);
+    await expect(page.getByRole('button', { name: '刷新模型', exact: true })).toHaveCount(0);
+    await screenshot(page, info, 'settings-without-model-refresh');
+    await page.getByRole('button', { name: '设置模型', exact: true }).click();
+    await expect(page.locator('.sheet-title-row').getByRole('button', { name: '刷新模型' })).toBeVisible();
+  }
   const refresh = page.getByRole('button', { name: '刷新模型', exact: true });
   await expect(refresh).toBeEnabled();
   expect(await operationCount(request, 'modelsRefresh')).toBe(0);
   await screenshot(page, info, 'empty-model-refresh');
   await refresh.click();
   await expect.poll(() => operationCount(request, 'modelsRefresh')).toBe(1);
-  if (!isDesktop(page)) await closeChatSettings(page);
+  if (!isDesktop(page)) {
+    await expect(page.getByRole('radio', { name: '测试模型', exact: true })).toBeVisible();
+    await screenshot(page, info, 'model-list-refresh');
+    await page.getByRole('button', { name: '返回上一层', exact: true }).click();
+    await closeChatSettings(page);
+  }
   await expect(page.getByRole('button', { name: '发送消息', exact: true })).toBeEnabled();
   await expect(input).toHaveValue('刷新后继续发送');
   if (isDesktop(page)) {
     await page.getByRole('button', { name: /^模型与推理强度：/ }).click();
     const panel = page.getByRole('dialog', { name: '模型与推理强度', exact: true });
-    await expect(panel.getByRole('button', { name: '刷新模型', exact: true })).toBeEnabled();
+    await expect(panel.getByRole('button', { name: '刷新模型', exact: true })).toHaveCount(0);
+    await panel.getByRole('button', { name: '选择模型', exact: true }).click();
+    const refreshIcon = panel.locator('.composer-model-list-header').getByRole('button', { name: '刷新模型' });
+    await expect(refreshIcon).toBeEnabled();
+    await refreshIcon.click();
+    await expect.poll(() => operationCount(request, 'modelsRefresh')).toBe(2);
+    await expect(page.getByRole('menuitemradio', { name: '测试模型', exact: true })).toBeVisible();
     expect((await panel.boundingBox())!.width).toBeLessThanOrEqual(400);
     await screenshot(page, info, 'recovered-model-picker');
   }

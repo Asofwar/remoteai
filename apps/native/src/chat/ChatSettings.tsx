@@ -64,7 +64,6 @@ export function ChatSettings({ models, selection, saving, ready, error, updateSe
       </Pressable>)}
       {!!notice && <Text accessibilityRole={error ? 'alert' : undefined}
         style={error ? styles.error : styles.subtitle}>{t(notice)}</Text>}
-      <ModelRefreshButton ready={ready} refreshModels={refreshModels} />
       {!!error && <Pressable accessibilityRole="button" style={styles.button}
         onPress={() => { void updateSettings(selection); }}><Text style={styles.buttonText}>{t("重新保存")}</Text></Pressable>}
       <ChatUsage read={readUsage} active={usageActive && !nestedOpen} ready={ready} tokenUsage={tokenUsage}
@@ -75,6 +74,7 @@ export function ChatSettings({ models, selection, saving, ready, error, updateSe
       api={contextSettings} onClose={() => setContextOpen(false)} />}
     {field && <BottomSheet fullWidthContent
       visible title={t(SETTINGS_FIELDS.find((entry) => entry.field === field)!.title)}
+      titleAction={field === 'model' ? <ModelRefreshButton ready={ready} refreshModels={refreshModels} /> : undefined}
       onBack={() => setField(null)} onClose={() => setField(null)}>
       <SheetScrollView key={field} contentContainerStyle={[styles.settings, menuStyles.content, menuStyles.options]}>
         {settingOptions(field, models, selection).map((option) => <Pressable key={option.value}

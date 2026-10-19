@@ -52,7 +52,6 @@ export function ChatSettings({ models, selection, saving, ready, error, updateSe
         <span aria-hidden="true">›</span>
       </button>)}
       {!!notice && <p role={error ? 'alert' : 'status'} className={error ? 'chat-error' : 'chat-muted'}>{t(notice)}</p>}
-      <ModelRefreshButton ready={ready} refreshModels={refreshModels} />
       {!!error && <button type="button" className="chat-button" onClick={() => { void updateSettings(selection); }}>
         {t("重新保存")}</button>}
       <ChatUsage read={readUsage} active={!field && !contextOpen} ready={ready} tokenUsage={tokenUsage}
@@ -60,6 +59,7 @@ export function ChatSettings({ models, selection, saving, ready, error, updateSe
         onContextSettings={threadId ? () => setContextOpen(true) : undefined} />
     </div>
     {field && <AdaptiveSheet open title={t(SETTINGS_FIELDS.find((entry) => entry.field === field)!.title)} width={400}
+      titleAction={field === 'model' ? <ModelRefreshButton ready={ready} refreshModels={refreshModels} /> : undefined}
       onBack={() => setField(null)} onClose={() => setField(null)}>
       <div className="chat-settings chat-setting-options" role="radiogroup">
         {settingOptions(field, models, selection).map((option) => <button key={option.value}

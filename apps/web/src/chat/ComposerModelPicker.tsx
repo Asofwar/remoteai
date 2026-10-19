@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Button, Input, Popover, Tooltip } from 'antd';
 import { Check, ChevronLeft, ChevronRight, RotateCcw, Search } from 'lucide-react';
 import { EFFORT_LABELS } from '../../../../shared/remote-chat/composer';
@@ -26,15 +26,19 @@ function moveModelFocus(event: KeyboardEvent<HTMLDivElement>) {
   buttons[next]?.focus();
 }
 
-function ModelList({ models, model, onSelect, onBack }: {
+function ModelList({ models, model, onSelect, onBack, titleAction }: {
   models: Model[]; model: string; onSelect: (model: string) => void; onBack: () => void;
+  titleAction: ReactNode;
 }) {
   const [query, setQuery] = useState('');
   const options = models.filter(entry => `${entry.displayName} ${entry.model}`.toLowerCase()
     .includes(query.trim().toLowerCase()));
   return <div className="composer-model-list-panel">
-    <button type="button" className="composer-model-list-heading" onClick={onBack}
-      aria-label={t('返回推理强度设置')}><ChevronLeft size={12} /><span>{t('选择模型')}</span></button>
+    <div className="composer-model-list-header">
+      <button type="button" className="composer-model-list-heading" onClick={onBack}
+        aria-label={t('返回推理强度设置')}><ChevronLeft size={12} /><span>{t('选择模型')}</span></button>
+      {titleAction}
+    </div>
     {models.length > MODEL_SEARCH_THRESHOLD && <Input size="small" className="composer-model-search"
       prefix={<Search size={12} />} placeholder={t('搜索模型')} aria-label={t('搜索模型')}
       value={query} allowClear onChange={event => setQuery(event.target.value)} />}
@@ -78,6 +82,7 @@ export function ComposerModelPicker({ models, selection, updateSettings, setting
       if (event.key === 'Escape') { event.stopPropagation(); changeOpen(false); trigger.current?.focus(); }
     }}>
     {choosingModel ? <ModelList models={models} model={model} onBack={returnToReasoning}
+      titleAction={<ModelRefreshButton ready={ready} refreshModels={refreshModels} />}
       onSelect={value => {
         void updateSettings(resolveModelSelection(models, { model: value, effort: '' })); returnToReasoning();
       }} /> : <div className="composer-model-reasoning">
@@ -106,7 +111,6 @@ export function ComposerModelPicker({ models, selection, updateSettings, setting
         </div>
       </div> : <p className="composer-model-hint">{t('该模型不支持调整推理强度')}</p>}
     </div>}
-    <ModelRefreshButton ready={ready} refreshModels={refreshModels} />
   </div>;
   return <Popover trigger="click" placement="topRight" arrow={false} open={open && !!model}
     onOpenChange={changeOpen} content={panel} destroyOnHidden styles={{ root: { maxWidth: 400 },

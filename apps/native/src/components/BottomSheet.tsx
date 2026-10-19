@@ -33,6 +33,7 @@ interface BottomSheetProps {
   visible: boolean;
   title: string;
   titleIcon?: ReactNode;
+  titleAction?: ReactNode;
   truncateTitle?: boolean;
   subtitle?: string;
   onClose: () => void;
@@ -52,6 +53,7 @@ export function BottomSheet({
   visible,
   title,
   titleIcon,
+  titleAction,
   truncateTitle = false,
   subtitle,
   onClose,
@@ -116,6 +118,10 @@ export function BottomSheet({
     onPanResponderTerminate: resetDrag,
   }), [dismissible, onClose, resetDrag, translateY]);
 
+  const headingTitle = <Text style={[styles.title, compactHeader && styles.compactTitle,
+    titleAction ? styles.actionTitle : undefined]}
+    numberOfLines={truncateTitle ? 1 : undefined} ellipsizeMode="tail">{title}</Text>;
+
   return <Modal
     visible={visible}
     transparent
@@ -150,9 +156,7 @@ export function BottomSheet({
             </Pressable>}
             {titleIcon}
             <View style={[styles.heading, compactHeader && styles.compactHeading]}>
-              <Text style={[styles.title, compactHeader && styles.compactTitle]}
-                numberOfLines={truncateTitle ? 1 : undefined} ellipsizeMode="tail">
-                {title}</Text>
+              {titleAction ? <View style={styles.titleRow}>{headingTitle}{titleAction}</View> : headingTitle}
               {subtitle ? <Text style={[styles.subtitle, compactHeader && styles.compactSubtitle]}
                 numberOfLines={compactHeader ? 1 : 2}>{subtitle}</Text> : null}
             </View>
@@ -220,6 +224,8 @@ const useStyles = createThemedStyles((color) => ({
   handle: { width: 44, height: 5, borderRadius: 3, alignSelf: 'center', backgroundColor: color('#d5dfd9', 'elevated'), marginBottom: 17 },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
   heading: { flex: 1, minWidth: 0 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  actionTitle: { flexShrink: 1 },
   title: { color: color('#10251d', 'ink'), fontSize: 21, lineHeight: 31, fontWeight: '800',
     includeFontPadding: true, paddingVertical: 2 },
   subtitle: { color: color('#708078', 'muted'), fontSize: 12, lineHeight: 18, marginTop: 4,

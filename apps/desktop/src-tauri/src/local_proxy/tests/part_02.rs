@@ -415,7 +415,7 @@ fn delayed_quota_response_uses_its_original_generation() {
 }
 
 #[test]
-fn retry_timeout_returns_the_last_429_response() {
+fn transient_retry_timeout_returns_the_last_429_response() {
     let switch_count = AtomicUsize::new(0);
     let timeout_count = AtomicUsize::new(0);
     let request_count = AtomicUsize::new(0);
@@ -425,7 +425,11 @@ fn retry_timeout_returns_the_last_429_response() {
         Duration::from_secs(2),
         || {
             request_count.fetch_add(1, AtomicOrdering::SeqCst);
-            Ok(official_payload(429, 0))
+            let mut response = official_payload(429, 0);
+            response.body = UpstreamBody::Buffered(
+                br#"{"error":{"code":"rate_limit_exceeded","type":"tokens"}}"#.to_vec(),
+            );
+            Ok(response)
         },
         |_, event| {
             match event {
@@ -446,7 +450,7 @@ fn retry_timeout_returns_the_last_429_response() {
     .unwrap();
 
     assert_eq!(response.status, 429);
-    assert_eq!(switch_count.load(AtomicOrdering::SeqCst), 2);
+    assert_eq!(switch_count.load(AtomicOrdering::SeqCst), 0);
     assert_eq!(timeout_count.load(AtomicOrdering::SeqCst), 1);
     assert_eq!(request_count.load(AtomicOrdering::SeqCst), 2);
 }
@@ -485,7 +489,11 @@ fn progressive_429_delays_hide_intermediate_responses() {
         Duration::from_secs(10),
         || {
             let attempt = request_count.fetch_add(1, AtomicOrdering::SeqCst);
-            Ok(official_payload(if attempt < 3 { 429 } else { 200 }, 0))
+            let mut response = official_payload(if attempt < 3 { 429 } else { 200 }, 0);
+            response.body = UpstreamBody::Buffered(
+                br#"{"error":{"code":"rate_limit_exceeded","type":"tokens"}}"#.to_vec(),
+            );
+            Ok(response)
         },
         |_, _| false,
         |delay| {

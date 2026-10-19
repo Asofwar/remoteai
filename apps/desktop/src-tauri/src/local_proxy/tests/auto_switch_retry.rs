@@ -67,7 +67,7 @@ fn quota_switch_still_retries_after_transient_429_used_the_retry_budget() {
 }
 
 #[test]
-fn unsuccessful_quota_switch_keeps_backoff_and_returns_the_original_error() {
+fn unsuccessful_quota_switch_returns_the_original_error_without_backoff() {
     let mut requests = 0;
     let mut switches = 0;
     let mut timeouts = 0;
@@ -85,17 +85,17 @@ fn unsuccessful_quota_switch_keeps_backoff_and_returns_the_original_error() {
             }
             false
         },
-        |_| timeout,
+        |_| panic!("Confirmed exhaustion without a switch must return immediately"),
     )
     .unwrap();
 
     assert_eq!(response.status, 429);
     assert!(is_official_quota_exhaustion(&response));
-    assert_eq!((requests, switches, timeouts), (1, 1, 1));
+    assert_eq!((requests, switches, timeouts), (1, 1, 0));
 }
 
 #[test]
-fn repeated_exhausted_accounts_cannot_cycle_without_a_retry_timeout() {
+fn repeated_exhausted_accounts_stop_without_backoff_or_a_retry_timeout() {
     let mut requests = 0;
     let mut switched_accounts = Vec::new();
     let mut timeouts = 0;
@@ -124,14 +124,54 @@ fn repeated_exhausted_accounts_cannot_cycle_without_a_retry_timeout() {
             }
             true
         },
-        |_| timeout,
+        |_| panic!("Repeated exhausted accounts must return the quota error immediately"),
     )
     .unwrap();
 
     assert_eq!(response.status, 429);
     assert_eq!(requests, 3);
     assert_eq!(switched_accounts, ["current", "backup"]);
-    assert_eq!(timeouts, 1);
+    assert_eq!(timeouts, 0);
+}
+
+#[test]
+fn image_quota_retry_requires_a_successful_account_switch() {
+    for (account_ids, healthy_account, expected_status, expected_attempts) in [
+        (vec!["a"], None, 429, vec!["a"]),
+        (vec!["a", "b"], Some("b"), 200, vec!["a", "b"]),
+        (vec!["a", "b"], None, 429, vec!["a", "b", "a"]),
+    ] {
+        let mut pool = ImageAccountPool::new(account_ids.into_iter().map(String::from).collect());
+        let switched = std::cell::Cell::new(false);
+        let mut attempts = Vec::new();
+        let response = retry_upstream_request_with(
+            Duration::from_secs(60),
+            || {
+                let account_id = pool.as_ref().unwrap().current_account_id().to_string();
+                attempts.push(account_id.clone());
+                assert!(attempts.len() <= expected_attempts.len());
+                let status = if healthy_account == Some(account_id.as_str()) {
+                    200
+                } else {
+                    429
+                };
+                let mut response = official_payload(status, 0);
+                let account = response.token_usage_account.as_mut().unwrap();
+                account.account_id = account_id;
+                account.auto_switch_eligible = false;
+                switched.set(advance_image_account_after_429(&mut pool, &response));
+                Ok(response)
+            },
+            |_, event| {
+                assert!(matches!(event, UpstreamQuotaEvent::Retry { .. }));
+                switched.get()
+            },
+            |_| panic!("Image quota must either switch immediately or return the error"),
+        )
+        .unwrap();
+        assert_eq!(response.status, expected_status);
+        assert_eq!(attempts, expected_attempts);
+    }
 }
 
 fn stale_positive_quota_accounts() -> Vec<AccountSummary> {

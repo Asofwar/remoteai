@@ -75,20 +75,20 @@ where
             record_retried_proxy_response(&response);
             continue;
         }
-        if response.status == 429 {
-            retry_number = retry_number.saturating_add(1);
-            let delay = upstream_429_retry_delay(retry_number);
-            diagnostic_retry("rate_limit", delay);
-            let elapsed = wait_before_retry(delay);
-            if elapsed >= timeout {
-                diagnostic_event(json!({ "event": "retry_budget_exhausted", "attempt": attempt }));
-                let _ = handle_quota_event(&response, UpstreamQuotaEvent::RetryTimedOut);
-                return Ok(response);
-            }
-            record_retried_proxy_response(&response);
-            continue;
+        // Confirmed exhaustion cannot recover through backoff without a new target.
+        if response.status != 429 || is_official_quota_exhaustion(&response) {
+            return Ok(response);
         }
-        return Ok(response);
+        retry_number = retry_number.saturating_add(1);
+        let delay = upstream_429_retry_delay(retry_number);
+        diagnostic_retry("rate_limit", delay);
+        let elapsed = wait_before_retry(delay);
+        if elapsed >= timeout {
+            diagnostic_event(json!({ "event": "retry_budget_exhausted", "attempt": attempt }));
+            let _ = handle_quota_event(&response, UpstreamQuotaEvent::RetryTimedOut);
+            return Ok(response);
+        }
+        record_retried_proxy_response(&response);
     }
 }
 
@@ -132,7 +132,7 @@ fn switch_exhausted_account(
         return false;
     }
     // Stale positive usage can send us back to an exhausted account. Bound immediate
-    // failovers per request so that cycle still reaches the normal retry timeout.
+    // failovers per request so that cycle terminates with the quota error.
     quota_retry
         .switched_account_ids
         .insert(account.account_id.clone());

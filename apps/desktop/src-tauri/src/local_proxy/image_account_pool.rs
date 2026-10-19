@@ -59,14 +59,15 @@ fn image_account_pool_for_request<R: Runtime>(
         .into_iter()
         .filter(|id| image_account_is_eligible(&paths, id, purpose))
         .collect::<Vec<_>>();
-    ImageAccountPool::new(account_ids)
-        .map(Some)
-        .ok_or_else(|| {
-            "No compatible official account is available for this image request".to_string()
-        })
+    ImageAccountPool::new(account_ids).map(Some).ok_or_else(|| {
+        "No compatible official account is available for this image request".to_string()
+    })
 }
 
-fn image_failover_account_ids(paths: &Paths, state: &ManagerStateFile) -> Result<Vec<String>, String> {
+fn image_failover_account_ids(
+    paths: &Paths,
+    state: &ManagerStateFile,
+) -> Result<Vec<String>, String> {
     let mut account_ids = enabled_concurrent_account_ids(paths, state)?;
     if state.concurrent_account_routing_enabled && concurrent_custom_priority_enabled(state) {
         // Keep every tier for 429 fallback; the explicitly selected image account
@@ -153,24 +154,25 @@ fn image_auth_supports_purpose(auth: &Value, purpose: OfficialCredentialPurpose)
 fn advance_image_account_after_429(
     pool: &mut Option<ImageAccountPool>,
     response: &UpstreamPayload,
-) {
+) -> bool {
     if response.status != 429 {
-        return;
+        return false;
     }
     let Some(failed_account_id) = response
         .token_usage_account
         .as_ref()
         .map(|account| account.account_id.as_str())
     else {
-        return;
+        return false;
     };
     let Some(next_account_id) = pool
         .as_mut()
         .and_then(|pool| pool.advance_after_429(failed_account_id))
     else {
-        return;
+        return false;
     };
     log_proxy_error!(
         "image request account failover: failed={failed_account_id}, next={next_account_id}"
     );
+    true
 }

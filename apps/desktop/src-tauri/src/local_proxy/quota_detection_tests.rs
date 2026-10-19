@@ -111,3 +111,43 @@ fn quota_code_does_not_make_a_fallback_credential_eligible_to_switch() {
     assert!(!credential_can_trigger_auto_switch(account));
     assert!(is_official_quota_exhaustion(&response));
 }
+
+#[test]
+fn unswitchable_quota_errors_preserve_body_and_headers_without_waiting() {
+    let mut header_error = error_response(json!({ "message": "Quota exhausted" }));
+    header_error.response_headers.push((
+        CODEX_RATE_LIMIT_REACHED_TYPE_HEADER.to_string(),
+        "workspace_member_usage_limit_reached".to_string(),
+    ));
+    for mut original in [
+        error_response(json!({ "type": "usage_limit_reached" })),
+        error_response(json!({ "code": "insufficient_quota" })),
+        header_error,
+    ] {
+        // Provider responses can carry explicit quota errors without an official account.
+        original.token_usage_account = None;
+        original
+            .response_headers
+            .push(("retry-after".into(), "3600".into()));
+        let expected_headers = original.response_headers.clone();
+        let UpstreamBody::Buffered(expected_body) = &original.body else {
+            panic!("Expected buffered quota error");
+        };
+        let expected_body = expected_body.clone();
+        let mut original = Some(original);
+        let response = retry_upstream_request_with(
+            Duration::from_secs(60),
+            || Ok(original.take().expect("Quota error must not be retried")),
+            |_, _| panic!("No official account is available to switch or disable"),
+            |_| panic!("Explicit quota errors must not wait for backoff"),
+        )
+        .unwrap();
+        assert_eq!(response.status, 429);
+        assert_eq!(response.content_type.as_deref(), Some("application/json"));
+        assert_eq!(response.response_headers, expected_headers);
+        let UpstreamBody::Buffered(body) = response.body else {
+            panic!("Expected original buffered quota error");
+        };
+        assert_eq!(body, expected_body);
+    }
+}

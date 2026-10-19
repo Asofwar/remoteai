@@ -296,3 +296,28 @@ fn initial_sse_quota_failure_switches_and_retries_through_the_existing_loop() {
         .unwrap()
         .contains("ok"));
 }
+
+#[test]
+fn initial_sse_quota_failure_returns_immediately_when_switching_is_unavailable() {
+    let mut requests = 0;
+    let mut switches = 0;
+    let payload = retry_upstream_request_with(
+        Duration::from_secs(60),
+        || {
+            requests += 1;
+            inspect_initial_official_sse(sse_payload(Cursor::new(
+                failed_quota_event().into_bytes(),
+            )))
+        },
+        |_, event| {
+            assert!(matches!(event, UpstreamQuotaEvent::Retry { .. }));
+            switches += 1;
+            false
+        },
+        |_| panic!("Opening quota failure without a switch must not wait or retry"),
+    )
+    .unwrap();
+    assert_eq!(payload.status, 429);
+    assert!(is_official_quota_exhaustion(&payload));
+    assert_eq!((requests, switches), (1, 1));
+}

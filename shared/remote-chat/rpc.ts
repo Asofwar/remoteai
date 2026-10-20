@@ -10,10 +10,12 @@ const TRANSFER_CHARS_PER_SECOND = 128 * 1024;
 const SMALL_REQUEST_CHARS = 1024 * 1024;
 const MAX_TIMER_MS = 2_147_483_647;
 const GIT_ACTION_TIMEOUT_MS = 5 * 60_000;
+const GIT_MESSAGE_TIMEOUT_MS = 120_000;
 // Source switches also await the host's 140-second catalog recovery before replying.
 const MODEL_CATALOG_TIMEOUT_MS = 150_000;
 function requestTimeout(body: unknown) {
   const operation = (body as { operation?: unknown } | null)?.operation;
+  if (operation === 'guiGitGenerateMessage') return GIT_MESSAGE_TIMEOUT_MS;
   if (operation === 'guiGitAction' || operation === 'guiGitWorkspace'
     || operation === 'guiGitRevision') return GIT_ACTION_TIMEOUT_MS;
   if (operation === 'models' || operation === 'modelsRefresh'

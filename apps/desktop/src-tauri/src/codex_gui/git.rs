@@ -15,6 +15,14 @@ pub(crate) mod tool;
 
 #[derive(Debug, thiserror::Error)]
 pub(super) enum GitError {
+    #[error("暂时无法同步 Git 设置，请稍后重试。")]
+    Settings,
+    #[error("未能生成提交说明，请重试或手动填写。")]
+    MessageGeneration,
+    #[error("请先在 Codex GUI 中选择可用的 AI 账户。")]
+    MessageAccount,
+    #[error("所选文件过多，请减少选择后再生成提交说明。")]
+    MessageSize,
     #[error("无法保存验证记录，请检查电脑可用空间后重试。")]
     ReviewStorage,
     #[error("项目已有验证在运行，请等待完成。")]

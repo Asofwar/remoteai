@@ -170,6 +170,7 @@ mod tests {
     include!("tests/gui_aggregate.rs");
     include!("tests/gui_runtime_isolation.rs");
     include!("tests/gui_runtime.rs");
+    include!("tests/git_message.rs");
     include!("tests/gui_system_prompts.rs");
     include!("tests/gui_home_isolation.rs");
     include!("tests/gui_transport_error.rs");

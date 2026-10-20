@@ -7,6 +7,7 @@ import type { GitFileRow } from '../../../../../shared/remote-chat/useGitFileLis
 import type { RemoteGit } from '../../../../../shared/remote-chat/useRemoteGit';
 import { gitAreaColors } from './gitTheme';
 import { GitFileMenu } from './GitFileMenu';
+import { GitCommitForm } from './GitCommitForm';
 import { t } from '../../i18n';
 
 export function GitChanges({ panel, connected }: { panel: RemoteGit; connected: boolean }) {
@@ -27,16 +28,7 @@ export function GitChanges({ panel, connected }: { panel: RemoteGit; connected: 
       {list.rows.map(row => <GitRow key={row.id} row={row} panel={panel} connected={connected}
         onToggle={() => list.toggleFolder(row.id)} flat={list.mode === 'flat'} />)}
     </div>
-    <div className="git-commit-form"><textarea aria-label={t('提交说明')} placeholder={t('填写提交说明')}
-      maxLength={4000} value={panel.message} disabled={panel.busy}
-      onChange={event => panel.setMessage(event.target.value)} />
-      <p>{t('提交所选文件的全部改动，包含已暂存和未暂存的内容。')}</p>
-      <div className="git-commit-actions">
-        <button type="button" className="git-submit" disabled={!panel.canCommit} onClick={() => void panel.commit()}>
-          {t('提交 {count} 个文件', { count })}</button>
-        <button type="button" className="git-submit" disabled={!panel.canCommitAndPush}
-          onClick={() => void panel.commit({ push: true })}>{t('提交并推送')}</button>
-      </div></div>
+    <GitCommitForm panel={panel} />
   </>;
 }
 

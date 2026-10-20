@@ -7,6 +7,7 @@ import { useGitFileList } from './useGitFileList';
 import { gitErrorText, useGitRequests } from './useGitRequests';
 import { readGitSnapshot, refreshGitHistory } from './gitSnapshot';
 import { useGitRevisionActions } from './useGitRevisionActions';
+import { useGitCommit } from './useGitCommit';
 
 export type GitDetail = { kind: 'files'; commit: GitCommit }
   | { kind: 'diff'; path: string; commit?: GitCommit; title: string };
@@ -27,7 +28,6 @@ export function useRemoteGit({ client, cwd, active, connected, refreshInterval }
   const fileList = useGitFileList(changes?.files ?? []);
   const [{ commits, hasMore }, setHistory] = useState<GitHistory>({ commits: [], hasMore: false });
   const [selected, setSelected] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState('');
   const [tab, setTab] = useState<'changes' | 'history'>('changes');
   const [detail, setDetail] = useState<GitDetail | null>(null);
   const [fileAction, setFileAction] = useState<GitFileActionPrompt | null>(null);
@@ -42,13 +42,16 @@ export function useRemoteGit({ client, cwd, active, connected, refreshInterval }
   const { busy, error, notice, setNotice, run, refresh } = useGitRequests({
     scope, enabled: active && connected && !!cwd, load, refreshInterval,
   });
+  const submission = useGitCommit({ client, cwd, scope, changes, repository, selected,
+    enabled: active && connected, busy, run, load, setNotice, isCurrent: () => current.current === scope,
+    onCommitted: () => { setSelected({}); setDetail(null); } });
   const revisions = useGitRevisionActions({ client, cwd, scope, changes, connected, busy, run, load, setNotice,
     isCurrent: () => current.current === scope, onDone: () => {
       setDetail(null); setSelected({}); setHistory({ commits: [], hasMore: false });
     } });
   useEffect(() => {
     current.current = scope;
-    setChanges(null); setHistory({ commits: [], hasMore: false }); setSelected({}); setMessage(''); setDetail(null);
+    setChanges(null); setHistory({ commits: [], hasMore: false }); setSelected({}); setDetail(null);
     setRepository(null); setFileAction(null);
     return () => { current.current = {}; };
   }, [scope]);
@@ -85,30 +88,6 @@ export function useRemoteGit({ client, cwd, active, connected, refreshInterval }
     setFileAction(null); setDetail(null); setNotice(notice);
     await load();
   });
-  const canPush = !!changes?.branch && !!repository?.upstream && !!repository.remotes.length;
-  const canCommit = connected && !busy && !!message.trim() && Object.keys(selected).length > 0
-    && !changes?.files.some(file => file.conflict);
-  const commit = (options: { push?: boolean } = {}) => run(async () => {
-    if (!changes || changes.files.some(file => file.conflict)
-      || !message.trim() || !Object.keys(selected).length || (options.push && !canPush)) return;
-    const result = await client.commit({ cwd, head: changes.head, message: message.trim(),
-      files: Object.entries(selected).map(([path, version]) => ({ path, version })) });
-    if (current.current !== scope) return;
-    setSelected({}); setMessage(''); setDetail(null); setNotice(`已提交 ${result.hash.slice(0, 8)}`);
-    let failure: unknown;
-    if (options.push) {
-      try {
-        await client.action({ cwd, action: 'push', head: result.hash, branch: changes.branch });
-        if (current.current === scope) setNotice('提交并推送完成');
-      } catch (error) {
-        failure = error;
-        if (current.current === scope) setNotice('提交已完成，推送未完成。请稍后重试推送。');
-      }
-    }
-    if (current.current !== scope) return;
-    try { await load(); } catch (error) { failure ??= error; }
-    if (failure) throw failure;
-  });
   const action = (action: GitAction, target?: string) => run(async () => {
     if (!changes) return;
     let failure: unknown;
@@ -129,11 +108,12 @@ export function useRemoteGit({ client, cwd, active, connected, refreshInterval }
       ...page.commits.filter(commit => !previous.commits.some(row => row.hash === commit.hash))],
     hasMore: page.hasMore }));
   });
-  return { ...revisions, busy, error, notice, changes, commits, hasMore, selected, message, setMessage, tab, setTab,
-    detail, setDetail, backDetail: () => setDetail(parentGitDetail), refresh, toggle, selectAll, selectFiles, commit, more,
+  return { ...revisions, ...submission, busy, error: error || submission.settingsError,
+    notice, changes, commits, hasMore, selected, tab, setTab,
+    detail, setDetail, backDetail: () => setDetail(parentGitDetail), refresh, toggle, selectAll, selectFiles, more,
     repository, action, strategy, setStrategy, fileList, fileAction, requestFileAction, confirmFileAction,
     cancelFileAction: () => { if (!busy) setFileAction(null); },
-    canCommit, canCommitAndPush: canCommit && canPush };
+  };
 }
 
 export type RemoteGit = ReturnType<typeof useRemoteGit>;

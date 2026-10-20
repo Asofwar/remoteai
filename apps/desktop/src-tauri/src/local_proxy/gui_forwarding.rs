@@ -13,11 +13,16 @@ struct Attempt {
 pub(super) fn forward<R: Runtime>(
     mut request: GuiProxyRequest<'_, R>,
 ) -> Result<UpstreamPayload, String> {
-    if header_value(
-        request.headers,
-        crate::codex_config::LOCAL_PROXY_REQUEST_PURPOSE_HEADER,
-    ) == Some(crate::codex_config::HELP_REQUEST_PURPOSE)
-    {
+    if matches!(
+        header_value(
+            request.headers,
+            crate::codex_config::LOCAL_PROXY_REQUEST_PURPOSE_HEADER,
+        ),
+        Some(
+            crate::codex_config::HELP_REQUEST_PURPOSE
+                | crate::codex_config::GIT_MESSAGE_REQUEST_PURPOSE
+        )
+    ) {
         return forward_help(request);
     }
     let route = gui_auto_switch::prepare(request.app, request.session_id)

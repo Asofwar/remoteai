@@ -21,6 +21,18 @@ vi.mock('../pages/codexGui/terminal/api', () => ({
 const request = (id: string, body: object) => ({ kind: 'request' as const, method: 'request' as const, id, body });
 const flush = async () => { for (let index = 0; index < 10; index++) await Promise.resolve(); };
 
+it('routes remote Git generation and host preferences through the native Git service', async () => {
+  const operations = new ChatOperations();
+  const files = [{ path: 'chosen.ts', version: 'v1' }];
+  await operations.execute(request('ai-message', { operation: 'guiGitGenerateMessage', cwd: '/project',
+    head: 'head', files, language: 'zh' }));
+  expect(invoke).toHaveBeenLastCalledWith('codex_gui_git_tool', { request: {
+    operation: 'generateMessage', cwd: '/project', head: 'head', files, language: 'zh' } });
+  await operations.execute(request('git-settings', { operation: 'guiGitSettings', autoMessage: true }));
+  expect(invoke).toHaveBeenLastCalledWith('codex_gui_git_tool', {
+    request: { operation: 'settings', autoMessage: true } });
+});
+
 it.each(['read', 'udpRead', 'udpWrite'])('keeps %s retries idempotent across long transfers and isolates reconnects',
   async type => {
   const operations = new ChatOperations();

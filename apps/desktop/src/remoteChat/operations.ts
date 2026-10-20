@@ -44,6 +44,7 @@ import { PROJECT_LIST_OPERATION } from '../../../../shared/remote-chat/projects'
 
 const OPERATIONS = new Set([
   'suggestNextPrompt',
+  'guiGitGenerateMessage',
   'downloadOpen', 'downloadBrowse', 'previewOpen',
   'fileOpen', 'fileRead', 'fileClose',
   'videoOpen', 'videoRead', 'videoClose',
@@ -139,6 +140,7 @@ export class ChatOperations {
     const result = running.then((data) => response(request, data, mode))
       .catch((error: unknown): RpcResponse => ({ kind: 'response', id: request.id, error: operationError(error) }));
     const readOnly = request.method === 'request' && (READ_OPERATIONS.has(operation ?? '')
+      || (operation === 'guiGitSettings' && object(request.body).autoMessage === undefined)
       || (operation === 'guiGitWorkspace' && object(object(request.body).request).operation === 'status')
       || (operation === DESKTOP_OPERATION && object(request.body).action === 'signal'));
     const entry: Cached = { fingerprint, result, expires: Date.now() + CACHE_TTL_MS, completed: false, readOnly };

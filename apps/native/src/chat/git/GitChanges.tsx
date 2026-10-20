@@ -1,7 +1,7 @@
 import { gitAreaColors } from './theme';
 import { useThemeColor } from '../../theme/store';
 import { t, useLanguage } from '../../i18n';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { selectionState } from '../../../../../shared/remote-chat/gitFiles';
 import type { GitFileRow } from '../../../../../shared/remote-chat/useGitFileList';
@@ -9,10 +9,10 @@ import type { RemoteGit } from '../../../../../shared/remote-chat/useRemoteGit';
 import { useGitStyles as useStyles } from './styles';
 import { palette } from '../styles';
 import { GitSelectionMark, GitTreeIcon } from './GitTreeIcon';
+import { GitCommitForm } from './GitCommitForm';
 
 export function GitChanges({ panel, connected }: { panel: RemoteGit; connected: boolean }) {
   const styles = useStyles();
-  const themedColor = useThemeColor();
   useLanguage();
   const files = panel.changes?.files ?? [];
   const list = panel.fileList;
@@ -36,15 +36,7 @@ export function GitChanges({ panel, connected }: { panel: RemoteGit; connected: 
       {list.rows.map(row => <GitRow key={row.id} row={row} panel={panel} connected={connected}
         flat={list.mode === 'flat'} onToggle={() => list.toggleFolder(row.id)} />)}
     </ScrollView>
-    <View style={styles.form}>
-      <TextInput accessibilityLabel={t("提交说明")} placeholder={t("填写提交说明")} placeholderTextColor={themedColor(palette.muted, 'muted')}
-        style={styles.input} multiline maxLength={4000} value={panel.message} editable={!panel.busy}
-        onChangeText={panel.setMessage} />
-      <Text style={styles.hint}>{t("提交所选文件的全部改动，包含已暂存和未暂存的内容。")}</Text>
-      <Pressable accessibilityRole="button" disabled={!panel.canCommit}
-        style={[styles.submit, !panel.canCommit && styles.disabled]} onPress={() => void panel.commit()}>
-        <Text style={styles.submitText}>{t("提交")}{' '}{count}{' '}{t("个文件")}</Text></Pressable>
-    </View>
+    <GitCommitForm panel={panel} />
   </>;
 }
 

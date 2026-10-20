@@ -72,7 +72,10 @@ impl Drop for IndexTransaction {
     }
 }
 
-fn selected_paths(current: &changes::Changes, selected: &[SelectedFile]) -> Result<Vec<String>> {
+pub(super) fn selected_paths(
+    current: &changes::Changes,
+    selected: &[SelectedFile],
+) -> Result<Vec<String>> {
     if selected.is_empty() || selected.len() > current.files.len() {
         return Err(GitError::Selection);
     }
@@ -115,7 +118,7 @@ pub(super) fn require_idle(root: &Path) -> Result<()> {
     Ok(())
 }
 
-fn stage(transaction: &IndexTransaction, root: &Path, paths: &[String]) -> Result<()> {
+pub(super) fn stage(transaction: &IndexTransaction, root: &Path, paths: &[String]) -> Result<()> {
     // Already staged deletions and rename sources no longer exist in the index; git add rejects them.
     let listed = transaction
         .command(root)

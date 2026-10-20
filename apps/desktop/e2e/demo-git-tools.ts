@@ -1,11 +1,13 @@
 import { createGitFixture } from '../../../shared/remote-chat/testing/gitFixture';
 import type { GitActionRequest, GitCommitRequest, GitFileActionRequest,
-  GitRevisionRequest } from '../../../shared/remote-chat/gitTypes';
+  GitRevisionRequest, GitMessageRequest } from '../../../shared/remote-chat/gitTypes';
 
 const git = createGitFixture();
 export function demoGitTools(input: Record<string, unknown>) {
   const cwd = String(input.cwd);
   switch (input.operation) {
+    case 'guiGitSettings': return git.settings(input.autoMessage as boolean | undefined);
+    case 'guiGitGenerateMessage': return git.generateMessage(input as unknown as GitMessageRequest);
     case 'guiGitRepository': return git.repository(cwd);
     case 'guiGitAction': return git.action(input as unknown as GitActionRequest) ?? null;
     case 'guiGitRevision': return git.revision(input as unknown as GitRevisionRequest) ?? null;

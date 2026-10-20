@@ -20,11 +20,14 @@ reopen the terminal after changing PATH.
 Windows release builds also need [7-Zip](https://www.7-zip.org/download.html) on PATH to unpack native
 dependencies. After installing it, add `C:\Program Files\7-Zip` to PATH and reopen the terminal.
 
-Ubuntu needs the Linux WebKitGTK/AppIndicator toolchain before `npm run dev:app`, `npm run check`, or `npm run build:app`:
+Ubuntu needs the Linux WebKitGTK/AppIndicator and screen capture dependencies before
+`npm run dev:app`, `npm run check`, or `npm run build:app`:
 
 ```bash
 sudo apt update
-sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils
+sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev \
+  libappindicator3-dev librsvg2-dev patchelf xdg-utils pkg-config libclang-dev libxcb1-dev \
+  libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev libegl-dev
 ```
 
 Dependency versions are locked by the root `package-lock.json` and `apps/desktop/src-tauri/Cargo.lock`. Include both lockfile changes whenever a dependency update is intentional.

@@ -14,7 +14,8 @@ const supported = ['win32', 'darwin'].includes(process.platform) && ['x64', 'arm
 const executable = path.resolve('apps/desktop/src-tauri/target/debug', process.platform === 'win32' ? 'csw.exe' : 'csw');
 const source = process.env.CSW_CUA_DRIVER_DIRECTORY;
 const codex = process.env.CSW_CUA_CODEX_BINARY;
-const version = '0.37.0';
+const version = '0.37.0-remoteai.2';
+const driverVersion = '0.37.0';
 const timeoutMs = 30000;
 const cleanupOptions = { recursive: true, force: true, maxRetries: 10, retryDelay: 100 };
 const target = process.platform === 'darwin' ? 'darwin-universal'
@@ -70,7 +71,7 @@ async function initialize(child) {
   const reply = await call('initialize', { protocolVersion: '2024-11-05', capabilities: {},
     clientInfo: { name: 'codex-switch-verification', version: '1.0.0' } });
   assert.ok(reply.result?.serverInfo);
-  assert.equal(reply.result.serverInfo.version, version);
+  assert.equal(reply.result.serverInfo.version, driverVersion);
   child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
   return call;
 }

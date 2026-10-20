@@ -53,7 +53,7 @@ fn driver_urls(version: &str) -> Vec<String> {
     ["windows-x86_64.zip", "windows-arm64.zip", "darwin-universal-binary.tar.gz"]
         .iter()
         .map(|asset| format!(
-            "https://github.com/trycua/cua/releases/download/cua-driver-rs-v{version}/cua-driver-rs-{version}-{asset}"
+            "https://github.com/piperhex/remoteai/releases/download/cua-v{version}/cua-driver-rs-{version}-{asset}"
         ))
         .collect()
 }

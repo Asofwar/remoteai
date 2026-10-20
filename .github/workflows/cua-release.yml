@@ -8,7 +8,9 @@ on:
         type: boolean
         default: false
   push:
+    branches: [master]
     tags: ["cua-v*"]
+    paths: ["packages/cua/**", ".github/workflows/cua-release.yml"]
   pull_request:
     paths: ["packages/cua/**", ".github/workflows/cua-release.yml"]
 
@@ -51,8 +53,7 @@ jobs:
             import {tag} from "./packages/cua/common.mjs";
             if (process.env.GITHUB_REF_TYPE === "tag" && process.env.GITHUB_REF_NAME !== tag)
               throw new Error("CUA tag and package version differ");'
-      - name: Prepare pinned source
-        if: startsWith(matrix.target, 'windows-')
+      - name: Verify repository source
         run: node packages/cua/prepare.mjs
       - name: Install pinned Rust toolchain
         if: startsWith(matrix.target, 'windows-')
@@ -69,10 +70,10 @@ jobs:
         if: startsWith(matrix.target, 'windows-')
         with:
           key: cua-${{ matrix.target }}-${{ hashFiles('packages/cua/upstream.json') }}
-          workspaces: .codex-tmp/cua-source/libs/cua-driver/rust
+          workspaces: packages/cua/vendor/libs/cua-driver/rust
       - name: Check patched Windows code
         if: startsWith(matrix.target, 'windows-')
-        working-directory: .codex-tmp/cua-source/libs/cua-driver/rust
+        working-directory: packages/cua/vendor/libs/cua-driver/rust
         shell: pwsh
         run: |
           cargo fmt -p platform-windows -- --check

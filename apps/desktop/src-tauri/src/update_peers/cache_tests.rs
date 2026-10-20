@@ -170,7 +170,7 @@ async fn dependency_slots_preserve_updates_and_restore_all_six_packages() {
             .unwrap();
         let url = format!(
             concat!(
-                "https://github.com/trycua/cua/releases/download/cua-driver-rs-v{0}/",
+                "https://github.com/piperhex/remoteai/releases/download/cua-v{0}/",
                 "cua-driver-rs-{0}-windows-x86_64.zip"
             ),
             version

@@ -128,7 +128,7 @@ fn preserves_windows_zip_layout_and_rejects_missing_files() {
 }
 
 #[test]
-#[ignore = "requires CSW_CUA_TEST_ARCHIVE pointing to the pinned upstream macOS binary tarball"]
+#[ignore = "requires CSW_CUA_TEST_ARCHIVE pointing to the pinned Remote AI macOS binary tarball"]
 fn verifies_and_extracts_pinned_macos_release() {
     use sha2::{Digest, Sha256};
     let asset = assets::select("macos", "aarch64").unwrap();
@@ -138,4 +138,26 @@ fn verifies_and_extracts_pinned_macos_release() {
     extract(&bytes, "unused", &directory.0, &asset).unwrap();
     let executable = fs::read(directory.0.join(asset.executable())).unwrap();
     assert_eq!(&executable[..8], &[0xca, 0xfe, 0xba, 0xbe, 0, 0, 0, 2]);
+}
+
+#[cfg(windows)]
+#[test]
+#[ignore = "requires CSW_CUA_TEST_ARCHIVE pointing to the pinned Remote AI Windows archive"]
+fn verifies_and_extracts_pinned_windows_release() {
+    use sha2::{Digest, Sha256};
+    let asset = assets::select("windows", std::env::consts::ARCH).unwrap();
+    let bytes = fs::read(std::env::var_os("CSW_CUA_TEST_ARCHIVE").unwrap()).unwrap();
+    assert_eq!(format!("{:x}", Sha256::digest(&bytes)), asset.digest);
+    let directory = TemporaryDirectory::new();
+    let prefix = format!(
+        "cua-driver-rs-{}-{}",
+        crate::computer_use::VERSION,
+        asset.target
+    );
+    extract(&bytes, &prefix, &directory.0, &asset).unwrap();
+    for name in asset.files {
+        assert!(fs::metadata(directory.0.join(name)).unwrap().len() > 0);
+    }
+    let executable = fs::read(directory.0.join(asset.executable())).unwrap();
+    assert_eq!(&executable[..2], b"MZ");
 }

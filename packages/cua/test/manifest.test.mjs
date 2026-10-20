@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { asset, sha256, tag, upstream, version } from '../common.mjs';
 import { manifest } from '../manifest.mjs';
-import { patchBytes } from '../prepare.mjs';
+import { patchBytes, sourceLockBytes } from '../prepare.mjs';
 
 test('release manifest rejects mixed builds, altered archives, and absent targets', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'remoteai-cua-manifest-'));
@@ -16,6 +16,7 @@ test('release manifest rejects mixed builds, altered archives, and absent target
       await writeFile(join(directory, `${target}.json`), JSON.stringify({
         version, tag, target, filename, sha256: sha256(target), upstreamCommit: upstream.commit,
         patchSha256: sha256(await patchBytes()), sourceCommit: process.env.GITHUB_SHA || 'fixture',
+        sourceInventorySha256: sha256(await sourceLockBytes()),
       }));
     }
     assert.equal((await manifest(directory)).assets.length, 3);
@@ -24,6 +25,9 @@ test('release manifest rejects mixed builds, altered archives, and absent target
     const original = await readFile(metadataPath, 'utf8');
     await writeFile(metadataPath, JSON.stringify({ ...JSON.parse(original), sourceCommit: 'different' }));
     await assert.rejects(manifest(directory), /Mixed release source/);
+    await writeFile(metadataPath, original);
+    await writeFile(metadataPath, JSON.stringify({ ...JSON.parse(original), sourceInventorySha256: '0'.repeat(64) }));
+    await assert.rejects(manifest(directory), /Invalid metadata/);
     await writeFile(metadataPath, original);
     const archive = join(directory, asset('windows-arm64').filename);
     await writeFile(archive, 'tampered');

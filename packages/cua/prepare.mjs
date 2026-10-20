@@ -1,56 +1,55 @@
-import { existsSync } from 'node:fs';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { lstatSync, readFileSync, readlinkSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { directory, root, run, source, upstream } from './common.mjs';
+import { directory, run, sha256, source, upstream } from './common.mjs';
 
-export function prepare() {
-  if (!existsSync(source)) {
-    run('git', ['clone', '--depth=1', '--branch', `cua-driver-rs-v${upstream.version}`,
-      '--filter=blob:none', '--sparse', upstream.repository, source],
-      { cwd: root });
-  }
-  const git = (...args) => run('git', args, { cwd: source, encoding: 'utf8', stdio: 'pipe' });
-  if (git('rev-parse', 'HEAD') !== upstream.commit) {
-    if (git('status', '--porcelain')) throw new Error('CUA source has uncommitted changes');
-    git('fetch', '--depth=1', 'origin', upstream.commit);
-    git('checkout', '--detach', upstream.commit);
-  }
-  git('sparse-checkout', 'set', 'libs/cua-driver', 'libs/cua', 'libs/images');
-  const patch = join(directory, 'patches/windows-native-launch.patch');
-  if (!git('status', '--porcelain')) {
-    git('apply', '--check', patch);
-    git('apply', patch);
-  }
-  verifySource({ source, patch, commit: upstream.commit });
+const lockPath = join(directory, 'source-lock.json');
+
+function sourceFiles(checkout) {
+  // Use the main repository's tracked files and unignored additions. Build caches stay excluded.
+  const names = run('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', '.'],
+    { cwd: checkout, stdio: 'pipe', maxBuffer: 16 * 1024 * 1024 }).split('\0').filter(Boolean);
+  return [...new Set(names)].sort();
 }
 
-// Compare against a private index built from the pinned commit plus exactly our patch.
-// Reverse-apply alone also accepts unrelated changes, so it is not a release integrity check.
-export function verifySource({ source: checkout, patch, commit }) {
-  const scratch = mkdtempSync(join(tmpdir(), 'remoteai-cua-index-'));
-  const skipped = run('git', ['ls-files', '-t', '-z'], { cwd: checkout, encoding: 'utf8', stdio: 'pipe',
-    maxBuffer: 16 * 1024 * 1024 }).split('\0').filter(line => line.startsWith('S ')).map(line => line.slice(2));
-  const env = { ...process.env, GIT_INDEX_FILE: join(scratch, 'index') };
-  const git = (...args) => run('git', args, { cwd: checkout, encoding: 'utf8', stdio: 'pipe',
-    env });
-  try {
-    if (git('rev-parse', 'HEAD') !== commit) throw new Error('CUA upstream revision mismatch');
-    git('read-tree', commit);
-    git('apply', '--cached', patch);
-    if (skipped.length) run('git', ['update-index', '--skip-worktree', '-z', '--stdin'],
-      { cwd: checkout, env, stdio: 'pipe', input: `${skipped.join('\0')}\0` });
-    git('diff', '--quiet', '--no-ext-diff');
-    if (git('ls-files', '--others', '--exclude-standard')) throw new Error('Untracked CUA source files');
-  } finally {
-    rmSync(scratch, { recursive: true, force: true });
+export function sourceManifest(checkout = source) {
+  const files = {};
+  for (const name of sourceFiles(checkout)) {
+    const path = join(checkout, name);
+    const stat = lstatSync(path);
+    if (!stat.isFile() && !stat.isSymbolicLink()) throw new Error(`Non-regular CUA source: ${name}`);
+    // Windows may check out symlinks as text files; hash their target bytes without following them.
+    files[name] = sha256(stat.isSymbolicLink() ? readlinkSync(path) : readFileSync(path));
   }
+  return { upstreamCommit: upstream.commit, files };
+}
+
+export function verifySource({ source: checkout, manifest }) {
+  if (manifest.upstreamCommit !== upstream.commit) throw new Error('CUA upstream revision mismatch');
+  const actual = sourceManifest(checkout);
+  if (!Object.keys(manifest.files).length) throw new Error('CUA source inventory is empty');
+  if (JSON.stringify(actual.files) !== JSON.stringify(manifest.files)) {
+    throw new Error('CUA source differs from source-lock.json; review changes and record the new inventory');
+  }
+}
+
+export function prepare() {
+  verifySource({ source, manifest: JSON.parse(readFileSync(lockPath, 'utf8')) });
 }
 
 export async function patchBytes() {
   return readFile(join(directory, 'patches/windows-native-launch.patch'));
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) prepare();
+export async function sourceLockBytes() {
+  return readFile(lockPath);
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (process.argv.includes('--record')) {
+    writeFileSync(lockPath, `${JSON.stringify(sourceManifest(), null, 2)}\n`);
+  } else {
+    prepare();
+  }
+}

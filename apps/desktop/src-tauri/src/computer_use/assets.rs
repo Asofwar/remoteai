@@ -1,4 +1,4 @@
-//! Pinned upstream packages; macOS uses the host-attributed direct runtime.
+//! Pinned Remote AI CUA packages; macOS preserves the upstream host-attributed runtime.
 use super::{ComputerError, Result};
 
 #[derive(Clone, Copy)]
@@ -50,11 +50,11 @@ pub(super) fn select(os: &str, architecture: &str) -> Result<Asset> {
         }
         ("windows", "x86_64") => (
             "windows-x86_64",
-            "109ab57e5c0a6e13a73e2ce2daf01b338027366eb1a20c6e0b413a10610bc8e2",
+            "cc395c8a7f2f291b4a4bcadff7dd95f96050f4c70004700b92acc970c7c77f1a",
         ),
         ("windows", "aarch64") => (
             "windows-arm64",
-            "612818fb1ebea702b5934c1d982a815375f25ac0e1b1389249c9f20f21354b70",
+            "b1b83f810ce48c834c08d7bb5a689eb2c4c811901714c13552e8b964d2562151",
         ),
         _ => return Err(ComputerError::Unsupported),
     };

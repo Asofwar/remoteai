@@ -221,14 +221,16 @@ fn every_enabled_home_adopts_the_shared_package() {
 }
 
 #[test]
-fn subsequent_releases_and_missing_packages_trigger_upgrade() {
+fn upstream_037_and_missing_downstream_packages_trigger_upgrade() {
     let Some(fixture) = Fixture::new() else {
         return;
     };
     let mut record = fixture.record();
-    record.version = "0.25.0".into();
+    record.version = "0.37.0".into();
     state::save(fixture.root.path(), &record).unwrap();
     fixture.upgrade(|| fixture.prepare_package()).unwrap();
+    assert_eq!(fixture.record().version, VERSION);
+    assert_ne!(fixture.record().generation, record.generation);
     let generation = fixture.record().generation;
     fs::remove_file(package::executable(fixture.root.path()).unwrap()).unwrap();
     fixture.upgrade(|| fixture.prepare_package()).unwrap();

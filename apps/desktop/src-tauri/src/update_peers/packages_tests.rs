@@ -8,10 +8,32 @@ const CODEX_URL: &str = concat!(
     "codex-package-x86_64-pc-windows-msvc.tar.gz"
 );
 const DRIVER_URL: &str = concat!(
-    "https://github.com/trycua/cua/releases/download/cua-driver-rs-v1.0.0/",
+    "https://github.com/piperhex/remoteai/releases/download/cua-v1.0.0/",
     "cua-driver-rs-1.0.0-windows-x86_64.zip"
 );
 const BYTES: &[u8] = b"verified dependency";
+
+#[test]
+fn downstream_cua_packages_require_exact_remoteai_release_urls() {
+    let version = "0.37.0-remoteai.2";
+    let base = format!("https://github.com/piperhex/remoteai/releases/download/cua-v{version}");
+    for target in [
+        "windows-x86_64.zip",
+        "windows-arm64.zip",
+        "darwin-universal-binary.tar.gz",
+    ] {
+        let url = format!("{base}/cua-driver-rs-{version}-{target}");
+        assert!(Package::computer_use(version, &url, &"a".repeat(64)).is_some());
+        for untrusted in [
+            url.replace("piperhex/remoteai", "trycua/cua"),
+            url.replace("cua-v", "v"),
+            url.replace("cua-v0.37.0", "cua-v0.36.0"),
+            format!("{url}?token=secret"),
+        ] {
+            assert!(Package::computer_use(version, &untrusted, &"a".repeat(64)).is_none());
+        }
+    }
+}
 
 fn package() -> Package {
     Package::codex(

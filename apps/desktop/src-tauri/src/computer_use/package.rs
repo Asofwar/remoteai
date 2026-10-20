@@ -38,7 +38,7 @@ pub(super) fn ensure(app: &tauri::AppHandle, root: &Path) -> Result<()> {
     let asset = platform::asset()?;
     let name = format!("cua-driver-rs-{VERSION}-{}", asset.target);
     let url = format!(
-        "https://github.com/trycua/cua/releases/download/cua-driver-rs-v{VERSION}/{name}{}",
+        "https://github.com/piperhex/remoteai/releases/download/cua-v{VERSION}/{name}{}",
         asset.suffix
     );
     let bytes = shared_download(app, &url, asset.digest)?;

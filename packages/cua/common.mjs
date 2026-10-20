@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 export const directory = dirname(fileURLToPath(import.meta.url));
 export const root = resolve(directory, '../..');
-export const source = join(root, '.codex-tmp/cua-source');
+export const source = join(directory, 'vendor');
 export const workspace = join(source, 'libs/cua-driver/rust');
 export const output = join(root, '.codex-tmp/cua-release');
 export const upstream = JSON.parse(await readFile(join(directory, 'upstream.json'), 'utf8'));

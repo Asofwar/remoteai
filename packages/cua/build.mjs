@@ -3,19 +3,20 @@ import { join } from 'node:path';
 import {
   asset, downloadUpstream, output, run, sha256, tag, upstream, version, workspace,
 } from './common.mjs';
-import { patchBytes, prepare } from './prepare.mjs';
+import { patchBytes, prepare, sourceLockBytes } from './prepare.mjs';
 
 const target = process.argv[2];
 const info = asset(target);
+prepare();
 await mkdir(output, { recursive: true });
 const archive = await downloadUpstream(target);
 const provenance = { version, upstreamVersion: upstream.version, upstreamCommit: upstream.commit,
   patchSha256: sha256(await patchBytes()), sourceCommit: process.env.GITHUB_SHA || 'local-review',
+  sourceInventorySha256: sha256(await sourceLockBytes()),
   target, rust: upstream.rust };
 
 if (target.startsWith('windows-')) {
   if (process.platform !== 'win32') throw new Error('Windows CUA builds require Windows');
-  prepare();
   const cargoArgs = ['build', '--locked', '--release', '--target', info.rustTarget,
     '-p', 'cua-driver', '--bin', 'cua-driver', '-p', 'cua-driver-sdk', '--lib'];
   run('cargo', cargoArgs, { cwd: workspace, env: { ...process.env,

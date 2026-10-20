@@ -14,6 +14,7 @@ import { GOAL_STATUS } from "./goalTypes";
 import extras from "./ComposerExtras.module.less";
 import { AccessPicker } from "./AccessPicker";
 import { ComposerSubmit } from "./ComposerSubmit";
+import { ComposerDictation } from "./ComposerDictation";
 import type { GuiController } from "./controller";
 import type { AccessMode, GuiState } from "./types";
 import { ImageAttachments } from "./ImageAttachments";
@@ -44,10 +45,11 @@ export const Composer = forwardRef<ComposerHandle, {
   const skillInput = useRef<SkillInputHandle>(null);
   const key = state.selected ?? "new";
   const [dialog, setDialog] = useState<"files" | "goal" | null>(null);
+  const [dictating, setDictating] = useState(false);
   const goalMode = useGoalMode(state.selected, Boolean(state.goalBusy));
   const requestSpeed = useGuiRequestSpeed(active);
   const workspaceBusy = Boolean(state.workspaceBusy);
-  const { draft, reading: draftReading, editContent, removeImage, editImage, addImages, paste, pasteKeyDown,
+  const { draft, reading: draftReading, editContent, appendDictation, removeImage, editImage, addImages, paste, pasteKeyDown,
     send: sendDraft, addAttachments, removeAttachment, addQuote, removeQuote, clearQuotes, editQueued }
     = useComposerDraft(key, controller);
   // Creating a goal first creates its conversation; keep the form until the goal request succeeds.
@@ -63,7 +65,7 @@ export const Composer = forwardRef<ComposerHandle, {
   const drop = useComposerDrop({ target: dropTarget, selected: state.selected, active,
     disabled: disabled || draftReading || !!dialog, addAttachments, addImages,
     setProject: controller.setProject, report: controller.report, focus: () => skillInput.current?.focus() });
-  const reading = draftReading || drop.reading;
+  const reading = draftReading || drop.reading || dictating;
   const hasDraft = Boolean(draft.text.trim() || draft.images.length
     || draft.attachments?.length || draft.quotes?.length);
   const suggestion = useNextPromptSuggestion(state, { active,
@@ -151,6 +153,9 @@ export const Composer = forwardRef<ComposerHandle, {
             onRetry={() => controller.refreshModels().catch(controller.report)}
             disabled={state.connection !== "ready" || Boolean(state.modelCatalogLoading)}
             onChange={controller.settings} />
+          <ComposerDictation key={`dictation:${key}`} active={active && !disabled} disabled={disabled || !active}
+            onBusyChange={setDictating}
+            onText={(text) => { flushSync(() => appendDictation(text)); skillInput.current?.focus(); }} />
           <ComposerSubmit state={state} controller={controller}
             goalMode={goalMode.enabled}
             hasDraft={hasDraft} reading={reading || workspaceBusy

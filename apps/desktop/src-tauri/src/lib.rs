@@ -349,6 +349,9 @@ pub fn run() {
             #[cfg(windows)]
             system_tray::quick_menu::quick_menu_activate,
             codex_gui::codex_gui_connect,
+            codex_gui::dictation::codex_gui_dictation_prepare,
+            codex_gui::dictation::codex_gui_dictation_transcribe,
+            codex_gui::dictation::codex_gui_dictation_cancel,
             codex_gui::help_assistant::remote_ai_help_status,
             codex_gui::help_assistant::remote_ai_help_ask,
             codex_gui::help_assistant::control::remote_ai_help_cancel,

@@ -3,6 +3,15 @@ fn dispatch_gui_command(app: AppHandle, command: &str, args: Value) -> Result<Va
     use tauri::Manager;
 
     match command {
+        "codex_gui_dictation_prepare" => serialize(block_on(codex_gui::dictation::codex_gui_dictation_prepare(
+            app.clone(), app.state::<GuiState>(),
+        ))),
+        "codex_gui_dictation_transcribe" => serialize(block_on(codex_gui::dictation::codex_gui_dictation_transcribe(
+            app.clone(), app.state::<GuiState>(), argument(&args, "request")?,
+        ))),
+        "codex_gui_dictation_cancel" => serialize(block_on(codex_gui::dictation::codex_gui_dictation_cancel(
+            app.state::<GuiState>(), argument(&args, "sessionId")?,
+        ))),
         "remote_ai_help_cancel" => serialize(block_on(codex_gui::help_assistant::control::remote_ai_help_cancel(
             app.state::<GuiState>(), argument(&args, "requestId")?,
         ))),

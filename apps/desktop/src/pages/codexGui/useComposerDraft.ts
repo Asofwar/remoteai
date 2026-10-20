@@ -47,6 +47,11 @@ export function useComposerDraft(key: string, controller: GuiController) {
   };
   const editText = (text: string) => update((value) => ({ ...value, text, mentions: [] }));
   const editContent = (content: ComposerText) => update((value) => ({ ...value, ...content }));
+  const appendDictation = (text: string) => {
+    if (!text.trim()) return;
+    update((value) => ({ ...value,
+      text: value.text + (value.text && !/\s$/.test(value.text) ? "\n" : "") + text.trim() }));
+  };
   const editQueued = (id: string) => {
     if (submitting.current) return false;
     const message = controller.queue.take(key, id);
@@ -139,7 +144,7 @@ export function useComposerDraft(key: string, controller: GuiController) {
       }
     } finally { submitting.current = false; }
   };
-  return { draft, reading, editText, editContent, removeImage, editImage, addImages, paste, pasteKeyDown,
+  return { draft, reading, editText, editContent, appendDictation, removeImage, editImage, addImages, paste, pasteKeyDown,
     send, addAttachments, removeAttachment,
     addQuote, removeQuote, clearQuotes, editQueued };
 }

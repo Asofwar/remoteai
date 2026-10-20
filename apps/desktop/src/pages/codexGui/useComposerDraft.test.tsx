@@ -14,6 +14,21 @@ let readers: FileReader[];
 const imageUrl = "data:image/png;base64,iVBORw0KGgo=";
 const file = () => new File(["image"], "截图.png", { type: "image/png" });
 
+it("appends dictation to the latest text while retaining references and mentions", () => {
+  const attachment = { kind: "file" as const, name: "notes", path: "C:/notes.txt" };
+  const mention = { start: 0, end: 6,
+    skill: { name: "check", path: "C:/SKILL.md", description: "", enabled: true } };
+  act(() => {
+    editor.editContent({ text: "$check 已输入", mentions: [mention] });
+    editor.addAttachments([attachment]);
+    editor.appendDictation("  这是转写文字  ");
+  });
+  expect(editor.draft.text).toBe("$check 已输入\n这是转写文字");
+  expect(editor.draft.mentions).toEqual([mention]);
+  expect(editor.draft.attachments).toEqual([attachment]);
+  expect(controller.send).not.toHaveBeenCalled();
+});
+
 it("retains conversation references on failure and restores them from queued messages", async () => {
   const attachment = { kind: "conversation" as const, name: "方案", path: "codex-thread://source" };
   act(() => editor.addAttachments([attachment, attachment]));

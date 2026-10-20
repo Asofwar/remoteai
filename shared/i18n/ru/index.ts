@@ -1,4 +1,5 @@
 import { imageAiRussian } from '../imageAi';
+import { dictationRussian } from '../dictation';
 import { gitMessageRussian } from '../gitMessage';
 import { accountUsageRussian } from '../accountUsage';
 import { aggregateRoutingRussian } from '../aggregateRouting';
@@ -23,6 +24,7 @@ import { cozeRussian } from '../coze';
 import { portForwardingRussian } from '../portForwarding';
 
 export const russian = {
+  ...dictationRussian,
   ...gitMessageRussian,
   ...accountUsageRussian,
   ...aggregateRoutingRussian,

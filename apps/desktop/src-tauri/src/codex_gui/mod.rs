@@ -19,6 +19,7 @@ mod conversation_context;
 mod conversation_tools;
 mod coze_reference;
 pub(crate) mod deletion;
+pub(crate) mod dictation;
 mod downloads;
 pub(crate) mod dropped_files;
 mod error;
@@ -92,6 +93,7 @@ use protocol::{ApprovalReply, GuiEvent, GuiRequest, GuiResponse};
 
 #[derive(Default)]
 pub(crate) struct GuiState {
+    dictation: dictation::Sessions,
     pub(crate) model_discovery: model_discovery::ModelDiscovery,
     workspaces: Arc<workspace_activity::WorkspaceActivity>,
     pub(crate) proxy: crate::local_proxy::gui_runtime::GuiProxyRuntime,

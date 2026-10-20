@@ -25,7 +25,7 @@ macOS 通用包逐字节镜像上游归属宿主进程的运行时，保留原�
 需要 Node.js 20 及以上、Git、tar；Windows 还需要 Rust、Visual C++ Build Tools 和 Spectre 库。
 
 ```powershell
-node --test packages/cua/test
+node packages/cua/test.mjs
 node packages/cua/prepare.mjs
 powershell -File packages/cua/install-spectre.ps1
 node packages/cua/build.mjs windows-x86_64
@@ -43,6 +43,8 @@ Windows 设置 `CUA_NATIVE_LAUNCH_TEST=1` 后，还会分别通过直接启动�
 
 `.github/workflows/cua-release.yml` 在子包相关 PR 中执行构建验证，也支持手动构建。
 确认版本及上游锁定信息、提交并推送后，推送相同版本的 `cua-v*` 标签触发发布。
+也可手动运行工作流并勾选 `publish`：全部验证通过后才创建对应标签及 Release。
+已有标签必须指向本次构建提交，已有 Release 不可覆盖。
 所有平台成功后才发布，并附带 `manifest.json`、`SHA256SUMS` 和开源许可。
 已发布的版本不可覆盖；修改补丁时递增 `remoteai.N`。
 

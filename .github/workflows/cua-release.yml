@@ -2,6 +2,11 @@ name: CUA package
 
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the verified package version
+        type: boolean
+        default: false
   push:
     tags: ["cua-v*"]
   pull_request:
@@ -41,7 +46,7 @@ jobs:
       - name: Verify release version and package scripts
         shell: bash
         run: |
-          node --test packages/cua/test
+          node packages/cua/test.mjs
           node --input-type=module -e '
             import {tag} from "./packages/cua/common.mjs";
             if (process.env.GITHUB_REF_TYPE === "tag" && process.env.GITHUB_REF_NAME !== tag)
@@ -110,7 +115,7 @@ jobs:
 
   release:
     needs: package
-    if: startsWith(github.ref, 'refs/tags/cua-v')
+    if: startsWith(github.ref, 'refs/tags/cua-v') || inputs.publish
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -132,8 +137,12 @@ jobs:
       - name: Publish independent CUA release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$RELEASE_TAG" .codex-tmp/cua-release/* \
-            --verify-tag --title "Remote AI CUA ${RELEASE_TAG#cua-v}" \
+          release_tag=$(node -p '"cua-v" + require("./packages/cua/package.json").version')
+          git fetch --tags origin
+          if git rev-parse --verify "refs/tags/$release_tag" >/dev/null 2>&1; then
+            test "$(git rev-parse "$release_tag^{commit}")" = "$GITHUB_SHA"
+          fi
+          gh release create "$release_tag" .codex-tmp/cua-release/* \
+            --target "$GITHUB_SHA" --title "Remote AI CUA ${release_tag#cua-v}" \
             --notes-file packages/cua/README.md --latest=false

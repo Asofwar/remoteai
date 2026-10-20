@@ -11,6 +11,9 @@ pub(super) struct Record {
     pub home: PathBuf,
     pub enabled: bool,
     pub generation: String,
+    /// Missing on legacy installations, which must adopt the app's pinned driver.
+    #[serde(default)]
+    pub version: String,
 }
 
 pub(super) fn home_id(home: &Path) -> String {
@@ -55,4 +58,29 @@ pub(super) fn save(root: &Path, record: &Record) -> Result<()> {
 
 pub(super) fn allowed(root: &Path, id: &str, generation: &str) -> bool {
     matches!(read(root, id), Ok(Some(record)) if record.enabled && record.generation == generation)
+}
+
+/// Enumerate managed homes independently so one corrupt record cannot block other upgrades.
+pub(super) fn installed_homes(root: &Path) -> Result<Vec<PathBuf>> {
+    let entries = match fs::read_dir(root.join("homes")) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(_) => return Err(ComputerError::Storage),
+    };
+    let mut homes = Vec::new();
+    for entry in entries {
+        let path = entry.map_err(|_| ComputerError::Storage)?.path();
+        if path.extension().is_none_or(|extension| extension != "json") {
+            continue;
+        }
+        let Some(id) = path.file_stem().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        match read(root, id) {
+            Ok(Some(record)) if record.enabled => homes.push(record.home),
+            Ok(_) => {}
+            Err(error) => eprintln!("Could not read computer-use upgrade record: {error}"),
+        }
+    }
+    Ok(homes)
 }

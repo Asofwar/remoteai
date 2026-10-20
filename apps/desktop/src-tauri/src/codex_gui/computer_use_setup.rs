@@ -27,10 +27,13 @@ fn publish(app: &AppHandle, status: SetupStatus) {
 pub(super) async fn prepare(app: AppHandle, home: PathBuf) {
     let worker_app = app.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        crate::computer_use::setup_gui(&worker_app, &home, || {
+        crate::computer_use::setup_gui(&worker_app, &home, |kind| {
             publish(&worker_app, SetupStatus::Installing);
-            #[cfg(windows)]
-            super::unattended_setup::start(worker_app.clone());
+            // CUA upgrades must not trigger installation of a separate desktop service.
+            if matches!(kind, crate::computer_use::SetupKind::FirstInstall) {
+                #[cfg(windows)]
+                super::unattended_setup::start(worker_app.clone());
+            }
         })
     })
     .await;

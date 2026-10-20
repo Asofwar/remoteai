@@ -25,13 +25,25 @@ permissions of the app that launches it, such as a terminal or IDE.
 The managed macOS runtime has no cursor overlay; use screenshots to verify actions.
 
 1. Inspect the available applications with `list_apps` and identify the user's intended application.
-2. Use the driver's snapshot/screenshot tools to inspect the current window. Prefer fresh accessible
-   element references when supported. Use coordinates only from a current screenshot and keep its
-   scale and target window consistent with the action tool.
-3. Perform the authorized action, then inspect the result before proceeding. Refresh references when
-   the UI changes. Never invent element indices, coordinates, app identifiers, or tool parameters.
-4. Prefer background delivery where supported. If foreground interaction is required, account for
+2. Read the intended window with `get_window_state`, using `query`, `max_elements`, or `max_depth`
+   to keep large trees focused. Use `element_token` from this snapshot, in the form `<snapshot_id>:N`.
+   Use coordinates only from a current screenshot with the same scale and target window.
+3. Use `run_steps` with `observe:{}` for known actions. It stops at the first failure and returns
+   the resulting changes. For loops or conditional flows, use `run_script`; its sandbox has no
+   filesystem, network, or process access. Every step still follows the user's authorization.
+   Do not batch past a decision that needs the user's input or replay an uncertain action.
+4. Re-read with `since:"latest"` to get changes, and use the new snapshot ID for subsequent tokens.
+   A screenshot-only read with `include_accessibility_tree:false` preserves current element tokens.
+   For a passive preview, also use `display_only:true`; preview images are not action coordinates.
+   Verify outcomes at meaningful checkpoints and before finishing. `unknown` or `unverifiable`
+   does not establish success. Never invent tokens, coordinates, app identifiers, or tool parameters.
+5. Prefer background delivery where supported. If foreground interaction is required, account for
    focus changes and do not send input to an unverified window.
+
+Use `get_guide` for current guidance on batching, dragging, menus, browsers, or permissions.
+Guides describe the driver; Remote AI's Chrome routing and host permission instructions above
+still apply. Optional visual parsing requires a separately installed extension. Do not install
+extensions or download models merely because an operation reports that they are missing.
 
 Use purpose-built APIs for tasks they support. Use the Chrome browser assistant for connected Chrome
 tabs when available. Keep desktop actions scoped to the user's task and preserve their open work.

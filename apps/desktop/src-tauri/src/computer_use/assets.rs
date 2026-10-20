@@ -43,18 +43,18 @@ pub(super) fn select(os: &str, architecture: &str) -> Result<Asset> {
             return Ok(Asset {
                 target: "darwin-universal",
                 suffix: "-binary.tar.gz",
-                digest: "29984f5363c12d9901588e814a3a519b8015a1255d7a59d658fbf2d3e51f8983",
+                digest: "7d491f67f54be5f3b380ffd85c64b242eaefd05dad6df78012cde227c95aee2a",
                 format: ArchiveFormat::TarGz,
                 files: MACOS_FILES,
             })
         }
         ("windows", "x86_64") => (
             "windows-x86_64",
-            "4ea967b72209aefa8c25126feaedaba662b8bee8cdec01f69b2ff2b19d3781e7",
+            "109ab57e5c0a6e13a73e2ce2daf01b338027366eb1a20c6e0b413a10610bc8e2",
         ),
         ("windows", "aarch64") => (
             "windows-arm64",
-            "3785beda0735bf80904ab373cd745565cbd5e79a675675916fa137a13b5b0914",
+            "612818fb1ebea702b5934c1d982a815375f25ac0e1b1389249c9f20f21354b70",
         ),
         _ => return Err(ComputerError::Unsupported),
     };

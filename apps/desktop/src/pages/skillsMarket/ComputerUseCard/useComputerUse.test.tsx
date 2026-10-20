@@ -10,7 +10,7 @@ const api = vi.hoisted(() => ({ computerUseStatus: vi.fn(), computerUseAction: v
 vi.mock("../../../api/computerUse", () => api);
 
 const installed: ComputerUseStatus = { installed: true, enabled: true, needsRepair: false,
-  version: "0.25.0", supported: true, permissions: null };
+  version: "0.37.0", supported: true, permissions: null };
 let root: Root;
 let hook: ReturnType<typeof useComputerUse>;
 function Harness({ home = "first", active = true }: { home?: string; active?: boolean }) {

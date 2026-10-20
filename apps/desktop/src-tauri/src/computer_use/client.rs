@@ -8,7 +8,7 @@ use tokio::{
 };
 
 const START_TIMEOUT: Duration = Duration::from_secs(10);
-const TOOL_TIMEOUT: Duration = Duration::from_secs(60);
+const TOOL_TIMEOUT: Duration = Duration::from_secs(super::TOOL_TIMEOUT_SECONDS);
 const MAX_MESSAGE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_TOOL_PAGES: usize = 8;
 const TOOLS: &[&str] = &[
@@ -38,6 +38,9 @@ const TOOLS: &[&str] = &[
     "bring_to_front",
     "verify_state",
     "zoom",
+    "get_guide",
+    "run_steps",
+    "run_script",
 ];
 
 struct Installation {
@@ -301,6 +304,10 @@ mod tests {
         let tool = function_tool(&json!({"name": "type_text", "inputSchema": schema})).unwrap();
         assert_eq!(tool["parameters"], schema);
         assert_eq!(tool["strict"], false);
+        for name in ["get_guide", "run_steps", "run_script"] {
+            let tool = function_tool(&json!({"name": name, "inputSchema": schema})).unwrap();
+            assert_eq!(tool["parameters"], schema);
+        }
         for name in [
             "shell",
             "page",
@@ -308,6 +315,7 @@ mod tests {
             "escalate_session",
             "clipboard_read",
             "browser_type",
+            "install_extension",
         ] {
             assert!(function_tool(&json!({"name": name, "inputSchema": schema})).is_none());
         }

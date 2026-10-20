@@ -14,7 +14,7 @@ const supported = ['win32', 'darwin'].includes(process.platform) && ['x64', 'arm
 const executable = path.resolve('apps/desktop/src-tauri/target/debug', process.platform === 'win32' ? 'csw.exe' : 'csw');
 const source = process.env.CSW_CUA_DRIVER_DIRECTORY;
 const codex = process.env.CSW_CUA_CODEX_BINARY;
-const version = '0.25.0';
+const version = '0.37.0';
 const timeoutMs = 30000;
 const cleanupOptions = { recursive: true, force: true, maxRetries: 10, retryDelay: 100 };
 const target = process.platform === 'darwin' ? 'darwin-universal'
@@ -52,14 +52,15 @@ async function fixture(root, name) {
   await save();
   await fs.writeFile(path.join(home, 'config.toml'),
     `[mcp_servers.codex_switch_computer_use]\ncommand = ${JSON.stringify(executable)}\n`
-    + `args = [${JSON.stringify(argument)}]\nenabled = true\nstartup_timeout_sec = 30\ntool_timeout_sec = 120\n`
+    + `args = [${JSON.stringify(argument)}]\nenabled = true\nstartup_timeout_sec = 30\ntool_timeout_sec = 150\n`
     + `[mcp_servers.codex_switch_computer_use.env]\nCSW_COMPUTER_USE_TEST_ROOT = ${JSON.stringify(root)}\n`);
   return { record, save, argument };
 }
 
 function start(root, argument) {
   const child = spawn(executable, [argument], { windowsHide: true,
-    env: { ...process.env, CSW_COMPUTER_USE_TEST_ROOT: root }, stdio: ['pipe', 'pipe', 'pipe'] });
+    env: { ...process.env, CSW_COMPUTER_USE_TEST_ROOT: root, CUA_DRIVER_RS_HOME: path.join(root, 'runtime') },
+    stdio: ['pipe', 'pipe', 'pipe'] });
   child.stderr.on('data', () => {}); // Driver diagnostics stay out of protocol assertions and user screen data.
   return child;
 }
@@ -69,6 +70,7 @@ async function initialize(child) {
   const reply = await call('initialize', { protocolVersion: '2024-11-05', capabilities: {},
     clientInfo: { name: 'codex-switch-verification', version: '1.0.0' } });
   assert.ok(reply.result?.serverInfo);
+  assert.equal(reply.result.serverInfo.version, version);
   child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
   return call;
 }
@@ -109,9 +111,23 @@ test('real CUA MCP discovers tools, returns images and revokes only the selected
       if (process.platform === 'darwin') {
         assert.ok(tools.some(tool => tool.name === 'check_permissions'));
       }
-      for (const name of ['list_apps', 'get_window_state', 'click', 'type_text', 'get_desktop_state']) {
+      for (const name of ['list_apps', 'get_window_state', 'click', 'type_text', 'get_desktop_state',
+        'run_steps', 'run_script', 'get_guide']) {
         assert.ok(tools.some(tool => tool.name === name), `Missing ${name}`);
       }
+      const windowSchema = tools.find(tool => tool.name === 'get_window_state').inputSchema;
+      assert.ok(windowSchema.properties.since);
+      assert.ok(windowSchema.properties.display_only);
+      const clickSchema = tools.find(tool => tool.name === 'click').inputSchema;
+      assert.ok(clickSchema.properties.element_token);
+      const guide = await firstCall('tools/call', { name: 'get_guide', arguments: { topic: 'batching' } });
+      assert.notEqual(guide.result?.isError, true);
+      assert.ok(guide.result?.content.some(part => part.type === 'text' && part.text.includes('run_steps')));
+      const script = await firstCall('tools/call', {
+        name: 'run_script', arguments: { script: 'return { answer: 6 * 7 };' },
+      });
+      assert.notEqual(script.result?.isError, true);
+      assert.match(JSON.stringify(script.result), /42/);
       const apps = await firstCall('tools/call', { name: 'list_apps', arguments: {} });
       assert.notEqual(apps.result?.isError, true);
       assert.ok(apps.result?.content.length);
@@ -145,6 +161,7 @@ test('the GUI-managed Codex CLI loads the computer-use tools from the selected h
         JSON.stringify({ OPENAI_API_KEY: 'fixture-no-model-request' }));
       child = spawn(codex, ['app-server'], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: {
         ...process.env, CODEX_HOME: selected.record.home, CSW_COMPUTER_USE_TEST_ROOT: root,
+        CUA_DRIVER_RS_HOME: path.join(root, 'runtime'),
         CODEX_INTERNAL_ORIGINATOR_OVERRIDE: 'codex-tui',
       } });
       child.stderr.on('data', () => {});

@@ -1,7 +1,7 @@
 use super::{
     package,
     state::{self, Record},
-    ComputerError, Result, HELPER_ARGUMENT, MCP_SERVER,
+    ComputerError, Result, HELPER_ARGUMENT, MCP_SERVER, TOOL_TIMEOUT_SECONDS, VERSION,
 };
 use std::{
     fs,
@@ -24,7 +24,7 @@ fn entry(home: &Path, enabled: bool) -> Result<Table> {
     )]));
     table["enabled"] = value(enabled);
     table["startup_timeout_sec"] = value(30);
-    table["tool_timeout_sec"] = value(120);
+    table["tool_timeout_sec"] = value(TOOL_TIMEOUT_SECONDS as i64);
     Ok(table)
 }
 
@@ -98,6 +98,7 @@ fn install_with(root: &Path, home: &Path, prepare: impl FnOnce() -> Result<()>) 
         home: home.to_owned(),
         enabled: false,
         generation: uuid::Uuid::new_v4().to_string(),
+        version: String::new(),
     };
     state::save(root, &record)?;
     prepare()?;
@@ -106,6 +107,15 @@ fn install_with(root: &Path, home: &Path, prepare: impl FnOnce() -> Result<()>) 
     crate::storage::write_text_atomic(&skill, SKILL).map_err(|_| ComputerError::Storage)?;
     update(home, Some(true))?;
     record.enabled = true;
+    record.version = VERSION.to_owned();
+    state::save(root, &record)
+}
+
+/// Commit an already prepared upgrade while the caller holds the installation guard.
+pub(super) fn upgrade(root: &Path, mut record: Record) -> Result<()> {
+    refresh_installed(root, &record.home)?;
+    record.version = VERSION.to_owned();
+    record.generation = uuid::Uuid::new_v4().to_string();
     state::save(root, &record)
 }
 

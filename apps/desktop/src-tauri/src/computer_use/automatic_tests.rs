@@ -59,6 +59,7 @@ fn existing_enabled_and_disabled_installations_are_preserved() {
                 home: home.clone(),
                 enabled,
                 generation: "existing".into(),
+                version: String::new(),
             },
         )
         .unwrap();

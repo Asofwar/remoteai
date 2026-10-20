@@ -10,14 +10,18 @@ pub(crate) mod permissions;
 mod platform;
 mod session;
 mod state;
+mod upgrade;
 
 use std::path::PathBuf;
 
-pub(crate) use automatic::setup_gui;
+pub(crate) use automatic::{setup_gui, SetupKind};
 pub(crate) use client::ComputerSession;
+pub(crate) use upgrade::start;
 static CHANGES: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-const VERSION: &str = "0.25.0";
+const VERSION: &str = "0.37.0";
+// run_script allows 120 seconds; leave time for dispatch and the final response.
+const TOOL_TIMEOUT_SECONDS: u64 = 150;
 const MCP_SERVER: &str = "codex_switch_computer_use";
 const HELPER_ARGUMENT: &str = "--computer-use-mcp=";
 

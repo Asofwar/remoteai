@@ -261,6 +261,7 @@ pub fn run() {
             remote_command::start(app.handle().clone());
             cloud::start_official_usage_reporting(app.handle().clone());
             if !launch_options.headless {
+                computer_use::start(app.handle().clone());
                 remote_chat::start(app.handle().clone());
                 #[cfg(windows)]
                 desktop_service::start(app.handle());

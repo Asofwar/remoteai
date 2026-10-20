@@ -9,6 +9,7 @@ use std::{
 };
 
 const MAX_ARCHIVE_BYTES: u64 = 64 * 1024 * 1024;
+static DOWNLOAD: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 pub(super) fn directory(root: &Path) -> Result<PathBuf> {
     Ok(root.join(format!("{VERSION}-{}", platform::asset()?.target)))
@@ -28,6 +29,9 @@ pub(super) fn present(root: &Path) -> Result<bool> {
 }
 
 pub(super) fn ensure(app: &tauri::AppHandle, root: &Path) -> Result<()> {
+    // Automatic upgrades release the installation guard while downloading. Serialize
+    // package preparation separately so simultaneous homes share one verified download.
+    let _download = DOWNLOAD.lock().map_err(|_| ComputerError::Storage)?;
     if present(root)? {
         return Ok(());
     }

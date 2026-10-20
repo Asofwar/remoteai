@@ -15,8 +15,9 @@ const LANGUAGE_LABELS: Record<string, string> = {
 };
 
 export function ChatCodeBlock({ text, language = '', label, copyLabel = t("复制代码"), copyText = text,
-  desktop = false }: {
+  desktop = false, wrapMode = 'toggle' }: {
   text: string; language?: string; label?: string; copyLabel?: string; copyText?: string; desktop?: boolean;
+  wrapMode?: 'toggle' | 'always';
 }) {
   useLanguage();
   const environment = useContext(FileEnvironmentContext);
@@ -30,10 +31,12 @@ export function ChatCodeBlock({ text, language = '', label, copyLabel = t("复�
   return <section className="chat-code-block">
     <header><span>{desktop && <Code2 size={16} aria-hidden="true" />}
       {label || (desktop ? LANGUAGE_LABELS[language] : '') || language || t("代码")}</span>
-      {desktop && <button type="button" className="chat-code-wrap" aria-label={t("自动换行")} aria-pressed={wrapped}
+      {desktop && wrapMode === 'toggle' && <button type="button" className="chat-code-wrap"
+        aria-label={t("自动换行")} aria-pressed={wrapped}
         onClick={() => setWrapped(value => !value)}><WrapText size={15} /></button>}
       <ChatCopyButton text={copyText} label={copyLabel} /></header>
-    <pre className={desktop && !wrapped ? 'chat-code-unwrapped' : undefined} tabIndex={0} onScroll={event => {
+    <pre className={desktop && wrapMode === 'toggle' && !wrapped ? 'chat-code-unwrapped' : undefined}
+      tabIndex={0} onScroll={event => {
       const node = event.currentTarget;
       if (more && node.scrollHeight - node.scrollTop - node.clientHeight < 100) {
         setLimit(value => value + PAGE_CHARACTERS);

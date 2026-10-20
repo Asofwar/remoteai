@@ -21,7 +21,7 @@ export function ChatTurnDetails({ turn, panel, onClose }: { turn: Turn; panel: T
       {panel === 'result' && <TaskReviewPanel key={turn.id} turn={turn} />}
       {panel === 'changes' && <ChatDiff files={completedTurnFiles(turn)} />}
       {panel === 'error' && <ChatCodeBlock label={t("报错详情")} copyLabel={t("复制报错详情")}
-        text={error ? requestErrorDetails(error) : turnErrorNotice(turn)} />}
+        text={error ? requestErrorDetails(error) : turnErrorNotice(turn)} wrapMode="always" />}
       {panel === 'plan' && <>
         {turn.planExplanation && <ChatMarkdown text={turn.planExplanation} />}
         {turn.plan?.map((step, index) => {

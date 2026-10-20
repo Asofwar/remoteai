@@ -8,6 +8,7 @@ import type { FileReference } from "./fileReference";
 import { DetailsContext } from "./detailsContext";
 import { FileEnvironmentContext } from './fileEnvironment';
 import { isDownloadOnlyFile } from '../../../../../shared/remote-chat/filePreview';
+import { animateDownloadToNavigation, type DownloadOrigin } from '../../../../web/src/downloads/downloadFeedback';
 
 const FEEDBACK_STYLE = { maxWidth: 400, marginInline: "auto" };
 
@@ -17,6 +18,7 @@ export function useFileMenu(target: FileReference) {
   const environment = useContext(FileEnvironmentContext);
   const api = environment?.actions ?? fileApi;
   const desktop = Boolean(environment) || isTauri();
+  const downloadOnly = Boolean(environment) && isDownloadOnlyFile(target.path, { mediaPreview: true });
   const [open, setOpen] = useState(false);
   const [applications, setApplications] = useState<FileApplication[]>([]);
   const [loading, setLoading] = useState(false);
@@ -27,15 +29,15 @@ export function useFileMenu(target: FileReference) {
     setOpen(false); setApplications([]);
   }, [target.path, threadId, api]);
   useEffect(() => {
-    if (!open || !desktop) return;
+    if (!open || !desktop || downloadOnly) return;
     let cancelled = false;
     setLoading(true); setFailed(false);
     void api.applications().then((value) => { if (!cancelled) setApplications(value); })
       .catch(() => { if (!cancelled) setFailed(true); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [open, desktop, api]);
-  const perform = async (action: FileAction) => {
+  }, [open, desktop, downloadOnly, api]);
+  const perform = async (action: FileAction, origin?: DownloadOrigin) => {
     if (flight.current) return;
     flight.current = true; setBusy(true); setOpen(false);
     try {
@@ -52,6 +54,7 @@ export function useFileMenu(target: FileReference) {
       if (action.type === "saveAs" && result.saved) {
         void message.success({ content: guiText("文件已保存"), style: FEEDBACK_STYLE });
       }
+      if (action.type === "saveAs" && environment) animateDownloadToNavigation(origin);
     } catch (error) {
       // Native errors are intentionally limited to friendly messages at the IPC boundary.
       void message.error({ content: typeof error === "string" ? error : guiText("操作未完成，请稍后重试。"),
@@ -77,6 +80,6 @@ export function useFileMenu(target: FileReference) {
         style: FEEDBACK_STYLE });
     } finally { flight.current = false; setBusy(false); }
   };
-  return { open, setOpen, applications, desktop, remote: Boolean(environment), canPreview: desktop || isHostedWebApp,
-    loading, failed, busy, perform, preview };
+  return { open, setOpen, applications, desktop, remote: Boolean(environment), downloadOnly,
+    canPreview: !downloadOnly && (desktop || isHostedWebApp), loading, failed, busy, perform, preview };
 }

@@ -12,6 +12,74 @@ async function enqueue(page: Page) {
   await dialog.getByRole('button', { name: '关闭', exact: true }).click();
 }
 
+test('collapsed download icon counts active tasks and receives the download animation', async ({ page }) => {
+  await page.goto('/e2e/download-manager-harness.html?collapsed&dark');
+  await page.evaluate(() => { window.desktopDownloads.delay = 1500; });
+  const icon = page.locator('[data-download-target]');
+  const count = icon.getByRole('status');
+  await expect(count).toHaveCount(0);
+  await page.getByRole('button', { name: '文件操作：C:/project/office.msi', exact: true }).click();
+  const download = page.getByRole('menuitem', { name: '下载到本机…', exact: true });
+  await download.click({ trial: true });
+  const origin = (await download.boundingBox())!;
+  const destination = (await icon.boundingBox())!;
+  await download.click();
+  const flight = page.locator('.download-flight');
+  await expect(flight).toBeVisible();
+  const points = await flight.evaluate(element => {
+    const animation = element.getAnimations()[0];
+    animation.pause();
+    animation.currentTime = 260;
+    return (animation.effect as KeyframeEffect).getKeyframes().map(frame => {
+      const matrix = new DOMMatrixReadOnly(String(frame.transform));
+      return { x: matrix.m41 + 16, y: matrix.m42 + 16 };
+    });
+  });
+  expect(points[0].x).toBeCloseTo(origin.x + origin.width / 2, 0);
+  expect(points[0].y).toBeCloseTo(origin.y + origin.height / 2, 0);
+  expect(points.at(-1)!.x).toBeCloseTo(destination.x + destination.width / 2, 0);
+  expect(points.at(-1)!.y).toBeCloseTo(destination.y + destination.height / 2, 0);
+  await expect(count).toHaveText('1');
+  await expect(count).toHaveCSS('color', 'rgb(255, 107, 107)');
+  const badge = (await count.boundingBox())!;
+  expect(badge.y).toBeLessThan(destination.y);
+  expect(badge.x).toBeGreaterThan(destination.x);
+  await page.screenshot({ path: '../../.codex-tmp/desktop-download-flight.png' });
+  await flight.evaluate(element => element.getAnimations()[0].play());
+  await expect(flight).toHaveCount(0);
+  await page.getByRole('button', { name: '切换电脑', exact: true }).click();
+  await enqueue(page);
+  await expect(count).toHaveText('2');
+  await page.getByRole('button', { name: '切换账号' }).click();
+  await expect(count).toHaveCount(0);
+  await page.getByRole('button', { name: '切换账号' }).click();
+  await expect(count).toHaveText('2');
+  await page.getByRole('navigation').getByRole('button', { name: '下载管理', exact: true }).click();
+  const office = page.getByRole('article', { name: 'office.msi' });
+  await office.getByRole('button', { name: '暂停', exact: true }).click();
+  await expect(count).toHaveText('1');
+  await page.evaluate(() => { window.desktopDownloads.delay = 10; });
+  await expect(page.getByRole('article', { name: 'home.msi' })).toContainText('文件已就绪', { timeout: 30_000 });
+  await expect(count).toHaveCount(0);
+});
+
+test('failed additions do not animate and reduced motion still updates the download count', async ({ page }) => {
+  await page.goto('/e2e/download-manager-harness.html');
+  await page.evaluate(() => { window.desktopDownloads.failDownload = true; });
+  const link = page.getByRole('button', { name: '文件操作：C:/project/office.msi', exact: true });
+  await link.click();
+  await page.getByRole('menuitem', { name: '下载到本机…', exact: true }).click();
+  await expect(page.getByText('操作未完成，请稍后重试。')).toBeVisible();
+  await expect(page.locator('.download-flight')).toHaveCount(0);
+  await expect(page.locator('[data-download-target] sup')).toHaveCount(0);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.evaluate(() => { window.desktopDownloads.failDownload = false; });
+  await link.click();
+  await page.getByRole('menuitem', { name: '下载到本机…', exact: true }).click();
+  await expect(page.locator('[data-download-target] sup')).toHaveText('1');
+  await expect(page.locator('.download-flight')).toHaveCount(0);
+});
+
 test('desktop navigation exposes background downloads above diagnostics and saves complete files', async ({ page }) => {
   await page.goto('/e2e/download-manager-harness.html');
   const navigation = page.getByRole('navigation');

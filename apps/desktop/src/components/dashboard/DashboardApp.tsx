@@ -57,6 +57,7 @@ import { TokenUsageDashboard } from "../TokenUsageDashboard";
 import { TotpPage } from "../../pages/TotpPage";
 import { LogDiagnosticsPage, type LogDiagnosticsTab } from "../../pages/LogDiagnosticsPage";
 import { DownloadsPage } from "../../pages/DownloadsPage";
+import { authenticatedDownloadOwner } from "../../downloads/useDesktopDownloads";
 import logDiagnosticsStyles from "../../pages/LogDiagnosticsPage/index.module.less";
 import { CloudLoginModal } from "../modals/CloudLoginModal";
 import { CloudAccountModal } from "../modals/CloudAccountModal";
@@ -1196,6 +1197,7 @@ export function DashboardApp() {
       startDisabledReason={proxyStartDisabledReason} t={t} />
   );
   const sidebarNavigationEnabled = navigationStyle.style === "sidebar";
+  const downloadOwner = authenticatedDownloadOwner(cloud.state);
   const proxySpeedControl = <ExternalProxySpeedButton proxy={providerManager.localProxy}
     busy={providerManager.proxyBusy} onChange={providerManager.setProxyServiceTier} t={t} />;
   const proxyTopbarActions = (
@@ -1205,7 +1207,7 @@ export function DashboardApp() {
   const accountToolbox = (
     <AccountToolbox t={t}
       onSystemPrompts={isAccountManagementPage(page) ? () => setPage("systemPrompts") : undefined}
-      navigation={sidebarNavigationEnabled ? undefined : { page, onPageChange: setPage }}>
+      navigation={sidebarNavigationEnabled ? undefined : { page, onPageChange: setPage, downloadOwner }}>
       {(page === "accounts" || page === "providers") && <>
         {titlebarProxyRunning && <CloudRecycleBin t={t} disabled={!cloud.state.authenticated}
           triggerClassName="refresh-all" />}
@@ -1292,6 +1294,7 @@ export function DashboardApp() {
               <span className="brand-name">Remote AI</span>
             </button>
             <DashboardNavigation collapsed={navigationStyle.sidebarCollapsed}
+              downloadOwner={downloadOwner}
               onPageChange={setPage} page={page} t={t} variant="sidebar" />
           </aside>
         )}

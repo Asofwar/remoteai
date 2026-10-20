@@ -1,4 +1,5 @@
 import { Download, Pause, Play, X } from 'lucide-react';
+import type { MouseEventHandler } from 'react';
 import { t } from '../i18n';
 import './fileDownload.css';
 
@@ -9,7 +10,7 @@ const ACTIONS = {
   save: { label: '保存到设备', Icon: Download },
 };
 interface Props {
-  action: DownloadAction; onAction: () => void; disabled: boolean;
+  action: DownloadAction; onAction: MouseEventHandler<HTMLButtonElement>; disabled: boolean;
   progress?: { percent?: number; status: string; detail: string };
   message?: string; note?: string;
 }

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { Translate } from "../../i18n";
 import { LogDiagnosticsIcon } from "./LogDiagnosticsIcon";
+import { DownloadNavigationIcon } from "../../downloads/DownloadNavigationIcon";
 
 export type DashboardPage =
   | "accounts"
@@ -39,6 +40,7 @@ export function isAccountManagementPage(page: DashboardPage): page is AccountMan
 
 interface DashboardNavigationProps {
   collapsed?: boolean;
+  downloadOwner?: string;
   onPageChange: (page: DashboardPage) => void;
   page: DashboardPage;
   t: Translate;
@@ -72,6 +74,7 @@ export function isToolboxPage(page: DashboardPage) {
 
 export function DashboardNavigation({
   collapsed = false,
+  downloadOwner,
   onPageChange,
   page,
   t,
@@ -88,9 +91,10 @@ export function DashboardNavigation({
     return (
       <button key={item.page} type="button" className={selected ? "selected" : ""}
         aria-current={selected ? "page" : undefined}
-        aria-label={collapsed ? label : undefined} title={collapsed ? label : undefined}
+        aria-label={collapsed || item.page === "downloads" ? label : undefined} title={collapsed ? label : undefined}
         onClick={() => onPageChange(selected ? page : item.page)}>
-        <Icon size={19} /><span>{label}</span>
+        {item.page === "downloads" ? <DownloadNavigationIcon owner={downloadOwner} /> : <Icon size={19} />}
+        <span>{label}</span>
       </button>
     );
   };

@@ -107,12 +107,31 @@ it('keeps forwarded local addresses distinct from remote URLs throughout preview
   expect(environment.resolveWebsite).toHaveBeenCalledTimes(2);
 });
 
-it.each(['pdf', 'audio', 'video'] as const)('uses the same %s preview content', async kind => {
+it.each([
+  ['pdf', 'pdf'], ['audio', 'mp3'], ['audio', 'wav'], ['audio', 'flac'], ['video', 'ogg'], ['video', 'mp4'],
+] as const)('uses the same %s preview content for %s files', async (kind, extension) => {
   vi.mocked(environment.previews.open).mockResolvedValue({ ...file, kind, text: null });
-  await render('[Media](F:/remote/media.pdf)'); await click('Media');
+  await render(`[Media](F:/remote/media.${extension})`); await click('Media');
   const media = host.querySelector(kind === 'pdf' ? 'object' : kind);
   expect(media?.getAttribute(kind === 'pdf' ? 'data' : 'src')).toBe(file.url);
 });
+
+it.each(['msi', 'EXE', 'zip', 'docx', 'BIN'])(
+  'only offers a local download for remote %s files without previewing or discovering applications', async extension => {
+    const path = `F:/remote/release.${extension}`;
+    await render(`[Download](${path})`); await click('Download');
+    const items = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')];
+    expect(items.map(item => item.textContent)).toEqual(['下载到本机…']);
+    expect(document.querySelector('[role="separator"]')).toBeNull();
+    expect(environment.previews.open).not.toHaveBeenCalled();
+    expect(environment.actions.applications).not.toHaveBeenCalled();
+    expect(environment.actions.perform).not.toHaveBeenCalled();
+    await act(async () => items[0].click());
+    expect(environment.actions.perform).toHaveBeenCalledExactlyOnceWith(
+      { path, threadId: 'remote-thread' }, { type: 'saveAs' },
+    );
+  },
+);
 
 it('keeps native file operations out of remote error handling and remote menus', async () => {
   vi.mocked(environment.previews.open).mockRejectedValue(new Error('Disconnected'));

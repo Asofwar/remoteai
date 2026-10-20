@@ -50,7 +50,8 @@ export function PcFilePreviewFixture({ legacy = false }: { legacy?: boolean }) {
     <FileEnvironmentContext.Provider value={environment}><FileThreadContext.Provider value="remote-thread">
       <ChatFileContext.Provider value={files}><ChatImageContext.Provider value={images}>
       <ChatDetailsWorkspace selected="remote-thread" active enabled>
-        <ChatMarkdown text={'[交接文档](F:/remote/docs/guide.md)\n\n[远程网页](http://localhost:3000)'} />
+        <ChatMarkdown text={'[交接文档](F:/remote/docs/guide.md)\n\n[远程网页](http://localhost:3000)'
+          + '\n\n[Remote AI MSI](F:/remote/Remote%20AI.MSI)\n\n[归档](F:/remote/release.zip)'} />
         <output aria-label="文件操作结果">{action}</output>
       </ChatDetailsWorkspace>
       </ChatImageContext.Provider></ChatFileContext.Provider>

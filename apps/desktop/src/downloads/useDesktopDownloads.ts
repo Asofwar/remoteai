@@ -2,9 +2,14 @@ import { useEffect } from 'react';
 import { downloadManager } from '../../../web/src/downloads/manager';
 import type { ChatController } from '../../../../shared/remote-chat/client/controller';
 import type { GuiCloudIdentity, GuiComputer } from '../pages/codexGui/remote/types';
+import type { CloudAuthState } from '../types';
 
 export const desktopDownloadOwner = (identity: GuiCloudIdentity) =>
   JSON.stringify(['desktop', identity.baseUrl, identity.userId]);
+
+export const authenticatedDownloadOwner = (auth: CloudAuthState) =>
+  auth.authenticated && auth.baseUrl && auth.userId
+    ? desktopDownloadOwner({ baseUrl: auth.baseUrl, userId: auth.userId }) : '';
 
 /** Keep transfers attached to their remote connection, independently of the visible page. */
 export function useDesktopDownloads(options: {

@@ -7,7 +7,7 @@ import styles from "./AccountToolbox.module.less";
 
 interface AccountToolboxProps {
   children?: ReactNode;
-  navigation?: { page: DashboardPage; onPageChange: (page: DashboardPage) => void };
+  navigation?: { page: DashboardPage; onPageChange: (page: DashboardPage) => void; downloadOwner?: string };
   onSystemPrompts?: () => void;
   t: Translate;
 }
@@ -31,6 +31,7 @@ export function AccountToolbox({ children, navigation, onSystemPrompts, t }: Acc
             setOpen(false);
           }}>
           {navigation && <DashboardNavigation page={navigation.page} t={t} variant="toolbox"
+            downloadOwner={navigation.downloadOwner}
             onPageChange={(page) => {
               navigation.onPageChange(page);
               setOpen(false);

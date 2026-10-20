@@ -1,4 +1,4 @@
-import { useRef, useState, useSyncExternalStore } from 'react';
+import { useRef, useState, useSyncExternalStore, type MouseEvent } from 'react';
 import { useFileDownload } from '../../../../shared/remote-chat/useFileDownload';
 import { previewProgressText } from '../../../../shared/chat/previewProgress';
 import { t } from '../i18n';
@@ -7,6 +7,7 @@ import { browserDownloadTarget, prepareBrowserDownload } from '../chat/fileDownl
 import { downloadManager } from './manager';
 import type { DownloadConnection } from './types';
 import { FileDownloadControl } from './FileDownloadControl';
+import { animateDownloadToNavigation, downloadOrigin } from './downloadFeedback';
 
 const DOWNLOAD_STATUS = { queued: '等待下载', preparing: '准备并校验文件', downloading: '下载中',
   verifying: '正在校验', ready: '文件已就绪', saving: '正在保存', paused: '已暂停', completed: '已完成', failed: '下载失败' };
@@ -33,8 +34,9 @@ function ManagedDownload({ path, context, connection }: Props & { connection: Do
   const progress = task && previewProgressText({ received: task.received, status: task.status,
     total: task.status === 'queued' || task.status === 'preparing' ? undefined : task.size,
     bytesPerSecond: task.status === 'downloading' ? task.bytesPerSecond : undefined });
-  const run = async () => {
+  const run = async (event: MouseEvent<HTMLButtonElement>) => {
     if (pending.current) return;
+    const origin = downloadOrigin(event);
     pending.current = true; setBusy(true); setError('');
     try {
       if (completed && task) await downloadManager.save(task.id);
@@ -43,6 +45,7 @@ function ManagedDownload({ path, context, connection }: Props & { connection: Do
       else if (context.threadId) await downloadManager.enqueue({ owner: connection.owner,
         deviceId: connection.deviceId, deviceName: connection.deviceName, scope: 'project',
         threadId: context.threadId, path });
+      if (!completed && !running) animateDownloadToNavigation(origin);
     } catch { setError('操作未完成，请检查浏览器存储空间后重试。'); }
     finally { pending.current = false; setBusy(false); }
   };
@@ -50,7 +53,7 @@ function ManagedDownload({ path, context, connection }: Props & { connection: Do
   if (completed || task?.status === 'saving') action = 'save';
   else if (running) action = 'pause';
   else if (task) action = 'resume';
-  return <FileDownloadControl action={action} onAction={() => { void run(); }}
+  return <FileDownloadControl action={action} onAction={event => { void run(event); }}
     disabled={busy || task?.status === 'saving' || (!running && !completed && (!context.ready || !context.threadId))}
     progress={task && progress ? { percent: progress.percent, status: DOWNLOAD_STATUS[task.status],
       detail: `${progress.amount}${task.status === 'downloading' && task.bytesPerSecond ? ` · ${progress.speed}` : ''}`,

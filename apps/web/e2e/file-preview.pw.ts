@@ -10,6 +10,33 @@ async function clipboard(page: Page) {
   return page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, '\n'));
 }
 
+test('unsupported remote files only offer a local download on left and right click', async ({ page }, info) => {
+  await page.goto('e2e/file-preview-harness.html?pc');
+  for (const path of ['F:/remote/Remote AI.MSI', 'F:/remote/release.zip']) {
+    const link = page.getByRole('button', { name: `文件操作：${path}`, exact: true });
+    for (const button of ['left', 'right'] as const) {
+      await link.click({ button });
+      const menu = page.getByRole('menu');
+      await expect(menu.getByRole('menuitem')).toHaveText(['下载到本机…']);
+      await expect(menu.getByRole('separator')).toHaveCount(0);
+      await expect(page.locator('aside[data-details-panel]')).toHaveCount(0);
+      const bounds = (await menu.boundingBox())!;
+      expect(bounds.width).toBeLessThanOrEqual(400);
+      expect(bounds.x).toBeGreaterThanOrEqual(0);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+      await page.keyboard.press('Escape');
+      await expect(menu).toHaveCount(0);
+    }
+    await link.click();
+    await expect(page.getByRole('menu')).toBeVisible();
+    await screenshot(page, info, `download-only-${path.split('.').at(-1)}`);
+    await page.getByRole('menuitem', { name: '下载到本机…', exact: true }).click();
+    await expect(page.getByLabel('文件操作结果')).toHaveText(JSON.stringify({
+      computer: 'remote-PC', path, threadId: 'remote-thread', action: 'saveAs',
+    }));
+  }
+});
+
 test('remote files preview on left click across peer versions; right click opens actions', async ({ page }, info) => {
   await page.goto('e2e/file-preview-harness.html?pc&legacy');
   const link = page.getByRole('button', { name: '预览文件：F:/remote/docs/guide.md', exact: true });

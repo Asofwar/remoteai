@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { ArrowLeft, ChevronRight, Download, Folder } from 'lucide-react';
 import type { DownloadBrowse } from '../../../../shared/remote-chat/downloads';
 import type { ProjectFile, ProjectFilesResponse } from '../../../../shared/remote-chat/projectFiles';
 import { t } from '../i18n';
 import { downloadManager } from './manager';
 import type { DownloadConnection } from './types';
+import { animateDownloadToNavigation, downloadOrigin } from './downloadFeedback';
 
 export function DownloadBrowser({ connection, scope, back }: {
   connection: DownloadConnection; scope: DownloadBrowse['scope']; back: () => void;
@@ -28,14 +29,16 @@ export function DownloadBrowser({ connection, scope, back }: {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [client, ready, scope, directory, threadId, cwd, revision]);
-  const choose = async (file: ProjectFile) => {
+  const choose = async (file: ProjectFile, event: MouseEvent<HTMLButtonElement>) => {
     if (file.directory) { setDirectories(current => [...current, file.path]); return; }
     if (pending.current) return;
+    const origin = downloadOrigin(event);
     pending.current = true; setNotice(''); setError('');
     try {
       await downloadManager.enqueue({ owner: connection.owner, deviceId: connection.deviceId,
         deviceName: connection.deviceName, scope, threadId, cwd, path: file.path });
       setNotice('已加入下载管理。');
+      animateDownloadToNavigation(origin);
     } catch { setError('暂时无法下载，请检查浏览器存储空间后重试。'); }
     finally { pending.current = false; }
   };
@@ -55,7 +58,7 @@ export function DownloadBrowser({ connection, scope, back }: {
       {loading && <p role="status">{t('正在读取文件夹…')}</p>}
       {!loading && ready && !error && result?.entries.length === 0 && <p>{t('此文件夹没有文件。')}</p>}
       {result?.entries.map(file => <button type="button" className="download-file" key={file.path}
-        disabled={!ready} onClick={() => { void choose(file); }}
+        disabled={!ready} onClick={event => { void choose(file, event); }}
         aria-label={t(file.directory ? '打开文件夹：{name}' : '下载：{name}', { name: file.name })}>
         {file.directory ? <Folder size={21} /> : <Download size={21} />}<span>{file.name}</span>
         <ChevronRight size={17} /></button>)}

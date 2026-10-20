@@ -4,7 +4,7 @@ import { Modal, Segmented } from 'antd';
 import { DownloadCard } from '../../../../web/src/downloads/DownloadCard';
 import { downloadManager } from '../../../../web/src/downloads/manager';
 import { useDownloadTasks } from '../../../../web/src/downloads/useDownloadTasks';
-import { desktopDownloadOwner } from '../../downloads/useDesktopDownloads';
+import { authenticatedDownloadOwner } from '../../downloads/useDesktopDownloads';
 import { openDesktopDownload } from '../../downloads/openDownload';
 import { LOCAL_DOWNLOAD_OWNER, useLocalGitDownloads } from '../../downloads/localGitDownloads';
 import { guiText } from '../../i18n/guiText';
@@ -29,8 +29,7 @@ function confirmRemove() {
 export function DownloadsPage({ auth }: { auth: CloudAuthState }) {
   useGuiLanguage();
   useLocalGitDownloads();
-  const owner = auth.authenticated && auth.baseUrl && auth.userId
-    ? desktopDownloadOwner({ baseUrl: auth.baseUrl, userId: auth.userId }) : '';
+  const owner = authenticatedDownloadOwner(auth);
   const { tasks, busy, error, run } = useDownloadTasks(owner, {
     confirmRemove, openDownload: openDesktopDownload, additionalOwner: LOCAL_DOWNLOAD_OWNER });
   const [filter, setFilter] = useState<Filter>('all');

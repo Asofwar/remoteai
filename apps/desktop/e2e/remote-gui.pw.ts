@@ -82,12 +82,14 @@ test('remote chat sidebar resizes and restores its width after hiding and mobile
     await ports.click();
     const forwardingPanel = page.getByRole('region', { name: '端口映射设置' });
     await expect(forwardingPanel).toBeInViewport();
+    await forwardingPanel.getByRole('button', { name: '新建映射', exact: true }).click();
     const remotePort = forwardingPanel.getByRole('spinbutton', { name: '远程端口' });
     await expect(remotePort).toBeEnabled();
     await remotePort.click();
     await expect(remotePort).toBeFocused();
     await page.screenshot({ path: '../../.codex-tmp/port-forwarding-workspace.png', animations: 'disabled' });
-    await ports.click();
+    await remotePort.press('Escape');
+    await expect(forwardingPanel).toBeHidden();
     await page.getByRole('button', { name: 'Window layout', exact: true }).click();
     await checkRemoteWindowLayout(page);
     await checkThreadSidebarResize(page);

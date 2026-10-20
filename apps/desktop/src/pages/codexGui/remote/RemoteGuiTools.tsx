@@ -29,7 +29,8 @@ export function RemoteGuiTools({ controller, state, active, terminal }: {
   };
   return <div className="gui-remote-tools">
     <Tooltip title={guiText("重新连接远程 Codex")} styles={{ root: { maxWidth: 400 } }}>
-      <Button type="text" icon={<RefreshCw size={16} />} aria-label={guiText("重新连接远程 Codex")}
+      <Button type="text" className="gui-remote-secondary-tool"
+        icon={<RefreshCw size={16} />} aria-label={guiText("重新连接远程 Codex")}
         loading={reconnecting || state.connecting} disabled={running || installer.installing}
         onClick={() => { void reconnect(); }} />
     </Tooltip>
@@ -37,7 +38,8 @@ export function RemoteGuiTools({ controller, state, active, terminal }: {
       <Installer installer={installer} compact remote running={running} disabled={!connected} />
       {installer.error && <Alert type="error" message={installer.error} />}
     </>}>
-      <Button type="text" icon={<CliUpdateIcon version={installer.version} release={installer.release} />}
+      <Button type="text" className="gui-remote-secondary-tool"
+        icon={<CliUpdateIcon version={installer.version} release={installer.release} />}
         aria-label={guiText("远程 Codex CLI 更新")} />
     </Popover>
     <Tooltip title={terminalLabel} styles={{ root: { maxWidth: 400 } }}>

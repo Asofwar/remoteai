@@ -29,3 +29,13 @@
   border-radius: 50%;
   background: #22c55e;
 }
+
+@container chat-message-panel (max-width: 700px) {
+  .launcher {
+    position: relative;
+    width: 26px;
+    padding: 0;
+    > span { display: none; }
+    > .status { display: block; position: absolute; top: 1px; right: 1px; }
+  }
+}

@@ -88,10 +88,24 @@
   }
 }
 .chat-drawer .gui-remote-sidebar { width: 100%; }
+@container chat-message-panel (max-width: 700px) {
+  .gui-remote-workspace.chat-page {
+    .chat-header { height: 28px; min-height: 28px; padding: 0 8px; gap: 4px;
+      > .chat-grow { flex: 1 0 auto; gap: 4px; }
+      h2 { display: none; }
+      .ant-btn { flex-shrink: 0; width: 26px; min-width: 26px; height: 26px; padding: 0; }
+    }
+    .chat-composer-dock, .gui-remote-project { padding-inline: 10px; }
+    .chat-message-content { padding-inline: 14px; }
+  }
+}
 @media (max-width: 860px) {
   .gui-remote-workspace.chat-page {
     .chat-message-content { padding: 18px 14px; }
     .chat-composer-dock, .gui-remote-project { padding-inline: 10px; }
     .chat-composer-dock { padding-bottom: 10px; }
   }
+}
+@container chat-message-panel (max-width: 400px) {
+  .gui-remote-workspace .gui-remote-secondary-tool { display: none; }
 }

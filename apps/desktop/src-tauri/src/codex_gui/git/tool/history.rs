@@ -1,7 +1,11 @@
 use super::super::command;
 use super::{changes, commit_files, validate_path, GitError, Result};
 use serde::Serialize;
-use std::{io::Read, path::Path, process::Stdio};
+use std::{
+    io::Read,
+    path::Path,
+    process::{Command, Stdio},
+};
 
 const DIFF_BYTES: u64 = 256 * 1024;
 const HISTORY_BYTES: u64 = 1024 * 1024;
@@ -29,9 +33,17 @@ pub(super) struct Commit {
 }
 
 pub(super) fn bounded(root: &Path, args: &[&str], limit: u64) -> Result<(Vec<u8>, bool)> {
-    let mut child = command(root)
-        .args(args)
-        .env("GIT_LITERAL_PATHSPECS", "1")
+    let mut git = command(root);
+    git.args(args).env("GIT_LITERAL_PATHSPECS", "1");
+    bounded_command(git, limit, args.contains(&"--no-index"))
+}
+
+pub(super) fn bounded_command(
+    mut command: Command,
+    limit: u64,
+    no_index: bool,
+) -> Result<(Vec<u8>, bool)> {
+    let mut child = command
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .stdin(Stdio::null())
@@ -53,7 +65,7 @@ pub(super) fn bounded(root: &Path, args: &[&str], limit: u64) -> Result<(Vec<u8>
     }
     let status = child.wait().map_err(|_| GitError::Operation)?;
     read.map_err(|_| GitError::Operation)?;
-    let difference = args.contains(&"--no-index") && status.code() == Some(1);
+    let difference = no_index && status.code() == Some(1);
     if !truncated && !status.success() && !difference {
         return Err(GitError::Operation);
     }

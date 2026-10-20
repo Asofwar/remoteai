@@ -11,6 +11,7 @@ type SyncGitClient = { [Key in keyof GitClient]:
   (...args: Parameters<GitClient[Key]>) => Awaited<ReturnType<GitClient[Key]>> };
 
 export function createGitFixture(): SyncGitClient {
+  let settings = { autoMessage: false, revision: 0 };
   let branch: string | null = 'main';
   let head = hash(5);
   let files: GitChanges['files'] = [
@@ -30,6 +31,11 @@ export function createGitFixture(): SyncGitClient {
     { path: 'docs/工具说明.md', originalPath: 'docs/旧说明.md', status: 'R' },
   ]]]);
   return {
+    settings: autoMessage => {
+      if (autoMessage !== undefined) settings = { autoMessage, revision: settings.revision + 1 };
+      return { ...settings };
+    },
+    generateMessage: input => ({ message: `feat: 更新 ${input.files.map(file => file.path).join('、')}` }),
     revision: input => {
       head = input.commit;
       if (input.action === 'checkout') branch = null;
@@ -77,6 +83,8 @@ export function createGitFixture(): SyncGitClient {
 export function createAsyncGitFixture(): GitClient {
   const git = createGitFixture();
   return { repository: async cwd => git.repository(cwd), action: async input => git.action(input),
+    settings: async autoMessage => git.settings(autoMessage),
+    generateMessage: async input => git.generateMessage(input),
     revision: async input => git.revision(input),
     changes: async cwd => git.changes(cwd), history: async (cwd, skip) => git.history(cwd, skip),
     commitFiles: async (cwd, commit) => git.commitFiles(cwd, commit),

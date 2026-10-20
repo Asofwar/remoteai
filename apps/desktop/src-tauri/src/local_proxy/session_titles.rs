@@ -16,6 +16,7 @@ pub(super) fn from_request(headers: &[(String, String)]) -> Option<&'static str>
         Some(TITLE_GENERATION_REQUEST_PURPOSE) => Some(TITLE_GENERATION_SESSION_TITLE),
         Some(PREDICTION_REQUEST_PURPOSE) => Some("下一句话建议"),
         Some(HELP_REQUEST_PURPOSE) => Some("Remote AI 问题解答"),
+        Some(crate::codex_config::GIT_MESSAGE_REQUEST_PURPOSE) => Some("Git 提交说明"),
         _ => None,
     }
 }

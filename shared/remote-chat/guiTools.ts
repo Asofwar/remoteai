@@ -7,7 +7,7 @@ import type { GitRequest, GitStatus } from './gitWorkspace';
 import { PROJECT_LIST_OPERATION, PROJECT_SELECT_OPERATION, type ProjectSelection } from './projects';
 import type { ChatProject } from './client/types';
 import type { GitActionRequest, GitChanges, GitCommitFile, GitCommitRequest, GitDiff, GitHistory,
-  GitFileActionRequest, GitRepository, GitRevisionRequest } from './gitTypes';
+  GitFileActionRequest, GitRepository, GitRevisionRequest, GitMessageRequest, GitSettings } from './gitTypes';
 
 export interface CliRelease { version: string; size: number; ready?: boolean }
 export interface CliProgress { downloaded: number; total: number; phase: 'downloading' | 'installing' }
@@ -25,6 +25,8 @@ export const GUI_TOOL_OPERATIONS = new Set([
   'guiTerminalLink',
   'guiGitChanges', 'guiGitDiff', 'guiGitHistory', 'guiGitCommit', 'guiGitCommitFiles',
   'guiGitRepository', 'guiGitAction', 'guiGitFileAction', 'guiGitWorkspace', 'guiGitRevision',
+  'guiGitGenerateMessage',
+  'guiGitSettings',
   'guiTaskReview', 'guiTaskRestore',
 ]);
 
@@ -47,6 +49,9 @@ export function createGuiToolsClient(request: <T>(body: object) => Promise<T>,
     reconnect: () => request<void>({ operation: 'guiReconnect' }),
     workspace: (input: GitRequest) => request<GitStatus>({ operation: 'guiGitWorkspace', request: input }),
     git: {
+      settings: (autoMessage?: boolean) => request<GitSettings>({ operation: 'guiGitSettings', autoMessage }),
+      generateMessage: (input: GitMessageRequest) =>
+        request<{ message: string }>({ ...input, operation: 'guiGitGenerateMessage' }),
       revision: (input: GitRevisionRequest) => request<void>({ ...input, operation: 'guiGitRevision' }),
       repository: (cwd: string) => request<GitRepository>({ operation: 'guiGitRepository', cwd }),
       action: (input: GitActionRequest) => request<void>({ ...input, operation: 'guiGitAction' }),

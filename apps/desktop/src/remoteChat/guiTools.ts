@@ -41,6 +41,9 @@ export async function guiToolRequest(body: Record<string, unknown>) {
     case PROJECT_LIST_OPERATION: return readRemoteProjects();
     case PROJECT_SELECT_OPERATION: return selectRemoteProject(body);
     case 'guiGitWorkspace': return workspaceRequest(body.request);
+    case 'guiGitSettings': return invoke('codex_gui_git_tool', { request: { ...body, operation: 'settings' } });
+    case 'guiGitGenerateMessage':
+      return invoke('codex_gui_git_tool', { request: { ...body, operation: 'generateMessage' } });
     case 'guiTaskReview': return invoke('codex_gui_git_tool', { request: { ...body, operation: 'review' } });
     case 'guiTaskRestore': {
       if (body.preview !== true && (typeof body.expectedVersion !== 'string'

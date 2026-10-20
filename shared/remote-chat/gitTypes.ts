@@ -13,6 +13,10 @@ export interface GitHistory { commits: GitCommit[]; hasMore: boolean }
 export interface GitCommitRequest {
   cwd: string; head: string | null; message: string; files: { path: string; version: string }[];
 }
+export interface GitMessageRequest extends Omit<GitCommitRequest, 'message'> {
+  language: 'zh' | 'en' | 'ru';
+}
+export interface GitSettings { autoMessage: boolean; revision: number }
 export type GitFileAction = 'rollback' | 'delete';
 export interface GitFileActionRequest extends Omit<GitCommitRequest, 'message'> {
   action: GitFileAction;
@@ -39,6 +43,8 @@ export interface GitRevisionRequest {
 }
 export interface GitRevisionPrompt extends Omit<GitRevisionRequest, 'cwd' | 'mode'> { subject: string }
 export interface GitClient {
+  settings: (autoMessage?: boolean) => Promise<GitSettings>;
+  generateMessage: (request: GitMessageRequest) => Promise<{ message: string }>;
   revision: (request: GitRevisionRequest) => Promise<void>;
   repository: (cwd: string) => Promise<GitRepository>;
   action: (request: GitActionRequest) => Promise<void>;

@@ -11,6 +11,7 @@ pub(crate) const LOCAL_PROXY_REQUEST_PURPOSE_HEADER: &str = "x-codex-switch-requ
 pub(crate) const TITLE_GENERATION_REQUEST_PURPOSE: &str = "title-generation";
 pub(crate) const PREDICTION_REQUEST_PURPOSE: &str = "next-prompt-suggestion";
 pub(crate) const HELP_REQUEST_PURPOSE: &str = "remote-ai-help";
+pub(crate) const GIT_MESSAGE_REQUEST_PURPOSE: &str = "git-commit-message";
 pub(crate) const HELP_ACCOUNT_REVISION_HEADER: &str = "x-remote-ai-help-account-revision";
 pub(crate) const LOCAL_PROXY_PROVIDER_ID: &str = "codex-switch-local";
 

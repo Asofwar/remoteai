@@ -17,6 +17,11 @@ mod file_actions;
 #[cfg(test)]
 mod file_actions_tests;
 mod history;
+mod message;
+mod message_context;
+#[cfg(test)]
+mod message_tests;
+mod message_transport;
 pub(crate) mod patch;
 #[cfg(test)]
 mod patch_tests;
@@ -24,6 +29,7 @@ mod review;
 mod revision;
 #[cfg(test)]
 mod revision_tests;
+mod settings;
 #[cfg(test)]
 mod tests;
 
@@ -34,6 +40,13 @@ mod tests;
     rename_all_fields = "camelCase"
 )]
 pub(crate) enum Request {
+    Settings {
+        auto_message: Option<bool>,
+    },
+    GenerateMessage {
+        #[serde(flatten)]
+        request: message::Request,
+    },
     Review {
         cwd: String,
         #[serde(flatten)]
@@ -91,6 +104,8 @@ pub(crate) struct SelectedFile {
 #[derive(Serialize)]
 #[serde(untagged)]
 pub(crate) enum Response {
+    Settings(settings::Settings),
+    Message { message: String },
     Review(review::Response),
     Repository(branches::Repository),
     Done(()),
@@ -103,6 +118,8 @@ pub(crate) enum Response {
 
 fn execute(request: Request) -> Result<Response> {
     let cwd = match &request {
+        Request::Settings { .. } => return Err(GitError::Operation),
+        Request::GenerateMessage { request } => &request.cwd,
         Request::Review { cwd, .. }
         | Request::Changes { cwd }
         | Request::Repository { cwd }
@@ -116,7 +133,9 @@ fn execute(request: Request) -> Result<Response> {
     };
     let root = repository(&directory(cwd)?)?;
     match request {
-        Request::Review { .. } => Err(GitError::Operation),
+        Request::Review { .. } | Request::GenerateMessage { .. } | Request::Settings { .. } => {
+            Err(GitError::Operation)
+        }
         Request::Repository { .. } => branches::read(&root).map(Response::Repository),
         Request::Action { request, .. } => actions::execute(&root, &request).map(Response::Done),
         Request::Revision { request, .. } => revision::execute(&root, &request).map(Response::Done),
@@ -167,6 +186,12 @@ pub(crate) async fn codex_gui_git_tool(
     state: State<'_, GitState>,
     request: Request,
 ) -> std::result::Result<Response, String> {
+    if let Request::GenerateMessage { request } = request {
+        return message::generate(app, state.0.clone(), request)
+            .await
+            .map(|message| Response::Message { message })
+            .map_err(|error| error.to_string());
+    }
     let workspace = match &request {
         Request::Action { cwd, request } if request.changes_worktree() => {
             Some(super::workspace_change(&app, cwd.clone()).await?)
@@ -193,6 +218,10 @@ pub(crate) async fn codex_gui_git_tool(
             None
         };
         match request {
+            Request::Settings { auto_message } => {
+                let data = app.path().app_data_dir().map_err(|_| GitError::Settings)?;
+                settings::access(&data, auto_message).map(Response::Settings)
+            }
             Request::Review { cwd, request } => {
                 let data = app
                     .path()

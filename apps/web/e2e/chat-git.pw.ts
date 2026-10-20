@@ -3,6 +3,40 @@ import { connect, fixtureUrl, login, navigate, openChatList, screenshot, state }
 import { checkInternalGitDrawer } from '../../desktop/e2e/git-drawer-checks';
 import { readFile } from 'node:fs/promises';
 
+test('AI commit settings sync across remote viewers and generate only selected files', async ({ page, browser, request }) => {
+  await request.post(`${fixtureUrl}/test/reset`);
+  const otherContext = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'zh-CN' });
+  const other = await otherContext.newPage();
+  try {
+    for (const viewer of [page, other]) {
+      await login(viewer); await connect(viewer); await openChatList(viewer);
+      await viewer.getByRole('button', { name: '移动端聊天体验', exact: true }).click();
+      await viewer.getByRole('button', { name: '打开工具', exact: true }).click();
+      await viewer.getByRole('button', { name: 'Git', exact: true }).click();
+    }
+    const auto = page.getByRole('checkbox', { name: '自动生成提交说明', exact: true });
+    const remoteAuto = other.getByRole('checkbox', { name: '自动生成提交说明', exact: true });
+    await auto.check();
+    await expect(remoteAuto).toBeChecked();
+    await expect(other.getByRole('textbox', { name: '提交说明', exact: true })).toBeDisabled();
+    await remoteAuto.uncheck();
+    await expect(auto).not.toBeChecked();
+    await page.getByRole('checkbox', { name: '选择 src/app.ts', exact: true }).check();
+    await page.getByRole('button', { name: 'AI 生成', exact: true }).click();
+    await expect(page.getByRole('textbox', { name: '提交说明', exact: true })).toHaveValue('feat: 更新 src/app.ts');
+    await auto.check();
+    await page.getByRole('button', { name: '提交并推送', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Git', exact: true }).getByRole('status'))
+      .toHaveText('提交并推送完成');
+    const operations = (await state(request)).operations;
+    const generations = operations.filter(operation => operation.operation === 'guiGitGenerateMessage');
+    expect(generations).toHaveLength(2);
+    for (const generation of generations) expect(generation.files).toEqual([{ path: 'src/app.ts', version: 'app-v1' }]);
+    expect(operations.find(operation => operation.operation === 'guiGitCommit')?.message).toBe('feat: 更新 src/app.ts');
+    await expect(other.getByRole('button', { name: '查看 README.md', exact: true })).toBeVisible();
+  } finally { await otherContext.close(); }
+});
+
 test('remote commit context actions and patches reach this browser download manager', async ({ page, request }, info) => {
   await page.addInitScript(() => { Object.defineProperty(window, 'showSaveFilePicker', { value: undefined }); });
   await request.post(`${fixtureUrl}/test/reset`);

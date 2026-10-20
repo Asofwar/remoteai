@@ -136,7 +136,12 @@
 .chat-diff-line.remove { background: var(--app-canvas, #fce8e6); }
 .chat-output-paging { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--app-muted, #74847b); }
 .chat-tool-text { display: flex; flex-direction: column; flex-shrink: 0; gap: 8px; min-width: 0; }
-.chat-tool-text-actions { display: flex; justify-content: flex-end; }
-.chat-tool-text-actions .chat-text-action { min-height: 44px; box-sizing: border-box; }
+.chat-tool-markdown { display: flex; align-items: flex-end; gap: 8px; min-width: 0; }
+.chat-tool-markdown > .chat-markdown { flex: 1; min-width: 0; }
+/* Keep the touch target generous without adding a toolbar-height gap around a short result. */
+.chat-tool-markdown > .chat-copy-icon {
+  flex: 0 0 32px; height: 44px; min-height: 44px; padding: 0; font-size: inherit;
+  margin: calc((1.8em - 44px) / 2) 0; justify-content: center; box-sizing: border-box;
+}
 .chat-output-paging button { border: 0; color: var(--app-accent, #14806f); background: transparent; cursor: pointer; }
 @media (min-width: 861px) { .chat-messages { padding-inline: 28px; } }

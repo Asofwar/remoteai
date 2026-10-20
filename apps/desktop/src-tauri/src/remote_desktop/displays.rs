@@ -27,6 +27,8 @@ pub(crate) struct DisplayInfo {
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Opened {
+    #[serde(default)]
+    pub display_sessions: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub resolutions: Vec<Resolution>,
     #[serde(default)]

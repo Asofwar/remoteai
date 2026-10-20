@@ -343,13 +343,13 @@ async fn retaining_a_relay_invalidates_a_pending_backup_commit() {
     )
     .await;
     // Match the authorization lease normally created before a native stream starts.
-    let lease = crate::remote_desktop::SESSION.get_or_init(|| std::sync::Mutex::new(None));
-    let previous_lease = lease
-        .lock()
-        .unwrap()
-        .replace(crate::remote_desktop::Session {
+    let lease = crate::remote_desktop::sessions::SESSIONS.get_or_init(Default::default);
+    let previous_lease = lease.lock().unwrap().insert(
+        stream.id.clone(),
+        crate::remote_desktop::Session {
             permissions: crate::remote_desktop::permissions::Permissions::default(),
             id: stream.id.clone(),
+            capture_group: None,
             touched: Instant::now(),
             deadline: Instant::now() + Duration::from_secs(60),
             clipboard: None,
@@ -357,7 +357,8 @@ async fn retaining_a_relay_invalidates_a_pending_backup_commit() {
             display: stream.display.borrow().clone(),
             privacy: None,
             input: Default::default(),
-        });
+        },
+    );
     let standby_signal = |action| {
         serde_json::from_value::<SignalRequest>(serde_json::json!({
             "id": "direct-upgrade-unit-test",
@@ -373,5 +374,9 @@ async fn retaining_a_relay_invalidates_a_pending_backup_commit() {
     assert!(Arc::ptr_eq(&stream.peer.borrow(), &original));
     assert!(!*stream.cancel.borrow());
     stream.close().await;
-    *lease.lock().unwrap() = previous_lease;
+    let mut leases = lease.lock().unwrap();
+    leases.remove(&stream.id);
+    if let Some(previous) = previous_lease {
+        leases.insert(stream.id.clone(), previous);
+    }
 }

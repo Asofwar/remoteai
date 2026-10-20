@@ -24,7 +24,7 @@ test('switches landscape and portrait displays, preserves settings, and recovers
   await expect.poll(() => page.locator('video').evaluate(video => video.videoHeight > video.videoWidth)).toBe(true);
   await expect(page.getByRole('button', { name: '高清', exact: true })).toHaveAttribute('aria-pressed', 'true');
   expect(await page.evaluate(() => window.desktopTest.selectedDisplays)).toEqual(['display-1', 'display-2']);
-  expect(await page.evaluate(() => window.desktopTest.closed)).toBe(1);
+  expect(await page.evaluate(() => window.desktopTest.closed)).toBe(0);
   expect(await panel.evaluate(node => node.scrollWidth <= node.clientWidth && node.clientWidth <= 400)).toBe(true);
   await page.screenshot({ path: info.outputPath('multi-display-settings.png') });
   await page.getByRole('button', { name: '关闭显示设置', exact: true }).click();

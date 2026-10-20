@@ -11,6 +11,7 @@ use std::{
 struct Open {
     display_id: Option<String>,
     expires_at: u64,
+    capture_group: Option<String>,
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -76,8 +77,13 @@ async fn execute(call: Call, root: PathBuf) -> Result<Value, String> {
                 let settings = crate::desktop_service::configuration::read()
                     .map_err(|_| "桌面服务未就绪。".to_owned())?;
                 encode(
-                    super::open(args.display_id, settings.permissions, Some(args.expires_at))
-                        .map_err(super::safe_error)?,
+                    super::open(
+                        args.display_id,
+                        settings.permissions,
+                        Some(args.expires_at),
+                        args.capture_group,
+                    )
+                    .map_err(super::safe_error)?,
                 )
             })
             .await

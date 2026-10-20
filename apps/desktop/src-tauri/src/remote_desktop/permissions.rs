@@ -40,13 +40,14 @@ pub(super) fn open(
     app: &AppHandle,
     display_id: Option<String>,
     expires_at: Option<u64>,
+    capture_group: Option<String>,
 ) -> Result<super::displays::Opened> {
     let _guard = SETTINGS.lock().map_err(|_| DesktopError::Settings)?;
     let root = app
         .path()
         .app_data_dir()
         .map_err(|_| DesktopError::Settings)?;
-    super::open(display_id, read(&root)?, expires_at)
+    super::open(display_id, read(&root)?, expires_at, capture_group)
 }
 
 #[cfg(windows)]

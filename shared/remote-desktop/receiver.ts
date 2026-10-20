@@ -14,7 +14,7 @@ import { DesktopDirectRetry } from './directRetry';
 import { desktopVideoCodecs } from './codecs';
 import { closeNativeMedia, openNativeMedia, nativeMediaIceServers, type NativeMediaSession } from './nativeMedia';
 
-interface ReceiverOptions {
+export interface ReceiverOptions {
   client: DesktopClient;
   createPeer: (configuration: RTCConfiguration) => RTCPeerConnection;
   stream: (stream: MediaStream | undefined) => void;
@@ -37,6 +37,8 @@ const CLOSE_TIMEOUT_MS = 4000;
 /** Only signaling and small controls cross JS. Media stays in each platform's WebRTC engine. */
 export class DesktopReceiver {
   private readonly id = `desktop-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  get sessionId() { return this.id; }
+  get closed() { return this.stopped; }
   private pc?: RTCPeerConnection;
   private channel?: RTCDataChannel;
   private clipboardChannel?: RTCDataChannel;

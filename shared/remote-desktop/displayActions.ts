@@ -1,15 +1,15 @@
 import type { MutableRefObject } from 'react';
-import type { DesktopReceiver } from './receiver';
+import type { DesktopDisplaySession } from './displaySession';
 
 interface DisplayAction {
   allowed: boolean;
-  receiver: MutableRefObject<DesktopReceiver | undefined>;
+  receiver: MutableRefObject<DesktopDisplaySession | undefined>;
   updating: MutableRefObject<boolean>;
   saving: (value: boolean) => void;
   status: (value: string) => void;
   release: () => void;
   message: string;
-  run: (receiver: DesktopReceiver) => Promise<unknown>;
+  run: (receiver: DesktopDisplaySession) => Promise<unknown>;
 }
 
 /** One display transaction owns input release and UI feedback until its receiver changes. */

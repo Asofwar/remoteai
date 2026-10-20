@@ -13,7 +13,7 @@ declare global { interface Window { desktopRelayFixture?: {
   delayDirectPingMs?: number;
 } } }
 
-const canvas = document.createElement('canvas');
+const captures = new Map<string, { display: DesktopDisplay; canvas: HTMLCanvasElement }>();
 // Supply a real Opus source through the existing video fixture to exercise the production receiver.
 if (new URLSearchParams(location.search).has('audio')) {
   const addTrack = RTCPeerConnection.prototype.addTrack;
@@ -36,6 +36,9 @@ const displays: DesktopDisplay[] = [
   { id: 'display-1', name: 'DISPLAY1', width: 1600, height: 900, primary: true },
   { id: 'display-2', name: 'DISPLAY2', width: 900, height: 1600, primary: false },
 ];
+if (new URLSearchParams(location.search).has('three-displays')) {
+  displays.push({ id: 'display-3', name: 'DISPLAY3', width: 1920, height: 1080, primary: false });
+}
 let selected = displays[0];
 const multiDisplay = new URLSearchParams(location.search).has('displays');
 export const desktopTest = { inputs: [] as DesktopInput[], settings: [] as DesktopSettings[],
@@ -51,16 +54,21 @@ export const desktopTest = { inputs: [] as DesktopInput[], settings: [] as Deskt
   localClipboard: { content: { format: 'text', text: 'Local clipboard' } as ClipboardContent,
     calls: [] as string[], delay: 0, writeFailures: 0 },
   selectedDisplays: [] as string[], inputDisplays: [] as string[],
+  framesByDisplay: {} as Record<string, number>,
+  settingsRequests: [] as { id: string; settings: DesktopSettings }[],
   displays,
   peers: [] as RTCPeerConnection[],
   standbyReady: [] as RTCPeerConnection[],
   iceErrors: [] as string[],
   frames: 0, captures: 0, closed: 0, concurrent: 0, maxConcurrent: 0, errors: [] as string[] };
 
-async function frame(width: number) {
+async function frame(id: string, width: number) {
+  const capture = captures.get(id);
+  if (!capture) throw new Error('Capture closed');
+  const { canvas, display } = capture;
   desktopTest.concurrent += 1;
   desktopTest.maxConcurrent = Math.max(desktopTest.maxConcurrent, desktopTest.concurrent);
-  canvas.width = width; canvas.height = Math.round(width * selected.height / selected.width);
+  canvas.width = width; canvas.height = Math.round(width * display.height / display.width);
   const context = canvas.getContext('2d')!;
   context.scale(width / 1600, width / 1600);
   context.fillStyle = '#12344e'; context.fillRect(0, 0, 1600, 900);
@@ -76,6 +84,7 @@ async function frame(width: number) {
   context.fillStyle = '#94bdea'; context.fillRect((desktopTest.frames * 4) % 1500, 845, 100, 12);
   context.fillStyle = '#24384d'; context.fillRect(0, 870, 1600, 30);
   desktopTest.frames += 1;
+  desktopTest.framesByDisplay[display.id] = (desktopTest.framesByDisplay[display.id] ?? 0) + 1;
   try {
     const blob = await new Promise<Blob>(resolve => canvas.toBlob(value => resolve(value!), 'image/jpeg', 0.85));
     return await blob.arrayBuffer();
@@ -88,6 +97,7 @@ if (new URLSearchParams(location.search).has('native-clipboard')) {
 }
 Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {
   invoke: async (command: string, args: {
+    id?: string;
     width?: number; input?: DesktopInput; displayId?: string; message?: ClipboardMessage; content?: ClipboardContent;
   } = {}) => {
     if (command === 'remote_desktop_read_local_clipboard') {
@@ -120,15 +130,16 @@ Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {
       selected = desktopTest.displays.find(item => item.id === args.displayId) ?? desktopTest.displays[0];
       desktopTest.selectedDisplays.push(selected.id);
       const id = `capture-${++opened}`;
+      captures.set(id, { display: selected, canvas: document.createElement('canvas') });
       const macos = new URLSearchParams(location.search).has('macos');
-      return multiDisplay || macos ? { id, displays: desktopTest.displays, displayId: selected.id,
+      return multiDisplay || macos ? { id, displays: desktopTest.displays, displayId: selected.id, displaySessions: true,
         ...(macos ? { platform: 'macos' } : {}) } : id;
     }
-    if (command === 'remote_desktop_frame') return frame(args.width!);
+    if (command === 'remote_desktop_frame') return frame(args.id!, args.width!);
     if (command === 'remote_desktop_input') {
-      desktopTest.inputs.push(args.input!); desktopTest.inputDisplays.push(selected.id); return;
+      desktopTest.inputs.push(args.input!); desktopTest.inputDisplays.push(captures.get(args.id!)!.display.id); return;
     }
-    if (command === 'remote_desktop_close') { desktopTest.closed += 1; return; }
+    if (command === 'remote_desktop_close') { captures.delete(args.id!); desktopTest.closed += 1; return; }
     throw new Error(`Unexpected native call: ${command}`);
   },
 }, configurable: true });
@@ -191,6 +202,7 @@ const host = new RemoteDesktopHost(privacyFixture || resolutionFixture ? (settin
       }
       desktopTest.privacyChanges.push(enabled);
       selected = enabled ? { ...displays[0], id: 'private', name: 'Privacy' } : displays[0];
+      for (const capture of captures.values()) capture.display = selected;
       return { displays: enabled ? [selected] : displays, displayId: selected.id, privacyScreen: enabled, resolutions };
     },
     resolution: async size => {
@@ -203,12 +215,15 @@ const host = new RemoteDesktopHost(privacyFixture || resolutionFixture ? (settin
 } : undefined);
 host.register('fixture', window.desktopRelayFixture?.iceServers ?? []);
 export async function desktopRequest<T>(body: object): Promise<T> {
-  const request = body as { action: string; settings?: DesktopSettings; directUpgrade?: { action: string } };
+  const request = body as { action: string; id: string; settings?: DesktopSettings; directUpgrade?: { action: string } };
   // Windows WebKit has no WebRTC. Its layout tests hold signaling while Chromium tests real media separately.
   if (request.action === 'open' && new URLSearchParams(location.search).has('layout-only')) {
     return new Promise<T>(() => {});
   }
   if (request.settings) desktopTest.settings.push(request.settings);
+  if (request.action === 'settings' && request.settings) {
+    desktopTest.settingsRequests.push({ id: request.id, settings: request.settings });
+  }
   try {
     const result = await host.request(body, 'fixture');
     if (request.directUpgrade?.action === 'commit' && window.desktopRelayFixture?.loseCommitReply) {

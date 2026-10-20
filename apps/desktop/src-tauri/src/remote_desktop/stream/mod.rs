@@ -52,16 +52,16 @@ pub(crate) use model::*;
 #[cfg(any(windows, target_os = "macos"))]
 const MAX_CANDIDATES: usize = 128;
 #[cfg(any(windows, target_os = "macos"))]
-static STREAM: tokio::sync::Mutex<Option<std::sync::Arc<native::Stream>>> =
-    tokio::sync::Mutex::const_new(None);
+static STREAMS: tokio::sync::Mutex<
+    std::collections::BTreeMap<String, std::sync::Arc<native::Stream>>,
+> = tokio::sync::Mutex::const_new(std::collections::BTreeMap::new());
 
 #[cfg(any(windows, target_os = "macos"))]
 async fn current(id: &str) -> super::Result<std::sync::Arc<native::Stream>> {
-    STREAM
+    STREAMS
         .lock()
         .await
-        .as_ref()
-        .filter(|stream| stream.id == id)
+        .get(id)
         .cloned()
         .ok_or(DesktopError::Expired)
 }
@@ -88,8 +88,8 @@ pub(crate) async fn remote_desktop_stream_available(app: tauri::AppHandle) -> bo
 pub(super) async fn revoke() {
     #[cfg(any(windows, target_os = "macos"))]
     {
-        let active = STREAM.lock().await.take();
-        if let Some(stream) = active {
+        let active = std::mem::take(&mut *STREAMS.lock().await);
+        for stream in active.into_values() {
             stream.close().await;
         }
     }
@@ -137,9 +137,9 @@ pub(super) async fn open_at(
     .await
     .map_err(|_| safe_error(DesktopError::Platform))?
     .map_err(safe_error)?;
-    let mut active = STREAM.lock().await;
+    let mut active = STREAMS.lock().await;
     if active
-        .as_ref()
+        .get(&request.id)
         .is_some_and(|stream| !*stream.cancel.borrow())
     {
         return Err(safe_error(DesktopError::Invalid));
@@ -147,7 +147,8 @@ pub(super) async fn open_at(
     let (stream, offer) = native::Stream::open(path, request)
         .await
         .map_err(safe_error)?;
-    *active = Some(stream);
+    active.retain(|_, stream| !*stream.cancel.borrow());
+    active.insert(stream.id.clone(), stream);
     Ok(offer)
 }
 
@@ -255,14 +256,7 @@ pub(crate) async fn remote_desktop_stream_close(id: String) -> std::result::Resu
     }
     #[cfg(any(windows, target_os = "macos"))]
     {
-        let stream = {
-            let mut active = STREAM.lock().await;
-            if active.as_ref().is_some_and(|stream| stream.id == id) {
-                active.take()
-            } else {
-                None
-            }
-        };
+        let stream = STREAMS.lock().await.remove(&id);
         if let Some(stream) = stream {
             stream.close().await;
         }

@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { IceServer } from '../../../../shared/remote-chat/protocol';
 import type { DesktopDisplays, DesktopResolution, DesktopSettings, DesktopSignal, DesktopSignalReply }
   from '../../../../shared/remote-desktop/protocol';
-import { openDesktopCapture } from './displays';
+import { openDesktopCapture, type DesktopCaptureSettings } from './displays';
 import { desktopFailure } from '../../../../shared/remote-desktop/diagnostics';
 import type { ConnectionDiagnostic, DiagnosticFields } from '../../../../shared/remote-chat/diagnostics';
 import { desktopProfile } from '../../../../shared/remote-desktop/profiles';
@@ -29,7 +29,7 @@ export class NativeDesktopSession {
   private nativeOnly = false;
   private changingPrivacy = false;
   get allowsCaptureFallback() { return !this.nativeOnly; }
-  constructor(private settings: DesktopSettings, private readonly iceServers: IceServer[], private expiresAt?: number,
+  constructor(private settings: DesktopCaptureSettings, private readonly iceServers: IceServer[], private expiresAt?: number,
     private readonly diagnostic?: ConnectionDiagnostic) {}
 
   async open() {
@@ -44,7 +44,8 @@ export class NativeDesktopSession {
       if (this.stopped) throw new Error('桌面连接已结束。');
       stage = 'capture-open';
       this.diagnostic?.('desktop-stage', { stage, state: 'checking' });
-      const { id, nativeOnly, ...displays } = await openDesktopCapture(this.settings.displayId, this.expiresAt);
+      const { id, nativeOnly, ...displays } = await openDesktopCapture(
+        this.settings.displayId, this.expiresAt, this.settings.captureGroup);
       this.nativeOnly = nativeOnly === true;
       this.id = id; this.displays = displays;
       if (this.stopped) throw new Error('桌面连接已结束。');

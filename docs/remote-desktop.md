@@ -5,8 +5,13 @@ live encoder control, clipboard channel negotiation and host identity behavior.
 
 The phone and Web chat toolbox opens the selected computer's remote desktop. Windows hosts support choosing
 any connected display under **Display → Monitor**, with its Windows display number, resolution and primary marker.
-Switching releases held mouse buttons and reconnects video and sound to the chosen screen, retaining quality,
-frame rate and mute settings. Zoom resets to fit the new screen. Capture and input share the selected display's
+PC, Web and mobile viewers connect only the initial display. Visiting another display retains the previous
+connection at 1 FPS; displays never visited are neither connected nor captured. Returning to a visited display
+reuses its connection and restores the user's quality and frame rate settings. Sound and input follow the
+selected display, preserving mute settings. Switching releases held mouse buttons; zoom resets to fit the new screen.
+Closing the viewer releases every visited display. Privacy transitions first release background physical displays.
+Hosts without the `displaySessions` capability retain the reconnect-on-switch behavior.
+Capture and input share the selected display's
 physical pixel bounds, including negative coordinates, portrait screens and mixed DPI. Native GPU, GDI,
 FFmpeg and WebView compatibility capture all honor the selection. Reconnection refreshes the display list;
 if the selected display was removed, it returns to the primary display and updates the selection.
@@ -343,7 +348,9 @@ timeouts and picture arrival; the browser fixture completes real ICE while pausi
 A transient chat-connection interruption keeps the viewer open and preserves its orientation. Desktop media has
 its own connection state and retry action; chat reconnection does not dismiss the viewer or restore portrait.
 
-Only one remote desktop may own a host at a time. Control queues are bounded and coalesce pointer motion while
+Only one remote viewer may own a host at a time. Visited displays have separate capture and media leases in
+a host-issued group; another authenticated viewer cannot join it or open a second capture for the same display.
+Control queues are bounded and coalesce pointer motion while
 preserving button ordering. Closing the viewer, hiding the app/page, losing its chat session or missing the
 control heartbeat stops capture. A separate native 15-second lease releases mouse buttons if the desktop
 WebView disappears. Input validation rejects nonfinite/out-of-range coordinates and oversized text/wheel data.
@@ -401,6 +408,21 @@ primary display and a 2560 × 1600 secondary display using different Windows sca
 delivered 1920 × 1080 and 1920 × 1200 video respectively, with decoded system sound on both connections.
 Browser regression tests cover monitor switching in portrait, landscape and desktop layouts; native component
 tests cover selected/disabled controls. These checks do not replace Android/iOS physical-device validation.
+
+`remote-desktop-display-sessions.pw.ts` additionally verifies lazy display connection, 1 FPS background capture,
+reuse on return, and complete cleanup in portrait, landscape and PC layouts. The ignored native test
+`visited_displays_keep_native_connections_at_one_background_frame_per_second` exercises two real displays:
+
+```powershell
+cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --test codex_switch_lib_tests `
+  visited_displays_keep_native -- --ignored --nocapture
+```
+
+On 2026-10-20, two 2048 × 1152 Windows displays stayed connected through native H.264/WebRTC to Edge.
+The moving background display decoded five frames in five seconds, then 149 frames in five seconds
+after restoring 30 FPS on the same connection. Closing its sibling left it connected and decoding.
+The static sibling sent fewer frames because existing damage detection suppresses unchanged pictures.
+This validates local Windows media; macOS and physical Android/iOS multi-display playback still need device checks.
 
 With isolated TURN credentials in `DESKTOP_UPGRADE_TEST_ICE`, `remote-desktop-standby.pw.ts` and
 `remote-desktop-upgrade.pw.ts` verify standby creation/repair, paused backup media, retained relay fallback and

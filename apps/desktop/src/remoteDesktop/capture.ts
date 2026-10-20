@@ -11,8 +11,8 @@ export class DesktopCapture {
   private closing?: Promise<void>;
   displays: DesktopDisplays = {};
   private stream?: MediaStream;
-  async open(width: number, displayId?: string, expiresAt?: number) {
-    const { id, nativeOnly, ...displays } = await openDesktopCapture(displayId, expiresAt);
+  async open(width: number, displayId?: string, expiresAt?: number, captureGroup?: string) {
+    const { id, nativeOnly, ...displays } = await openDesktopCapture(displayId, expiresAt, captureGroup);
     this.id = id; this.displays = displays;
     if (this.stopped) { await this.release(); throw new Error('桌面连接已结束。'); }
     if (nativeOnly) {

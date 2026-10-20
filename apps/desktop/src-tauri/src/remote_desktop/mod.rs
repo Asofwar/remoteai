@@ -1,7 +1,9 @@
 //! Screen capture and input run on blocking workers, never the Windows UI thread.
 use serde::Deserialize;
-use std::sync::{Mutex, OnceLock};
-use std::time::{Duration, Instant};
+#[cfg(any(windows, target_os = "macos"))]
+use sessions::begin_session;
+use sessions::{close, revoke, with_lease};
+use std::time::Instant;
 
 pub(crate) mod clipboard;
 mod clipboard_files;
@@ -16,6 +18,7 @@ mod lease;
 mod macos;
 #[cfg(any(target_os = "macos", test))]
 mod macos_keymap;
+mod sessions;
 #[cfg(target_os = "macos")]
 use macos::{input as platform_input, monitors};
 #[cfg(windows)]
@@ -107,12 +110,14 @@ pub(super) enum DesktopError {
     UnsupportedCodec,
 }
 type Result<T> = std::result::Result<T, DesktopError>;
-const LEASE: Duration = Duration::from_secs(15);
 struct Session {
     #[cfg(any(windows, target_os = "macos"))]
     privacy: Option<privacy::Guardian>,
     permissions: permissions::Permissions,
+    #[cfg(any(windows, target_os = "macos"))]
     id: String,
+    #[cfg(any(windows, target_os = "macos"))]
+    capture_group: Option<String>,
     touched: Instant,
     deadline: Instant,
     clipboard: Option<clipboard::Transfer>,
@@ -122,7 +127,6 @@ struct Session {
     #[cfg(any(windows, target_os = "macos"))]
     input: platform_input::InputState,
 }
-static SESSION: OnceLock<Mutex<Option<Session>>> = OnceLock::new();
 
 #[derive(Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
@@ -229,27 +233,11 @@ fn with_session<T>(id: &str, operation: impl FnOnce(&mut Session) -> Result<T>) 
     })
 }
 
-// Heartbeat/authorization checks must not depend on an input desktop being available during a lock transition.
-fn with_lease<T>(id: &str, operation: impl FnOnce(&mut Session) -> Result<T>) -> Result<T> {
-    let mut guard = SESSION
-        .get_or_init(|| Mutex::new(None))
-        .lock()
-        .map_err(|_| DesktopError::Platform)?;
-    let session = guard
-        .as_mut()
-        .filter(|session| session.id == id)
-        .ok_or(DesktopError::Expired)?;
-    if session.touched.elapsed() > LEASE || Instant::now() >= session.deadline {
-        return Err(DesktopError::Expired);
-    }
-    session.touched = Instant::now();
-    operation(session)
-}
-
 fn open(
     display_id: Option<String>,
     permissions: permissions::Permissions,
     expires_at: Option<u64>,
+    capture_group: Option<String>,
 ) -> Result<displays::Opened> {
     #[cfg(windows)]
     let _desktop = input_desktop::InputDesktop::enter()?;
@@ -262,12 +250,18 @@ fn open(
     {
         return Err(DesktopError::Invalid);
     }
+    if capture_group
+        .as_ref()
+        .is_some_and(|group| uuid::Uuid::parse_str(group).is_err())
+    {
+        return Err(DesktopError::Invalid);
+    }
     lease::deadline(expires_at)?;
     #[cfg(target_os = "macos")]
     macos::authorize_open(permissions.control)?;
     #[cfg(not(any(windows, target_os = "macos")))]
     {
-        let _ = (display_id, expires_at);
+        let _ = (display_id, expires_at, capture_group);
         Err(DesktopError::Unsupported)
     }
     #[cfg(any(windows, target_os = "macos"))]
@@ -283,8 +277,9 @@ fn open(
         };
         #[cfg(not(windows))]
         let resolutions = vec![];
-        let id = begin_session(display, permissions, expires_at)?;
+        let id = begin_session(display, permissions, expires_at, capture_group)?;
         Ok(displays::Opened {
+            display_sessions: true,
             resolutions,
             platform: Some(if cfg!(target_os = "macos") {
                 displays::HostPlatform::Macos
@@ -300,118 +295,29 @@ fn open(
     }
 }
 
-#[cfg(any(windows, target_os = "macos"))]
-fn begin_session(
-    display: monitors::Monitor,
-    permissions: permissions::Permissions,
-    expires_at: Option<u64>,
-) -> Result<String> {
-    let deadline = lease::deadline(expires_at)?;
-    let mut guard = SESSION
-        .get_or_init(|| Mutex::new(None))
-        .lock()
-        .map_err(|_| DesktopError::Platform)?;
-    if let Some(session) = guard.as_mut() {
-        if session.touched.elapsed() <= LEASE && Instant::now() < session.deadline {
-            return Err(DesktopError::Busy);
-        }
-        session.input.release()?;
-    }
-    let id = uuid::Uuid::new_v4().to_string();
-    *guard = Some(Session {
-        privacy: None,
-        permissions,
-        id: id.clone(),
-        touched: Instant::now(),
-        deadline,
-        clipboard: None,
-        clipboard_revision: clipboard_revision::current().ok(),
-        display,
-        input: platform_input::InputState::default(),
-    });
-    let watched = id.clone();
-    std::thread::spawn(move || expire(watched));
-    Ok(id)
-}
-
-#[cfg(any(windows, target_os = "macos"))]
-fn expire(id: String) {
-    loop {
-        std::thread::sleep(Duration::from_secs(1));
-        let Ok(mut guard) = SESSION.get_or_init(|| Mutex::new(None)).lock() else {
-            return;
-        };
-        let Some(session) = guard.as_mut().filter(|session| session.id == id) else {
-            return;
-        };
-        if session.touched.elapsed() <= LEASE && Instant::now() < session.deadline {
-            continue;
-        }
-        #[cfg(windows)]
-        let _desktop = match input_desktop::InputDesktop::enter() {
-            Ok(desktop) => Some(desktop),
-            Err(error) => {
-                eprintln!("desktop cleanup context: {error}");
-                None
-            }
-        };
-        if let Err(error) = session.input.release() {
-            eprintln!("desktop input cleanup: {error}");
-        }
-        *guard = None;
-        return;
-    }
-}
-
-fn revoke() -> Result<()> {
-    let mut guard = SESSION
-        .get_or_init(|| Mutex::new(None))
-        .lock()
-        .map_err(|_| DesktopError::Platform)?;
-    let _session = guard.take();
-    // Drop privacy ownership even if the input desktop is unavailable during disconnect.
-    #[cfg(any(windows, target_os = "macos"))]
-    if let Some(mut session) = _session {
-        #[cfg(windows)]
-        let _desktop = input_desktop::InputDesktop::enter()?;
-        session.input.release()?;
-    }
-    Ok(())
-}
-
-fn close(id: &str) -> Result<()> {
-    let mut guard = SESSION
-        .get_or_init(|| Mutex::new(None))
-        .lock()
-        .map_err(|_| DesktopError::Platform)?;
-    if guard.as_ref().is_some_and(|session| session.id == id) {
-        let _session = guard.take();
-        #[cfg(any(windows, target_os = "macos"))]
-        if let Some(mut session) = _session {
-            #[cfg(windows)]
-            let _desktop = input_desktop::InputDesktop::enter()?;
-            session.input.release()?;
-        }
-    }
-    Ok(())
-}
-
 #[tauri::command]
 pub(crate) async fn remote_desktop_open(
     app: tauri::AppHandle,
     display_id: Option<String>,
     expires_at: Option<u64>,
+    capture_group: Option<String>,
 ) -> std::result::Result<displays::Opened, String> {
     #[cfg(windows)]
-    if let Some(opened) =
-        crate::desktop_service::delegation::open(display_id.clone(), expires_at).await?
+    if let Some(opened) = crate::desktop_service::delegation::open(
+        display_id.clone(),
+        expires_at,
+        capture_group.clone(),
+    )
+    .await?
     {
         return Ok(opened);
     }
-    tauri::async_runtime::spawn_blocking(move || permissions::open(&app, display_id, expires_at))
-        .await
-        .map_err(|_| safe_error(DesktopError::Platform))?
-        .map_err(safe_error)
+    tauri::async_runtime::spawn_blocking(move || {
+        permissions::open(&app, display_id, expires_at, capture_group)
+    })
+    .await
+    .map_err(|_| safe_error(DesktopError::Platform))?
+    .map_err(safe_error)
 }
 
 #[tauri::command]

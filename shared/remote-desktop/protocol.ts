@@ -9,6 +9,7 @@ export type DesktopQuality = 'auto' | 'smooth' | 'clear' | 'original';
 export type DesktopVideoCodec = 'h264' | 'h265';
 export interface DesktopSettings {
   fps: 'auto' | number; quality: DesktopQuality; displayId?: string; clipboardChannel?: boolean;
+  retainedSession?: string;
   nativeMedia?: boolean; relayStandby?: boolean;
   videoCodecs?: DesktopVideoCodec[];
 }
@@ -20,12 +21,14 @@ export type DesktopPlatform = 'windows' | 'macos';
 export type DesktopSystemPermission = 'screenRecording' | 'accessibility';
 export interface DesktopPermissionStatus { required: DesktopSystemPermission | null }
 export interface DesktopDisplays {
+  displaySessions?: boolean;
   resolutions?: DesktopResolution[];
   privacyScreen?: boolean;
   displays?: DesktopDisplay[]; displayId?: string; permissions?: DesktopPermissions; platform?: DesktopPlatform;
 }
 export interface DesktopResolution { width: number; height: number }
 export interface DesktopCapabilities {
+  displaySessions?: boolean;
   clipboardNative?: boolean;
   resolution?: boolean;
   privacyScreen?: boolean;
@@ -112,10 +115,15 @@ export function validateSettings(value: unknown): DesktopSettings {
     || !input.displayId.length || input.displayId.length > 128)) {
     throw new Error('请选择有效的显示器。');
   }
+  if (input.retainedSession !== undefined && (typeof input.retainedSession !== 'string'
+    || !/^[a-zA-Z0-9-]{1,100}$/.test(input.retainedSession))) {
+    throw new Error('桌面连接信息无效，请重新连接。');
+  }
   if (input.videoCodecs !== undefined && (!Array.isArray(input.videoCodecs) || input.videoCodecs.length > 2
     || input.videoCodecs.some(codec => codec !== 'h264' && codec !== 'h265')
     || !input.videoCodecs.includes('h264'))) throw new Error('桌面连接信息无效，请重新连接。');
   return { fps: input.fps!, quality: input.quality!,
+    ...(input.retainedSession === undefined ? {} : { retainedSession: input.retainedSession }),
     ...(input.videoCodecs ? { videoCodecs: [...new Set(input.videoCodecs)] } : {}),
     ...(input.nativeMedia === true ? { nativeMedia: true } : {}),
     ...(input.relayStandby === true ? { relayStandby: true } : {}),

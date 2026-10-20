@@ -15,6 +15,7 @@ fn identifier(id: &str) -> std::result::Result<&str, String> {
 pub(crate) async fn open(
     display_id: Option<String>,
     expires_at: Option<u64>,
+    capture_group: Option<String>,
 ) -> std::result::Result<Option<crate::remote_desktop::displays::Opened>, String> {
     // An optional service-manager restriction must not remove the existing user-session desktop path.
     if expires_at.is_none() || !control::running().await.unwrap_or(false) {
@@ -22,7 +23,7 @@ pub(crate) async fn open(
     }
     let value = control::desktop(
         "remote_desktop_open",
-        json!({"displayId":display_id,"expiresAt":expires_at}),
+        json!({"displayId":display_id,"expiresAt":expires_at,"captureGroup":capture_group}),
     )
     .await
     .map_err(|error| error.to_string())?;

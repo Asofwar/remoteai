@@ -54,10 +54,12 @@ for (const native of [false, true]) {
     await expect(primary).toHaveAttribute('aria-pressed', 'true');
     await expect(primary).toBeEnabled();
     await expect.poll(() => page.locator('video').evaluate(video => video.videoWidth > video.videoHeight)).toBe(true);
+    expect(await page.evaluate(() => window.desktopTest.captures)).toBe(2);
+    expect(await page.evaluate(() => window.desktopTest.closed)).toBe(0);
     await page.screenshot({ path: info.outputPath('display-bar-landscape.png') });
     await page.getByRole('button', { name: '关闭', exact: true }).click();
     await expect(bar).toHaveCount(0);
-    await expect.poll(() => page.evaluate(() => window.desktopTest.closed)).toBe(3);
+    await expect.poll(() => page.evaluate(() => window.desktopTest.closed)).toBe(2);
     expect(errors).toEqual([]);
   });
 }

@@ -4,12 +4,13 @@ import { DesktopHostSession } from './session';
 import { NativeDesktopSession } from './nativeSession';
 import type { ConnectionDiagnostic } from '../../../../shared/remote-chat/diagnostics';
 import { desktopFailure } from '../../../../shared/remote-desktop/diagnostics';
+import type { DesktopCaptureSettings } from './displays';
 
 /** Keep a working capture fallback for Windows installations without a supported native encoder. */
 export class HostSession {
   private session: DesktopHostSession | NativeDesktopSession;
   private stopped = false;
-  constructor(private settings: DesktopSettings, private readonly iceServers: IceServer[], private expiresAt?: number,
+  constructor(private settings: DesktopCaptureSettings, private readonly iceServers: IceServer[], private expiresAt?: number,
     private readonly diagnostic?: ConnectionDiagnostic) {
     this.session = new NativeDesktopSession(settings, iceServers, expiresAt, diagnostic);
   }
@@ -36,7 +37,7 @@ export class HostSession {
   }
   private offer(offer: Awaited<ReturnType<NativeDesktopSession['open']>>) {
     const policy = offer.permissions;
-    return { ...offer, capabilities: { platform: offer.platform,
+    return { ...offer, capabilities: { platform: offer.platform, displaySessions: offer.displaySessions === true,
       privacyScreen: this.session instanceof NativeDesktopSession && policy?.control !== false,
       resolution: this.session instanceof NativeDesktopSession && policy?.control !== false
         && !!offer.resolutions?.length,

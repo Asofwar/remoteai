@@ -4,7 +4,8 @@ import type { DesktopReceiver } from './receiver';
 import { sendDesktopChord } from './softKeyboard';
 
 /** Older hosts retain native editing; only negotiated hosts may automatically replace their clipboard. */
-export function sessionClipboard(receiver: () => DesktopReceiver | undefined, capabilities: DesktopCapabilities) {
+export function sessionClipboard(receiver: () => Pick<DesktopReceiver, 'clipboard' | 'input'> | undefined,
+  capabilities: DesktopCapabilities) {
   const current = () => {
     const session = receiver();
     if (!session) throw new Error('请等待桌面连接后重试。');

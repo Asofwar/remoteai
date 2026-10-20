@@ -10,15 +10,21 @@ import type { DesktopDirectRetry } from '../../../../shared/remote-desktop/direc
 interface FakeSession {
   options: { stream: (stream?: MediaStream) => void; displays: (value: DesktopDisplays) => void;
     capabilities: (value: DesktopCapabilities) => void;
-    failed: (message: string) => void; directRetry: DesktopDirectRetry };
+    failed: (message: string) => void; status: (value: string) => void; directRetry: DesktopDirectRetry };
   start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn>; input: ReturnType<typeof vi.fn>;
+  settings: ReturnType<typeof vi.fn>; mute: ReturnType<typeof vi.fn>; sessionId: string;
   privacy: ReturnType<typeof vi.fn>;
   resolution: ReturnType<typeof vi.fn<(size: DesktopResolution) => Promise<void>>>;
 }
-const runtime = vi.hoisted(() => ({ sessions: [] as FakeSession[] }));
+const runtime = vi.hoisted(() => ({
+  sessions: [] as FakeSession[], multiDisplay: false, openFailure: '',
+}));
 vi.mock('../../../../shared/remote-desktop/receiver', () => ({ DesktopReceiver: class {
-  start = vi.fn(async () => {
-    this.options.displays({ displays: [], displayId: 'first' });
+  sessionId = `desktop-${runtime.sessions.length}`;
+  start = vi.fn(async (settings: DesktopSettings) => {
+    if (runtime.openFailure) { this.options.failed(runtime.openFailure); return; }
+    this.options.displays({ displays: [], displayId: runtime.multiDisplay ? settings.displayId : 'first' });
+    if (runtime.multiDisplay) this.options.capabilities({ displaySessions: true, control: true, privacyScreen: true });
     this.options.stream({} as MediaStream);
   });
   stop = vi.fn(async () => { this.options.stream(undefined); });
@@ -40,7 +46,8 @@ function Harness({ active = true, connected = true }) {
   session = useDesktopSession({ client, active, connected, createPeer }); return null;
 }
 beforeEach(async () => {
-  runtime.sessions.length = 0; vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  runtime.sessions.length = 0; runtime.multiDisplay = false; runtime.openFailure = '';
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   root = createRoot(document.createElement('div'));
   await act(async () => root.render(<Harness />));
 });
@@ -189,4 +196,108 @@ it('cancels pending offline recovery when the viewer closes', async () => {
   await act(async () => root.render(<Harness active={false} />));
   await act(async () => { session.retry(); await vi.runAllTimersAsync(); });
   expect(runtime.sessions).toHaveLength(1); expect(vi.getTimerCount()).toBe(0);
+});
+
+async function enableDisplaySessions() {
+  runtime.multiDisplay = true;
+  await act(async () => runtime.sessions[0].options.capabilities({
+    displaySessions: true, control: true, privacyScreen: true,
+  }));
+}
+
+it('opens only visited displays, parks the previous one at 1 FPS and reuses it on return', async () => {
+  await enableDisplaySessions();
+  const first = runtime.sessions[0];
+  expect(runtime.sessions).toHaveLength(1);
+  act(() => session.pointer.button('left', true));
+  await act(async () => session.update({ fps: 90, quality: 'clear', displayId: 'second' }));
+  const second = runtime.sessions[1];
+  expect(first.input).toHaveBeenLastCalledWith({ kind: 'button', button: 'left', down: false });
+  expect(first.settings).toHaveBeenLastCalledWith({ fps: 1, quality: 'auto', displayId: 'first' });
+  expect(first.stop).not.toHaveBeenCalled();
+  expect(second.start).toHaveBeenCalledWith({
+    fps: 90, quality: 'clear', displayId: 'second', retainedSession: first.sessionId,
+  });
+  expect(first.mute).toHaveBeenLastCalledWith(true);
+  expect(second.mute).toHaveBeenLastCalledWith(false);
+  await act(async () => session.update({ ...session.settings, displayId: 'first' }));
+  expect(runtime.sessions).toHaveLength(2);
+  expect(first.start).toHaveBeenCalledOnce();
+  expect(first.settings).toHaveBeenLastCalledWith({ fps: 90, quality: 'clear', displayId: 'first' });
+  expect(second.settings).toHaveBeenLastCalledWith({ fps: 1, quality: 'clear', displayId: 'second' });
+  expect(second.stop).not.toHaveBeenCalled();
+  expect(session.settings).toEqual({ fps: 90, quality: 'clear', displayId: 'first' });
+  act(() => session.input({ kind: 'key', key: 'desktop' }));
+  expect(first.input).toHaveBeenLastCalledWith({ kind: 'key', key: 'desktop' });
+  expect(second.input).not.toHaveBeenCalled();
+  await act(async () => root.render(<Harness active={false} />));
+  expect(first.stop).toHaveBeenCalledOnce(); expect(second.stop).toHaveBeenCalledOnce();
+});
+
+it('ignores background media callbacks and closes backgrounds before enabling privacy', async () => {
+  await enableDisplaySessions();
+  const first = runtime.sessions[0];
+  await act(async () => session.update({ ...session.settings, displayId: 'second' }));
+  const stream = session.stream;
+  await act(async () => {
+    first.options.stream(undefined);
+    first.options.displays({ displayId: 'first' });
+    first.options.status('background status');
+  });
+  expect(session.stream).toBe(stream); expect(session.settings.displayId).toBe('second');
+  expect(session.status).not.toBe('background status');
+  await act(async () => session.togglePrivacy());
+  expect(first.stop).toHaveBeenCalledOnce();
+  expect(runtime.sessions[1].privacy).toHaveBeenCalledWith(true);
+  expect(runtime.sessions[1].stop).not.toHaveBeenCalled();
+});
+
+it('restores the current display after a failed new display and can retry', async () => {
+  await enableDisplaySessions();
+  const first = runtime.sessions[0];
+  // A failed settings RPC must not open a second capture or change the selected screen.
+  first.settings.mockRejectedValueOnce(new Error('settings unavailable'));
+  await act(async () => session.update({ ...session.settings, displayId: 'second' }));
+  expect(runtime.sessions).toHaveLength(1); expect(session.settings.displayId).toBe('first');
+  expect(session.saving).toBe(false);
+  await act(async () => session.update({ ...session.settings, displayId: 'second' }));
+  expect(runtime.sessions).toHaveLength(2); expect(session.settings.displayId).toBe('second');
+});
+
+it('restores foreground quality after a rejected capture without dropping the existing connection', async () => {
+  await enableDisplaySessions();
+  const first = runtime.sessions[0];
+  runtime.openFailure = '显示器已断开，请重新连接桌面。';
+  await act(async () => session.update({ fps: 90, quality: 'clear', displayId: 'removed' }));
+  expect(runtime.sessions).toHaveLength(2); expect(session.settings.displayId).toBe('first');
+  expect(first.settings).toHaveBeenLastCalledWith({ fps: 'auto', quality: 'auto', displayId: 'first' });
+  expect(first.stop).not.toHaveBeenCalled(); expect(session.saving).toBe(false);
+  expect(session.status).toBe(runtime.openFailure);
+  runtime.openFailure = '';
+  await act(async () => session.update({ ...session.settings, displayId: 'second' }));
+  expect(runtime.sessions).toHaveLength(3); expect(session.settings.displayId).toBe('second');
+});
+
+it('does not let a failed background interrupt the foreground and opens it again on the next visit', async () => {
+  await enableDisplaySessions();
+  const first = runtime.sessions[0];
+  await act(async () => session.update({ ...session.settings, displayId: 'second' }));
+  const stream = session.stream;
+  await act(async () => first.options.failed('removed display'));
+  expect(first.stop).toHaveBeenCalledOnce();
+  expect(session.stream).toBe(stream); expect(session.settings.displayId).toBe('second');
+  await act(async () => session.update({ ...session.settings, displayId: 'first' }));
+  expect(runtime.sessions).toHaveLength(3);
+  expect(runtime.sessions[2].start).toHaveBeenCalledWith(expect.objectContaining({ displayId: 'first' }));
+});
+
+it('cancels an in-flight switch without opening unvisited screens after closing', async () => {
+  await enableDisplaySessions();
+  let release!: () => void;
+  runtime.sessions[0].settings.mockImplementationOnce(() => new Promise<void>(resolve => { release = resolve; }));
+  let pending!: Promise<void>;
+  await act(async () => { pending = session.update({ ...session.settings, displayId: 'second' }); });
+  await act(async () => root.render(<Harness active={false} />));
+  await act(async () => { release(); await pending; });
+  expect(runtime.sessions).toHaveLength(1); expect(session.saving).toBe(false);
 });

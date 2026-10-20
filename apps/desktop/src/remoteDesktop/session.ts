@@ -2,6 +2,7 @@ import type { IceServer } from '../../../../shared/remote-chat/protocol';
 import { DesktopAdaptation, type NetworkSample } from '../../../../shared/remote-desktop/adaptation';
 import type { DesktopSettings, DesktopSignal, DesktopSignalReply } from '../../../../shared/remote-desktop/protocol';
 import { DesktopCapture } from './capture';
+import type { DesktopCaptureSettings } from './displays';
 import { DesktopControls } from './controls';
 import { MAX_CONTROL_MESSAGE_BYTES } from '../../../../shared/remote-desktop/clipboard';
 import { RtcObserver } from '../../../../shared/remote-chat/rtcObserver';
@@ -43,10 +44,10 @@ export class DesktopHostSession {
   private expires: ReturnType<typeof setTimeout>;
   private lastStats = 0;
   private frames = 0;
-  private settings: DesktopSettings;
+  private settings: DesktopCaptureSettings;
   private observer?: RtcObserver;
 
-  constructor(settings: DesktopSettings, private readonly iceServers: IceServer[], private expiresAt?: number,
+  constructor(settings: DesktopCaptureSettings, private readonly iceServers: IceServer[], private expiresAt?: number,
     private readonly diagnostic?: ConnectionDiagnostic) {
     if (settings.relayStandby) this.standby = new BrowserDesktopRelayHost({ iceServers, stream: () => this.media,
       current: () => this.pc, bind: peer => this.bind(peer), activate: peer => {
@@ -107,7 +108,8 @@ export class DesktopHostSession {
   }
 
   async open() {
-    const stream = await this.capture.open(this.adaptation.profile().width, this.settings.displayId, this.expiresAt);
+    const stream = await this.capture.open(this.adaptation.profile().width, this.settings.displayId,
+      this.expiresAt, this.settings.captureGroup);
     if (this.stopped) throw new Error('桌面连接已结束。');
     this.adaptation.update(this.settings, this.capture.displays);
     this.media = stream;

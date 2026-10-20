@@ -1,4 +1,6 @@
 use super::{model::*, native::Stream};
+#[path = "native_multi_display_test.rs"]
+mod multi_display;
 use std::{
     io::Read,
     sync::{
@@ -14,7 +16,7 @@ async fn native_capture_reaches_a_real_browser_decoder() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("resources/remote-desktop/runtime/ffmpeg.exe");
     let requested = std::env::var("CSW_NATIVE_TEST_DISPLAY").ok();
-    let opened = super::super::open(requested.clone(), Default::default(), None)
+    let opened = super::super::open(requested.clone(), Default::default(), None, None)
         .expect("native input lease");
     if let Some(requested) = requested {
         assert_eq!(opened.display_id, requested);
@@ -142,6 +144,20 @@ fn start_bridge(
             } else if request.url() == "/stats" {
                 let stats = runtime.block_on(async { stream.stats.lock().await.clone() });
                 serde_json::to_value(stats).expect("stats JSON")
+            } else if request.url() == "/profile" {
+                let profile = serde_json::from_str(&body).expect("test profile");
+                runtime
+                    .block_on(super::remote_desktop_stream_update(
+                        stream.id.clone(),
+                        profile,
+                    ))
+                    .expect("update test stream");
+                serde_json::json!({})
+            } else if request.url() == "/close" {
+                runtime
+                    .block_on(super::remote_desktop_stream_close(stream.id.clone()))
+                    .expect("close test stream");
+                serde_json::json!({})
             } else {
                 let mut value: serde_json::Value =
                     serde_json::from_str(&body).expect("signal JSON");

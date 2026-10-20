@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { DesktopReceiver } from './receiver';
+import { DesktopDisplaySession } from './displaySession';
 import { DesktopPointer } from './input';
 import { DesktopRecovery, DESKTOP_OFFLINE_STATUS } from './recovery';
 import { DesktopDirectRetry } from './directRetry';
@@ -18,7 +18,7 @@ interface Options {
 }
 export function useDesktopSession({ client, active, connected = true, createPeer }: Options) {
   const available = useRef(connected); available.current = connected;
-  const receiver = useRef<DesktopReceiver>();
+  const receiver = useRef<DesktopDisplaySession>();
   const settingsRef = useRef(DEFAULT_SETTINGS);
   const closing = useRef(Promise.resolve());
   const updating = useRef(false);
@@ -54,7 +54,7 @@ export function useDesktopSession({ client, active, connected = true, createPeer
     setResolutions([]);
     if (!active) return;
     if (!available.current) { recovery.current?.failed(DESKTOP_OFFLINE_STATUS); return; }
-    const session = new DesktopReceiver({ client, createPeer, directRetry, stream: setStream, status: setStatus,
+    const session = new DesktopDisplaySession({ client, createPeer, directRetry, stream: setStream, status: setStatus,
       connected: () => recovery.current?.connected(),
       failed: message => { pointer.release(); recovery.current?.failed(message); },
       stats: setStats, audio: setHasAudio, capabilities: setCapabilities, displays: value => {
@@ -80,15 +80,12 @@ export function useDesktopSession({ client, active, connected = true, createPeer
     try {
       validateSettings(next); updating.current = true; setSaving(true);
       if (next.displayId !== settingsRef.current.displayId) {
-        pointer.release(); setStatus('正在切换显示器…');
-        closing.current = current.stop(); await closing.current;
-        if (receiver.current !== current) return;
-        settingsRef.current = next; setSettings(next); setAttempt(value => value + 1);
-        return;
+        pointer.release();
       }
       await current.settings(next);
       if (receiver.current !== current) return;
-      settingsRef.current = next; setSettings(next);
+      settingsRef.current = { ...next, displayId: current.displayId ?? next.displayId };
+      setSettings(settingsRef.current);
     } catch (error) { setStatus(error instanceof Error ? error.message : '显示设置未能保存，请重试。'); }
     finally { updating.current = false; setSaving(false); }
   };
@@ -107,7 +104,7 @@ export function useDesktopSession({ client, active, connected = true, createPeer
   return { stream, status, stats, settings, displays, update, saving, pointer, muted, mute, hasAudio, clipboard, capabilities,
     privacyScreen, togglePrivacy, resolution, frameRendered: () => receiver.current?.frameRendered(stream),
     waitingForPermission: waitingForDesktopPermission(status),
-    input: (input: Parameters<DesktopReceiver['input']>[0]) => receiver.current?.input(input),
+    input: (input: Parameters<DesktopDisplaySession['input']>[0]) => receiver.current?.input(input),
     retry: () => {
       if (!active || !available.current) return;
       recovery.current?.stop();

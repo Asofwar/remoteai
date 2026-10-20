@@ -48,7 +48,7 @@ export function ComposerAccess({ selection, settingsBusy, updateSettings, before
   </div>;
   return <Popover trigger="click" placement="topLeft" arrow={false} open={open} content={content}
     onOpenChange={value => { if (value) beforeOpen(); setOpen(value); }}
-    styles={{ root: { maxWidth: 400 }, body: { padding: 0, borderRadius: 12 } }}>
+    styles={{ root: { maxWidth: 400 }, body: { padding: 0, borderRadius: 12, overflow: 'hidden' } }}>
     <button ref={trigger} type="button" className={`chat-composer-access${selected.value === 'danger-full-access'
       ? ' is-full-access' : ''}`} disabled={settingsBusy} aria-haspopup="menu" aria-expanded={open}
       aria-label={t('访问权限：{value1}', { value1: t(selected.label) })}

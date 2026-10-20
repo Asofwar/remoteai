@@ -51,6 +51,7 @@ function modelRefreshExpression(models, capabilities = {}) {
     observer_patch_helpers: observerHelpers,
     // The DOM speed overlay is tested separately in codex-usage-overlay.test.mjs.
     speed_selector_overlay: "",
+    context_usage_overlay: "",
   };
   return expressionTemplate.replace(/\{\{|\}\}|\{([a-z_]+)\}/g, (token, key) => {
     if (token === "{{") return "{";
@@ -197,6 +198,25 @@ function createHarness({ models = upstreamModels, select = selectModels, queryKe
     },
   };
 }
+
+test("fresh launch and restart refresh models and composer status after a delayed React mount", async () => {
+  for (const launch of ["initial launch", "restart"]) {
+    const harness = createHarness({ models: [defaultModel] });
+    const readyRoot = harness.window.__codexRoot;
+    delete harness.window.__codexRoot;
+    assert.equal((await harness.refresh(upstreamModels)).reason, "unavailable", launch);
+    harness.window.__codexRoot = { _internalRoot: { current: {} } };
+    assert.equal((await harness.refresh(upstreamModels)).reason, "query-client-not-found", launch);
+    assert.equal(harness.client.queryDataWrites, 0);
+
+    harness.window.__codexRoot = readyRoot;
+    const result = await harness.refresh(upstreamModels, { fastModeModels: upstreamModels });
+    assert.equal(result.refreshed, true, launch);
+    assert.deepEqual(harness.observer.modelIds(), upstreamModels, launch);
+    assert.equal(harness.window.__CODEX_SWITCH_COMPOSER_STATUS_ALLOWED__, true, launch);
+    assert.equal(harness.window.__CODEX_SWITCH_FAST_MODE_ALLOWED__, true, launch);
+  }
+});
 
 const cachedOfficialCapabilities = {
   fastModeModels: [defaultModel, "gpt-5.6-terra"],

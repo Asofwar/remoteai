@@ -351,7 +351,9 @@ pub(crate) fn refresh_codex_models(
     let mut session = CdpSession::connect(&target, port)?;
     session.enable()?;
     let result = session.evaluate(&expression)?;
-    install_renderer_bindings(&target, port)?;
+    if result.get("refreshed").and_then(Value::as_bool) == Some(true) {
+        install_renderer_bindings(&target, port)?;
+    }
     Ok(CodexModelRefreshResult {
         refreshed: result
             .get("refreshed")

@@ -15,6 +15,7 @@ include!("runtime_recovery.rs");
 include!("windows_runtime.rs");
 include!("macos_runtime.rs");
 include!("runtime_lifecycle.rs");
+use crate::codex_runtime::refresh_after_launch;
 include!("runtime_launch.rs");
 include!("runtime_entry.rs");
 include!("theme_commands.rs");

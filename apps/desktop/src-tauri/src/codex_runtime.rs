@@ -39,6 +39,10 @@ static CODEX_RUNTIME_APP: OnceLock<AppHandle> = OnceLock::new();
 mod model_retry;
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 mod official_refresh;
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+mod renderer_refresh;
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+pub(crate) use renderer_refresh::refresh_after_launch;
 
 pub(crate) struct ModelRefreshRequest {
     pub(crate) models: Vec<String>,
@@ -251,24 +255,7 @@ fn apply_model_refresh(generation: u64, request: ModelRefreshRequest) {
         .get_or_init(|| Mutex::new(()))
         .lock()
         .unwrap_or_else(|error| error.into_inner());
-    if MODEL_REFRESH_GENERATION.load(Ordering::Acquire) != generation {
-        return;
-    }
-    match crate::dream_skin_native::refresh_codex_models(
-        &request.models,
-        &request.fast_mode_models,
-        &request.image_input_models,
-        &request.model_reasoning_efforts,
-        &request.selected_model,
-        request.reasoning_profile,
-    ) {
-        Ok(result) if result.refreshed => {}
-        Ok(result) => eprintln!(
-            "Codex model picker refresh was skipped: {}",
-            result.reason.as_deref().unwrap_or("unknown reason")
-        ),
-        Err(error) => eprintln!("Codex model picker refresh failed: {error}"),
-    }
+    renderer_refresh::apply(generation, &request);
 }
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]

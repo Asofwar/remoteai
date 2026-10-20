@@ -18,6 +18,7 @@ struct Simulation {
     arguments: Vec<Vec<String>>,
     debug_operations: usize,
     stops: usize,
+    refreshes: usize,
 }
 
 thread_local! {
@@ -110,6 +111,13 @@ fn verify_runtime_skin(_: SkinVerificationMode, _: Option<u16>) -> Result<(), St
     Ok(())
 }
 
+fn refresh_after_launch() {
+    with_simulation(|state| {
+        assert_eq!(state.session.session, NativeRuntimeStatus::Active);
+        state.refreshes += 1;
+    });
+}
+
 include!("runtime_launch.rs");
 
 fn launch() -> Result<(), String> {
@@ -143,6 +151,7 @@ fn ordinary_launch_uses_no_arguments_and_clears_previous_debug_session() {
         assert_eq!(state.session.session, NativeRuntimeStatus::Ready);
         assert_ne!(state.session.launch_id, "previous-launch");
         assert!(!state.session.allows_recovery());
+        assert_eq!(state.refreshes, 0);
     });
 }
 
@@ -161,6 +170,7 @@ fn enabled_enhancements_keep_the_existing_debug_launch() {
         assert_eq!(state.session.port, Some(9335));
         assert_eq!(state.session.session, NativeRuntimeStatus::Active);
         assert!(state.debug_operations > 0);
+        assert_eq!(state.refreshes, 1);
     });
 }
 
@@ -172,6 +182,7 @@ fn ordinary_launch_failure_never_falls_back_to_debug_mode() {
         assert_eq!(state.arguments, vec![Vec::<String>::new()]);
         assert_eq!(state.session.session, NativeRuntimeStatus::Failed);
         assert!(!state.session.allows_recovery());
+        assert_eq!(state.refreshes, 0);
     });
 }
 
@@ -182,5 +193,24 @@ fn failed_session_write_prevents_stopping_or_launching_a_client() {
     with_simulation(|state| {
         assert_eq!(state.stops, 0);
         assert!(state.arguments.is_empty());
+        assert_eq!(state.refreshes, 0);
     });
+}
+
+#[test]
+fn every_managed_restart_refreshes_models_and_composer_controls() {
+    with_simulation(|state| state.enhancements = true);
+    launch().unwrap();
+    launch().unwrap();
+    with_simulation(|state| assert_eq!(state.refreshes, 2));
+}
+
+#[test]
+fn failed_managed_launch_does_not_schedule_a_refresh() {
+    with_simulation(|state| {
+        state.enhancements = true;
+        state.launch_fails = true;
+    });
+    assert!(launch().is_err());
+    with_simulation(|state| assert_eq!(state.refreshes, 0));
 }

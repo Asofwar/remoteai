@@ -82,7 +82,7 @@ export function ComposerModelPicker({ models, selection, updateSettings, setting
       if (event.key === 'Escape') { event.stopPropagation(); changeOpen(false); trigger.current?.focus(); }
     }}>
     {choosingModel ? <ModelList models={models} model={model} onBack={returnToReasoning}
-      titleAction={<ModelRefreshButton ready={ready} refreshModels={refreshModels} />}
+      titleAction={<ModelRefreshButton compact ready={ready} refreshModels={refreshModels} />}
       onSelect={value => {
         void updateSettings(resolveModelSelection(models, { model: value, effort: '' })); returnToReasoning();
       }} /> : <div className="composer-model-reasoning">

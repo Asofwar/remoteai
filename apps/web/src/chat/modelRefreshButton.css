@@ -1,3 +1,4 @@
+.model-refresh-button-compact { flex-shrink: 0; color: var(--muted, var(--app-muted, #718078)); }
 .model-refresh-button { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
   width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
   color: var(--app-accent, #147d6b); background: var(--app-canvas, #eef3f0); vertical-align: middle; }

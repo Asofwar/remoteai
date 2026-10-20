@@ -1,4 +1,16 @@
 export const portMappingEditingEnglish: Readonly<Record<string, string>> = {
+  '新建映射': 'New mapping',
+  '返回映射列表': 'Back to mappings',
+  '本机访问': 'Local access',
+  '远程目标': 'Remote target',
+  '传输协议': 'Transport protocol',
+  '选填': 'Optional',
+  '留空时，访问远程电脑本机。': 'Leave blank to access the remote computer itself.',
+  '同远程端口': 'Same as remote port',
+  '留空时与远程端口一致。': 'Leave blank to use the remote port.',
+  '最近编辑': 'Last edited',
+  '配置已同步': 'Configuration synced',
+  '仅本机可访问': 'Accessible only on this device',
   '通过远程电脑访问目标 IP 和端口': 'Access an IP and port through the remote computer',
   '映射启动后，点击地址可选择应用内预览或浏览器打开。留空 IP 可访问远程电脑本机。':
     'Start a mapping, then tap its address to open in the app or browser. Leave the IP blank for the remote computer.',
@@ -24,6 +36,18 @@ export const portMappingEditingEnglish: Readonly<Record<string, string>> = {
 };
 
 export const portMappingEditingRussian: Readonly<Record<string, string>> = {
+  '新建映射': 'Новый проброс',
+  '返回映射列表': 'Назад к списку',
+  '本机访问': 'Локальный адрес',
+  '远程目标': 'Удалённый адрес',
+  '传输协议': 'Протокол передачи',
+  '选填': 'Необязательно',
+  '留空时，访问远程电脑本机。': 'Оставьте пустым для доступа к самому удалённому компьютеру.',
+  '同远程端口': 'Как удалённый порт',
+  '留空时与远程端口一致。': 'Оставьте пустым, чтобы использовать удалённый порт.',
+  '最近编辑': 'Изменено',
+  '配置已同步': 'Настройки синхронизированы',
+  '仅本机可访问': 'Доступ только с этого устройства',
   '通过远程电脑访问目标 IP 和端口': 'Доступ к IP и порту через удалённый компьютер',
   '映射启动后，点击地址可选择应用内预览或浏览器打开。留空 IP 可访问远程电脑本机。':
     'Запустите проброс и нажмите адрес для открытия в приложении или браузере. Пустой IP означает удалённый компьютер.',

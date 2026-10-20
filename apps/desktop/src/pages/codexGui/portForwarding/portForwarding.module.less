@@ -45,14 +45,15 @@ button.headerIcon {
 .title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .title h2 { margin: 0; color: var(--ink); font-size: 23px; font-weight: 650; line-height: 1.4; }
 .total {
-  padding: 2px 9px; border-radius: 8px; background: var(--mapping-surface);
+  flex-shrink: 0; padding: 2px 9px; border-radius: 8px; background: var(--mapping-surface);
   color: var(--muted); font-size: 14px;
 }
+.create { flex-shrink: 0; height: 32px; padding-inline: 12px; border-radius: 8px; }
 .heading p { margin: 6px 0 0; color: var(--muted); font-size: 14px; font-weight: 400; line-height: 1.6; }
 .panel { color: var(--ink); font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
 .columns, .endpoints { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1.1fr); gap: 12px; }
 .columns { padding: 0 18px; margin-bottom: 8px; color: var(--muted); }
-.list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.list { display: flex; flex-direction: column; gap: 10px; }
 .mapping { padding: 18px; background: var(--mapping-surface); border: 1px solid var(--line); border-radius: 15px; }
 .endpoints { align-items: center; }
 .endpoints code, .address code, code.address, .preview code {

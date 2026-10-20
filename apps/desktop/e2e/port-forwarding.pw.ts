@@ -13,8 +13,8 @@ declare global {
   }
 }
 async function add(page: Page, remotePort: number, localPort: number) {
-  if (await panel(page).getByRole('button', { name: '新建映射', exact: true }).isVisible()) {
-    await panel(page).getByRole('button', { name: '新建映射', exact: true }).click();
+  if (await page.getByRole('dialog').getByRole('button', { name: '新建映射', exact: true }).isVisible()) {
+    await page.getByRole('dialog').getByRole('button', { name: '新建映射', exact: true }).click();
   }
   await panel(page).getByRole('spinbutton', { name: '远程端口' }).fill(String(remotePort));
   await panel(page).getByRole('spinbutton', { name: '本地端口' }).fill(String(localPort));
@@ -27,13 +27,13 @@ test.beforeEach(async ({ page }) => {
 
 test('opens separate forms, discards drafts, and uses optional defaults', async ({ page }) => {
   await expect(panel(page).getByRole('textbox')).toHaveCount(0);
-  await panel(page).getByRole('button', { name: '新建映射', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '新建映射', exact: true }).click();
   await expect(page.getByRole('heading', { name: '新建映射', exact: true })).toBeVisible();
   await expect(panel(page).getByRole('article')).toHaveCount(0);
   await panel(page).getByRole('spinbutton', { name: '远程端口' }).fill('3002');
   await page.getByRole('button', { name: '返回映射列表' }).click();
   await expect(panel(page)).toContainText('还没有端口映射');
-  await panel(page).getByRole('button', { name: '新建映射', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '新建映射', exact: true }).click();
   await expect(panel(page).getByRole('spinbutton', { name: '远程端口' })).toHaveValue('');
   await page.screenshot({ path: '../../.codex-tmp/port-forwarding-create.png', animations: 'disabled' });
   await panel(page).getByRole('spinbutton', { name: '远程端口' }).fill('3002');
@@ -64,14 +64,14 @@ test('keeps eight cards and the form usable in a small window', async ({ page })
   await page.reload();
   await page.getByRole('button', { name: '端口映射', exact: true }).click();
   await expect(panel(page).getByRole('article')).toHaveCount(8);
-  await expect(panel(page).getByRole('button', { name: '新建映射', exact: true })).toBeDisabled();
+  await expect(page.getByRole('dialog').getByRole('button', { name: '新建映射', exact: true })).toBeDisabled();
   await page.setViewportSize({ width: 360, height: 640 });
   const last = panel(page).getByRole('article').last();
   await last.getByRole('button', { name: /^更多操作/ }).click();
   await expect(page.getByRole('menuitem', { name: '删除映射' })).toBeVisible();
   expect((await page.getByRole('menu').boundingBox())!.width).toBeLessThanOrEqual(400);
   await page.getByRole('menuitem', { name: '删除映射' }).click();
-  await expect(panel(page).getByRole('button', { name: '新建映射', exact: true })).toBeEnabled();
+  await expect(page.getByRole('dialog').getByRole('button', { name: '新建映射', exact: true })).toBeEnabled();
   await panel(page).getByRole('article').last().getByRole('button', { name: /^编辑映射/ }).click();
   await expect(page.getByRole('heading', { name: '编辑映射', exact: true })).toBeVisible();
   expect(await panel(page).evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
@@ -84,7 +84,7 @@ test('keeps eight cards and the form usable in a small window', async ({ page })
 
 test('selects UDP or both, persists edits, and keeps protocol controls within a narrow panel', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await panel(page).getByRole('button', { name: '新建映射', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '新建映射', exact: true }).click();
   await panel(page).getByText('UDP', { exact: true }).click();
   await expect(panel(page).getByRole('radio', { name: 'UDP', exact: true })).toBeChecked();
   await add(page, 53, 1053);
@@ -108,7 +108,7 @@ test('selects UDP or both, persists edits, and keeps protocol controls within a 
 });
 
 test('maps a selected IP and restores it after reload', async ({ page }) => {
-  await panel(page).getByRole('button', { name: '新建映射', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '新建映射', exact: true }).click();
   await panel(page).getByRole('textbox', { name: '目标 IP' }).fill('192.168.1.20:3000');
   await add(page, 3000, 13000);
   await expect(panel(page).getByRole('alert')).toHaveText('请输入有效的 IPv4 或 IPv6 地址。');

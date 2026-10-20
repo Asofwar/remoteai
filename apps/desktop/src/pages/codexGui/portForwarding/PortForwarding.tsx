@@ -53,9 +53,10 @@ export function PortForwarding(props: {
             <div className={styles.title}><h2>{t(title)}</h2>
               {view.type === 'list' && <>
                 <span className={styles.total}>{entries.length} / {MAX_PORT_MAPPINGS}</span>
-                <Button type="primary" className={styles.create} icon={<Plus size={16} aria-hidden="true" />}
+                {entries.length > 0 && <Button type="primary" className={styles.create}
+                  icon={<Plus size={16} aria-hidden="true" />}
                   disabled={entries.length >= MAX_PORT_MAPPINGS}
-                  onClick={() => setView({ type: 'create' })}>{t('新建映射')}</Button>
+                  onClick={() => setView({ type: 'create' })}>{t('新建映射')}</Button>}
               </>}
             </div>
             <p>{t('通过远程电脑访问目标 IP 和端口')}</p>
@@ -64,7 +65,7 @@ export function PortForwarding(props: {
         <section className={styles.panel} data-view={view.type} aria-label={t('端口映射设置')}>
           {!props.connected && <Alert type="info" message={t('连接已断开，重新连接后可再次启动。')} />}
           {view.type === 'list' && <MappingList entries={entries} service={service} connected={props.connected}
-            edit={entry => setView({ type: 'edit', entry })} onOpen={close} />}
+            create={() => setView({ type: 'create' })} edit={entry => setView({ type: 'edit', entry })} onOpen={close} />}
           {removed && <Alert type="info" message={t('该映射已被删除，请重新添加。')}
             action={<Button onClick={back}>{t('返回映射列表')}</Button>} />}
           {showForm && <MappingForm key={editing?.id ?? 'create'} formId={formId}

@@ -18,7 +18,7 @@
   :global(.ant-modal-header) {
     flex-shrink: 0; margin: 0; padding: 28px 64px 24px 28px; background: transparent;
   }
-  :global(.ant-modal-body) { display: flex; flex: 1; min-height: 0; overflow: hidden; padding: 0 28px 24px; }
+  :global(.ant-modal-body) { display: flex; flex: 1; min-height: 0; overflow: hidden; padding: 0 0 24px; }
   :global(.ant-modal-footer) {
     flex-shrink: 0; margin: 0; padding: 0;
   }
@@ -51,7 +51,7 @@ button.headerIcon {
 .create { flex-shrink: 0; height: 32px; padding-inline: 12px; border-radius: 8px; }
 .heading p { margin: 6px 0 0; color: var(--muted); font-size: 14px; font-weight: 400; line-height: 1.6; }
 .panel {
-  flex: 1; min-width: 0; min-height: 0; overflow-y: auto;
+  flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding-inline: 28px;
   color: var(--ink); font-size: 14px; line-height: 1.6; overflow-wrap: anywhere;
   &[data-view='list'] {
     display: flex; flex-direction: column; overflow: hidden;
@@ -108,7 +108,8 @@ code.address { cursor: text; }
 .toggle { height: 36px; padding-inline: 13px; border-radius: 9px; }
 .primary { height: 50px; border-radius: 11px; font-size: 16px; font-weight: 600; }
 .empty {
-  display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 40px 0; color: var(--muted);
+  display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; padding: 24px 0; color: var(--muted); text-align: center;
 }
 .form { display: flex; flex-direction: column; gap: 26px; padding-top: 4px; }
 .field { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
@@ -130,12 +131,17 @@ code.address { cursor: text; }
   :global(.ant-input), :global(.ant-input-number) {
     width: 100%; border-color: var(--line); border-radius: 10px; background: var(--panel); color: var(--ink);
     font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 15px;
+    outline: none; box-shadow: none;
   }
   :global(.ant-input) { height: 50px; padding-inline: 14px; }
-  :global(.ant-input-number-input) { height: 48px; padding-inline: 14px; }
-  :global(.ant-input:focus), :global(.ant-input-number-focused) {
+  :global(.ant-input-number-input) { height: 48px; padding-inline: 14px; outline: none; box-shadow: none; }
+  :global(.ant-input:not(:disabled):hover), :global(.ant-input-number:not(.ant-input-number-disabled):hover) {
     border-color: var(--mapping-accent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--mapping-accent) 16%, transparent);
+  }
+  :global(.ant-input:focus), :global(.ant-input:focus-within), :global(.ant-input-number-focused) {
+    border-color: var(--mapping-accent);
+    outline: none;
+    box-shadow: inset 0 0 0 1px var(--mapping-accent);
   }
 }
 .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
@@ -172,10 +178,11 @@ code.address { cursor: text; }
 @media (max-width: 520px) {
   .dialog {
     :global(.ant-modal-header) { padding: 22px 48px 22px 18px; }
-    :global(.ant-modal-body) { padding: 0 18px 20px; }
+    :global(.ant-modal-body) { padding: 0 0 20px; }
     :global(.ant-modal-close) { top: 18px; right: 12px; }
   }
   .header { gap: 12px; }
+  .panel { padding-inline: 18px; }
   .headerIcon { flex-basis: 42px; width: 42px; height: 42px; border-radius: 13px; }
   .title h2 { font-size: 20px; }
   .heading p { font-size: 12px; }

@@ -45,7 +45,6 @@ export function MappingForm(props: MappingFormProps) {
   const form = useMappingForm(props);
   return <form id={formId} className={styles.form} onSubmit={form.submit}>
     <div className={styles.field}>
-      <span className={styles.label}>{t('传输协议')}</span>
       <Radio.Group className={styles.protocols} aria-label={t('传输协议')} value={form.protocol}
         disabled={saving} onChange={event => form.setProtocol(event.target.value as MappingProtocol)}>
         <Radio.Button value="tcp">TCP</Radio.Button><Radio.Button value="udp">UDP</Radio.Button>
@@ -54,10 +53,9 @@ export function MappingForm(props: MappingFormProps) {
     </div>
     <div className={styles.field}>
       <label className={styles.label} htmlFor="mapping-host">{t('目标 IP')}<span>{t('选填')}</span></label>
-      <Input id="mapping-host" aria-label={t('目标 IP')} aria-describedby="mapping-host-hint"
+      <Input id="mapping-host" aria-label={t('目标 IP')}
         value={form.remoteHost} onChange={event => form.setRemoteHost(event.target.value)}
         placeholder={DEFAULT_MAPPING_HOST} disabled={saving} autoComplete="off" spellCheck={false} autoFocus />
-      <p id="mapping-host-hint" className={styles.hint}>{t('留空时，访问远程电脑本机。')}</p>
     </div>
     <div className={styles.fields}>
       <div className={styles.field}>
@@ -67,10 +65,9 @@ export function MappingForm(props: MappingFormProps) {
       </div>
       <div className={styles.field}>
         <label className={styles.label} htmlFor="mapping-local-port">{t('本地端口')}<span>{t('选填')}</span></label>
-        <InputNumber id="mapping-local-port" aria-label={t('本地端口')} aria-describedby="mapping-port-hint"
+        <InputNumber id="mapping-local-port" aria-label={t('本地端口')}
           min={1} max={MAX_PORT} value={form.localPort} onChange={form.setLocalPort}
           placeholder={t('同远程端口')} disabled={saving} />
-        <p id="mapping-port-hint" className={styles.hint}>{t('留空时与远程端口一致。')}</p>
       </div>
     </div>
     {entry && <MappingPreview remoteHost={form.remoteHost} remotePort={form.remotePort}

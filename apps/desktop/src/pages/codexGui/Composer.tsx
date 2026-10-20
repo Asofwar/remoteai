@@ -26,6 +26,7 @@ import { UsageStatus } from "./UsageStatus";
 import { ConversationTokenStatus } from './ConversationTokenStatus';
 import { ProjectPicker } from "./ProjectPicker";
 import { GuiToolbox } from "./GuiToolbox";
+import { LocalProjectBrowser } from './LocalProjectBrowser';
 import { localGitClient } from "./localGitClient";
 import { SkillInput, type SkillInputHandle } from "./SkillInput";
 import { useNextPromptSuggestion } from './useNextPromptSuggestion';
@@ -92,13 +93,16 @@ export const Composer = forwardRef<ComposerHandle, {
   };
   return <div ref={dropTarget} className={styles.composerWrap}>
     <RunningChangesSummary value={current} />
-    {(!running || isDesktopApp || hostPicker) && <ProjectPicker key={key} value={project}
+    <ProjectPicker value={project}
       projects={state.projects} hostPicker={hostPicker} running={running} active={active} dropState={drop}
-      actions={isDesktopApp && <GuiToolbox trigger="git" active={active} connected={!workspaceBusy}
-        cwd={project} deviceName={guiText("本机")} git={localGitClient} />}
+      actions={<>
+        {isDesktopApp && <GuiToolbox trigger="git" active={active} connected={!workspaceBusy}
+          cwd={project} deviceName={guiText("本机")} git={localGitClient} />}
+        <LocalProjectBrowser cwd={project} active={active} connected={!workspaceBusy && state.connection === 'ready'} />
+      </>}
       disabled={running || state.sending || state.archived || workspaceBusy || reading} gitEnabled={!state.selected}
       onBusyChange={controller.setWorkspaceBusy}
-      onChange={controller.setProject} onError={controller.report} />}
+      onChange={controller.setProject} onError={controller.report} />
     {state.selected && <QueuedMessages threadId={state.selected} messages={queuedMessages}
       running={running} connected={state.connection === "ready"} queue={controller.queue}
       editDisabled={disabled || reading || !active} onEdit={editQueuedMessage} />}

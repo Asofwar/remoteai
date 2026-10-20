@@ -1,0 +1,17 @@
+.project-browser-drawer { color: var(--git-ink); background: var(--git-surface); }
+.project-browser-drawer .pf-browser {
+  --pf-ink: var(--git-ink); --pf-muted: var(--git-muted); --pf-surface: var(--git-surface);
+  --pf-border: var(--git-border); --pf-subtle: var(--git-subtle); --pf-hover: var(--git-hover);
+  --pf-accent: var(--git-action); --pf-on-accent: var(--git-on-action); --pf-selection: var(--git-accent-bg);
+}
+.project-browser-title { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; }
+.project-browser-project { flex: 1; min-width: 0; text-align: right; overflow: hidden; white-space: nowrap;
+  text-overflow: ellipsis; color: var(--git-muted); font-size: 12px; }
+.project-browser-loading { padding: 16px; text-align: center; color: var(--git-muted); }
+.project-browser-drawer[data-dragging=true] { user-select: none; }
+@media (max-width: 860px) {
+  .project-browser-drawer > header button { min-width: 40px; min-height: 40px; }
+}
+@media (prefers-color-scheme: dark) {
+  .project-browser-drawer .pf-editor-host .cm-editor { color-scheme: dark; }
+}

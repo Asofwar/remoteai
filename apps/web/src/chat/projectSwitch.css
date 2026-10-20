@@ -1,5 +1,5 @@
 /* Align the visible folder edge with the plus stroke, accounting for their different icon sizes. */
-.chat-project-switch { min-width: 0; margin: 0 12px; }
+.chat-project-switch { display: flex; align-items: center; gap: 4px; min-width: 0; margin: 0 12px; }
 .chat-project-trigger { display: flex; align-items: center; gap: 7px; max-width: min(100%, 400px);
   min-height: 36px; padding: 6px 8px; border: 0; border-radius: 10px; background: transparent;
   color: var(--chat-muted); font: inherit; font-size: 13px; line-height: 20px; cursor: pointer; }
@@ -18,3 +18,4 @@
 .chat-project-option small { margin-top: 4px; color: var(--app-muted); font-size: 12px; }
 .chat-project-create { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 @media (min-width: 861px) { .chat-project-switch { margin-inline: 14px; } }
+@media (max-width: 860px) { .chat-project-files-trigger { display: none; } }

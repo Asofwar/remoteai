@@ -205,6 +205,7 @@ export type ApprovalReply = {
   answers?: Record<string, { answers: string[] }>;
 };
 export type Request =
+  | Exclude<import('../../../../../shared/project-browser/protocol').ProjectBrowserRequest, { operation: 'projectFiles' }>
   | { operation: 'suggestNextPrompt'; threadId: string; sourceTurnId: string; model: string;
       effort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' }
   | { operation: 'fileManifest'; threadId: string; id: string; page?: number; maxBytes: number }

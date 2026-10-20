@@ -1,21 +1,29 @@
 import { useEffect, useState } from 'react';
 import { Popover } from 'antd';
-import { GitBranch, Monitor, SquareTerminal, Wrench } from 'lucide-react';
+import { FolderSearch, GitBranch, Monitor, SquareTerminal, Wrench } from 'lucide-react';
 import type { GuiToolsClient } from '../../../../shared/remote-chat/guiTools';
 import { ChatTerminal } from './ChatTerminal';
 import { ChatGit } from './git/ChatGit';
 import { RemoteDesktop } from './desktop/RemoteDesktop';
 import { t } from '../i18n';
 import './git/git.css';
+import { ProjectBrowserDrawer } from './projectBrowser/ProjectBrowserDrawer';
+import { useDesktopLayout } from '../useDesktopLayout';
 
 interface Props {
   client: GuiToolsClient; cwd: string; active: boolean; connected: boolean; deviceName?: string;
 }
 export function ChatTools(props: Props) {
-  return <ProjectTools key={props.cwd} {...props} />;
+  const [project, setProject] = useState<string>();
+  return <>
+    <ProjectTools key={props.cwd} {...props} openFiles={() => setProject(value => value ?? props.cwd)} />
+    {project && <ProjectBrowserDrawer client={props.client.projectBrowser} cwd={project}
+      active={props.active} connected={props.connected} onClose={() => setProject(undefined)} />}
+  </>;
 }
 
-function ProjectTools({ client, ...props }: Props) {
+function ProjectTools({ client, openFiles, ...props }: Props & { openFiles: () => void }) {
+  const wide = useDesktopLayout();
   const [menu, setMenu] = useState(false);
   const [launchId, setLaunchId] = useState(0);
   const [git, setGit] = useState(false);
@@ -32,6 +40,9 @@ function ProjectTools({ client, ...props }: Props) {
           <SquareTerminal size={20} />{t('终端')}</button>
         <button type="button" onClick={() => { setMenu(false); setGit(true); }}>
           <GitBranch size={20} />{t('Git')}</button>
+        {!wide && <button type="button" disabled={!props.connected || !props.cwd}
+          onClick={() => { setMenu(false); openFiles(); }}>
+          <FolderSearch size={20} />{t('文件浏览')}</button>}
       </div>}>
       <button type="button" className="chat-terminal-toggle" aria-label={t('打开工具')}
         aria-expanded={menu && props.active}>

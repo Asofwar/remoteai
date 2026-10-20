@@ -43,6 +43,7 @@ import { applyProjectOverride, effectiveProjectThread } from './projects';
 import { PROJECT_LIST_OPERATION } from '../../../../shared/remote-chat/projects';
 
 const OPERATIONS = new Set([
+  'projectFileRead', 'projectFileWrite',
   'suggestNextPrompt',
   'guiGitGenerateMessage',
   'downloadOpen', 'downloadBrowse', 'previewOpen',
@@ -73,6 +74,7 @@ function terminalLinkRequest(request: RpcRequest): Cached['terminalLink'] {
     action: udpActions[String(stream.type)] ?? stream.type };
 }
 const READ_OPERATIONS = new Set([
+  'projectFileRead',
   'guiFileApplications', 'guiFilePreviewClose', 'guiFilePreviewHost', 'guiResourceClose',
   'suggestNextPrompt',
   PROJECT_LIST_OPERATION,
@@ -156,7 +158,7 @@ export class ChatOperations {
       }
       if (entry.terminalLink && reply.error) entry.readOnly = true;
       // Range reads are repeatable; caching their payloads would retain an entire file in memory.
-      if (operation === 'videoRead' || operation === 'fileRead'
+      if (operation === 'videoRead' || operation === 'fileRead' || operation === 'projectFileRead'
         || (operation === 'guiTerminalRead' && object(request.body).cursor !== undefined)) this.cache.delete(cacheKey);
     });
     return result;
@@ -280,6 +282,8 @@ export class ChatOperations {
     }
     applyProjectOverride(body);
     const result = await guiApi.request(body as unknown as Request);
+    // File documents must stay byte-faithful; conversation image rewriting would corrupt embedded data URLs.
+    if (body.operation === 'projectFileRead' || body.operation === 'projectFileWrite') return result;
     this.titles.completed(body, result);
     if (body.operation === 'skills') return composerCatalog(result as SkillsResponse, body);
     if (body.operation === 'list') {

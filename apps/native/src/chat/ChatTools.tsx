@@ -12,6 +12,7 @@ import { ChatToolsPopover } from './ChatToolsPopover';
 import { PortMappings } from './portMapping/PortMappings';
 import type { AuthSession } from '../types';
 import { palette, useStyles } from './styles';
+import { ProjectBrowser } from './ProjectBrowser';
 
 interface Props {
   client: GuiToolsClient; cwd: string; active: boolean; connected: boolean; deviceName?: string;
@@ -20,14 +21,18 @@ interface Props {
 export function ChatTools(props: Props) {
   useLanguage();
   const [mapping, setMapping] = useState(false);
+  const [project, setProject] = useState<string>();
   return <>
-    <ProjectTools key={props.cwd} {...props} openMappings={() => setMapping(true)} />
+    <ProjectTools key={props.cwd} {...props} openMappings={() => setMapping(true)}
+      openFiles={() => setProject(value => value ?? props.cwd)} />
+    {project && <ProjectBrowser client={props.client.projectBrowser} cwd={project}
+      active={props.active} connected={props.connected} onClose={() => setProject(undefined)} />}
     <PortMappings client={props.client.files} scope={props.scope} connected={props.connected} session={props.session}
       active={props.active} deviceName={props.deviceName} open={mapping} close={() => setMapping(false)} />
   </>;
 }
 
-function ProjectTools({ client, ...props }: Props & { openMappings: () => void }) {
+function ProjectTools({ client, ...props }: Props & { openMappings: () => void; openFiles: () => void }) {
   const styles = useStyles();
   const color = useThemeColor();
   const menuStyles = useMenuStyles();
@@ -65,6 +70,14 @@ function ProjectTools({ client, ...props }: Props & { openMappings: () => void }
       <Pressable accessibilityRole="button" style={({ pressed }) => [menuStyles.item, pressed && menuStyles.pressed]}
         onPress={() => { setMenu(false); setGit(true); }}>
         <Ionicons name="git-branch-outline" size={20} color={color(palette.ink, 'ink')} /><Text style={menuStyles.label}>Git</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" disabled={!props.connected || !props.cwd}
+        accessibilityState={{ disabled: !props.connected || !props.cwd }}
+        style={({ pressed }) => [menuStyles.item, pressed && menuStyles.pressed,
+          (!props.connected || !props.cwd) && styles.disabled]}
+        onPress={() => { setMenu(false); props.openFiles(); }}>
+        <Ionicons name="folder-open-outline" size={20} color={color(palette.ink, 'ink')} />
+        <Text style={menuStyles.label}>{t('文件浏览')}</Text>
       </Pressable>
     </ChatToolsPopover>}
     <ChatTerminal {...props} client={client.terminal} launchId={launchId} hideTrigger />

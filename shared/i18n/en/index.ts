@@ -1,5 +1,6 @@
 import { imageAiEnglish } from '../imageAi';
 import { dictationEnglish } from '../dictation';
+import { projectBrowserEnglish } from '../projectBrowser';
 import { gitMessageEnglish } from '../gitMessage';
 import { accountUsageEnglish } from '../accountUsage';
 import { aggregateRoutingEnglish } from '../aggregateRouting';
@@ -21,6 +22,7 @@ import { portForwardingEnglish } from '../portForwarding';
 
 export const english: Readonly<Record<string, string>> = {
   ...dictationEnglish,
+  ...projectBrowserEnglish,
   ...gitMessageEnglish,
   ...accountUsageEnglish,
   ...aggregateRoutingEnglish,

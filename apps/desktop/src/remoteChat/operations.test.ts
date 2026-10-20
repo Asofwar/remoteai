@@ -99,6 +99,31 @@ it('passes project photo browsing to the typed desktop boundary', async () => {
   expect(result.data).toMatchObject({ directory: 'C:/project', entries: [] });
 });
 
+it('routes project edits over the authenticated connection and deduplicates a retried save', async () => {
+  const body = { operation: 'projectFileWrite', cwd: 'D:/remote', path: 'D:/remote/src/main.ts',
+    text: 'export const changed = true;', revision: 'original' };
+  vi.mocked(guiApi.request).mockResolvedValue({ path: body.path, text: body.text, revision: 'updated' });
+  const operations = new ChatOperations();
+  const request = { kind: 'request' as const, id: 'project-save', method: 'request' as const, body };
+  const [first, retry] = await Promise.all([operations.execute(request), operations.execute(request)]);
+  expect(first.error).toBeUndefined();
+  expect(retry).toEqual(first);
+  expect(guiApi.request).toHaveBeenCalledExactlyOnceWith(body);
+  const read = { operation: 'projectFileRead', cwd: body.cwd, path: body.path };
+  expect(await operations.execute({ ...request, id: 'project-read', body: read }))
+    .toMatchObject({ data: { revision: 'updated' } });
+  expect(guiApi.request).toHaveBeenLastCalledWith(read);
+});
+
+it.each(['projectFileRead', 'projectFileWrite'])('preserves literal image data in %s documents', async operation => {
+  const image = 'data:image/png;base64,aW1hZ2U=';
+  const data = { path: 'C:/project/source.ts', text: `export const icon = "${image}";`, image, revision: 'original' };
+  vi.mocked(guiApi.request).mockResolvedValue(data);
+  const reply = await new ChatOperations().execute({ kind: 'request', id: 'document', method: 'request',
+    body: { operation, cwd: 'C:/project', path: data.path, text: data.text, revision: 'original' } });
+  expect(reply.data).toEqual(data);
+});
+
 it('retains available skills when the plugin catalog fails', async () => {
   const skills = { data: [{ cwd: 'C:/project', skills: [], errors: [] }] };
   vi.mocked(guiApi.request).mockResolvedValueOnce(skills).mockRejectedValueOnce(new Error('unavailable'));

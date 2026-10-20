@@ -1,0 +1,28 @@
+# 项目文件浏览器
+
+桌面本地、桌面远程和宽屏 Web 的入口位于聊天输入框上方工具栏末尾，手机 Web 和原生应用的入口位于右上角工具菜单。
+
+宽屏使用右侧抽屉：左侧按需展开文件树，右侧查看或编辑文件。抽屉左边缘和两栏分隔线均支持拖动、方向键调整，双击可恢复默认宽度。窄屏切换显示文件列表和内容，内容页可返回列表。
+
+文本编辑支持查找／替换、折叠、撤销／重做、行号、自动换行和保存。只有可识别语言的代码文件启用语法高亮，普通文本、日志和 Markdown 使用纯文本。支持 UTF-8 文本，保留原有 CRLF 换行；PNG、JPEG、GIF、WebP 和 ICO 可预览。二进制、非 UTF-8 文件及超过 2 MB 的文件显示说明，不执行文件内容。每个目录最多列出 500 项，达到上限时显示提示。
+
+切换文件、重新加载或关闭前会提示处理未保存修改。编辑器保留保存期间新增的修改；断线时保留草稿并禁用保存。原生编辑器在应用进入后台时保持挂载，避免丢失草稿。
+
+## 实现与边界
+
+- `shared/project-browser`：三端共用的文件树、CodeMirror 编辑器、草稿状态和手机消息桥。
+- `projectFiles` 复用现有目录列表；`projectFileRead` 和 `projectFileWrite` 经本机或已认证远程聊天连接进入 Rust。
+- Rust 校验规范化后的文件路径必须位于所选项目内，拒绝网络地址、目录和超限文件。阻塞读写及互斥锁均运行在线程池中。
+- 保存携带读取时的内容摘要，暂存后再次校验，使用临时文件替换目标。外部修改导致保存失败时，编辑草稿保持不变；不会自动覆盖冲突。
+- 原生 WebView 只加载随应用打包的编辑器；禁止导航、网络和本机文件访问。项目根目录由原生宿主决定。
+
+修改共享编辑器后运行 `node apps/native/scripts/build-project-browser.cjs` 更新原生资源，`npm run check -w @codex-switch/native` 会检查资源是否过期。
+
+## 验证
+
+- Rust：`cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --test codex_switch_lib_tests codex_gui::project_`。
+- 桌面：`npx vitest run src/remoteChat/projectBrowser.test.tsx src/remoteChat/operations.test.ts`。
+- 原生消息桥：`npm run test -w @codex-switch/native -- src/chat/projectBrowserBridge.test.ts`。
+- 界面与原生资源：`npm run test:chat:e2e -w @codex-switch/desktop -- project-browser`。
+- Android 独立测试包：在 `apps/native/android` 执行 `gradlew assembleRelease -I ../e2e/project-browser.init.gradle -PreactNativeArchitectures=arm64-v8a`，应用 ID 为 `com.codexswitch.mobile.filebrowsertest`。
+- 设置 `ANDROID_SERIAL` 后运行 `node apps/native/e2e/project-browser-test.mjs`，测试会安装独立测试包并在结束后卸载，恢复此前打开的应用。

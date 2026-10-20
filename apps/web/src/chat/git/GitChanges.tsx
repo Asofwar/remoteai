@@ -47,7 +47,7 @@ function GitRow({ row, panel, connected, onToggle, flat }: {
   const folder = row.kind === 'folder';
   const area = row.kind === 'area';
   const colors = gitAreaColors(row.area.id);
-  return <GitFileMenu file={row.file} panel={panel} connected={connected}>
+  return <GitFileMenu row={row} panel={panel} connected={connected}>
     <div className={`git-file git-file-${row.kind}`} data-area={row.area.id}
     style={{ color: colors.color, background: !area && checked === true ? colors.background : undefined }}>
     <Checkbox aria-label={t('选择 {path}', { path: row.path })} checked={checked === true}

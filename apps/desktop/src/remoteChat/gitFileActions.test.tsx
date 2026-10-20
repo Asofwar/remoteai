@@ -82,3 +82,49 @@ it('deletes only the context file and blocks actions offline or after changing p
   await act(async () => panel.confirmFileAction());
   expect(client.fileAction).toHaveBeenCalledTimes(1);
 });
+
+it.each(['commit', 'rollback', 'delete'] as const)(
+  '%s targets every descendant of a collapsed folder in its status group', async action => {
+    const selected = panel.changes!.files.find(file => file.path === 'README.md')!;
+    const folder = panel.fileList.rows.find(row => row.kind === 'folder' && row.id === 'unstaged:src')!;
+    const files = folder.files.map(({ path, version }) => ({ path, version }));
+    const head = panel.changes!.head;
+    await act(async () => {
+      panel.toggle(selected); panel.setMessage('keep draft'); panel.fileList.toggleFolder(folder.id);
+    });
+    expect(panel.fileList.rows.some(row => row.file?.path === 'src/chat/tools.ts')).toBe(false);
+    await act(async () => panel.requestFileAction(action, folder.files));
+    expect(panel.fileAction).toEqual({ action, head, files });
+    expect(files.map(file => file.path).sort()).toEqual(['src/app.ts', 'src/chat/menu.ts', 'src/chat/tools.ts']);
+    expect(client.commit).not.toHaveBeenCalled();
+    expect(client.fileAction).not.toHaveBeenCalled();
+    await act(async () => panel.confirmFileAction('folder changes'));
+    const request = { cwd: '/project', head, files };
+    if (action === 'commit') expect(client.commit).toHaveBeenCalledWith({ ...request, message: 'folder changes' });
+    else expect(client.fileAction).toHaveBeenCalledWith({ ...request, action });
+    expect(panel.selected).toEqual({ [selected.path]: selected.version });
+    expect(panel.message).toBe('keep draft');
+    expect(panel.changes!.files.some(file => file.path === 'src/theme.css')).toBe(true);
+    expect(panel.fileAction).toBeNull();
+  },
+);
+
+it('keeps folder versions and HEAD captured before a refresh and ignores an empty target list', async () => {
+  await act(async () => panel.toggle(panel.changes!.files[0]));
+  await act(async () => panel.requestFileAction('rollback', []));
+  expect(panel.fileAction).toBeNull();
+  const folder = panel.fileList.rows.find(row => row.path === 'src/chat')!;
+  const head = panel.changes!.head;
+  const files = folder.files.map(({ path, version }) => ({ path, version }));
+  await act(async () => panel.requestFileAction('rollback', folder.files));
+  const next = structuredClone(panel.changes!);
+  next.head = 'new-head';
+  next.files = next.files.map(file => ({ ...file, version: `${file.version}-newer` }));
+  vi.spyOn(client, 'changes').mockResolvedValue(next);
+  await act(async () => panel.refresh());
+  vi.mocked(client.fileAction).mockRejectedValueOnce(new Error('文件已变化'));
+  await act(async () => panel.confirmFileAction());
+  expect(client.fileAction).toHaveBeenCalledWith({ cwd: '/project', action: 'rollback', head, files });
+  expect(panel.fileAction).not.toBeNull();
+  expect(panel.error).toBe('文件已变化');
+});

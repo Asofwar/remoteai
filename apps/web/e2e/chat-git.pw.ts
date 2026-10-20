@@ -197,4 +197,22 @@ test('remote Git file actions send only the confirmed files', async ({ page, req
     { action: 'delete', files: [{ path: '新文件 [1].txt', version: 'new-v1' }] },
   ]);
   await expect(drawer.getByRole('button', { name: '查看 README.md', exact: true })).toBeVisible();
+  const selected = drawer.getByRole('checkbox', { name: '选择 README.md', exact: true });
+  await selected.check();
+  const folder = drawer.getByRole('button', { name: '展开或收起 src/chat', exact: true });
+  await folder.click();
+  await folder.scrollIntoViewIfNeeded();
+  await folder.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '提交文件夹内改动', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '提交 2 个文件', exact: true });
+  await expect(dialog.locator('li')).toHaveText(['src/chat/tools.ts', 'src/chat/menu.ts']);
+  await dialog.getByRole('textbox', { name: '提交说明', exact: true }).fill('提交文件夹改动');
+  await dialog.getByRole('button', { name: '提交', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(folder).toHaveCount(0);
+  await expect(selected).toBeChecked();
+  const commit = (await state(request)).operations.find(operation => operation.operation === 'guiGitCommit');
+  expect(commit?.files).toEqual([
+    { path: 'src/chat/tools.ts', version: 'tools-v1' }, { path: 'src/chat/menu.ts', version: 'menu-v1' },
+  ]);
 });

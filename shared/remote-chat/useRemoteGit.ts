@@ -58,10 +58,10 @@ export function useRemoteGit({ client, cwd, active, connected, refreshInterval }
   };
   const toggle = (file: GitChange) => selectFiles([file]);
   const selectAll = () => selectFiles(changes?.files ?? []);
-  const requestFileAction = (action: GitFileActionPrompt['action'], file?: GitChange) => {
+  const requestFileAction = (action: GitFileActionPrompt['action'], target?: GitChange | GitChange[]) => {
     if (!changes || busy || !connected || changes.files.some(item => item.conflict)) return;
-    const files = file ? [{ path: file.path, version: file.version }]
-      : Object.entries(selected).map(([path, version]) => ({ path, version }));
+    const targets = target ?? Object.entries(selected).map(([path, version]) => ({ path, version }));
+    const files = (Array.isArray(targets) ? targets : [targets]).map(({ path, version }) => ({ path, version }));
     if (files.length) setFileAction({ action, head: changes.head, files });
   };
   const confirmFileAction = (commitMessage = '') => run(async () => {

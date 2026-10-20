@@ -134,23 +134,37 @@ fn remove_target(
     Ok(())
 }
 
+#[derive(Default)]
+struct RendererMonitorState {
+    injected: HashMap<String, InjectedTarget>,
+    last_port: Option<u16>,
+    recovery: RendererRecovery,
+    last_sync_check: Option<Instant>,
+}
+
 fn monitor_iteration(
     paths: &RuntimePaths,
-    injected: &mut HashMap<String, InjectedTarget>,
-    last_port: &mut Option<u16>,
-    recovery: &mut RendererRecovery,
+    monitor: &mut RendererMonitorState,
 ) -> Result<(), String> {
+    let RendererMonitorState {
+        injected,
+        last_port,
+        recovery,
+        last_sync_check,
+    } = monitor;
     let skin_enabled = marker_path()?.is_file();
     let state = read_session();
     let Some(port) = state.port else {
         injected.clear();
         *last_port = None;
         recovery.reset();
+        *last_sync_check = None;
         return Ok(());
     };
     if *last_port != Some(port) {
         injected.clear();
         *last_port = Some(port);
+        *last_sync_check = None;
     }
     let paused = !runtime_enhancements_enabled() || !skin_enabled || pause_path()?.is_file();
     let payload = if paused {
@@ -172,42 +186,47 @@ fn monitor_iteration(
             return Err(error);
         }
     };
+    maintain_renderer_sync(&targets, port, last_sync_check);
     injected.retain(|id, _| targets.iter().any(|target| &target.id == id));
     for target in targets {
-        let current = injected.get(&target.id).cloned();
-        if paused {
-            if current
-                .as_ref()
-                .is_none_or(|entry| entry.revision != "paused")
-            {
-                remove_target(
-                    &target,
-                    port,
-                    current
-                        .as_ref()
-                        .and_then(|entry| entry.early_script_id.as_deref()),
-                )?;
-                injected.insert(
-                    target.id,
-                    InjectedTarget {
-                        revision: "paused".to_string(),
-                        early_script_id: None,
-                    },
-                );
-            }
-        } else if let Some(payload) = &payload {
-            if let Err(error) = refresh_skin_target(&target, port, payload, injected) {
-                eprintln!("Dream Skin target {}: {error}", target.id);
-            }
-        }
+        refresh_monitored_skin(&target, port, payload.as_ref(), injected)?;
     }
     Ok(())
 }
 
+fn refresh_monitored_skin(
+    target: &CdpTarget,
+    port: u16,
+    payload: Option<&LoadedPayload>,
+    injected: &mut HashMap<String, InjectedTarget>,
+) -> Result<(), String> {
+    if let Some(payload) = payload {
+        if let Err(error) = refresh_skin_target(target, port, payload, injected) {
+            eprintln!("Dream Skin target {}: {error}", target.id);
+        }
+        return Ok(());
+    }
+    let current = injected.get(&target.id);
+    if current.is_some_and(|entry| entry.revision == "paused") {
+        return Ok(());
+    }
+    remove_target(
+        target,
+        port,
+        current.and_then(|entry| entry.early_script_id.as_deref()),
+    )?;
+    injected.insert(
+        target.id.clone(),
+        InjectedTarget {
+            revision: "paused".to_string(),
+            early_script_id: None,
+        },
+    );
+    Ok(())
+}
+
 fn monitor_loop(control: Arc<MonitorControl>) {
-    let mut injected = HashMap::new();
-    let mut last_port = None;
-    let mut recovery = RendererRecovery::default();
+    let mut monitor = RendererMonitorState::default();
     loop {
         let paths = {
             let guard = control
@@ -223,8 +242,7 @@ fn monitor_loop(control: Arc<MonitorControl>) {
         let Some(paths) = paths else {
             continue;
         };
-        if let Err(error) = monitor_iteration(&paths, &mut injected, &mut last_port, &mut recovery)
-        {
+        if let Err(error) = monitor_iteration(&paths, &mut monitor) {
             if !error.contains("CDP is unavailable") {
                 eprintln!("Codex renderer monitor: {error}");
             }

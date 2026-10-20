@@ -25,7 +25,7 @@ export const messages1 = {
   "codexConnection.connecting": "Подключение к Codex",
   "codexConnection.unsupported": "Codex недоступен",
   "codexConnection.checkingHint": "Проверка подключения к Codex.",
-  "codexConnection.connectedHint": "Подключено к Codex.",
+  "codexConnection.connectedHint": "Codex подключен. Нажмите, чтобы обновить данные об использовании.",
   "codexConnection.connectHint": "Нажмите, чтобы подключиться к Codex.",
   "codexConnection.connectingHint": "Подключение к Codex. подождите.",
   "codexConnection.unsupportedHint": "Подключение к Codex в этой среде недоступно.",

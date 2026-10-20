@@ -165,6 +165,33 @@ test("shows the current API daily estimate while preserving global daily usage",
   assert.doesNotMatch(harness.usage.title, /钱包/);
 });
 
+test("expires disconnected usage instead of presenting old zero tokens and full quota as current", () => {
+  const harness = createHarness();
+  update(harness, { totalTokens: 0, estimatedCostUsd: 0, primaryRemainingPercent: 100 });
+  harness.advance(30000);
+  delete harness.window.codexSwitchRequestUsageSummary;
+  harness.poll();
+  assert.equal(harness.usage.querySelector("[data-today-tokens]").textContent, "--");
+  assert.equal(harness.usage.querySelector("[data-today-cost]").textContent, "待更新");
+  assert.equal(harness.usage.querySelector("[data-trailing-balance]").hidden, true);
+  assert.doesNotMatch(harness.usage.title, /100%/);
+  update(harness, { totalTokens: 5000, primaryRemainingPercent: 90 });
+  assert.equal(harness.usage.querySelector("[data-today-tokens]").textContent, "5K");
+  assert.equal(harness.usage.querySelector("[data-trailing-balance]").textContent, "90%");
+});
+
+test("unknown accounting is not converted to zero while measured zero remains valid", () => {
+  const harness = createHarness();
+  for (const value of [undefined, null, NaN, Infinity, "0"]) {
+    update(harness, { totalTokens: value, estimatedCostUsd: value });
+    assert.equal(harness.usage.querySelector("[data-today-tokens]").textContent, "--");
+    assert.equal(harness.usage.querySelector("[data-today-cost]").textContent, "待更新");
+  }
+  update(harness, { totalTokens: 0, estimatedCostUsd: 0 });
+  assert.equal(harness.usage.querySelector("[data-today-tokens]").textContent, "0");
+  assert.equal(harness.usage.querySelector("[data-today-cost]").textContent, "0 USD");
+});
+
 test("converts daily and API prices using display settings without changing USD accounting", () => {
   const harness = createHarness();
   const trailing = update(harness, { providerEstimatedCost: { amountUsd: 1.25, aggregated: false },

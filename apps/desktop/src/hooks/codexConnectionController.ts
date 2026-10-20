@@ -91,7 +91,7 @@ export class CodexConnectionController {
   };
 
   connect = async (): Promise<void> => {
-    if (this.snapshot.state !== "disconnected") return;
+    if (this.snapshot.state !== "disconnected" && this.snapshot.state !== "connected") return;
     const confirmation = this.confirmationGeneration;
     await this.perform("connect", async (generation) => {
       if (confirmation !== this.confirmationGeneration) return;

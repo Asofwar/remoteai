@@ -18,8 +18,7 @@ export function CodexConnectionControl(props: CodexConnectionControlProps) {
   const { state, operation, restartRequired } = connection;
   const displayState = operation ? "connecting" : state;
   const pending = state === "checking" || state === "connecting" || operation !== null;
-  const connected = state === "connected";
-  const disabled = blocked || pending || connected || !canManageCodexConnection || state === "unsupported";
+  const disabled = blocked || pending || !canManageCodexConnection || state === "unsupported";
   const label = t(`codexConnection.${displayState}`);
   const tooltipKey = displayState === "disconnected" ? "codexConnection.connectHint"
     : `codexConnection.${displayState}Hint` as const;

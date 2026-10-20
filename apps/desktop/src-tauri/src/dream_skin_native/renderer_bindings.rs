@@ -101,7 +101,8 @@ fn publish_usage_with_language(
 ) -> Result<(), String> {
     // Preferences must reach the renderer before accounting I/O can block or fail.
     let language = serde_json::to_string(&language).map_err(|error| error.to_string())?;
-    let expression = format!("window.__CODEX_SWITCH_SPEED_SELECTOR__?.updateLanguage?.({language})");
+    let expression =
+        format!("window.__CODEX_SWITCH_SPEED_SELECTOR__?.updateLanguage?.({language})");
     evaluate_for_binding(target, port, &expression)?;
     let summary = load_summary()?;
     let summary = serde_json::to_string(&summary).map_err(|error| error.to_string())?;
@@ -131,6 +132,7 @@ fn handle_renderer_binding(call: RendererBindingCall, target: &CdpTarget, port: 
 }
 
 fn run_renderer_bindings(mut session: CdpSession, target: CdpTarget, port: u16, generation: u64) {
+    let _health = RendererBindingGuard(generation);
     let mut published_revision = 0;
     while RENDERER_BINDING_GENERATION.load(Ordering::Acquire) == generation {
         let call = match session.read_renderer_binding() {
@@ -143,8 +145,11 @@ fn run_renderer_bindings(mut session: CdpSession, target: CdpTarget, port: u16, 
         if RENDERER_BINDING_GENERATION.load(Ordering::Acquire) != generation {
             return;
         }
+        record_renderer_binding_poll(generation);
         let revision = USAGE_SUMMARY_REVISION.load(Ordering::Acquire);
-        let requested_usage = call.as_ref().is_some_and(|call| call.name == USAGE_SUMMARY_BINDING);
+        let requested_usage = call
+            .as_ref()
+            .is_some_and(|call| call.name == USAGE_SUMMARY_BINDING);
         if let Some(call) = call {
             handle_renderer_binding(call, &target, port);
         }
@@ -159,17 +164,29 @@ fn run_renderer_bindings(mut session: CdpSession, target: CdpTarget, port: u16, 
 }
 
 fn install_renderer_bindings(target: &CdpTarget, port: u16) -> Result<(), String> {
+    let _install = RENDERER_BINDING_INSTALL_LOCK
+        .lock()
+        .map_err(|_| "Codex renderer synchronization is unavailable.".to_string())?;
     let mut session = CdpSession::connect(target, port)?;
     session.enable()?;
     session.add_binding(SERVICE_TIER_BINDING)?;
     session.add_binding(USAGE_SUMMARY_BINDING)?;
+    restore_composer(&mut session)?;
     session.evaluate(
         "setTimeout(() => { \
             window.__CODEX_SWITCH_SPEED_SELECTOR__?.completeUsageRequest?.(); \
             window.__CODEX_SWITCH_SPEED_SELECTOR__?.requestUsage?.(); \
         }, 0); true",
     )?;
-    let target = target.clone();
+    start_renderer_binding_worker(session, target.clone(), port)
+}
+
+fn start_renderer_binding_worker(
+    session: CdpSession,
+    target: CdpTarget,
+    port: u16,
+) -> Result<(), String> {
+    let endpoint = target.web_socket_debugger_url.clone();
     let (ready, activation) = std::sync::mpsc::sync_channel(1);
     thread::Builder::new()
         .name("codex-renderer-bindings".to_string())
@@ -182,6 +199,13 @@ fn install_renderer_bindings(target: &CdpTarget, port: u16) -> Result<(), String
     // Keep the previous listener alive until the replacement is fully initialized
     // and its worker exists. The worker waits for this generation before reading.
     let generation = RENDERER_BINDING_GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
+    *RENDERER_BINDING_HEALTH
+        .lock()
+        .unwrap_or_else(|error| error.into_inner()) = Some(RendererBindingHealth {
+        generation,
+        endpoint,
+        last_poll: Instant::now(),
+    });
     ready
         .send(generation)
         .map_err(|_| "Failed to activate the Codex renderer bindings.".to_string())

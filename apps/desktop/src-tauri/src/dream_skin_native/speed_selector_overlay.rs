@@ -1,9 +1,10 @@
 const CODEX_SPEED_SELECTOR_OVERLAY: &str = r#"
   window.__CODEX_SWITCH_REFRESH_SPEED_SELECTOR__ = () => {
     const stateKey = "__CODEX_SWITCH_SPEED_SELECTOR__";
-    const overlayVersion = 21;
+    const overlayVersion = 22;
     const usageRefreshMs = 5000;
     const usageRequestTimeoutMs = 15000;
+    const usageStaleMs = 30000;
     const initialTier = __CODEX_SWITCH_SERVICE_TIER__;
     const fastModeAllowed = window.__CODEX_SWITCH_FAST_MODE_ALLOWED__ === true;
     const existing = window[stateKey];
@@ -34,6 +35,7 @@ const CODEX_SPEED_SELECTOR_OVERLAY: &str = r#"
       installed: true, version: overlayVersion, tier: initialTier, fastModeAllowed, language: "zh",
       observer: null, timer: null,
       usageTimer: null, initialUsageTimer: null, usagePending: false, usageRequestedAt: 0,
+      usageUpdatedAt: null, usageStale: true,
       onUsageVisible: null,
       pendingTier: null, previousTier: null, selectionError: false, syncAll: null,
       completeSelection: null, completeUsageRequest: null, updateUsage: null, requestUsage: null,
@@ -50,6 +52,7 @@ const CODEX_SPEED_SELECTOR_OVERLAY: &str = r#"
         today: "今日", normal: "普通模式", fast: "快速模式", ultrafast: "Ultrafast 模式",
         group: "今日用量与速度模式", switchTo: "点击切换为",
         speedError: "速度模式未能切换，请稍后重试。",
+        pending: "待更新",
         tokens: "今日 Token 用量", cost: "今日预估成本",
         quota: "当前账号主用量余额", totalQuota: "并发账号主用量余额合计",
         apiCost: "当前 API 今日预估成本", totalApiCost: "聚合 API 今日总预估成本",
@@ -58,6 +61,7 @@ const CODEX_SPEED_SELECTOR_OVERLAY: &str = r#"
         today: "Today", normal: "Normal mode", fast: "Fast mode", ultrafast: "Ultrafast mode",
         group: "Today's usage and speed mode", switchTo: "Click to switch to ",
         speedError: "Couldn't change speed. Please try again.",
+        pending: "Awaiting update",
         tokens: "Tokens used today", cost: "Estimated cost today",
         quota: "Current account quota remaining", totalQuota: "Total quota remaining across concurrent accounts",
         apiCost: "Current API estimated cost today", totalApiCost: "Combined API estimated cost today",
@@ -66,6 +70,7 @@ const CODEX_SPEED_SELECTOR_OVERLAY: &str = r#"
         today: "Сегодня", normal: "Обычный режим", fast: "Быстрый режим", ultrafast: "Сверхбыстрый режим",
         group: "Расход за сегодня и режим скорости", switchTo: "Нажмите, чтобы переключиться на ",
         speedError: "Не удалось изменить скорость. Попробуйте ещё раз.",
+        pending: "Ожидание обновления",
         tokens: "Токены за сегодня", cost: "Стоимость за сегодня",
         quota: "Остаток лимита аккаунта", totalQuota: "Общий остаток лимитов параллельных аккаунтов",
         apiCost: "Стоимость текущего API за сегодня", totalApiCost: "Общая стоимость API за сегодня",
@@ -93,6 +98,7 @@ const CODEX_SPEED_SELECTOR_OVERLAY: &str = r#"
       return `${new Intl.NumberFormat("en-US", { maximumFractionDigits }).format(value)} ${display.unit}`;
     };
     const displayedTrailingUsage = () => {
+      if (state.usageStale) return null;
       if (Number.isFinite(state.usage.primaryRemainingPercent)) {
         const value = `${Math.round(state.usage.primaryRemainingPercent)}%`;
         return {
@@ -165,8 +171,9 @@ const CODEX_SPEED_SELECTOR_OVERLAY: &str = r#"
       usage.style.display = usage.hidden ? "none" : "inline-flex";
       if (usage.hidden) return;
       syncUsageColors(usage);
-      const tokens = formatTokens(state.usage.totalTokens);
-      const cost = formatCost(state.usage.estimatedCostUsd);
+      const tokens = state.usageStale || state.usage.totalTokens === null ? "--" : formatTokens(state.usage.totalTokens);
+      const cost = state.usageStale || state.usage.estimatedCostUsd === null
+        ? text("pending") : formatCost(state.usage.estimatedCostUsd);
       const balance = displayedTrailingUsage();
       const balanceSeparator = usage.querySelector("[data-balance-separator]");
       const balanceValue = usage.querySelector("[data-trailing-balance]");
@@ -206,14 +213,14 @@ const CODEX_SPEED_SELECTOR_OVERLAY: &str = r#"
     state.updateUsage = summary => {
       state.completeUsageRequest();
       if (["zh", "en", "ru"].includes(summary?.language)) state.language = summary.language;
-      const totalTokens = Number(summary?.totalTokens);
-      const estimatedCostUsd = Number(summary?.estimatedCostUsd);
+      const totalTokens = summary?.totalTokens;
+      const estimatedCostUsd = summary?.estimatedCostUsd;
       const primaryRemainingPercent = summary?.primaryRemainingPercent;
       const providerEstimatedCost = summary?.providerEstimatedCost;
       state.usage = {
         enabled: summary?.enabled === true,
-        totalTokens: Number.isFinite(totalTokens) ? Math.max(0, totalTokens) : 0,
-        estimatedCostUsd: Number.isFinite(estimatedCostUsd) ? Math.max(0, estimatedCostUsd) : 0,
+        totalTokens: Number.isFinite(totalTokens) ? Math.max(0, totalTokens) : null,
+        estimatedCostUsd: Number.isFinite(estimatedCostUsd) ? Math.max(0, estimatedCostUsd) : null,
         costDisplay: typeof summary?.costDisplay?.unit === "string"
           && summary.costDisplay.unit.trim() && Number.isFinite(summary.costDisplay.usdMultiplier)
           && summary.costDisplay.usdMultiplier > 0
@@ -232,9 +239,15 @@ const CODEX_SPEED_SELECTOR_OVERLAY: &str = r#"
           }
           : null,
       };
+      state.usageUpdatedAt = Date.now();
+      state.usageStale = false;
       syncAll();
     };
     state.requestUsage = () => {
+      if (!state.usageStale && Date.now() - state.usageUpdatedAt >= usageStaleMs) {
+        state.usageStale = true;
+        syncAll();
+      }
       if (!state.installed || window[stateKey] !== state
         || typeof window.codexSwitchRequestUsageSummary !== "function") return;
       const now = Date.now();

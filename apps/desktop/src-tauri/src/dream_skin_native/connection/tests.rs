@@ -13,6 +13,7 @@ struct SimulatedChannel {
     targets: Result<Vec<CdpTarget>, ()>,
     probe_passed: bool,
     bindings_fail: bool,
+    sync_healthy: bool,
     calls: Vec<ChannelCall>,
 }
 
@@ -22,12 +23,17 @@ impl Default for SimulatedChannel {
             targets: Ok(vec![main_target()]),
             probe_passed: true,
             bindings_fail: false,
+            sync_healthy: true,
             calls: Vec::new(),
         }
     }
 }
 
 impl RendererChannel for SimulatedChannel {
+    fn sync_healthy(&mut self, _target: &CdpTarget, port: u16) -> bool {
+        assert_eq!(port, PORT);
+        self.sync_healthy
+    }
     fn targets(&mut self, port: u16) -> Result<Vec<CdpTarget>, ()> {
         assert_eq!(port, PORT);
         self.calls.push(ChannelCall::List);
@@ -69,6 +75,23 @@ fn status_requires_a_live_main_renderer_and_does_not_restore_bindings() {
     assert_eq!(result.state, CodexConnectionState::Connected);
     assert!(!result.restart_required);
     assert_eq!(channel.calls, vec![ChannelCall::List, ChannelCall::Probe]);
+}
+
+#[test]
+fn a_reachable_page_without_usage_sync_does_not_count_as_connected() {
+    let mut channel = SimulatedChannel {
+        sync_healthy: false,
+        ..Default::default()
+    };
+    let result =
+        check_existing_channel(Some(PORT), ConnectionAction::Inspect, &mut channel).unwrap();
+    assert_eq!(result.state, CodexConnectionState::Disconnected);
+    assert!(!result.restart_required);
+    assert_eq!(channel.calls, vec![ChannelCall::List, ChannelCall::Probe]);
+    let result =
+        check_existing_channel(Some(PORT), ConnectionAction::Reconnect, &mut channel).unwrap();
+    assert_eq!(result.state, CodexConnectionState::Connected);
+    assert!(!result.restart_required);
 }
 
 #[test]

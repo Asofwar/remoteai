@@ -338,9 +338,7 @@
         assert!(!expression.contains("menuitemradio"));
         assert!(!expression.contains("openSubmenu"));
         assert!(!expression.contains("button.h-token-button-composer"));
-        assert!(expression.contains(&format!(
-            "window.{CODEX_COMPOSER_STATUS_ALLOWED_GLOBAL} = allowed"
-        )));
+        assert!(expression.contains("window.__CODEX_SWITCH_COMPOSER_STATUS_ALLOWED__ = allowed"));
         assert!(expression.contains("const hasActiveLocalModelQuery = (authMethod = null) =>"));
         assert!(expression.contains("const syncComposerStatus = () =>"));
         assert!(expression.contains("window.__CODEX_SWITCH_REFRESH_SPEED_SELECTOR__?.()"));

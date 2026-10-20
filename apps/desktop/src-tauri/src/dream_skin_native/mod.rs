@@ -10,6 +10,7 @@ include!("cdp.rs");
 mod connection;
 pub(crate) use connection::inspect_connection;
 include!("renderer_bindings.rs");
+include!("renderer_sync.rs");
 include!("injection_monitor.rs");
 include!("runtime_recovery.rs");
 include!("windows_runtime.rs");
@@ -25,6 +26,9 @@ mod tests_recovery_integration;
 
 #[cfg(test)]
 mod tests_renderer_bindings;
+
+#[cfg(test)]
+mod tests_renderer_sync;
 
 #[cfg(test)]
 mod tests_runtime_entry;

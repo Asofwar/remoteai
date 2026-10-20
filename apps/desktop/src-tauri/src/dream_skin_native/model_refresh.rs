@@ -5,8 +5,6 @@ const CODEX_MODEL_QUERY_PREFIX: [&str; 2] = ["models", "list"];
 const CODEX_MODEL_QUERY_HOST: &str = "local";
 const CODEX_MODEL_QUERY_NO_AUTH: &str = "no-auth";
 const CODEX_MODEL_QUERY_LIMIT: u16 = 100;
-const CODEX_COMPOSER_STATUS_ALLOWED_GLOBAL: &str = "__CODEX_SWITCH_COMPOSER_STATUS_ALLOWED__";
-const CODEX_COMPOSER_STATUS_OBSERVER_GLOBAL: &str = "__CODEX_SWITCH_COMPOSER_STATUS_OBSERVER__";
 
 /// Outcome reported by the Codex renderer after refreshing its model cache.
 #[derive(Debug, PartialEq, Eq)]
@@ -162,8 +160,8 @@ fn codex_model_refresh_expression(
         .map_err(|error| format!("Failed to prepare the proxy service tier: {error}"))?;
     let speed_selector_overlay =
         CODEX_SPEED_SELECTOR_OVERLAY.replace("__CODEX_SWITCH_SERVICE_TIER__", &service_tier);
-    let composer_status_allowed_global = CODEX_COMPOSER_STATUS_ALLOWED_GLOBAL;
-    let composer_status_observer_global = CODEX_COMPOSER_STATUS_OBSERVER_GLOBAL;
+    let composer_query_client = include_str!("composer_query_client.js");
+    let composer_status_setup = include_str!("composer_status.js");
     let context_usage_overlay = context_usage_overlay_expression(crate::local_proxy::is_running());
     Ok(format!(
         r#"(async () => {{
@@ -175,6 +173,7 @@ fn codex_model_refresh_expression(
   const supersededRefresh = {{ refreshed: false, reason: "superseded-model-refresh" }};
   const expectedModels = {models};
   const fastModeModels = new Set({fast_mode_models});
+  window.__CODEX_SWITCH_FAST_MODE_AVAILABLE__ = fastModeModels.size > 0;
   const imageInputModels = new Set({image_input_models});
   const selectedModel = {selected_model};
   const supportedReasoningEffortsByModel = {reasoning_efforts};
@@ -184,27 +183,7 @@ fn codex_model_refresh_expression(
   if (!root || !Array.isArray(expectedModels)) {{
     return {{ refreshed: false, reason: "unavailable" }};
   }}
-  const queue = [root._internalRoot?.current ?? root];
-  const seen = new Set();
-  let queryClient = null;
-  while (queue.length && seen.size < 50000) {{
-    const fiber = queue.shift();
-    if (!fiber || typeof fiber !== "object" || seen.has(fiber)) continue;
-    seen.add(fiber);
-    const candidates = [
-      fiber.memoizedProps?.client,
-      fiber.pendingProps?.client,
-      fiber.memoizedState?.client,
-    ];
-    queryClient = candidates.find(candidate =>
-      candidate && typeof candidate.getQueryCache === "function" &&
-      typeof candidate.invalidateQueries === "function" &&
-      typeof candidate.setQueryData === "function"
-    ) ?? null;
-    if (queryClient) break;
-    if (fiber.child) queue.push(fiber.child);
-    if (fiber.sibling) queue.push(fiber.sibling);
-  }}
+  const queryClient = {composer_query_client};
   if (!queryClient) return {{ refreshed: false, reason: "query-client-not-found" }};
 
   const matchesModelsQuery = query => Array.isArray(query?.queryKey) &&
@@ -214,34 +193,9 @@ fn codex_model_refresh_expression(
     (query.queryKey[0] === "config" &&
       (query.queryKey[1] === "user" || query.queryKey[1] === "read-response"))
   );
-  const hasActiveLocalModelQuery = (authMethod = null) => queryClient.getQueryCache().getAll().some(query => {{
-    const key = query.queryKey;
-    const active = typeof query.isActive === "function"
-      ? query.isActive()
-      : (query.observers?.length ?? 0) > 0;
-    return active && matchesModelsQuery(query) && key[2] === "local" &&
-      (authMethod === null || key[3] === authMethod);
-  }});
-  const syncComposerStatus = () => {{
-    // Daily usage is independent of login mode; authenticated Codex owns its native Fast control.
-    const allowed = hasActiveLocalModelQuery();
-    const fastModeAllowed = fastModeModels.size > 0 && hasActiveLocalModelQuery("no-auth");
-    const changed = window.{composer_status_allowed_global} !== allowed ||
-      window.__CODEX_SWITCH_FAST_MODE_ALLOWED__ !== fastModeAllowed;
-    window.{composer_status_allowed_global} = allowed;
-    window.__CODEX_SWITCH_FAST_MODE_ALLOWED__ = fastModeAllowed;
-    if (changed) window.__CODEX_SWITCH_REFRESH_SPEED_SELECTOR__?.();
-  }};
-  syncComposerStatus();
 {speed_selector_overlay}
+{composer_status_setup}
 {observer_patch_helpers}
-  window.{composer_status_observer_global}?.unsubscribe?.();
-  window.{composer_status_observer_global} = {{
-    unsubscribe: queryClient.getQueryCache().subscribe(event => {{
-      if (matchesModelsQuery(event?.query)) syncComposerStatus();
-    }}),
-  }};
-  syncComposerStatus();
   if (expectedModels.length === 0) {{
     clearModelQueryPatch();
     // Inactive picker queries retain injected Provider data after invalidation, so reset their

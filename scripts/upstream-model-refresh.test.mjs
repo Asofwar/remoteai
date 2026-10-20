@@ -46,8 +46,8 @@ function modelRefreshExpression(models, capabilities = {}) {
     reasoning_efforts: JSON.stringify(capabilities.reasoningEfforts ?? {}),
     default_reasoning_efforts: JSON.stringify(defaultReasoningEfforts),
     fallback_query_key: JSON.stringify(modelQueryKey),
-    composer_status_allowed_global: "__CODEX_SWITCH_COMPOSER_STATUS_ALLOWED__",
-    composer_status_observer_global: "__CODEX_SWITCH_COMPOSER_STATUS_OBSERVER__",
+    composer_query_client: readFileSync(new URL("composer_query_client.js", sourcePath), "utf8"),
+    composer_status_setup: readFileSync(new URL("composer_status.js", sourcePath), "utf8"),
     observer_patch_helpers: observerHelpers,
     // The DOM speed overlay is tested separately in codex-usage-overlay.test.mjs.
     speed_selector_overlay: "",

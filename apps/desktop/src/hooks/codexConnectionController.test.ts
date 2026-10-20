@@ -39,6 +39,21 @@ async function createController() {
 afterEach(() => { vi.useRealTimers(); });
 
 describe("Codex connection actions", () => {
+  it("can resync an already connected page without restarting or overlapping requests", async () => {
+    const context = await createController();
+    context.loadStatus.mockResolvedValue({ state: "connected" });
+    await context.controller.refresh();
+    const pending = deferred<CodexConnectResult>();
+    context.connect.mockReturnValue(pending.promise);
+    const first = context.controller.connect();
+    await context.controller.connect();
+    expect(context.connect).toHaveBeenCalledOnce();
+    pending.resolve({ state: "connected", restartRequired: false });
+    await first;
+    expect(context.controller.getSnapshot().state).toBe("connected");
+    expect(context.restart).not.toHaveBeenCalled();
+  });
+
   it("safe connect only requests confirmation, and cancellation never calls the backend", async () => {
     const context = await createController();
     await context.controller.connect();

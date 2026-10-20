@@ -61,6 +61,7 @@ impl Drop for ConnectionCheckGuard {
 trait RendererChannel {
     fn targets(&mut self, port: u16) -> Result<Vec<CdpTarget>, ()>;
     fn probe(&mut self, target: &CdpTarget, port: u16) -> bool;
+    fn sync_healthy(&mut self, target: &CdpTarget, port: u16) -> bool;
     fn restore_bindings(&mut self, target: &CdpTarget, port: u16) -> Result<(), ConnectionError>;
 }
 
@@ -93,6 +94,10 @@ impl RendererChannel for ExistingRendererChannel {
             eprintln!("Failed to restore Codex connection bindings: {error}");
             ConnectionError::BindingRestoreFailed
         })
+    }
+
+    fn sync_healthy(&mut self, target: &CdpTarget, port: u16) -> bool {
+        super::renderer_sync_healthy(target, port)
     }
 }
 
@@ -157,6 +162,9 @@ fn check_existing_channel(
         // Do not wake the general monitor: an outage there could authorize an
         // automatic restart before the user has confirmed taking over this app.
         channel.restore_bindings(&target, port)?;
+    } else if !channel.sync_healthy(&target, port) {
+        // A reachable page alone does not prove that the persistent listener survived.
+        return Ok(disconnected(ConnectionAction::Inspect));
     }
     Ok(CodexConnectionResult {
         state: CodexConnectionState::Connected,

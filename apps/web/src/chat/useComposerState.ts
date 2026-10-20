@@ -74,8 +74,15 @@ export function useComposerState(props: ComposerProps) {
     const input = menu.input.current;
     if (!input || !active) return;
     const resize = () => {
+      const viewport = input.closest<HTMLElement>('.chat-composer-content');
+      const scrollTop = viewport?.scrollTop ?? 0;
+      const editingEnd = document.activeElement === input && input.selectionStart === input.value.length;
+      // Measuring at auto height temporarily collapses the outer scroll range.
+      // Restore it after sizing, keeping the last line's padding visible while typing at the end.
       input.style.height = 'auto';
       input.style.height = `${input.scrollHeight}px`;
+      input.scrollTop = 0;
+      if (viewport) viewport.scrollTop = editingEnd ? viewport.scrollHeight : scrollTop;
     };
     resize();
     let width = input.clientWidth;

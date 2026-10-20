@@ -30,6 +30,12 @@ sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev
   libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev libegl-dev
 ```
 
+The screen capture bindings require newer PipeWire headers than Ubuntu 22.04's 0.3.48 package.
+Ubuntu 24.04 provides a suitable development package. The release workflow keeps Ubuntu 22.04 as its
+build baseline by compiling a checksum-pinned PipeWire 1.0.5 SDK into a private directory and setting
+`PKG_CONFIG_PATH` for compilation; it does not replace the system PipeWire runtime. See the
+`Prepare Linux screen capture SDK` step in [release.yml](../.github/workflows/release.yml).
+
 Dependency versions are locked by the root `package-lock.json` and `apps/desktop/src-tauri/Cargo.lock`. Include both lockfile changes whenever a dependency update is intentional.
 
 ## Common Commands

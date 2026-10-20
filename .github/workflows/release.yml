@@ -147,7 +147,33 @@ jobs:
             libxdo-dev libssl-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils \
             squashfs-tools xvfb xauth dbus-x11 x11-utils protobuf-compiler libprotobuf-dev clang cmake strace \
             pkg-config libclang-dev libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev \
-            libwayland-dev libegl-dev
+            libwayland-dev libegl-dev meson ninja-build
+
+      # xcap's PipeWire bindings need newer headers than Ubuntu 22.04 provides.
+      # Build a private SDK without replacing the runner's runtime or raising the glibc baseline.
+      - name: Prepare Linux screen capture SDK
+        if: startsWith(matrix.name, 'ubuntu')
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/pipewire-1.0.5.tar.bz2"
+          source="$RUNNER_TEMP/pipewire-1.0.5"
+          sdk="$RUNNER_TEMP/pipewire-sdk"
+          curl -fL --retry 3 \
+            https://archive.ubuntu.com/ubuntu/pool/main/p/pipewire/pipewire_1.0.5.orig.tar.bz2 \
+            -o "$archive"
+          checksum=d5e5f3d0b8460e5711c1571c500156fd61768ba55a062eaeb94356abdb955a56
+          echo "$checksum  $archive" | sha256sum --check --strict
+          tar -xjf "$archive" -C "$RUNNER_TEMP"
+          meson setup "$source/build" "$source" --prefix "$sdk" --libdir lib \
+            --buildtype release --wrap-mode nofallback -Dauto_features=disabled \
+            -Dsession-managers=[] -Dpipewire-jack=disabled \
+            -Dpipewire-v4l2=disabled -Dtests=disabled -Dexamples=disabled \
+            -Ddbus=disabled -Dflatpak=disabled -Dsystemd-user-service=disabled
+          meson compile -C "$source/build"
+          meson install -C "$source/build"
+          PKG_CONFIG_PATH="$sdk/lib/pkgconfig" pkg-config --exact-version=1.0.5 libpipewire-0.3
+          echo "PKG_CONFIG_PATH=$sdk/lib/pkgconfig" >> "$GITHUB_ENV"
 
       # Ubuntu 22.04 ships protoc 3.12; EasyTier requires stable proto3 optional support.
       - name: Install Linux connectivity protocol compiler

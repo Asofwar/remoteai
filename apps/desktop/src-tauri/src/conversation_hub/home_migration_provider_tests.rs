@@ -135,3 +135,41 @@ fn migration_request_rejects_unknown_providers_and_accepts_legacy_requests() {
     request["modelProvider"] = json!("unknown-provider");
     assert!(serde_json::from_value::<HomeMigrationRequest>(request).is_err());
 }
+
+#[test]
+fn provider_migration_preserves_paginated_rollouts_and_updates_database_routing() {
+    let source = source_fixture();
+    let target = source_fixture();
+    target.discard();
+    let compressed = source.rollout("archived_sessions/rollout-thread-a.jsonl.zst", THREAD);
+    let mut originals = Vec::new();
+    for path in [
+        source.home.join("sessions/rollout-thread-a.jsonl"),
+        compressed,
+    ] {
+        let (mut meta, body) = read_rollout(&path);
+        meta["payload"]["history_mode"] = json!("paginated");
+        meta["payload"]["model_provider"] = json!("codex-switch-local");
+        let mut bytes = serde_json::to_vec(&meta).unwrap();
+        bytes.push(b'\n');
+        bytes.extend(body);
+        if path.extension().is_some_and(|extension| extension == "zst") {
+            bytes = zstd::stream::encode_all(bytes.as_slice(), 1).unwrap();
+        }
+        fs::write(&path, &bytes).unwrap();
+        originals.push((
+            path.strip_prefix(&source.home).unwrap().to_path_buf(),
+            bytes,
+        ));
+    }
+    let report = migrate_with_provider(&source, &target, MigrationModelProvider::Openai).unwrap();
+    assert_eq!(report.migrated_count, 1);
+    for (relative, bytes) in originals {
+        assert_eq!(fs::read(target.home.join(relative)).unwrap(), bytes);
+    }
+    let state = snapshot_thread_row(Some(&target.home.join(STATE)), THREAD)
+        .unwrap()
+        .unwrap();
+    assert_eq!(sqlite_row_text(&state, "model_provider"), Some("openai"));
+    source.assert_removed();
+}

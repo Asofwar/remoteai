@@ -73,6 +73,7 @@ mod remote_command;
 mod remote_control;
 mod remote_desktop;
 mod remote_websocket;
+mod rollout_metadata;
 mod skills_market;
 mod storage;
 mod system_proxy;

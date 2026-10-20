@@ -59,7 +59,8 @@ fn create_visibility_checkpoint<R: Runtime>(
     if state_db.is_none() && snapshots.is_empty() && !index_path.exists() {
         return Ok(None);
     }
-    let root = app.app
+    let root = app
+        .app
         .path()
         .app_data_dir()
         .map_err(|error| error.to_string())?
@@ -94,54 +95,18 @@ fn create_visibility_checkpoint<R: Runtime>(
 }
 
 fn rewrite_rollout_provider(path: &Path, target_provider: &str) -> Result<bool, String> {
-    let mut reader = rollout_reader(path)?;
-    let mut first = String::new();
-    reader
-        .read_line(&mut first)
-        .map_err(|error| error.to_string())?;
-    let mut meta: Value =
-        serde_json::from_str(first.trim_end()).map_err(|error| error.to_string())?;
-    let payload = meta
-        .get_mut("payload")
-        .and_then(Value::as_object_mut)
-        .ok_or_else(|| "会话信息不完整，请恢复后重试".to_string())?;
-    if payload.get("model_provider").and_then(Value::as_str) == Some(target_provider) {
-        return Ok(false);
-    }
-    payload.insert(
-        "model_provider".to_string(),
-        Value::String(target_provider.to_string()),
-    );
-    let parent = path.parent().ok_or_else(|| "会话目录无效".to_string())?;
-    let mut temporary = tempfile::NamedTempFile::new_in(parent).map_err(|error| error.to_string())?;
-    if path.extension().and_then(|value| value.to_str()) == Some("zst") {
-        let mut encoder = zstd::stream::write::Encoder::new(temporary.as_file_mut(), 3)
-            .map_err(|error| error.to_string())?;
-        write_rollout_metadata(&mut encoder, &meta, &mut reader)?;
-        encoder.finish().map_err(|error| error.to_string())?;
-    } else {
-        write_rollout_metadata(temporary.as_file_mut(), &meta, &mut reader)?;
-    }
-    temporary
-        .as_file()
-        .sync_all()
-        .map_err(|error| error.to_string())?;
-    // Windows does not allow replacing the rollout while its decoder still owns
-    // an open handle to the original file.
-    drop(reader);
-    temporary.persist(path).map_err(|error| error.to_string())?;
-    Ok(true)
+    crate::rollout_metadata::update_provider(path, None, target_provider)
+        .map_err(|error| error.to_string())
 }
 
-fn write_rollout_metadata(
-    mut output: impl Write,
-    meta: &Value,
-    reader: &mut impl Read,
-) -> Result<(), String> {
-    serde_json::to_writer(&mut output, meta).map_err(|error| error.to_string())?;
-    output.write_all(b"\n").map_err(|error| error.to_string())?;
-    std::io::copy(reader, &mut output).map_err(|error| error.to_string())?;
-    Ok(())
+fn rollout_needs_provider_update(path: &Path, provider: &str) -> bool {
+    first_rollout_value(path)
+        .ok()
+        .flatten()
+        .is_some_and(|value| {
+            !crate::rollout_metadata::requires_stable_bytes(&value)
+                && value.pointer("/payload/model_provider").and_then(Value::as_str) != Some(provider)
+        })
 }
 
 fn rebuild_index_from_snapshots(
@@ -334,17 +299,7 @@ pub(crate) fn reconcile_codex_thread_visibility_blocking<R: Runtime>(
     } else {
         rollout_count = relevant
             .iter()
-            .filter(|item| {
-                first_rollout_value(&item.path)
-                    .ok()
-                    .flatten()
-                    .is_some_and(|value| {
-                        value
-                            .pointer("/payload/model_provider")
-                            .and_then(Value::as_str)
-                            != Some(provider.as_str())
-                    })
-            })
+            .filter(|item| rollout_needs_provider_update(&item.path, &provider))
             .count();
     }
     let index_entry_count = if mode == "deep" && !dry_run {
@@ -407,7 +362,8 @@ pub(crate) fn open_codex_thread_file_blocking<R: Runtime>(
     } else {
         snapshot.path
     };
-    app.app.opener()
+    app.app
+        .opener()
         .open_path(path.to_string_lossy().to_string(), None::<&str>)
         .map_err(|error| format!("无法打开 {}：{error}", path.display()))
 }

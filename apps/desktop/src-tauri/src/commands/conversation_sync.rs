@@ -349,66 +349,8 @@ fn update_rollout_provider(
     source_provider: &str,
     target_provider: &str,
 ) -> Result<bool, String> {
-    if !path.exists() {
-        return Err(format!("Codex 对话文件不存在：{}", path.display()));
-    }
-
-    let source = fs::File::open(path)
-        .map_err(|error| format!("无法打开 Codex 对话文件 {}：{error}", path.display()))?;
-    let mut reader = BufReader::new(source);
-    let mut first_line = String::new();
-    reader
-        .read_line(&mut first_line)
-        .map_err(|error| format!("无法读取 Codex 对话文件 {}：{error}", path.display()))?;
-    if first_line.trim().is_empty() {
-        return Err(format!("Codex 对话文件为空：{}", path.display()));
-    }
-
-    let mut metadata: Value = serde_json::from_str(first_line.trim_end())
-        .map_err(|error| format!("Codex 对话元数据无效 {}：{error}", path.display()))?;
-    let Some(provider) = metadata.pointer_mut("/payload/model_provider") else {
-        return Err(format!(
-            "Codex 对话文件缺少 model_provider：{}",
-            path.display()
-        ));
-    };
-    if provider.as_str() != Some(source_provider) {
-        return Ok(false);
-    }
-    *provider = Value::String(target_provider.to_string());
-
-    let temp_path = path.with_extension(format!("codex-switch-sync-{}.tmp", std::process::id()));
-    let write_result = (|| -> Result<(), String> {
-        let temp = fs::File::create(&temp_path).map_err(|error| {
-            format!(
-                "无法创建 Codex 对话临时文件 {}：{error}",
-                temp_path.display()
-            )
-        })?;
-        let mut writer = BufWriter::new(temp);
-        serde_json::to_writer(&mut writer, &metadata)
-            .map_err(|error| format!("无法写入 Codex 对话元数据：{error}"))?;
-        writer
-            .write_all(b"\n")
-            .and_then(|_| std::io::copy(&mut reader, &mut writer).map(|_| ()))
-            .and_then(|_| writer.flush())
-            .map_err(|error| format!("无法写入 Codex 对话文件 {}：{error}", path.display()))?;
-        writer
-            .get_ref()
-            .sync_all()
-            .map_err(|error| format!("无法刷新 Codex 对话文件 {}：{error}", path.display()))
-    })();
-
-    if let Err(error) = write_result {
-        let _ = fs::remove_file(&temp_path);
-        return Err(error);
-    }
-    drop(reader);
-    crate::storage::replace_file(&temp_path, path).map_err(|error| {
-        let _ = fs::remove_file(&temp_path);
-        format!("无法提交 Codex 对话文件 {}：{error}", path.display())
-    })?;
-    Ok(true)
+    crate::rollout_metadata::update_provider(path, Some(source_provider), target_provider)
+        .map_err(|error| error.to_string())
 }
 
 fn update_desktop_thread_catalogs(

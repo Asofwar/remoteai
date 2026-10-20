@@ -260,6 +260,9 @@ include!("tests.rs");
 mod thread_title_tests;
 
 #[cfg(test)]
+mod visibility_provider_tests;
+
+#[cfg(test)]
 mod bin_test_support;
 #[cfg(test)]
 mod bin_tests;

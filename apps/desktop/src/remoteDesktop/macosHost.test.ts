@@ -31,6 +31,20 @@ it('publishes macOS display discovery and controls through the existing viewer p
   expect(fallback.open).not.toHaveBeenCalled();
 });
 
+it('uses Retina backing pixels for capture quality on all viewers', async () => {
+  const original = call.getMockImplementation()!;
+  const display = { id: 'macos:1', name: '显示器 1', width: 3840, height: 2160, primary: true };
+  call.mockImplementation(async (command, args) => command === 'remote_desktop_open'
+    ? { id: 'mac-lease', nativeOnly: true, platform: 'macos', displays: [display], displayId: display.id }
+    : original(command, args));
+  const session = new HostSession(DEFAULT_SETTINGS, []);
+  expect(await session.open()).toMatchObject({ displays: [display] });
+  expect(call).toHaveBeenCalledWith('remote_desktop_stream_open', { request: expect.objectContaining({
+    profile: expect.objectContaining({ width: 2560, codec: 'h264' }),
+  }) });
+  await session.close();
+});
+
 it('preserves macOS encoder errors and releases the lease without attempting Windows capture', async () => {
   const original = call.getMockImplementation()!;
   call.mockImplementation(async (command, args) => {

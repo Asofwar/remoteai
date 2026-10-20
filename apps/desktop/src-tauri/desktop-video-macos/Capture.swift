@@ -9,11 +9,16 @@ final class DesktopCapture: NSObject, SCStreamOutput, SCStreamDelegate {
     private let options: CaptureOptions
     private var encoder: VideoEncoder?
     private var stream: SCStream?
+    private var configuration: SCStreamConfiguration?
+    private var frameRate: CaptureFrameRate
     private var latest: CVPixelBuffer?
     private var lastFrame = DispatchTime.now()
     private var timer: DispatchSourceTimer?
 
-    init(options: CaptureOptions) { self.options = options }
+    init(options: CaptureOptions) {
+        self.options = options
+        frameRate = CaptureFrameRate(options.fps)
+    }
 
     func start() async throws {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
@@ -23,6 +28,7 @@ final class DesktopCapture: NSObject, SCStreamOutput, SCStreamDelegate {
         encoder = try VideoEncoder(options: options) { [weak self] frame in try self?.write(frame) }
         try FileHandle.standardOutput.write(contentsOf: Wire.packet(Data("CSW2".utf8)))
         let configuration = SCStreamConfiguration()
+        self.configuration = configuration
         configuration.width = options.width
         configuration.height = options.height
         configuration.minimumFrameInterval = CMTime(value: 1, timescale: Int32(options.fps))
@@ -103,10 +109,30 @@ final class DesktopCapture: NSObject, SCStreamOutput, SCStreamDelegate {
                     self.queue.async { [self] in
                         do {
                             try self.encoder?.control(bitrate: bitrate, fps: fps)
+                            if fps != 0 {
+                                self.frameRate.request(Int(fps))
+                                self.updateFrameRate()
+                            }
                             if let image = self.latest { self.encode(image) }
                         } catch { exit(1) }
                     }
                 } catch { exit(1) }
+            }
+        }
+    }
+
+    private func updateFrameRate() {
+        guard let stream, let configuration, let fps = frameRate.beginUpdate() else { return }
+        configuration.minimumFrameInterval = CMTime(value: 1, timescale: Int32(fps))
+        stream.updateConfiguration(configuration) { [weak self] error in
+            guard let self else { return }
+            self.queue.async { [self] in
+                if error != nil {
+                    // Keep the previous stream alive if the display cannot accept this rate.
+                    fputs("desktop capture frame rate update refused\n", stderr)
+                }
+                self.frameRate.finishUpdate(succeeded: error == nil)
+                self.updateFrameRate()
             }
         }
     }

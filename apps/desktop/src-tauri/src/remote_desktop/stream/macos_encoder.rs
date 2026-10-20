@@ -115,10 +115,9 @@ impl Encoder {
     }
 
     pub async fn update(&mut self, profile: Profile) -> Result<bool> {
-        if profile.width != self.profile.width
-            || profile.fps != self.profile.fps
-            || self.child.stdin.is_none()
-        {
+        // ScreenCaptureKit and VideoToolbox apply frame-rate/bitrate changes in place. Restarting
+        // the helper here interrupts video and can exhaust the session heartbeat during startup.
+        if profile.width != self.profile.width || self.child.stdin.is_none() {
             return Ok(false);
         }
         self.control(profile.bitrate, profile.fps).await?;
@@ -162,3 +161,7 @@ pub(super) fn runtime_path(resource_dir: PathBuf) -> Result<PathBuf> {
     }
     Err(DesktopError::Platform)
 }
+
+#[cfg(test)]
+#[path = "macos_encoder_tests.rs"]
+mod tests;

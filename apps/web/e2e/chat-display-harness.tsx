@@ -9,6 +9,7 @@ import { ConversationChangesButton } from '../../desktop/src/pages/codexGui/Conv
 import { useDesktopLayout } from '../src/useDesktopLayout';
 import type { Thread } from '../src/chat/types';
 import { mergeHistory } from '../../../shared/remote-chat/client/history';
+import { historyLoadResult, type HistoryLoadResult } from '../../../shared/remote-chat/client/historyLoad';
 import { currentRunningTurn } from '../../../shared/chat/runningTurn';
 import '../src/styles.css';
 import '../src/chat/chat.css';
@@ -20,13 +21,18 @@ function Harness() {
   const [thread, setThread] = useState<Thread | null>(null);
   const [hasMore, setHasMore] = useState(new URLSearchParams(location.search).has('history'));
   const [loadingMore, setLoadingMore] = useState(false);
+  const [historyLoad, setHistoryLoad] = useState<HistoryLoadResult>();
   const runningTurn = currentRunningTurn(thread?.turns);
   const loadOlder = async () => {
+    const startedAt = Date.now();
+    setHistoryLoad(undefined);
     setLoadingMore(true);
     try {
       const response = await fetch('/web/display-history.json');
       const page: { turns: NonNullable<Thread['turns']>; hasMore: boolean } = await response.json();
-      setThread(current => current && { ...current, turns: [...page.turns, ...(current.turns ?? [])] });
+      const loaded = thread && { ...thread, turns: [...page.turns, ...(thread.turns ?? [])] };
+      setThread(loaded);
+      if (thread && loaded) setHistoryLoad(historyLoadResult(thread, loaded, startedAt));
       setHasMore(page.hasMore);
     } finally { setLoadingMore(false); }
   };
@@ -53,7 +59,7 @@ function Harness() {
           {desktop && <ConversationChangesButton value={thread?.turns ? { turns: thread.turns } : undefined} />}
         </header>
         <ChatMessages key={thread?.id} thread={thread} hasMore={hasMore}
-          loadingMore={loadingMore} loadOlder={loadOlder}
+          loadingMore={loadingMore} loadOlder={loadOlder} historyLoad={historyLoad}
           processing={runningTurn && <ChatProcessing key={runningTurn.id} turn={runningTurn} active />} />
         <footer style={{ padding: 20 }}><input aria-label="消息" placeholder="输入消息…" /></footer>
       </div>

@@ -4,7 +4,6 @@ import { memo, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, FlatList, Keyboard, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useChatScroll } from './useChatScroll';
-import { useHistoryLoadNotice } from '../../../../shared/remote-chat/useHistoryLoadNotice';
 import { ChatActivityRow, ChatMessage } from './ChatMessage';
 import { ChatToolDetails } from './ChatToolDetails';
 import { ChatWorkDrawer } from './ChatWorkDrawer';
@@ -73,9 +72,8 @@ export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder,
   const runningSummary = timeline.find(entry => entry.kind === 'summary' && entry.turn.id === runningTurn?.id);
   const { list, more, preservePosition, historyBottomSpace, initializing, onItemLayout, onFooterLayout,
     showScrollToBottom, scrollToBottom, ...scrollHandlers }
-    = useChatScroll<Entry>({ hasMore, loading, loadingMore, loadOlder,
+    = useChatScroll<Entry>({ hasMore, loading, loadingMore, loadOlder, historyLoad, threadId: thread?.id,
       latestItemId: timeline.at(-1)?.id, bottomPadding: styles.messages.padding });
-  const notice = useHistoryLoadNotice(historyLoad?.threadId === thread?.id ? historyLoad : undefined);
   // Expanded group headers can be replaced when an older page extends the group; anchor a message instead.
   const firstMessageIndex = entries[0]?.kind === 'work' && entries[0].inline ? 1 : 0;
   // Keep live messages visible through completion, including replies that never call tools.
@@ -108,8 +106,8 @@ export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder,
     // FlatList accounts for the list header itself, including in one-message conversations.
     maintainVisibleContentPosition={preservePosition ? { minIndexForVisible: firstMessageIndex } : undefined}
     {...scrollHandlers}
-    ListHeaderComponent={<View style={hasMore && [styles.historyStatus, styles.messageHeader]}>
-      {hasMore && <Pressable accessibilityRole="button" onPress={more} disabled={loadingMore}
+    ListHeaderComponent={<View style={(hasMore || loadingMore) && [styles.historyStatus, styles.messageHeader]}>
+      {(hasMore || loadingMore) && <Pressable accessibilityRole="button" onPress={more} disabled={loadingMore}
         accessibilityState={{ disabled: Boolean(loadingMore) }}>
         <Text style={styles.subtitle}>{loadingMore ? t("加载中…") : t("加载更早的消息")}</Text>
       </Pressable>}
@@ -130,11 +128,6 @@ export function ChatMessages({ thread, loading, loadingMore, hasMore, loadOlder,
     {showInitialLoading && <View style={styles.messageLoadingOverlay}>
       <ActivityIndicator size="small" accessibilityLabel={t("正在加载聊天记录")} />
       <Text style={[styles.subtitle, styles.messageLoadingText]}>{t("正在加载聊天记录…")}</Text>
-    </View>}
-    {notice && <View pointerEvents="none" style={styles.historyNotice}>
-      <Text accessibilityLiveRegion="polite" style={styles.historyNoticeText}>
-        {t('已加载 {count} 条历史记录，用时 {seconds} 秒', notice)}
-      </Text>
     </View>}
     </View>
     {selectedEntry && <ChatWorkDrawer entry={selectedEntry} onClose={close}

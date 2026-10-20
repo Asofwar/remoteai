@@ -26,7 +26,7 @@ test('loads short history on upward wheel, prevents overlap and preserves the re
   await page.route('**/display-history.json', async route => {
     requests++;
     await new Promise<void>(resolve => { finish = resolve; });
-    const turns = Array.from({ length: 12 }, (_, index) => turn(`older-${requests}-${index}`));
+    const turns = Array.from({ length: 24 }, (_, index) => turn(`older-${requests}-${index}`));
     await route.fulfill({ json: { turns, hasMore: requests < 2 } });
   });
   await open(page);
@@ -40,7 +40,7 @@ test('loads short history on upward wheel, prevents overlap and preserves the re
   for (let step = 0; step < 3; step++) await wheel(page, -120);
   expect(requests).toBe(1);
   finish();
-  await expect(page.locator('.chat-entry-message')).toHaveCount(13);
+  await expect(page.locator('.chat-entry-message')).toHaveCount(25);
   await expect(page.getByRole('button', { name: '加载更早的消息' })).toBeEnabled();
   // A short page has no room below its last message to preserve its exact vertical offset.
   await expect(latest).toBeInViewport();
@@ -55,7 +55,7 @@ test('loads short history on upward wheel, prevents overlap and preserves the re
   const first = page.locator('[data-message-id="older-1-0"]');
   const top = (await first.boundingBox())!.y;
   finish();
-  await expect(page.locator('.chat-entry-message')).toHaveCount(25);
+  await expect(page.locator('.chat-entry-message')).toHaveCount(49);
   await expect.poll(async () => Math.abs((await first.boundingBox())!.y - top)).toBeLessThan(3);
   await expect(page.getByRole('button', { name: '加载更早的消息' })).toHaveCount(0);
   await wheel(page, -10000);

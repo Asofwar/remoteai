@@ -2,7 +2,6 @@ import { t, useLanguage } from '../i18n';
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ArrowDown, ChevronDown, ChevronRight, Terminal } from 'lucide-react';
 import type { ChatMessagesProps } from '../../../../shared/remote-chat/client/messageProps';
-import { useHistoryLoadNotice } from '../../../../shared/remote-chat/useHistoryLoadNotice';
 import { useConversationEntries } from '../../../../shared/chat/useConversationEntries';
 import { currentRunningTurn } from '../../../../shared/chat/runningTurn';
 import { findWorkEntry, type WorkEntry } from '../../../../shared/chat/turnPresentation';
@@ -96,13 +95,14 @@ export function ChatMessages(props: MessageProps & { footer?: ReactNode }) {
   useLanguage();
   const desktop = useDesktopLayout();
   const scroll = useHistoryScroll(props);
-  const notice = useHistoryLoadNotice(props.historyLoad?.threadId === props.thread?.id ? props.historyLoad : undefined);
   const jump = scroll.showBottom && <button type="button" className="chat-scroll-bottom"
     onClick={scroll.toBottom}><ArrowDown size={17} />{t("回到底部")}</button>;
   return <div className={`chat-message-region${props.footer ? ' has-scroll-footer' : ''}`}>
     <ChatSelectionQuote root={scroll.content} selected={props.thread?.id ?? null} enabled={desktop} />
     <div ref={scroll.list} className="chat-scroll chat-messages" aria-label={t("聊天记录")}
-      onScroll={scroll.onScroll} onWheel={scroll.onWheel}>
+      onScroll={scroll.onScroll} onWheel={scroll.onWheel}
+      onTouchStart={scroll.onTouchStart} onTouchMove={scroll.onTouchMove}
+      onTouchEnd={scroll.onTouchEnd} onTouchCancel={scroll.onTouchCancel}>
       <div ref={scroll.body} className="chat-message-scroll-body">
         {/* Reset history details on selection changes without remounting the composer during its first send. */}
         <ChatMessageHistory key={props.thread?.id ?? 'new'} props={props} scroll={scroll} />
@@ -110,9 +110,6 @@ export function ChatMessages(props: MessageProps & { footer?: ReactNode }) {
       </div>
     </div>
     {!props.footer && jump}
-    {notice && <div className="chat-history-notice" role="status">
-      {t('已加载 {count} 条历史记录，用时 {seconds} 秒', notice)}
-    </div>}
   </div>;
 }
 
@@ -141,7 +138,7 @@ function ChatMessageHistory({ props, scroll }: {
   return <>
     <div ref={scroll.content} className={`chat-message-content${!entries.length ? ' is-empty' : ''}`}
       onClickCapture={desktop ? scroll.pauseFollowing : undefined}>
-      {(hasMore || (loading && !entries.length)) && <div className="chat-history-more">
+      {(hasMore || loadingMore || (loading && !entries.length)) && <div className="chat-history-more">
         {loading && !entries.length && !loadingMore
           ? <span role="status" className="chat-processing"><span className="chat-spinner" />{t("正在加载聊天记录…")}</span>
           : <button type="button" className="chat-text-action" onClick={scroll.more}

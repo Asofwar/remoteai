@@ -30,7 +30,6 @@ vi.mock('./ChatToolDetails', () => ({ ChatToolDetails: 'ToolDetails' }));
 vi.mock('./ChatProcessSummary', () => ({ ChatProcessSummary: 'ProcessSummary' }));
 vi.mock('./ChatTurnSummary', () => ({ ChatTurnDuration: 'Duration', ChatTurnSummary: 'Summary' }));
 vi.mock('./ChatTurnDetails', () => ({ ChatTurnDetails: 'TurnDetails' }));
-vi.mock('../../../../shared/remote-chat/useHistoryLoadNotice', () => ({ useHistoryLoadNotice: () => undefined }));
 vi.mock('./useConversationEntries', () => ({ useConversationEntries: (turns: Turn[]) => ({
   entries: conversationEntries(turns, state.inline), hasObservedLiveTurn: true,
   setInline: (id: string, inline: boolean) => { state.inline.set(id, inline); },

@@ -103,7 +103,7 @@ function touch(x: number, y: number, touches = 1): Parameters<Scroll['onTouchSta
 
 it('loads short history once per downward pull without requiring a refresh control', async () => {
   const loadOlder = vi.fn(async () => {});
-  const scroll = render({ latestItemId: 'last', loadOlder });
+  const scroll = render({ latestItemId: 'last', loadOlder, hasMore: true });
   scroll.onTouchStart(touch(20, 20));
   scroll.onTouchMove(touch(20, 45));
   expect(loadOlder).not.toHaveBeenCalled();
@@ -116,7 +116,7 @@ it('loads short history once per downward pull without requiring a refresh contr
 
 it('ignores sideways, upward, cancelled, multitouch and non-top pulls', () => {
   const loadOlder = vi.fn(async () => {});
-  const scroll = render({ latestItemId: 'last', loadOlder });
+  const scroll = render({ latestItemId: 'last', loadOlder, hasMore: true });
   for (const move of [touch(100, 100), touch(20, 10), touch(20, 100, 2)]) {
     scroll.onTouchStart(touch(20, 20));
     scroll.onTouchMove(move);
@@ -144,6 +144,58 @@ it('prevents overlapping pulls and still loads when scrolling lands exactly at t
   expect(loadOlder).toHaveBeenCalledOnce();
   finish();
   await Promise.resolve();
+});
+
+it.each(['onScrollEndDrag', 'onMomentumScrollEnd'] as const)(
+  'loads at the top on %s even if Android cancels touches and drops the last scroll event', async (finish) => {
+    const loadOlder = vi.fn(async () => {});
+    const scroll = render({ latestItemId: 'last', loadOlder, hasMore: true });
+    scroll.onScroll(scrollEvent(FIRST_CONTENT_HEIGHT, FIRST_CONTENT_HEIGHT - VIEWPORT_HEIGHT - 120));
+    scroll.onTouchStart(touch(20, 20));
+    scroll.onScrollBeginDrag();
+    scroll.onTouchCancel();
+    scroll[finish](scrollEvent(FIRST_CONTENT_HEIGHT, FIRST_CONTENT_HEIGHT - VIEWPORT_HEIGHT));
+    expect(loadOlder).toHaveBeenCalledOnce();
+    await Promise.resolve();
+    expect(render().preservePosition).toBe(true);
+  },
+);
+
+it('loads on a native drag at the top after touch cancellation', () => {
+  const loadOlder = vi.fn(async () => {});
+  const scroll = render({ latestItemId: 'last', loadOlder, hasMore: true });
+  scroll.onTouchStart(touch(20, 20));
+  scroll.onScrollBeginDrag();
+  scroll.onTouchCancel();
+  scroll.onScrollEndDrag(scrollEvent(FIRST_CONTENT_HEIGHT, FIRST_CONTENT_HEIGHT - VIEWPORT_HEIGHT));
+  expect(loadOlder).toHaveBeenCalledOnce();
+});
+
+it.each([{ hasMore: false }, { hasMore: true, loadingMore: true }, { hasMore: true, loading: true }])(
+  'does not request unavailable or already loading history: %j', async (options) => {
+    const loadOlder = vi.fn(async () => {});
+    const scroll = render({ latestItemId: 'last', loadOlder, ...options });
+    scroll.onTouchStart(touch(20, 20));
+    scroll.onTouchMove(touch(20, 100));
+    await scroll.more();
+    expect(loadOlder).not.toHaveBeenCalled();
+  },
+);
+
+it.each([400, 720])('prefetches within half of a %i pixel viewport only when reading toward the top', (viewport) => {
+  const loadOlder = vi.fn(async () => {});
+  const scroll = render({ latestItemId: 'last', loadOlder, hasMore: true });
+  const at = (offset: number) => scrollEvent(FIRST_CONTENT_HEIGHT, FIRST_CONTENT_HEIGHT - viewport - offset, viewport);
+  scroll.onScroll(at(viewport / 2));
+  expect(loadOlder).not.toHaveBeenCalled();
+  scroll.onScrollBeginDrag();
+  scroll.onScroll(at(viewport / 2 + 1));
+  expect(loadOlder).not.toHaveBeenCalled();
+  scroll.onScroll(at(viewport / 2));
+  expect(loadOlder).toHaveBeenCalledOnce();
+  scroll.onScroll(at(0));
+  scroll.onScrollEndDrag(at(0));
+  expect(loadOlder).toHaveBeenCalledOnce();
 });
 
 it('keeps initial events unthrottled until the real latest cell replaces the virtualization spacer', () => {

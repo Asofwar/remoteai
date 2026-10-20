@@ -8,7 +8,8 @@ const webUrl = `http://127.0.0.1:${webPort}/web/`;
 export default defineConfig({
   testDir: './e2e', testMatch: ['**/chat.pw.ts', '**/queue.pw.ts', '**/chat-parity.pw.ts',
     '**/chat-swipe.pw.ts', '**/chat-display.pw.ts', '**/thread-pagination.pw.ts', '**/project-collapse.pw.ts',
-    '**/skill-menu.pw.ts', '**/i18n-chat.pw.ts', '**/chat-history-scroll.pw.ts', '**/chat-scroll-bottom.pw.ts',
+    '**/skill-menu.pw.ts', '**/i18n-chat.pw.ts', '**/chat-history-scroll.pw.ts', '**/chat-history-touch.pw.ts',
+    '**/chat-scroll-bottom.pw.ts',
     '**/image-editor.pw.ts',
     '**/file-preview.pw.ts', '**/chat-devices.pw.ts', '**/image-editor-csp.pw.ts', '**/chat-diff.pw.ts',
     '**/chat-terminal.pw.ts', '**/chat-terminal-display.pw.ts', '**/chat-activities.pw.ts', '**/downloads.pw.ts',

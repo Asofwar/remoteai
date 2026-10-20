@@ -1,8 +1,11 @@
-import { useCallback, useLayoutEffect, useRef, useState, type WheelEvent } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState, type TouchEvent, type WheelEvent } from 'react';
 import type { ChatMessagesProps } from '../../../../shared/remote-chat/client/messageProps';
-import { shouldShowScrollToBottom } from '../../../../shared/chat/scrollPosition';
+import { isNearHistoryStart, shouldShowScrollToBottom } from '../../../../shared/chat/scrollPosition';
+import { useHistoryPull } from '../../../../shared/chat/useHistoryPull';
+import { useHistoryContinuation } from '../../../../shared/chat/useHistoryContinuation';
 
 const EDGE_DISTANCE = 100;
+const TOP_TOLERANCE = 1;
 
 function canScrollUp(target: EventTarget, container: HTMLElement) {
   let element = target instanceof Element ? target : null;
@@ -13,7 +16,7 @@ function canScrollUp(target: EventTarget, container: HTMLElement) {
   return false;
 }
 
-export function useHistoryScroll({ thread, loadingMore, hasMore, loadOlder }: ChatMessagesProps) {
+export function useHistoryScroll({ thread, loading, loadingMore, hasMore, loadOlder, historyLoad }: ChatMessagesProps) {
   const list = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
@@ -37,7 +40,8 @@ export function useHistoryScroll({ thread, loadingMore, hasMore, loadOlder }: Ch
     }));
   }, []);
   const more = () => {
-    if (!hasMore || loadingMore || fetching.current || !loadOlder || !list.current) return;
+    if (!hasMore || loading || loadingMore || fetching.current || !loadOlder || !list.current) return;
+    continueHistory();
     following.current = false;
     const top = list.current.getBoundingClientRect().top;
     const element = [...list.current.querySelectorAll('[data-message-id]')]
@@ -47,6 +51,20 @@ export function useHistoryScroll({ thread, loadingMore, hasMore, loadOlder }: Ch
     const current = scope.current;
     void loadOlder().finally(() => { if (scope.current === current) fetching.current = false; });
   };
+  const continueHistory = useHistoryContinuation({
+    threadId: thread?.id, result: historyLoad, hasMore, loading: Boolean(loading || loadingMore), loadOlder: more,
+    nearTop: () => Boolean(list.current && isNearHistoryStart({
+      offset: list.current.scrollTop, viewportHeight: list.current.clientHeight,
+    })),
+  });
+  const pull = useHistoryPull(() => Boolean(list.current && list.current.scrollTop <= TOP_TOLERANCE), more);
+  const touchPoint = (event: TouchEvent<HTMLDivElement>) => {
+    const touch = event.touches.length === 1 ? event.touches[0] : undefined;
+    return touch && !event.defaultPrevented && !canScrollUp(event.target, event.currentTarget)
+      ? { x: touch.pageX, y: touch.pageY } : undefined;
+  };
+  const onTouchStart = (event: TouchEvent<HTMLDivElement>) => pull.begin(touchPoint(event));
+  const onTouchMove = (event: TouchEvent<HTMLDivElement>) => pull.move(touchPoint(event));
   useLayoutEffect(() => {
     const node = list.current;
     if (!node) return;
@@ -78,7 +96,7 @@ export function useHistoryScroll({ thread, loadingMore, hasMore, loadOlder }: Ch
     position.current = node.scrollTop;
     following.current = node.scrollHeight - node.clientHeight - node.scrollTop < EDGE_DISTANCE;
     updateScrollButton();
-    if (upward && node.scrollTop < EDGE_DISTANCE) more();
+    if (upward && isNearHistoryStart({ offset: node.scrollTop, viewportHeight: node.clientHeight })) more();
   };
   const onWheel = (event: WheelEvent<HTMLDivElement>) => {
     if (event.deltaY >= 0 || event.ctrlKey || event.defaultPrevented) return;
@@ -94,5 +112,6 @@ export function useHistoryScroll({ thread, loadingMore, hasMore, loadOlder }: Ch
     list.current?.scrollTo({ top: list.current.scrollHeight, behavior: 'smooth' });
   };
   const pauseFollowing = () => { following.current = false; };
-  return { list, content, body, onScroll, onWheel, more, showBottom, toBottom, pauseFollowing };
+  return { list, content, body, onScroll, onWheel, more, showBottom, toBottom, pauseFollowing,
+    onTouchStart, onTouchMove, onTouchEnd: pull.clear, onTouchCancel: pull.clear };
 }

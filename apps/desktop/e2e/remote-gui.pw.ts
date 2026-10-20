@@ -11,6 +11,7 @@ import { checkGitDiffReview } from './git-diff-checks';
 import { checkRemoteFileDrop } from './file-drop-checks';
 import { checkThreadSidebarResize } from './thread-sidebar-resize';
 import { checkRemoteTiming } from './remote-timing-checks';
+import { checkRemoteHistory } from './remote-history-checks';
 import { checkRemoteWindowLayout } from './remote-window-layout';
 
 declare global { interface Window { desktopTest: typeof desktopTest } }
@@ -122,6 +123,9 @@ async function accountSummaryRows(page: Page) {
 }
 
 for (const blocked of [false, true]) {
+  test(`prefetches remote history through collapsed pages over ${blocked ? 'Relay' : 'P2P'}`, async ({ context, page }) => {
+    await checkRemoteHistory({ context, page, endpoint, blocked });
+  });
   test(`corrects remote conversation timing over ${blocked ? 'Relay' : 'P2P'}`, async ({ context, page }) => {
     await checkRemoteTiming({ context, page, endpoint, blocked });
   });

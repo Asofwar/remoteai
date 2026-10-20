@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FlatList, LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent, ViewToken } from 'react-native';
 import type { ChatMessagesProps } from '../../../../shared/remote-chat/client/messageProps';
-import { shouldShowScrollToBottom } from '../../../../shared/chat/scrollPosition';
+import { isNearHistoryStart, shouldShowScrollToBottom } from '../../../../shared/chat/scrollPosition';
+import { useHistoryContinuation } from '../../../../shared/chat/useHistoryContinuation';
 import type { Item } from './types';
 import { useNativeChatScroll } from './useNativeChatScroll';
 import { useHistoryPull } from './useHistoryPull';
@@ -14,11 +15,11 @@ const SCROLL_EVENT_THROTTLE_MS = 100;
 const VIEWABILITY_ROUNDING_TOLERANCE = 2;
 const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 0 };
 type ScrollEvent = NativeSyntheticEvent<NativeScrollEvent>;
-type Options = Pick<ChatMessagesProps, 'hasMore' | 'loading' | 'loadingMore' | 'loadOlder'>
-  & { latestItemId?: string; bottomPadding: number };
+type Options = Pick<ChatMessagesProps, 'hasMore' | 'loading' | 'loadingMore' | 'loadOlder' | 'historyLoad'>
+  & { threadId?: string; latestItemId?: string; bottomPadding: number };
 
 export function useChatScroll<Entry extends { id: string } = Item>(
-  { hasMore, loading, loadingMore, loadOlder, latestItemId, bottomPadding }: Options,
+  { hasMore, loading, loadingMore, loadOlder, historyLoad, threadId, latestItemId, bottomPadding }: Options,
 ) {
   const list = useRef<FlatList<Entry>>(null);
   const nativeScroll = useNativeChatScroll(list, SCROLL_EDGE_DISTANCE);
@@ -28,6 +29,7 @@ export function useChatScroll<Entry extends { id: string } = Item>(
   const position = useRef(0);
   const nativePosition = useRef(0);
   const contentHeight = useRef(0);
+  const historyAnchor = useRef({ height: 0, offset: 0 });
   const viewportHeight = useRef(0);
   const followFrame = useRef<ReturnType<typeof requestAnimationFrame> | undefined>(undefined);
   const presentFrame = useRef<ReturnType<typeof requestAnimationFrame> | undefined>(undefined);
@@ -112,8 +114,10 @@ export function useChatScroll<Entry extends { id: string } = Item>(
     followLatest();
   };
   const more = async () => {
-    if (loadingOlder.current || loadingMore || !loadOlder) return;
+    if (!hasMore || loading || loadingOlder.current || loadingMore || !loadOlder) return;
     loadingOlder.current = true;
+    continueHistory();
+    historyAnchor.current = { height: Math.max(contentHeight.current, viewportHeight.current), offset: position.current };
     if (latest.current) {
       following.current = false;
       nativeScroll.setFollowing(false);
@@ -124,21 +128,32 @@ export function useChatScroll<Entry extends { id: string } = Item>(
     try { await loadOlder(); }
     finally { loadingOlder.current = false; nativeScroll.finishLoadingOlder(); }
   };
+  const continueHistory = useHistoryContinuation({
+    threadId, result: historyLoad, hasMore, loading: Boolean(loading || loadingMore), loadOlder: () => { void more(); },
+    nearTop: () => isNearHistoryStart({ viewportHeight: viewportHeight.current,
+      // Android can drop the offset event after preserving a row. Account for the added content as well.
+      offset: Math.max(nativePosition.current,
+        historyAnchor.current.offset + contentHeight.current - historyAnchor.current.height) }),
+  });
   const finishScroll = (event: ScrollEvent) => {
+    const top = event.nativeEvent.contentOffset.y;
+    const towardTop = top <= position.current;
     updateFollowing(event);
     scrolling.current = false;
     // The last onScroll event can be throttled; drag/momentum completion carries the actual final position.
     updatePosition(event);
-    // Android can deliver the final scroll position after the drag event has ended.
-    const top = event.nativeEvent.contentOffset.y;
-    if (hasMore && top > 0 && top < SCROLL_EDGE_DISTANCE) void more();
+    // Android cancels JS touches when native scrolling takes over, even for a pull at offset zero.
+    // The final scroll event may also be throttled; use drag/momentum completion as the fallback.
+    if (towardTop && isNearHistoryStart({ offset: top, viewportHeight: viewportHeight.current })) void more();
   };
   const onScroll = (event: ScrollEvent) => {
     const top = event.nativeEvent.contentOffset.y;
     // Image loads and keyboard resizing also emit scroll events; only a drag changes follow intent.
     if (scrolling.current) {
       updateFollowing(event);
-      if (hasMore && top >= 0 && top < position.current && top < SCROLL_EDGE_DISTANCE) void more();
+      if (top < position.current && isNearHistoryStart({
+        offset: top, viewportHeight: event.nativeEvent.layoutMeasurement.height,
+      })) void more();
     }
     updatePosition(event);
   };

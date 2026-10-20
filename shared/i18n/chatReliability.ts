@@ -1,5 +1,4 @@
 export const reliabilityEnglish: Readonly<Record<string, string>> = {
-  '已加载 {count} 条历史记录，用时 {seconds} 秒': 'Loaded {count} history entries in {seconds} s',
   '待发送消息需要处理': 'Queued messages need attention',
   '图片无法读取，请重新选择后发送。': 'Could not read the image. Choose it again before sending.',
   '图片过大，请缩小图片或减少图片后发送。': 'Images are too large. Resize them or send fewer images.',
@@ -93,7 +92,6 @@ export const reliabilityEnglish: Readonly<Record<string, string>> = {
 };
 
 export const reliabilityRussian: Readonly<Record<string, string>> = {
-  '已加载 {count} 条历史记录，用时 {seconds} 秒': 'Загружено записей: {count}, за {seconds} с',
   '待发送消息需要处理': 'Сообщения в очереди требуют внимания',
   '图片无法读取，请重新选择后发送。': 'Не удалось прочитать изображение. Выберите его заново перед отправкой.',
   '图片过大，请缩小图片或减少图片后发送。': 'Изображения слишком большие. Уменьшите их размер или количество.',

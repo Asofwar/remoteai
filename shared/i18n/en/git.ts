@@ -74,6 +74,8 @@ export const gitMessages: Record<string, string> = {
   '请先选择一个项目。': 'Choose a project first.',
   '电脑连接后即可使用 Git。': 'Connect to your computer to use Git.',
   '已提交 {hash}': 'Committed {hash}',
+  '提交并推送': 'Commit and push', '提交并推送完成': 'Commit and push completed',
+  '提交已完成，推送未完成。请稍后重试推送。': 'Committed, but push failed. Try pushing again later.',
   '差异较大，仅显示部分内容。': 'This diff is large. Only part of it is shown.',
   '没有可显示的文本差异。': 'No text diff to display.', '正在处理…': 'Working…',
   '已选 {count} 个文件': '{count} files selected', '全选': 'Select all',

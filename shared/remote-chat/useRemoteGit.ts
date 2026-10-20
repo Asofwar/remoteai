@@ -85,14 +85,29 @@ export function useRemoteGit({ client, cwd, active, connected, refreshInterval }
     setFileAction(null); setDetail(null); setNotice(notice);
     await load();
   });
-  const commit = () => run(async () => {
+  const canPush = !!changes?.branch && !!repository?.upstream && !!repository.remotes.length;
+  const canCommit = connected && !busy && !!message.trim() && Object.keys(selected).length > 0
+    && !changes?.files.some(file => file.conflict);
+  const commit = (options: { push?: boolean } = {}) => run(async () => {
     if (!changes || changes.files.some(file => file.conflict)
-      || !message.trim() || !Object.keys(selected).length) return;
+      || !message.trim() || !Object.keys(selected).length || (options.push && !canPush)) return;
     const result = await client.commit({ cwd, head: changes.head, message: message.trim(),
       files: Object.entries(selected).map(([path, version]) => ({ path, version })) });
     if (current.current !== scope) return;
     setSelected({}); setMessage(''); setDetail(null); setNotice(`已提交 ${result.hash.slice(0, 8)}`);
-    await load();
+    let failure: unknown;
+    if (options.push) {
+      try {
+        await client.action({ cwd, action: 'push', head: result.hash, branch: changes.branch });
+        if (current.current === scope) setNotice('提交并推送完成');
+      } catch (error) {
+        failure = error;
+        if (current.current === scope) setNotice('提交已完成，推送未完成。请稍后重试推送。');
+      }
+    }
+    if (current.current !== scope) return;
+    try { await load(); } catch (error) { failure ??= error; }
+    if (failure) throw failure;
   });
   const action = (action: GitAction, target?: string) => run(async () => {
     if (!changes) return;
@@ -118,8 +133,7 @@ export function useRemoteGit({ client, cwd, active, connected, refreshInterval }
     detail, setDetail, backDetail: () => setDetail(parentGitDetail), refresh, toggle, selectAll, selectFiles, commit, more,
     repository, action, strategy, setStrategy, fileList, fileAction, requestFileAction, confirmFileAction,
     cancelFileAction: () => { if (!busy) setFileAction(null); },
-    canCommit: connected && !busy && !!message.trim() && Object.keys(selected).length > 0
-      && !changes?.files.some(file => file.conflict) };
+    canCommit, canCommitAndPush: canCommit && canPush };
 }
 
 export type RemoteGit = ReturnType<typeof useRemoteGit>;

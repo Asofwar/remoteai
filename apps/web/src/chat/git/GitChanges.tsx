@@ -31,8 +31,12 @@ export function GitChanges({ panel, connected }: { panel: RemoteGit; connected: 
       maxLength={4000} value={panel.message} disabled={panel.busy}
       onChange={event => panel.setMessage(event.target.value)} />
       <p>{t('提交所选文件的全部改动，包含已暂存和未暂存的内容。')}</p>
-      <button type="button" className="git-submit" disabled={!panel.canCommit} onClick={() => void panel.commit()}>
-        {t('提交 {count} 个文件', { count })}</button></div>
+      <div className="git-commit-actions">
+        <button type="button" className="git-submit" disabled={!panel.canCommit} onClick={() => void panel.commit()}>
+          {t('提交 {count} 个文件', { count })}</button>
+        <button type="button" className="git-submit" disabled={!panel.canCommitAndPush}
+          onClick={() => void panel.commit({ push: true })}>{t('提交并推送')}</button>
+      </div></div>
   </>;
 }
 

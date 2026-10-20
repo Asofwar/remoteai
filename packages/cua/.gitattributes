@@ -1,0 +1,2 @@
+# Unified diff context lines can consist of one space; keep patch bytes stable across hosts.
+patches/*.patch text eol=lf whitespace=-blank-at-eol,-blank-at-eof

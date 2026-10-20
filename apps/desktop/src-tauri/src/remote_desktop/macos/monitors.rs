@@ -2,6 +2,7 @@ use super::super::{
     displays::{Bounds, DisplayInfo},
     DesktopError, Result,
 };
+use std::ffi::c_void;
 
 const MAX_DISPLAYS: usize = 32;
 
@@ -30,8 +31,10 @@ struct Rect {
 extern "C" {
     fn CGGetActiveDisplayList(max: u32, displays: *mut u32, count: *mut u32) -> i32;
     fn CGDisplayBounds(display: u32) -> Rect;
-    fn CGDisplayPixelsWide(display: u32) -> usize;
-    fn CGDisplayPixelsHigh(display: u32) -> usize;
+    fn CGDisplayCopyDisplayMode(display: u32) -> *const c_void;
+    fn CGDisplayModeGetPixelWidth(mode: *const c_void) -> usize;
+    fn CGDisplayModeGetPixelHeight(mode: *const c_void) -> usize;
+    fn CGDisplayModeRelease(mode: *const c_void);
     fn CGDisplayIsMain(display: u32) -> u32;
 }
 
@@ -73,23 +76,17 @@ pub(in crate::remote_desktop) fn list() -> Result<Vec<Monitor>> {
 
 fn read(handle: u32, index: usize) -> Result<Monitor> {
     // SAFETY: IDs are from CoreGraphics enumeration; these read-only APIs accept scalar display IDs.
-    let (rect, width, height, primary) = unsafe {
-        (
-            CGDisplayBounds(handle),
-            CGDisplayPixelsWide(handle),
-            CGDisplayPixelsHigh(handle),
-            CGDisplayIsMain(handle) != 0,
-        )
-    };
-    if width == 0 || height == 0 || rect.size.width < 1.0 || rect.size.height < 1.0 {
+    let (rect, primary) = unsafe { (CGDisplayBounds(handle), CGDisplayIsMain(handle) != 0) };
+    if rect.size.width < 1.0 || rect.size.height < 1.0 {
         return Err(DesktopError::DisplayGone);
     }
+    let (width, height) = display_pixels(handle, rect.size)?;
     Ok(Monitor {
         info: DisplayInfo {
             id: format!("macos:{handle}"),
             name: format!("显示器 {}", index + 1),
-            width: width as u32,
-            height: height as u32,
+            width,
+            height,
             primary,
         },
         handle,
@@ -102,6 +99,42 @@ fn read(handle: u32, index: usize) -> Result<Monitor> {
     })
 }
 
+fn display_pixels(handle: u32, logical: Size) -> Result<(u32, u32)> {
+    // CGDisplayPixelsWide/High can return the scaled mode size on Retina displays.
+    // Copy the mode to read its backing pixels; input must continue using Quartz points.
+    // SAFETY: handle comes from enumeration. The Copy-rule reference is checked and released once
+    // after both getters, before any fallible conversion can return early.
+    let (width, height) = unsafe {
+        let mode = CGDisplayCopyDisplayMode(handle);
+        if mode.is_null() {
+            return Err(DesktopError::DisplayGone);
+        }
+        let pixels = (
+            CGDisplayModeGetPixelWidth(mode),
+            CGDisplayModeGetPixelHeight(mode),
+        );
+        CGDisplayModeRelease(mode);
+        pixels
+    };
+    oriented_pixels(width, height, logical)
+}
+
+fn oriented_pixels(width: usize, height: usize, logical: Size) -> Result<(u32, u32)> {
+    let width = u32::try_from(width).map_err(|_| DesktopError::DisplayGone)?;
+    let height = u32::try_from(height).map_err(|_| DesktopError::DisplayGone)?;
+    if width == 0 || height == 0 {
+        return Err(DesktopError::DisplayGone);
+    }
+    // Display modes describe the unrotated surface. Match the selected display's input orientation.
+    let rotated = (width > height && logical.width < logical.height)
+        || (width < height && logical.width > logical.height);
+    Ok(if rotated {
+        (height, width)
+    } else {
+        (width, height)
+    })
+}
+
 pub(in crate::remote_desktop) fn select(monitors: &[Monitor], id: Option<&str>) -> Result<Monitor> {
     monitors
         .iter()
@@ -111,3 +144,7 @@ pub(in crate::remote_desktop) fn select(monitors: &[Monitor], id: Option<&str>) 
         .cloned()
         .ok_or(DesktopError::Platform)
 }
+
+#[cfg(test)]
+#[path = "monitor_tests.rs"]
+mod tests;

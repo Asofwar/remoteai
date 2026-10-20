@@ -3,8 +3,29 @@ import VideoToolbox
 
 func selfTest() throws {
     try framingSelfTest()
+    try frameRateSelfTest()
     try encoderSelfTest()
-    print("macOS desktop framing, H.264 encoding, dropped-frame recovery and keyframe control passed")
+    print("macOS desktop framing, H.264 encoding, dropped-frame recovery and live frame rate control passed")
+}
+
+private func frameRateSelfTest() throws {
+    var rate = CaptureFrameRate(30)
+    guard rate.beginUpdate() == nil else { throw DesktopVideoError.encoding }
+    rate.request(90)
+    guard rate.beginUpdate() == 90 else { throw DesktopVideoError.encoding }
+    rate.request(144)
+    guard rate.beginUpdate() == nil else { throw DesktopVideoError.encoding }
+    rate.finishUpdate(succeeded: true)
+    guard rate.current == 90, rate.beginUpdate() == 144 else { throw DesktopVideoError.encoding }
+    rate.finishUpdate(succeeded: false)
+    guard rate.current == 90, rate.beginUpdate() == nil else { throw DesktopVideoError.encoding }
+    rate.request(60)
+    guard rate.beginUpdate() == 60 else { throw DesktopVideoError.encoding }
+    rate.request(30)
+    rate.finishUpdate(succeeded: false)
+    guard rate.current == 90, rate.beginUpdate() == 30 else { throw DesktopVideoError.encoding }
+    rate.finishUpdate(succeeded: true)
+    guard rate.current == 30, rate.beginUpdate() == nil else { throw DesktopVideoError.encoding }
 }
 
 private func framingSelfTest() throws {
@@ -38,9 +59,14 @@ private func encoderSelfTest() throws {
     try encoder.control(bitrate: 2_000_000, fps: 30)
     try encoder.encode(pixelBuffer, at: CMTime(value: 1, timescale: 30))
     try encoder.finish()
+    for (index, fps) in [UInt32(60), 90, 144, 30].enumerated() {
+        try encoder.control(bitrate: 2_000_000, fps: fps)
+        try encoder.encode(pixelBuffer, at: CMTime(value: Int64(index + 2), timescale: 30))
+        try encoder.finish()
+    }
     lock.lock()
     defer { lock.unlock() }
-    guard frames.count == 2, frames.allSatisfy({
+    guard frames.count == 6, frames.allSatisfy({
         $0.count > 4 && $0.starts(with: [0, 0, 0, 1]) && $0[4] & 0x1f == 7
     }) else {
         throw DesktopVideoError.encoding

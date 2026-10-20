@@ -119,8 +119,20 @@ macOS capture uses Apple's ScreenCaptureKit and VideoToolbox H.264 encoder in a 
 The shared native WebRTC path handles ICE, TURN, direct upgrades, clipboard and authenticated session expiry.
 Video dimensions are physical pixels; Quartz input coordinates use each display's logical point bounds,
 so Retina scaling and displays positioned left of or above the primary screen do not shift pointer input.
+Display discovery uses the current display mode's backing pixel dimensions, including rotation.
+`CGDisplayPixelsWide/High` can report the scaled mode dimensions: for example, a 3840 × 2160 Retina
+screen configured as 1920 × 1080 previously capped capture at 1920 × 1080 before encoding.
+The corrected dimensions allow the existing quality profile to use up to 2560 pixels in width without
+changing mouse coordinates. This improves the source for Windows, Android and Web viewers alike;
+the highest quality setting still scales displays wider than 2560 pixels to that existing limit.
 Closing, expiry and permission changes release held input. The helper stops on stdin EOF or host cancellation;
 bounded output buffers and periodic still-screen frames keep video responsive without unbounded backlog.
+Frame-rate and bitrate changes update the running ScreenCaptureKit stream and VideoToolbox encoder;
+they no longer terminate and relaunch the helper. Capture configuration changes stay single-flight,
+coalesce to the latest requested rate, and retain the working stream if a display refuses an update.
+Resolution changes still restart capture. A static desktop normally emits only two recovery frames per
+second; use a moving window or scrolling to measure frame throughput. The requested frame rate is an
+upper limit and cannot make a 60 Hz source produce 90 or 144 distinct frames per second.
 
 On a Mac, run `node scripts/prepare-remote-desktop-runtime.mjs` before `tauri dev`; `build:app` and the release
 workflow prepare the helper automatically. The build compiles both Apple Silicon and Intel slices, signs the

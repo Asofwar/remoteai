@@ -4,6 +4,7 @@ import VideoToolbox
 final class VideoEncoder {
     private var session: VTCompressionSession?
     private var forceKeyframe = true
+    private var frameRate: Int
     private let output: (Data) throws -> Void
 
     static let outputCallback: VTCompressionOutputCallback = { context, _, status, flags, sample in
@@ -17,6 +18,7 @@ final class VideoEncoder {
 
     init(options: CaptureOptions, output: @escaping (Data) throws -> Void) throws {
         self.output = output
+        frameRate = options.fps
         let result = VTCompressionSessionCreate(
             allocator: nil, width: Int32(options.width), height: Int32(options.height),
             codecType: kCMVideoCodecType_H264, encoderSpecification: nil,
@@ -53,6 +55,11 @@ final class VideoEncoder {
             throw DesktopVideoError.invalidArguments
         }
         try set(kVTCompressionPropertyKey_AverageBitRate, Int(bitrate) as CFNumber)
+        if frameRate != Int(fps) {
+            try set(kVTCompressionPropertyKey_ExpectedFrameRate, Int(fps) as CFNumber)
+            try set(kVTCompressionPropertyKey_MaxKeyFrameInterval, Int(fps) as CFNumber)
+            frameRate = Int(fps)
+        }
     }
 
     func encode(_ buffer: CVPixelBuffer, at timestamp: CMTime) throws {

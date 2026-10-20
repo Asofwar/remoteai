@@ -61,7 +61,7 @@ export function PortForwarding(props: {
             <p>{t('通过远程电脑访问目标 IP 和端口')}</p>
           </div>
         </div>}>
-        <section className={styles.panel} aria-label={t('端口映射设置')}>
+        <section className={styles.panel} data-view={view.type} aria-label={t('端口映射设置')}>
           {!props.connected && <Alert type="info" message={t('连接已断开，重新连接后可再次启动。')} />}
           {view.type === 'list' && <MappingList entries={entries} service={service} connected={props.connected}
             edit={entry => setView({ type: 'edit', entry })} onOpen={close} />}

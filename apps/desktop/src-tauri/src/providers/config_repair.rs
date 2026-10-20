@@ -49,7 +49,9 @@ fn replace_codex_config(
     official_config: &str,
     prepare_proxy_backup: bool,
 ) -> Result<(), String> {
-    write_text_atomic(&paths.current_config, official_config)?;
+    let compatible = codex_config::ensure_official_provider_compatibility(official_config)
+        .map_err(|error| error.to_string())?;
+    write_text_atomic(&paths.current_config, &compatible)?;
     if prepare_proxy_backup {
         return write_text_atomic(&paths.config_backup, official_config);
     }

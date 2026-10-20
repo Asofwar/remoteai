@@ -144,13 +144,24 @@ fn cleanup_non_proxy_provider_state(paths: &Paths) -> Result<(), String> {
         && state.active_provider_group.is_none()
         && !has_managed_proxy_config
     {
-        return Ok(());
+        return repair_official_conversation_provider(paths);
     }
     restore_official_config(paths)?;
     state.active_provider_id = None;
     state.active_provider_group = None;
     state.local_proxy_enabled = false;
     write_state(paths, &state)
+}
+
+fn repair_official_conversation_provider(paths: &Paths) -> Result<(), String> {
+    if !paths.current_config.exists() {
+        return Ok(());
+    }
+    let current = fs::read_to_string(&paths.current_config)
+        .map_err(|error| format!("Failed to read Codex config: {error}"))?;
+    let repaired = codex_config::ensure_official_provider_compatibility(&current)
+        .map_err(|error| error.to_string())?;
+    write_text_if_changed(&paths.current_config, &repaired).map(|_| ())
 }
 
 pub(crate) fn restore_official_config(paths: &Paths) -> Result<(), String> {

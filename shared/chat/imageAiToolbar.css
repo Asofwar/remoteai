@@ -20,7 +20,6 @@
 .cs-image-ai-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .cs-image-ai-actions button { padding: 10px; min-height: 44px; border-radius: 8px; background: #454545; }
 .cs-image-viewer:has(.cs-image-ai) .cs-image-toolbar { bottom: 88px; }
-.cs-image-viewer:has(.cs-image-ai) .cs-image-stage { bottom: 156px; }
 .cs-image-viewer:has(.cs-image-ai) .cs-image-status { bottom: 148px; }
 .cs-image-viewer:has(.cs-image-ai-form) .cs-image-toolbar,
 .cs-image-viewer:has(.cs-image-ai-form) .cs-image-status { visibility: hidden; }

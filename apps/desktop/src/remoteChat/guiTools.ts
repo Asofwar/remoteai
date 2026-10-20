@@ -56,6 +56,7 @@ export async function guiToolRequest(body: Record<string, unknown>) {
     case 'guiGitHistory': return invoke('codex_gui_git_tool', { request: { ...body, operation: 'history' } });
     case 'guiGitCommitFiles': return invoke('codex_gui_git_tool', { request: { ...body, operation: 'commitFiles' } });
     case 'guiGitCommit': return invoke('codex_gui_git_tool', { request: { ...body, operation: 'commit' } });
+    case 'guiGitFileAction': return invoke('codex_gui_git_tool', { request: { ...body, operation: 'fileAction' } });
     case 'guiCliStatus': return status();
     case 'guiCliRelease': return invoke<CliRelease>('codex_gui_cli_check');
     case 'guiCliInstall': {

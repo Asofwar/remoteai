@@ -1,4 +1,12 @@
 export const gitMessages: Record<string, string> = {
+  '回退所选文件': 'Roll back selected files', '回退单个文件': 'Roll back this file', '回退文件': 'Roll back files',
+  '提交单个文件': 'Commit this file', '单文件提交说明': 'Commit message for this file', '删除文件': 'Delete file',
+  '确认回退': 'Roll back', '确认删除': 'Delete', '已回退所选文件': 'Selected files rolled back',
+  '文件已删除': 'File deleted',
+  '将放弃这些文件的全部未提交改动，新增文件会被删除。此操作无法撤销。':
+    'Discard all uncommitted changes in these files and delete newly added files. This cannot be undone.',
+  '将从项目中删除此文件。此操作无法撤销。': 'Delete this file from the project. This cannot be undone.',
+  '文件或分支已变化，请刷新并重新选择文件。': 'Files or branches have changed. Refresh and select the files again.',
   '调整 Git 抽屉宽度': 'Resize Git panel', '展开 Git': 'Expand Git', '还原 Git 宽度': 'Restore Git width',
   '最小化 Git': 'Minimize Git', '恢复 Git': 'Restore Git',
   '返回提交记录': 'Back to history', '返回文件列表': 'Back to files', '变更文件 {count}': 'Changed files {count}',

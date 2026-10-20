@@ -88,7 +88,7 @@ test('tools open Git changes, commit only checked files and draw merge history',
   await screenshot(page, info, 'git-branches');
   await branches.getByRole('button', { name: 'feature/git 本地', exact: true }).click();
   await expect(drawer.getByRole('button', { name: '切换分支', exact: true })).toContainText('feature/git');
-  await drawer.getByRole('button', { name: '同步', exact: true }).click();
+  await drawer.getByRole('button', { name: '更新项目', exact: true }).click();
   await expect(drawer.getByLabel('整合方式', { exact: true })).toHaveCount(0);
   await expect(drawer).toContainText('获取远程更新，无冲突时自动合并并提交。');
   await expect(drawer.getByRole('button', { name: '执行 更新项目', exact: true })).toBeDisabled();
@@ -100,7 +100,6 @@ test('tools open Git changes, commit only checked files and draw merge history',
   await message.fill('完成剩余改动');
   await drawer.getByRole('button', { name: '提交 5 个文件', exact: true }).click();
   await expect(drawer).toContainText('工作区没有未提交的改动。');
-  await drawer.getByRole('button', { name: '同步', exact: true }).click();
   await drawer.getByRole('button', { name: '拉取 Pull', exact: true }).click();
   await drawer.getByLabel('整合方式', { exact: true }).selectOption('rebase');
   await drawer.getByRole('button', { name: '更新项目', exact: true }).click();
@@ -109,12 +108,10 @@ test('tools open Git changes, commit only checked files and draw merge history',
   await screenshot(page, info, 'git-update');
   await drawer.getByRole('button', { name: '执行 更新项目', exact: true }).click();
   await expect(drawer.getByRole('status')).toHaveText('项目已更新');
-  await drawer.getByRole('button', { name: '同步', exact: true }).click();
   await drawer.getByRole('button', { name: '拉取 Pull', exact: true }).click();
   await drawer.getByLabel('整合方式', { exact: true }).selectOption('rebase');
   await drawer.getByRole('button', { name: '执行 拉取 Pull', exact: true }).click();
   await expect(drawer.getByRole('status')).toHaveText('拉取完成');
-  await drawer.getByRole('button', { name: '同步', exact: true }).click();
   await drawer.getByRole('button', { name: '推送 Push', exact: true }).click();
   await drawer.getByRole('button', { name: '执行 推送 Push', exact: true }).click();
   await expect(drawer.getByRole('status')).toHaveText('推送完成');
@@ -127,4 +124,32 @@ test('tools open Git changes, commit only checked files and draw merge history',
   await page.getByRole('button', { name: '终端', exact: true }).click();
   await expect(page.getByRole('dialog', { name: '远程终端', exact: true })).toBeVisible();
   await expect(page.locator('.xterm-rows')).toContainText('Remote shell ready');
+});
+
+test('remote Git file actions send only the confirmed files', async ({ page, request }) => {
+  await request.post(`${fixtureUrl}/test/reset`);
+  await login(page); await connect(page); await openChatList(page);
+  await page.getByRole('button', { name: '移动端聊天体验', exact: true }).click();
+  await page.getByRole('button', { name: '打开工具', exact: true }).click();
+  await page.getByRole('button', { name: 'Git', exact: true }).click();
+  const drawer = page.getByRole('dialog', { name: 'Git', exact: true });
+  await drawer.getByRole('checkbox', { name: '选择 src/app.ts', exact: true }).check();
+  await drawer.getByRole('button', { name: '回退所选文件', exact: true }).click();
+  await page.getByRole('dialog', { name: '回退文件', exact: true })
+    .getByRole('button', { name: '确认回退', exact: true }).click();
+  await expect(drawer.getByRole('checkbox', { name: '选择 src/app.ts', exact: true })).toHaveCount(0);
+  const newFile = drawer.getByRole('button', { name: '查看 新文件 [1].txt', exact: true });
+  // Finish locating the row before opening a context menu, which dismisses itself on scroll.
+  await newFile.scrollIntoViewIfNeeded();
+  await newFile.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '删除文件', exact: true }).click();
+  await page.getByRole('dialog', { name: '删除文件', exact: true })
+    .getByRole('button', { name: '确认删除', exact: true }).click();
+  await expect(drawer.getByRole('button', { name: '查看 新文件 [1].txt', exact: true })).toHaveCount(0);
+  const actions = (await state(request)).operations.filter(operation => operation.operation === 'guiGitFileAction');
+  expect(actions.map(action => ({ action: action.action, files: action.files }))).toEqual([
+    { action: 'rollback', files: [{ path: 'src/app.ts', version: 'app-v1' }] },
+    { action: 'delete', files: [{ path: '新文件 [1].txt', version: 'new-v1' }] },
+  ]);
+  await expect(drawer.getByRole('button', { name: '查看 README.md', exact: true })).toBeVisible();
 });

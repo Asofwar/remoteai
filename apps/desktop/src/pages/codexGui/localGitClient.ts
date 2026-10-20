@@ -10,4 +10,5 @@ export const localGitClient: GitClient = {
   history: (cwd, skip) => invoke('codex_gui_git_tool', { request: { operation: 'history', cwd, skip } }),
   commitFiles: (cwd, commit) => invoke('codex_gui_git_tool', { request: { operation: 'commitFiles', cwd, commit } }),
   commit: request => invoke('codex_gui_git_tool', { request: { ...request, operation: 'commit' } }),
+  fileAction: request => invoke('codex_gui_git_tool', { request: { ...request, operation: 'fileAction' } }),
 };

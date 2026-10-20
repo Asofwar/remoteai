@@ -1,5 +1,5 @@
 import { createGitFixture } from '../../../shared/remote-chat/testing/gitFixture';
-import type { GitActionRequest, GitCommitRequest } from '../../../shared/remote-chat/gitTypes';
+import type { GitActionRequest, GitCommitRequest, GitFileActionRequest } from '../../../shared/remote-chat/gitTypes';
 
 const git = createGitFixture();
 export function demoGitTools(input: Record<string, unknown>) {
@@ -12,5 +12,6 @@ export function demoGitTools(input: Record<string, unknown>) {
     case 'guiGitCommitFiles': return git.commitFiles(cwd, String(input.commit));
     case 'guiGitDiff': return git.diff(cwd, String(input.path), input.commit as string | undefined);
     case 'guiGitCommit': return git.commit(input as unknown as GitCommitRequest);
+    case 'guiGitFileAction': return git.fileAction(input as unknown as GitFileActionRequest) ?? null;
   }
 }

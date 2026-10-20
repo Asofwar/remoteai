@@ -6,6 +6,7 @@ import { selectionState } from '../../../../../shared/remote-chat/gitFiles';
 import type { GitFileRow } from '../../../../../shared/remote-chat/useGitFileList';
 import type { RemoteGit } from '../../../../../shared/remote-chat/useRemoteGit';
 import { gitAreaColors } from './gitTheme';
+import { GitFileMenu } from './GitFileMenu';
 import { t } from '../../i18n';
 
 export function GitChanges({ panel, connected }: { panel: RemoteGit; connected: boolean }) {
@@ -42,7 +43,8 @@ function GitRow({ row, panel, connected, onToggle, flat }: {
   const folder = row.kind === 'folder';
   const area = row.kind === 'area';
   const colors = gitAreaColors(row.area.id);
-  return <div className={`git-file git-file-${row.kind}`} data-area={row.area.id}
+  return <GitFileMenu file={row.file} panel={panel} connected={connected}>
+    <div className={`git-file git-file-${row.kind}`} data-area={row.area.id}
     style={{ color: colors.color, background: !area && checked === true ? colors.background : undefined }}>
     <Checkbox aria-label={t('选择 {path}', { path: row.path })} checked={checked === true}
       indeterminate={checked === 'mixed'} disabled={panel.busy || !row.files.some(file => !file.conflict)}
@@ -63,5 +65,5 @@ function GitRow({ row, panel, connected, onToggle, flat }: {
         <span className="git-status" style={{ background: folder ? undefined : colors.background }}>
           {folder ? row.files.length : row.file?.status.trim()}</span>
       </button>}
-  </div>;
+    </div></GitFileMenu>;
 }

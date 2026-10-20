@@ -13,6 +13,13 @@ export interface GitHistory { commits: GitCommit[]; hasMore: boolean }
 export interface GitCommitRequest {
   cwd: string; head: string | null; message: string; files: { path: string; version: string }[];
 }
+export type GitFileAction = 'rollback' | 'delete';
+export interface GitFileActionRequest extends Omit<GitCommitRequest, 'message'> {
+  action: GitFileAction;
+}
+export interface GitFileActionPrompt extends Omit<GitCommitRequest, 'cwd' | 'message'> {
+  action: GitFileAction | 'commit';
+}
 export interface GitBranch {
   name: string; ref: string; remote: boolean; occupied: boolean;
 }
@@ -33,4 +40,5 @@ export interface GitClient {
   history: (cwd: string, skip: number) => Promise<GitHistory>;
   commitFiles: (cwd: string, commit: string) => Promise<GitCommitFile[]>;
   commit: (request: GitCommitRequest) => Promise<{ hash: string }>;
+  fileAction: (request: GitFileActionRequest) => Promise<void>;
 }

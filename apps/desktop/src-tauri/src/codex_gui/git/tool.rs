@@ -13,6 +13,9 @@ mod commit;
 mod commit_files;
 #[cfg(test)]
 mod commit_files_tests;
+mod file_actions;
+#[cfg(test)]
+mod file_actions_tests;
 mod history;
 mod review;
 #[cfg(test)]
@@ -60,6 +63,12 @@ pub(crate) enum Request {
         message: String,
         files: Vec<SelectedFile>,
     },
+    FileAction {
+        cwd: String,
+        head: Option<String>,
+        action: file_actions::Action,
+        files: Vec<SelectedFile>,
+    },
 }
 
 #[derive(Deserialize)]
@@ -90,7 +99,8 @@ fn execute(request: Request) -> Result<Response> {
         | Request::Diff { cwd, .. }
         | Request::History { cwd, .. }
         | Request::CommitFiles { cwd, .. }
-        | Request::Commit { cwd, .. } => cwd,
+        | Request::Commit { cwd, .. }
+        | Request::FileAction { cwd, .. } => cwd,
     };
     let root = repository(&directory(cwd)?)?;
     match request {
@@ -112,6 +122,12 @@ fn execute(request: Request) -> Result<Response> {
             ..
         } => commit::create(&root, head.as_deref(), &message, &files)
             .map(|hash| Response::Commit { hash }),
+        Request::FileAction {
+            head,
+            action,
+            files,
+            ..
+        } => file_actions::execute(&root, head.as_deref(), action, &files).map(Response::Done),
     }
 }
 
@@ -142,6 +158,7 @@ pub(crate) async fn codex_gui_git_tool(
         Request::Action { cwd, request } if request.changes_worktree() => {
             Some(super::workspace_change(&app, cwd.clone()).await?)
         }
+        Request::FileAction { cwd, .. } => Some(super::workspace_change(&app, cwd.clone()).await?),
         _ => None,
     };
     let guard = state.0.clone();

@@ -7,6 +7,7 @@ import { GitHistory } from './GitHistory';
 import { GitChanges } from './GitChanges';
 import { GitCommitFiles } from './GitCommitFiles';
 import { GitToolbar } from './GitToolbar';
+import { GitFileActionDialog } from './GitFileActionDialog';
 import { GitDiff } from './GitDiff';
 import { GitDrawer } from './GitDrawer';
 import { ChatDetailsWorkspace } from '../ChatDetailsWorkspace';
@@ -32,6 +33,7 @@ function GitContent(props: Props & { panel: RemoteGit }) {
   return <ChatDetailsWorkspace selected={props.cwd} active={props.active} enabled={Boolean(props.desktopDiffs)}>
     <div className="chat-git">
       <GitToolbar panel={panel} connected={props.connected} />
+      {panel.fileAction && <GitFileActionDialog panel={panel} connected={props.connected} />}
       <div className="git-project" title={panel.changes?.root ?? props.cwd}>{panel.changes?.root ?? props.cwd}</div>
       {!props.cwd && <p className="git-notice">{t('请先选择一个项目。')}</p>}
       {!props.connected && <p className="git-notice">{t('电脑连接后即可使用 Git。')}</p>}

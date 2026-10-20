@@ -56,6 +56,14 @@ export function createGitFixture(): SyncGitClient {
         ...commits.map(entry => ({ ...entry, refs: entry.refs.filter(ref => ref !== 'HEAD -> main') }))];
       return { hash: hash(6) };
     },
+    fileAction: input => {
+      const selected = new Set(input.files.map(file => file.path));
+      files = files.flatMap(file => {
+        if (!selected.has(file.path)) return [file];
+        if (input.action === 'rollback' || file.status === '??') return [];
+        return [{ ...file, status: ' D', version: `${file.version}-deleted` }];
+      });
+    },
   };
 }
 
@@ -64,5 +72,6 @@ export function createAsyncGitFixture(): GitClient {
   return { repository: async cwd => git.repository(cwd), action: async input => git.action(input),
     changes: async cwd => git.changes(cwd), history: async (cwd, skip) => git.history(cwd, skip),
     commitFiles: async (cwd, commit) => git.commitFiles(cwd, commit),
-    diff: async (cwd, path, commit) => git.diff(cwd, path, commit), commit: async input => git.commit(input) };
+    diff: async (cwd, path, commit) => git.diff(cwd, path, commit), commit: async input => git.commit(input),
+    fileAction: async input => git.fileAction(input) };
 }

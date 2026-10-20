@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { GitAction, GitChange, GitChanges, GitClient, GitCommit, GitDiff, GitHistory, GitRepository,
-  GitStrategy } from './gitTypes';
+  GitFileActionPrompt, GitStrategy } from './gitTypes';
 import { toggleFiles } from './gitFiles';
 import { GIT_ACTION_NOTICE } from './gitActions';
 import { useGitFileList } from './useGitFileList';
@@ -29,6 +29,7 @@ export function useRemoteGit({ client, cwd, active, connected, refreshInterval }
   const [message, setMessage] = useState('');
   const [tab, setTab] = useState<'changes' | 'history'>('changes');
   const [detail, setDetail] = useState<GitDetail | null>(null);
+  const [fileAction, setFileAction] = useState<GitFileActionPrompt | null>(null);
   const load = useCallback(async () => {
     const { changes: next, history, repository } = await readGitSnapshot(client, cwd);
     if (current.current !== scope) return;
@@ -43,7 +44,7 @@ export function useRemoteGit({ client, cwd, active, connected, refreshInterval }
   useEffect(() => {
     current.current = scope;
     setChanges(null); setHistory({ commits: [], hasMore: false }); setSelected({}); setMessage(''); setDetail(null);
-    setRepository(null);
+    setRepository(null); setFileAction(null);
     return () => { current.current = {}; };
   }, [scope]);
   const selectFiles = (files: GitChange[]) => {
@@ -52,6 +53,33 @@ export function useRemoteGit({ client, cwd, active, connected, refreshInterval }
   };
   const toggle = (file: GitChange) => selectFiles([file]);
   const selectAll = () => selectFiles(changes?.files ?? []);
+  const requestFileAction = (action: GitFileActionPrompt['action'], file?: GitChange) => {
+    if (!changes || busy || !connected || changes.files.some(item => item.conflict)) return;
+    const files = file ? [{ path: file.path, version: file.version }]
+      : Object.entries(selected).map(([path, version]) => ({ path, version }));
+    if (files.length) setFileAction({ action, head: changes.head, files });
+  };
+  const confirmFileAction = (commitMessage = '') => run(async () => {
+    if (!fileAction || (fileAction.action === 'commit' && !commitMessage.trim())) return;
+    const { action, ...snapshot } = fileAction;
+    let notice: string;
+    try {
+      if (action === 'commit') {
+        const result = await client.commit({ ...snapshot, cwd, message: commitMessage.trim() });
+        notice = `已提交 ${result.hash.slice(0, 8)}`;
+      } else {
+        await client.fileAction({ ...snapshot, cwd, action });
+        notice = action === 'rollback' ? '已回退所选文件' : '文件已删除';
+      }
+    } catch (error) {
+      // A failed file operation can still change some files; show the actual state before retrying.
+      await load();
+      throw error;
+    }
+    if (current.current !== scope) return;
+    setFileAction(null); setDetail(null); setNotice(notice);
+    await load();
+  });
   const commit = () => run(async () => {
     if (!changes || changes.files.some(file => file.conflict)
       || !message.trim() || !Object.keys(selected).length) return;
@@ -83,7 +111,8 @@ export function useRemoteGit({ client, cwd, active, connected, refreshInterval }
   });
   return { busy, error, notice, changes, commits, hasMore, selected, message, setMessage, tab, setTab,
     detail, setDetail, backDetail: () => setDetail(parentGitDetail), refresh, toggle, selectAll, selectFiles, commit, more,
-    repository, action, strategy, setStrategy, fileList,
+    repository, action, strategy, setStrategy, fileList, fileAction, requestFileAction, confirmFileAction,
+    cancelFileAction: () => { if (!busy) setFileAction(null); },
     canCommit: connected && !busy && !!message.trim() && Object.keys(selected).length > 0
       && !changes?.files.some(file => file.conflict) };
 }

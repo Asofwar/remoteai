@@ -7,14 +7,15 @@ use std::{
     process::{Command, Stdio},
 };
 
-struct IndexTransaction {
+/// Lock the real index while Git commands edit a temporary copy, then publish on success.
+pub(super) struct IndexTransaction {
     index: PathBuf,
     lock: PathBuf,
     temporary: PathBuf,
 }
 
 impl IndexTransaction {
-    fn new(root: &Path) -> Result<Self> {
+    pub(super) fn new(root: &Path) -> Result<Self> {
         let index = PathBuf::from(output(
             root,
             &["rev-parse", "--path-format=absolute", "--git-path", "index"],
@@ -38,7 +39,7 @@ impl IndexTransaction {
         Ok(transaction)
     }
 
-    fn command(&self, root: &Path) -> Command {
+    pub(super) fn command(&self, root: &Path) -> Command {
         let mut command = command_options(root, false);
         command
             .env("GIT_INDEX_FILE", &self.temporary)
@@ -49,7 +50,7 @@ impl IndexTransaction {
         command
     }
 
-    fn publish(&self) -> Result<()> {
+    pub(super) fn publish(&self) -> Result<()> {
         fs::copy(&self.temporary, &self.lock).map_err(|_| GitError::Operation)?;
         fs::rename(&self.lock, &self.index).map_err(|_| GitError::Operation)
     }

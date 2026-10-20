@@ -7,7 +7,7 @@ import type { GitRequest, GitStatus } from './gitWorkspace';
 import { PROJECT_LIST_OPERATION, PROJECT_SELECT_OPERATION, type ProjectSelection } from './projects';
 import type { ChatProject } from './client/types';
 import type { GitActionRequest, GitChanges, GitCommitFile, GitCommitRequest, GitDiff, GitHistory,
-  GitRepository } from './gitTypes';
+  GitFileActionRequest, GitRepository } from './gitTypes';
 
 export interface CliRelease { version: string; size: number; ready?: boolean }
 export interface CliProgress { downloaded: number; total: number; phase: 'downloading' | 'installing' }
@@ -24,7 +24,7 @@ export const GUI_TOOL_OPERATIONS = new Set([
   'guiTerminalList', 'guiTerminalOpen', 'guiTerminalRead', 'guiTerminalWrite', 'guiTerminalResize', 'guiTerminalClose',
   'guiTerminalLink',
   'guiGitChanges', 'guiGitDiff', 'guiGitHistory', 'guiGitCommit', 'guiGitCommitFiles',
-  'guiGitRepository', 'guiGitAction', 'guiGitWorkspace',
+  'guiGitRepository', 'guiGitAction', 'guiGitFileAction', 'guiGitWorkspace',
   'guiTaskReview', 'guiTaskRestore',
 ]);
 
@@ -56,6 +56,7 @@ export function createGuiToolsClient(request: <T>(body: object) => Promise<T>,
       commitFiles: (cwd: string, commit: string) =>
         request<GitCommitFile[]>({ operation: 'guiGitCommitFiles', cwd, commit }),
       commit: (input: GitCommitRequest) => request<{ hash: string }>({ ...input, operation: 'guiGitCommit' }),
+      fileAction: (input: GitFileActionRequest) => request<void>({ ...input, operation: 'guiGitFileAction' }),
     },
     terminal: {
       link: (id: string, input: TerminalLinkRequest) =>

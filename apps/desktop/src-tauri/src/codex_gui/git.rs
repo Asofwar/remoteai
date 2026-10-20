@@ -1,4 +1,4 @@
-//! Repository operations run on a worker and never force checkout or discard local edits.
+//! Repository operations run on a worker; discarding local edits requires an explicit file selection.
 use super::platform::execution_path;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -57,7 +57,7 @@ pub(super) enum GitError {
     File,
     #[error("改动文件过多，请先在电脑上整理后重试。")]
     TooManyFiles,
-    #[error("文件或分支已变化，请刷新并重新选择要提交的文件。")]
+    #[error("文件或分支已变化，请刷新并重新选择文件。")]
     Changed,
     #[error("请先在电脑上解决冲突或完成正在进行的合并。")]
     Conflict,

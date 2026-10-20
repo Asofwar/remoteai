@@ -6,6 +6,7 @@ import { downloadManager } from '../../../../web/src/downloads/manager';
 import { useDownloadTasks } from '../../../../web/src/downloads/useDownloadTasks';
 import { desktopDownloadOwner } from '../../downloads/useDesktopDownloads';
 import { openDesktopDownload } from '../../downloads/openDownload';
+import { LOCAL_DOWNLOAD_OWNER, useLocalGitDownloads } from '../../downloads/localGitDownloads';
 import { guiText } from '../../i18n/guiText';
 import { useGuiLanguage } from '../../i18n/useGuiLanguage';
 import type { CloudAuthState } from '../../types';
@@ -27,9 +28,11 @@ function confirmRemove() {
 
 export function DownloadsPage({ auth }: { auth: CloudAuthState }) {
   useGuiLanguage();
+  useLocalGitDownloads();
   const owner = auth.authenticated && auth.baseUrl && auth.userId
     ? desktopDownloadOwner({ baseUrl: auth.baseUrl, userId: auth.userId }) : '';
-  const { tasks, busy, error, run } = useDownloadTasks(owner, { confirmRemove, openDownload: openDesktopDownload });
+  const { tasks, busy, error, run } = useDownloadTasks(owner, {
+    confirmRemove, openDownload: openDesktopDownload, additionalOwner: LOCAL_DOWNLOAD_OWNER });
   const [filter, setFilter] = useState<Filter>('all');
   const ready = tasks.filter(task => READY_STATUSES.has(task.status)).length;
   const visible = tasks.filter(task => filter === 'all' || READY_STATUSES.has(task.status) === (filter === 'ready'));

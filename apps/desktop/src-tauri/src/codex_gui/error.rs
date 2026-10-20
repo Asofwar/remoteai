@@ -24,6 +24,8 @@ pub(super) enum GuiError {
     TextPreview,
     #[error("文件暂时无法读取，请确认文件存在且有读取权限。")]
     FileRead,
+    #[error("无法创建补丁，请确认项目和提交仍然存在后重试。")]
+    GitPatch,
     #[error("文件暂时无法添加，请确认单个文件不超过 2 MB 后重试。")]
     Attachment,
     #[error("暂时无法读取当前项目文件，请确认项目仍可访问。")]

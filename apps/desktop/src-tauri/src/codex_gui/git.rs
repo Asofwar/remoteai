@@ -47,6 +47,16 @@ pub(super) enum GitError {
     Branch,
     #[error("无法切换分支。请检查未提交的修改，或确认分支未被其他工作树使用。")]
     Checkout,
+    #[error("无法检出此提交，请先保存未提交的改动后重试。")]
+    RevisionCheckout,
+    #[error("重置未完成，请检查未提交的改动或正在进行的 Git 操作。")]
+    Reset,
+    #[error("当前不在任何分支上，请先切换到要重置的分支。")]
+    DetachedReset,
+    #[error("项目已变化，请关闭提示并重新选择提交。")]
+    RevisionChanged,
+    #[error("补丁超过当前传输大小上限。")]
+    PatchTooLarge,
     #[error("未能创建工作树。请确认仓库已有提交，且分支名称未被使用。")]
     Worktree,
     #[error("操作未完成，请稍后重试。")]

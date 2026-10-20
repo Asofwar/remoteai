@@ -55,6 +55,35 @@ fn video_mime_type(path: &Path, file: &mut File) -> Result<&'static str> {
 }
 
 impl StreamFile {
+    /// Hash generated files in bounded memory so reopened patch downloads can resume safely.
+    pub(super) fn generated(mut file: File, name: String, mime_type: String) -> Result<Self> {
+        use sha2::{Digest, Sha256};
+        file.rewind().map_err(|_| GuiError::FileRead)?;
+        let mut hash = Sha256::new();
+        let mut buffer = [0; 64 * 1024];
+        loop {
+            let length = file.read(&mut buffer).map_err(|_| GuiError::FileRead)?;
+            if length == 0 {
+                break;
+            }
+            hash.update(&buffer[..length]);
+        }
+        let metadata = file.metadata().map_err(|_| GuiError::FileRead)?;
+        Ok(Self {
+            info: StreamInfo {
+                id: uuid::Uuid::new_v4().to_string(),
+                size: metadata.len(),
+                name,
+                mime_type,
+                revision: format!("sha256:{:x}", hash.finalize()),
+            },
+            modified: metadata.modified().map_err(|_| GuiError::FileRead)?,
+            file,
+            manifest: None,
+            cancelled: Arc::new(AtomicBool::new(false)),
+        })
+    }
+
     /// A private, automatically deleted snapshot keeps previews on the normal download transport.
     /// The content revision is stable across reopened snapshots, allowing verified blocks to resume.
     pub(super) fn snapshot(bytes: &[u8], name: String, mime_type: String) -> Result<Self> {

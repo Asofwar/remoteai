@@ -1,6 +1,51 @@
 import { expect, test } from '@playwright/test';
-import { connect, fixtureUrl, login, openChatList, screenshot, state } from './chat-helpers';
+import { connect, fixtureUrl, login, navigate, openChatList, screenshot, state } from './chat-helpers';
 import { checkInternalGitDrawer } from '../../desktop/e2e/git-drawer-checks';
+import { readFile } from 'node:fs/promises';
+
+test('remote commit context actions and patches reach this browser download manager', async ({ page, request }, info) => {
+  await page.addInitScript(() => { Object.defineProperty(window, 'showSaveFilePicker', { value: undefined }); });
+  await request.post(`${fixtureUrl}/test/reset`);
+  await login(page); await connect(page); await openChatList(page);
+  await page.getByRole('button', { name: '移动端聊天体验', exact: true }).click();
+  await page.getByRole('button', { name: '打开工具', exact: true }).click();
+  await page.getByRole('button', { name: 'Git', exact: true }).click();
+  const drawer = page.getByRole('dialog', { name: 'Git', exact: true });
+  await drawer.getByRole('tab', { name: '提交记录', exact: true }).click();
+  const row = drawer.locator('.git-history-row').nth(1);
+  await row.click({ button: 'right' });
+  await expect(page.getByRole('menuitem')).toHaveCount(4);
+  await screenshot(page, info, 'git-commit-context');
+  await page.getByRole('menuitem', { name: '重置当前分支到此提交…', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '重置当前分支到此提交', exact: true });
+  await expect(dialog.getByRole('radio', { name: /Mixed/ })).toBeChecked();
+  await dialog.getByRole('radio', { name: /Soft/ }).check();
+  await screenshot(page, info, 'git-reset-confirmation');
+  await dialog.getByRole('button', { name: '确认重置', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  const actions = (await state(request)).operations.filter(op => op.operation === 'guiGitRevision');
+  expect(actions).toHaveLength(1);
+  expect(actions[0]).toMatchObject({ action: 'reset', mode: 'soft', commit: '72c48df0'.padEnd(40, '4'),
+    branch: 'main' });
+  expect(actions[0].files).toHaveLength(6);
+  await row.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '创建补丁…', exact: true }).click();
+  await expect(drawer).toContainText('已加入下载管理。');
+  await drawer.getByRole('button', { name: '关闭 Git', exact: true }).click();
+  await navigate(page, '设置');
+  await page.getByText('下载管理', { exact: true }).click();
+  const card = page.getByRole('article', { name: '72c48df04444.patch', exact: true });
+  await expect(card).toContainText('文件已就绪');
+  await expect(card).toContainText('我的工作电脑');
+  await screenshot(page, info, 'git-patch-download');
+  const downloading = page.waitForEvent('download');
+  await card.getByRole('button', { name: '保存到设备', exact: true }).click();
+  const downloaded = await downloading;
+  expect(downloaded.suggestedFilename()).toBe('72c48df04444.patch');
+  expect(await readFile((await downloaded.path())!, 'utf8')).toContain('+new\n');
+  expect((await state(request)).operations.find(op => op.operation === 'downloadOpen'))
+    .toMatchObject({ gitCommit: '72c48df0'.padEnd(40, '4'), cwd: expect.any(String) });
+});
 
 test('tools open Git changes, commit only checked files and draw merge history', async ({ page, request }, info) => {
   await request.post(`${fixtureUrl}/test/reset`);

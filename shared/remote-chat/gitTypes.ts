@@ -32,7 +32,14 @@ export interface GitActionRequest {
   cwd: string; action: GitAction; head: string | null; branch: string | null;
   target?: string; strategy?: GitStrategy;
 }
+export type GitResetMode = 'soft' | 'mixed' | 'hard' | 'keep';
+export interface GitRevisionRequest {
+  cwd: string; action: 'checkout' | 'reset'; commit: string; head: string | null; branch: string | null;
+  files: { path: string; version: string }[]; mode?: GitResetMode;
+}
+export interface GitRevisionPrompt extends Omit<GitRevisionRequest, 'cwd' | 'mode'> { subject: string }
 export interface GitClient {
+  revision: (request: GitRevisionRequest) => Promise<void>;
   repository: (cwd: string) => Promise<GitRepository>;
   action: (request: GitActionRequest) => Promise<void>;
   changes: (cwd: string) => Promise<GitChanges>;

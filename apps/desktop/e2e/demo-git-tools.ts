@@ -1,5 +1,6 @@
 import { createGitFixture } from '../../../shared/remote-chat/testing/gitFixture';
-import type { GitActionRequest, GitCommitRequest, GitFileActionRequest } from '../../../shared/remote-chat/gitTypes';
+import type { GitActionRequest, GitCommitRequest, GitFileActionRequest,
+  GitRevisionRequest } from '../../../shared/remote-chat/gitTypes';
 
 const git = createGitFixture();
 export function demoGitTools(input: Record<string, unknown>) {
@@ -7,6 +8,7 @@ export function demoGitTools(input: Record<string, unknown>) {
   switch (input.operation) {
     case 'guiGitRepository': return git.repository(cwd);
     case 'guiGitAction': return git.action(input as unknown as GitActionRequest) ?? null;
+    case 'guiGitRevision': return git.revision(input as unknown as GitRevisionRequest) ?? null;
     case 'guiGitChanges': return git.changes(cwd);
     case 'guiGitHistory': return git.history(cwd, Number(input.skip));
     case 'guiGitCommitFiles': return git.commitFiles(cwd, String(input.commit));

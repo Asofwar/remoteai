@@ -169,6 +169,19 @@ impl FileStreams {
         Ok(info)
     }
 
+    /// Register an authorized generated artifact on the same resumable transport as other downloads.
+    pub(super) fn insert_patch(
+        &self,
+        transfer_id: String,
+        file: std::fs::File,
+        name: String,
+    ) -> Result<GuiResponse> {
+        response(self.insert_file(
+            StreamFile::generated(file, name, "text/x-patch".into())?,
+            transfer_id,
+        )?)
+    }
+
     fn read_chunk(&self, options: StreamRead) -> Result<StreamChunk> {
         let file = self.authorized_file(&options.id, &options.thread_id)?;
         let mut file = file.lock().map_err(|_| GuiError::FileRead)?;

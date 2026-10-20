@@ -14,7 +14,8 @@ const GIT_ACTION_TIMEOUT_MS = 5 * 60_000;
 const MODEL_CATALOG_TIMEOUT_MS = 150_000;
 function requestTimeout(body: unknown) {
   const operation = (body as { operation?: unknown } | null)?.operation;
-  if (operation === 'guiGitAction' || operation === 'guiGitWorkspace') return GIT_ACTION_TIMEOUT_MS;
+  if (operation === 'guiGitAction' || operation === 'guiGitWorkspace'
+    || operation === 'guiGitRevision') return GIT_ACTION_TIMEOUT_MS;
   if (operation === 'models' || operation === 'modelsRefresh'
     || operation === 'composerSet' || operation === 'guiAccountSelect') {
     return MODEL_CATALOG_TIMEOUT_MS;

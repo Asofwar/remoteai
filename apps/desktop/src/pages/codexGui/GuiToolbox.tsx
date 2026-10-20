@@ -5,6 +5,7 @@ import { GitBranch, Wrench } from 'lucide-react';
 import type { GitClient } from '../../../../../shared/remote-chat/gitTypes';
 import styles from './GuiToolbox.module.less';
 import workspaceStyles from './WorkspacePicker.module.less';
+import { useLocalGitDownloads } from '../../downloads/localGitDownloads';
 import '../../../../web/src/chat/terminal.css';
 import '../../../../web/src/chat/git/git.css';
 
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export function GuiToolbox(props: Props) {
+  useLocalGitDownloads();
   const [menu, setMenu] = useState(false);
   const [panel, setPanel] = useState<'git' | null>(null);
   useEffect(() => { if (!props.active) { setMenu(false); setPanel(null); } }, [props.active]);

@@ -8,6 +8,8 @@ import { GitChanges } from './GitChanges';
 import { GitCommitFiles } from './GitCommitFiles';
 import { GitToolbar } from './GitToolbar';
 import { GitFileActionDialog } from './GitFileActionDialog';
+import { GitRevisionDialog } from './GitRevisionDialog';
+import { enqueueGitPatch } from '../../downloads/gitPatch';
 import { GitDiff } from './GitDiff';
 import { GitDrawer } from './GitDrawer';
 import { ChatDetailsWorkspace } from '../ChatDetailsWorkspace';
@@ -34,6 +36,7 @@ function GitContent(props: Props & { panel: RemoteGit }) {
     <div className="chat-git">
       <GitToolbar panel={panel} connected={props.connected} />
       {panel.fileAction && <GitFileActionDialog panel={panel} connected={props.connected} />}
+      {panel.revisionAction && <GitRevisionDialog panel={panel} connected={props.connected} />}
       <div className="git-project" title={panel.changes?.root ?? props.cwd}>{panel.changes?.root ?? props.cwd}</div>
       {!props.cwd && <p className="git-notice">{t('请先选择一个项目。')}</p>}
       {!props.connected && <p className="git-notice">{t('电脑连接后即可使用 Git。')}</p>}
@@ -62,7 +65,8 @@ function GitContent(props: Props & { panel: RemoteGit }) {
             onClick={() => { panel.setDetail(null); panel.setTab('history'); }}>
             {t('提交记录')}</button></div>
         {panel.tab === 'changes' ? <GitChanges panel={panel} connected={props.connected} />
-          : <GitHistory panel={panel} connected={props.connected} />}
+          : <GitHistory panel={panel} connected={props.connected}
+            onPatch={commit => enqueueGitPatch(props.client, props.cwd, commit.hash)} />}
       </>}
     </div>
     </ChatDetailsWorkspace>;

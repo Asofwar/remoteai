@@ -19,6 +19,7 @@ export interface DownloadOpen extends DownloadLocation {
   transferId: string;
   path: string;
   preview?: PreviewKind;
+  gitCommit?: string;
 }
 export interface DownloadBrowse extends DownloadLocation { directory: string }
 export interface DownloadClient {

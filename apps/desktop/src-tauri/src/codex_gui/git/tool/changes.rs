@@ -33,7 +33,14 @@ pub(super) fn head(root: &Path) -> Option<String> {
 pub(super) fn read(root: &Path) -> Result<Changes> {
     let result = run(
         root,
-        &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        // Polling must not rewrite index timestamps and invalidate pending confirmation snapshots.
+        &[
+            "--no-optional-locks",
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--untracked-files=all",
+        ],
     )?;
     if !result.status.success() {
         return Err(GitError::Repository);

@@ -6,6 +6,7 @@ import { GIT_ACTION_NOTICE } from './gitActions';
 import { useGitFileList } from './useGitFileList';
 import { gitErrorText, useGitRequests } from './useGitRequests';
 import { readGitSnapshot, refreshGitHistory } from './gitSnapshot';
+import { useGitRevisionActions } from './useGitRevisionActions';
 
 export type GitDetail = { kind: 'files'; commit: GitCommit }
   | { kind: 'diff'; path: string; commit?: GitCommit; title: string };
@@ -41,6 +42,10 @@ export function useRemoteGit({ client, cwd, active, connected, refreshInterval }
   const { busy, error, notice, setNotice, run, refresh } = useGitRequests({
     scope, enabled: active && connected && !!cwd, load, refreshInterval,
   });
+  const revisions = useGitRevisionActions({ client, cwd, scope, changes, connected, busy, run, load, setNotice,
+    isCurrent: () => current.current === scope, onDone: () => {
+      setDetail(null); setSelected({}); setHistory({ commits: [], hasMore: false });
+    } });
   useEffect(() => {
     current.current = scope;
     setChanges(null); setHistory({ commits: [], hasMore: false }); setSelected({}); setMessage(''); setDetail(null);
@@ -109,7 +114,7 @@ export function useRemoteGit({ client, cwd, active, connected, refreshInterval }
       ...page.commits.filter(commit => !previous.commits.some(row => row.hash === commit.hash))],
     hasMore: page.hasMore }));
   });
-  return { busy, error, notice, changes, commits, hasMore, selected, message, setMessage, tab, setTab,
+  return { ...revisions, busy, error, notice, changes, commits, hasMore, selected, message, setMessage, tab, setTab,
     detail, setDetail, backDetail: () => setDetail(parentGitDetail), refresh, toggle, selectAll, selectFiles, commit, more,
     repository, action, strategy, setStrategy, fileList, fileAction, requestFileAction, confirmFileAction,
     cancelFileAction: () => { if (!busy) setFileAction(null); },

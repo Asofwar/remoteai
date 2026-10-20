@@ -1,0 +1,57 @@
+import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+
+for (const width of [390, 1280]) {
+  test(`commit actions and patch downloads at ${width}px`, async ({ page, context }, info) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.addInitScript(() => { Object.defineProperty(window, 'showSaveFilePicker', { value: undefined }); });
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/e2e/git-actions.html?history');
+    const row = page.locator('.git-history-row').nth(1);
+    await row.click({ button: 'right' });
+    await expect(page.getByRole('menuitem')).toHaveCount(4);
+    expect((await page.locator('.git-commit-context-menu').boundingBox())!.width).toBeLessThanOrEqual(400);
+    await expect(page.locator('.git-commit-context-menu')).toHaveCSS('opacity', '1');
+    await page.screenshot({ path: info.outputPath('commit-menu.png'), animations: 'disabled' });
+    await page.getByRole('menuitem', { name: '复制提交哈希', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('72c48df0'.padEnd(40, '4'));
+    await row.click({ button: 'right' });
+    await page.getByRole('menuitem', { name: '创建补丁…', exact: true }).click();
+    const downloads = page.getByRole('region', { name: '下载管理' });
+    await expect(downloads).toContainText('文件已就绪');
+    await expect(downloads).toContainText('远程电脑');
+    const downloading = page.waitForEvent('download');
+    await downloads.getByRole('button', { name: '保存到设备' }).click();
+    const downloaded = await downloading;
+    expect(downloaded.suggestedFilename()).toBe('72c48df04444.patch');
+    expect(await readFile((await downloaded.path())!, 'utf8')).toContain('+new\n');
+    await row.click({ button: 'right' });
+    await page.getByRole('menuitem', { name: '重置当前分支到此提交…', exact: true }).click();
+    const reset = page.getByRole('dialog', { name: '重置当前分支到此提交', exact: true });
+    await expect(reset.getByRole('radio', { name: /Mixed/ })).toBeChecked();
+    await expect(reset.getByRole('radio')).toHaveCount(4);
+    expect((await reset.boundingBox())!.width).toBeLessThanOrEqual(400);
+    await reset.getByRole('radio', { name: /Hard/ }).check();
+    await expect(reset.getByRole('radio', { name: /Hard/ })).toBeChecked();
+    await expect(reset).toContainText('会丢失');
+    await page.screenshot({ path: info.outputPath('reset-options.png'), animations: 'disabled' });
+    await reset.getByRole('button', { name: '取消', exact: true }).click();
+    await row.click({ button: 'right' });
+    await page.getByRole('menuitem', { name: '重置当前分支到此提交…', exact: true }).click();
+    await expect(reset.getByRole('radio', { name: /Mixed/ })).toBeChecked();
+    await reset.getByRole('button', { name: '确认重置', exact: true }).click();
+    await expect(reset).toBeHidden();
+    await expect(page.locator('.git-notice')).toContainText('当前分支已重置');
+    await row.click({ button: 'right' });
+    await page.getByRole('menuitem', { name: '检出此提交…', exact: true }).click();
+    const checkout = page.getByRole('dialog', { name: '检出此提交', exact: true });
+    await expect(checkout).toContainText('分离 HEAD');
+    await checkout.getByRole('button', { name: '确认检出', exact: true }).click();
+    await expect(page.getByRole('button', { name: '切换分支', exact: true })).toContainText('分离的 HEAD');
+    await row.click({ button: 'right' });
+    await expect(page.getByRole('menuitem', { name: '重置当前分支到此提交…', exact: true })).toHaveAttribute('aria-disabled', 'true');
+    await page.reload();
+    await expect(downloads).toContainText('72c48df04444.patch');
+    await expect(downloads.getByRole('button', { name: '打开', exact: true })).toBeEnabled();
+  });
+}

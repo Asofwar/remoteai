@@ -42,6 +42,29 @@ pub(crate) struct Open {
     transfer_id: String,
     path: String,
     max_bytes: u64,
+    pub(super) git_commit: Option<String>,
+}
+
+/// Patch content is generated privately, never written into the source repository.
+pub(super) async fn open_git_patch(
+    streams: Arc<FileStreams>,
+    options: Open,
+) -> Result<GuiResponse> {
+    uuid::Uuid::parse_str(&options.transfer_id).map_err(|_| GuiError::InvalidRequest)?;
+    let hash = options.git_commit.ok_or(GuiError::InvalidRequest)?;
+    let cwd = options.location.cwd.ok_or(GuiError::InvalidRequest)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let file =
+            super::git::tool::patch::create(&cwd, &hash, options.max_bytes).map_err(|error| {
+                match error {
+                    super::git::GitError::PatchTooLarge => GuiError::FileTooLarge,
+                    _ => GuiError::GitPatch,
+                }
+            })?;
+        streams.insert_patch(options.transfer_id, file, format!("{}.patch", &hash[..12]))
+    })
+    .await
+    .map_err(|_| GuiError::GitPatch)?
 }
 
 async fn project_root(client: &Client, location: &Location) -> Result<Option<PathBuf>> {

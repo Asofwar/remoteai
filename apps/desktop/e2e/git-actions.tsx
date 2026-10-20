@@ -4,10 +4,15 @@ import { useRemoteGit } from '../../../shared/remote-chat/useRemoteGit';
 import { GitToolbar } from '../../web/src/chat/git/GitToolbar';
 import { GitChanges } from '../../web/src/chat/git/GitChanges';
 import { GitFileActionDialog } from '../../web/src/chat/git/GitFileActionDialog';
+import { GitHistory } from '../../web/src/chat/git/GitHistory';
+import { GitRevisionDialog } from '../../web/src/chat/git/GitRevisionDialog';
+import { enqueueGitPatch } from '../../web/src/downloads/gitPatch';
+import { GitRevisionDownloads } from './git-revision-download';
 import { useGitTheme } from '../../web/src/chat/git/gitTheme';
 import '../../web/src/chat/git/git.css';
 
 const client = createAsyncGitFixture();
+const historyMode = new URLSearchParams(location.search).has('history');
 if (new URLSearchParams(location.search).has('longBranch')) {
   const branch = `feature/${'long-branch-name-'.repeat(6)}git-actions`;
   const changes = client.changes;
@@ -22,8 +27,13 @@ function Fixture() {
   return <div className="chat-git" style={{ ...theme, height: '100vh' }}>
     <GitToolbar panel={panel} connected />
     {panel.notice && <p role="status" className="git-notice">{panel.notice}</p>}
-    <GitChanges panel={panel} connected />
+    {panel.error && <p role="alert">{panel.error}</p>}
+    {historyMode ? <GitHistory panel={panel} connected
+      onPatch={commit => enqueueGitPatch(client, '/demo/project', commit.hash)} />
+      : <GitChanges panel={panel} connected />}
     {panel.fileAction && <GitFileActionDialog panel={panel} connected />}
+    {panel.revisionAction && <GitRevisionDialog panel={panel} connected />}
+    {historyMode && <GitRevisionDownloads git={client} />}
   </div>;
 }
 

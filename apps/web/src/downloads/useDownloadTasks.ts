@@ -6,7 +6,7 @@ import type { DownloadTask } from './types';
 import { DownloadOpenError, type DownloadOpener } from './openDownload';
 
 export function useDownloadTasks(owner: string, options: {
-  confirmRemove?: () => Promise<boolean>; openDownload?: DownloadOpener;
+  confirmRemove?: () => Promise<boolean>; openDownload?: DownloadOpener; additionalOwner?: string;
 } = {}) {
   const allTasks = useSyncExternalStore(downloadManager.subscribe, downloadManager.snapshot);
   const current = useSyncExternalStore(downloadManager.subscribe, downloadManager.connection);
@@ -36,6 +36,7 @@ export function useDownloadTasks(owner: string, options: {
     finally { pending.current = false; setBusy(''); }
   };
   return { connection, busy, error: error || storageError, run,
-    tasks: allTasks.filter(task => task.source.owner === owner && (!task.source.preview || task.exported))
+    tasks: allTasks.filter(task => (task.source.owner === owner || task.source.owner === options.additionalOwner)
+      && (!task.source.preview || task.exported))
       .slice().reverse() };
 }

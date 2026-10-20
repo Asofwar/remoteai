@@ -11,7 +11,8 @@ type SyncGitClient = { [Key in keyof GitClient]:
   (...args: Parameters<GitClient[Key]>) => Awaited<ReturnType<GitClient[Key]>> };
 
 export function createGitFixture(): SyncGitClient {
-  let branch = 'main';
+  let branch: string | null = 'main';
+  let head = hash(5);
   let files: GitChanges['files'] = [
     { path: 'src/app.ts', originalPath: null, status: ' M', conflict: false, version: 'app-v1' },
     { path: 'README.md', originalPath: null, status: 'M ', conflict: false, version: 'readme-v1' },
@@ -29,6 +30,11 @@ export function createGitFixture(): SyncGitClient {
     { path: 'docs/工具说明.md', originalPath: 'docs/旧说明.md', status: 'R' },
   ]]]);
   return {
+    revision: input => {
+      head = input.commit;
+      if (input.action === 'checkout') branch = null;
+      if (input.action === 'reset' && input.mode === 'hard') files = [];
+    },
     repository: () => ({ upstream: `origin/${branch}`, ahead: 2, behind: 1, remotes: ['origin'], branches: [
       { name: 'main', ref: 'refs/heads/main', remote: false, occupied: false },
       { name: 'feature/git', ref: 'refs/heads/feature/git', remote: false, occupied: false },
@@ -41,7 +47,7 @@ export function createGitFixture(): SyncGitClient {
         throw new Error('请先提交本地改动，再拉取或更新项目。');
       }
     },
-    changes: cwd => ({ root: cwd, branch, head: commits[0].hash, files: [...files] }),
+    changes: cwd => ({ root: cwd, branch, head, files: [...files] }),
     history: (_cwd, skip) => ({ commits: commits.slice(skip, skip + 3), hasMore: skip + 3 < commits.length }),
     commitFiles: (_cwd, commit) => historyFiles.get(commit) ?? [],
     diff: (_cwd, path, commit) => ({ text: `diff --git a/${path || 'src/app.ts'} b/${path || 'src/app.ts'}\n`
@@ -54,6 +60,7 @@ export function createGitFixture(): SyncGitClient {
       files = files.filter(file => !selected.has(file.path));
       commits = [commit(6, [5], input.message, ['HEAD -> main']),
         ...commits.map(entry => ({ ...entry, refs: entry.refs.filter(ref => ref !== 'HEAD -> main') }))];
+      head = hash(6);
       return { hash: hash(6) };
     },
     fileAction: input => {
@@ -70,6 +77,7 @@ export function createGitFixture(): SyncGitClient {
 export function createAsyncGitFixture(): GitClient {
   const git = createGitFixture();
   return { repository: async cwd => git.repository(cwd), action: async input => git.action(input),
+    revision: async input => git.revision(input),
     changes: async cwd => git.changes(cwd), history: async (cwd, skip) => git.history(cwd, skip),
     commitFiles: async (cwd, commit) => git.commitFiles(cwd, commit),
     diff: async (cwd, path, commit) => git.diff(cwd, path, commit), commit: async input => git.commit(input),

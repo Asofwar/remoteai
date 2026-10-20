@@ -21,6 +21,14 @@ export function configureDownloadFixture(action: string) {
 }
 
 export function demoDownloads(input: Record<string, unknown>): { value: unknown } | undefined {
+  if (input.operation === 'downloadOpen' && input.gitCommit) {
+    const id = crypto.randomUUID();
+    const bytes = new TextEncoder().encode('diff --git a/one.txt b/one.txt\n--- a/one.txt\n'
+      + '+++ b/one.txt\n@@ -1 +1 @@\n-old\n+new\n');
+    previewHandles.set(id, bytes);
+    return { value: { id, size: bytes.length, name: `${String(input.gitCommit).slice(0, 12)}.patch`,
+      mimeType: 'text/x-patch', revision: String(input.gitCommit) } };
+  }
   if (input.operation === 'previewOpen') {
     const id = crypto.randomUUID();
     const image = input.preview === 'thumbnail' ? thumbnail : demoOriginal();

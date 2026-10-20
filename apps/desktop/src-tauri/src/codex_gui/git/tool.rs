@@ -17,7 +17,13 @@ mod file_actions;
 #[cfg(test)]
 mod file_actions_tests;
 mod history;
+pub(crate) mod patch;
+#[cfg(test)]
+mod patch_tests;
 mod review;
+mod revision;
+#[cfg(test)]
+mod revision_tests;
 #[cfg(test)]
 mod tests;
 
@@ -40,6 +46,11 @@ pub(crate) enum Request {
         cwd: String,
         #[serde(flatten)]
         request: actions::ActionRequest,
+    },
+    Revision {
+        cwd: String,
+        #[serde(flatten)]
+        request: revision::Request,
     },
     Changes {
         cwd: String,
@@ -96,6 +107,7 @@ fn execute(request: Request) -> Result<Response> {
         | Request::Changes { cwd }
         | Request::Repository { cwd }
         | Request::Action { cwd, .. }
+        | Request::Revision { cwd, .. }
         | Request::Diff { cwd, .. }
         | Request::History { cwd, .. }
         | Request::CommitFiles { cwd, .. }
@@ -107,6 +119,7 @@ fn execute(request: Request) -> Result<Response> {
         Request::Review { .. } => Err(GitError::Operation),
         Request::Repository { .. } => branches::read(&root).map(Response::Repository),
         Request::Action { request, .. } => actions::execute(&root, &request).map(Response::Done),
+        Request::Revision { request, .. } => revision::execute(&root, &request).map(Response::Done),
         Request::Changes { .. } => changes::read(&root).map(Response::Changes),
         Request::Diff { path, commit, .. } => {
             history::diff(&root, &path, commit.as_deref()).map(Response::Diff)
@@ -158,7 +171,9 @@ pub(crate) async fn codex_gui_git_tool(
         Request::Action { cwd, request } if request.changes_worktree() => {
             Some(super::workspace_change(&app, cwd.clone()).await?)
         }
-        Request::FileAction { cwd, .. } => Some(super::workspace_change(&app, cwd.clone()).await?),
+        Request::FileAction { cwd, .. } | Request::Revision { cwd, .. } => {
+            Some(super::workspace_change(&app, cwd.clone()).await?)
+        }
         _ => None,
     };
     let guard = state.0.clone();

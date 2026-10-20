@@ -4,17 +4,22 @@ import { GIT_HISTORY_CONTENT_WIDTH, GIT_HISTORY_DATE_FORMAT } from '../../../../
 import type { RemoteGit } from '../../../../../shared/remote-chat/useRemoteGit';
 import { t, getLocale } from '../../i18n';
 import { useGitHistoryScroll } from './useGitHistoryScroll';
+import { GitCommitMenu } from './GitCommitMenu';
+import type { GitCommit } from '../../../../../shared/remote-chat/gitTypes';
 import './gitHistory.css';
 
 const HISTORY_STYLE = { '--git-history-compact-width': `${GIT_HISTORY_CONTENT_WIDTH}px`,
   '--git-history-compact-height': `${GRAPH_ROW_HEIGHT}px` } as CSSProperties;
 
-export function GitHistory({ panel, connected }: { panel: RemoteGit; connected: boolean }) {
+export function GitHistory({ panel, connected, onPatch }: {
+  panel: RemoteGit; connected: boolean; onPatch?: (commit: GitCommit) => Promise<void>;
+}) {
   const graph = useMemo(() => gitGraph(panel.commits), [panel.commits]);
   const pagination = useGitHistoryScroll(panel, connected);
   return <div className="git-history" style={HISTORY_STYLE} ref={pagination.list} onScroll={pagination.onScroll}>
     {!panel.busy && !panel.commits.length && <p className="git-notice">{t('还没有提交记录。')}</p>}
-    {graph.rows.map(row => <button type="button" key={row.commit.hash} className="git-history-row"
+    {graph.rows.map(row => <GitCommitMenu key={row.commit.hash} commit={row.commit} panel={panel}
+      connected={connected} onPatch={onPatch}><button type="button" className="git-history-row"
       style={{ minWidth: `calc(${row.width}px + var(--git-history-content-width, 560px))` }}
       disabled={!connected || panel.busy} onClick={() => panel.setDetail({ kind: 'files', commit: row.commit })}>
       <svg className="git-history-graph" width={row.width} aria-hidden="true">
@@ -33,7 +38,7 @@ export function GitHistory({ panel, connected }: { panel: RemoteGit; connected: 
         <time dateTime={row.commit.date}>{
           new Date(row.commit.date).toLocaleString(getLocale(), GIT_HISTORY_DATE_FORMAT)}</time>
       </span>
-    </button>)}
+    </button></GitCommitMenu>)}
     <div ref={pagination.end} className="git-history-end">
       {panel.hasMore && pagination.loadingMore && <span role="status">{t('正在加载…')}</span>}
       {panel.hasMore && pagination.failed && <button type="button" className="git-more"

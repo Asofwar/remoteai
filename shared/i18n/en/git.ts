@@ -1,4 +1,31 @@
 export const gitMessages: Record<string, string> = {
+  '复制提交哈希': 'Copy revision number', '提交哈希': 'Revision number', '创建补丁…': 'Create patch…',
+  '检出此提交…': 'Checkout revision…', '检出此提交': 'Checkout revision',
+  '重置当前分支到此提交…': 'Reset current branch to here…', '重置当前分支到此提交': 'Reset current branch to here',
+  '确认重置': 'Reset branch', '确认检出': 'Check out', '重置方式': 'Reset mode',
+  '已检出所选提交': 'Checked out the selected commit', '当前分支已重置': 'Current branch reset',
+  '将分支 {branch} 移到所选提交。': 'Move branch {branch} to the selected commit.',
+  '保留改动并暂存（Soft）': 'Keep changes staged (Soft)',
+  '保留文件和暂存区，撤回的提交可重新提交。': 'Keep files and the index. Changes from removed commits stay staged.',
+  '保留改动，取消暂存（Mixed）': 'Keep changes unstaged (Mixed)',
+  '保留文件，将与目标提交的差异放回未暂存改动。': 'Keep files and leave differences from the target commit unstaged.',
+  '放弃改动（Hard）': 'Discard changes (Hard)',
+  '文件和暂存区将恢复到此提交，未提交的改动及阻挡恢复的未跟踪文件会丢失。':
+    'Restore files and the index to this commit. Uncommitted changes and obstructing untracked files will be lost.',
+  '保留未提交改动（Keep）': 'Keep uncommitted changes (Keep)',
+  '保留未提交的改动；如与目标提交冲突，将停止重置。':
+    'Keep uncommitted changes. Stop if they conflict with the target commit.',
+  '将切换到此提交，并进入分离 HEAD 状态。当前分支不会移动；若未提交的改动会被覆盖，操作将停止。':
+    'Check out this commit with a detached HEAD. The current branch stays in place. Stop if local edits would be overwritten.',
+  '电脑连接后即可创建补丁。': 'Connect to the computer to create a patch.',
+  '请选择一个 Git 提交后创建补丁。': 'Select a Git commit to create a patch.',
+  '无法检出此提交，请先保存未提交的改动后重试。': 'Cannot check out this commit. Save uncommitted changes and try again.',
+  '重置未完成，请检查未提交的改动或正在进行的 Git 操作。':
+    'Reset failed. Check uncommitted changes or unfinished Git operations.',
+  '当前不在任何分支上，请先切换到要重置的分支。': 'Check out the branch you want to reset first.',
+  '项目已变化，请关闭提示并重新选择提交。': 'The project has changed. Close this dialog and select the commit again.',
+  '补丁超过当前传输大小上限。': 'The patch exceeds the current transfer limit.',
+  '无法创建补丁，请确认项目和提交仍然存在后重试。': 'Cannot create the patch. Check that the project and commit still exist.',
   '回退所选文件': 'Roll back selected files', '回退单个文件': 'Roll back this file', '回退文件': 'Roll back files',
   '提交单个文件': 'Commit this file', '单文件提交说明': 'Commit message for this file', '删除文件': 'Delete file',
   '确认回退': 'Roll back', '确认删除': 'Delete', '已回退所选文件': 'Selected files rolled back',

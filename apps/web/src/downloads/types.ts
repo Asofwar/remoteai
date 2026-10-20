@@ -5,6 +5,7 @@ import type { ConnectionMode } from '../../../../shared/remote-chat/protocol';
 export interface DownloadSource extends DownloadLocation {
   owner: string; deviceId: string; deviceName: string; path: string;
   preview?: import('../../../../shared/remote-chat/downloads').PreviewKind;
+  gitCommit?: string;
 }
 export interface DownloadTask {
   id: string; source: DownloadSource; name: string;
@@ -21,4 +22,5 @@ export interface DownloadTask {
 export interface DownloadConnection {
   owner: string; deviceId: string; deviceName: string; ready: boolean; mode: ConnectionMode;
   threadId?: string; cwd?: string; client: DownloadClient; files: FileClient;
+  git?: import('../../../../shared/remote-chat/gitTypes').GitClient;
 }

@@ -29,6 +29,8 @@ export class WebDownloadManager {
   snapshot = () => this.tasks;
   connection = () => this.current;
   connectionForFile = (files: DownloadConnection['files']) => this.connections.get(files);
+  connectionForGit = (git: NonNullable<DownloadConnection['git']>) =>
+    [...this.connections.values()].find(connection => connection.git === git);
   connectionForSource = (source: Pick<DownloadSource, 'owner' | 'deviceId'>) =>
     [...this.connections.values()].find(connection => connection.owner === source.owner
       && connection.deviceId === source.deviceId);
@@ -86,6 +88,7 @@ export class WebDownloadManager {
       && task.source.scope === source.scope && task.source.threadId === source.threadId
       && task.source.cwd === source.cwd
       && task.source.preview === source.preview
+      && task.source.gitCommit === source.gitCommit
       && ['queued', 'preparing', 'downloading', 'verifying', 'saving', 'paused'].includes(task.status));
     if (existing) { await this.resume(existing.id); return existing.id; }
     if (this.tasks.length >= MAX_DOWNLOAD_RECORDS) throw new Error('下载记录已满，请删除不再需要的记录后重试。');
@@ -174,7 +177,7 @@ export class WebDownloadManager {
   }
   private async run(task: DownloadTask, connection: DownloadConnection, signal: AbortSignal) {
     try {
-      await this.persist({ ...task, status: 'downloading' });
+      await this.persist({ ...task, status: task.source.gitCommit ? 'preparing' : 'downloading' });
       await transferDownload({ task, client: connection.client, signal,
         mode: () => this.connectionForSource(task.source)?.mode ?? 'offline',
         update: value => { task = value; this.update(value); } });

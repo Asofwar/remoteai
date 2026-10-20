@@ -9,7 +9,7 @@ export const desktopDownloadOwner = (identity: GuiCloudIdentity) =>
 /** Keep transfers attached to their remote connection, independently of the visible page. */
 export function useDesktopDownloads(options: {
   identity: GuiCloudIdentity; device: GuiComputer;
-  controller: Pick<ChatController, 'snapshot' | 'subscribe' | 'downloads' | 'files'>;
+  controller: Pick<ChatController, 'snapshot' | 'subscribe' | 'downloads' | 'files' | 'guiTools'>;
 }) {
   const { identity, device, controller } = options;
   useEffect(() => {
@@ -19,7 +19,7 @@ export function useDesktopDownloads(options: {
       downloadManager.register({ owner: desktopDownloadOwner(identity), deviceId: device.deviceId,
         deviceName: device.name, ready: state.ready, mode: state.mode,
         threadId: state.selected?.id, cwd: state.selected?.cwd ?? state.draftProject?.cwd,
-        client: controller.downloads, files: controller.files });
+        client: controller.downloads, files: controller.files, git: controller.guiTools.git });
     };
     update();
     const unsubscribe = controller.subscribe(update);

@@ -187,6 +187,17 @@ pub(crate) async fn codex_gui_request(
 
 /// Share request validation and typed failures with background GUI operations.
 async fn execute_request(state: &GuiState, request: GuiRequest) -> Result<GuiResponse> {
+    // Local Git downloads also work when the chat server is disconnected.
+    let request = match request {
+        GuiRequest::DownloadOpen(options) if options.git_commit.is_some() => {
+            return downloads::open_git_patch(Arc::clone(&state.downloads.0), options).await;
+        }
+        GuiRequest::FileRead(options) => return Arc::clone(&state.downloads.0).read(options).await,
+        GuiRequest::FileClose(options) => {
+            return Arc::clone(&state.downloads.0).close(options).await
+        }
+        request => request,
+    };
     let client = connected(state).await?;
     match request {
         GuiRequest::Models {
@@ -213,12 +224,8 @@ async fn execute_request(state: &GuiState, request: GuiRequest) -> Result<GuiRes
         GuiRequest::FileOpen(options) => {
             return Arc::clone(&state.downloads.0).open(&client, options).await
         }
-        GuiRequest::FileRead(options) => return Arc::clone(&state.downloads.0).read(options).await,
         GuiRequest::FileManifest(options) => {
             return Arc::clone(&state.downloads.0).manifest(options).await
-        }
-        GuiRequest::FileClose(options) => {
-            return Arc::clone(&state.downloads.0).close(options).await
         }
         GuiRequest::VideoOpen(options) => {
             return Arc::clone(&state.videos).open(&client, options).await

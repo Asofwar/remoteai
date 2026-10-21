@@ -7,6 +7,9 @@ export const projectBrowserEnglish: Readonly<Record<string, string>> = {
   '剪切': 'Cut',
   '复制': 'Copy',
   '复制路径': 'Copy path',
+  '引用文件': 'Reference file',
+  '暂时无法引用，请确认聊天可用且附件数量未达上限。':
+    'Unable to add the reference. Check that chat is available and the attachment limit has not been reached.',
   '粘贴': 'Paste',
   '重命名': 'Rename',
   '删除': 'Delete',

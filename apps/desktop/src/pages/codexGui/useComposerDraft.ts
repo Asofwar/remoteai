@@ -82,16 +82,17 @@ export function useComposerDraft(key: string, controller: GuiController) {
     const combined = [...new Map([...(current.attachments ?? []), ...attachments]
       .map((item) => [attachmentKey(item), item])).values()];
     if (combined.filter((item) => item.kind === "conversation").length > MAX_CONVERSATION_REFERENCES) {
-      controller.report("每条消息最多引用 8 个对话。"); return;
+      controller.report("每条消息最多引用 8 个对话。"); return false;
     }
     if (combined.length > MAX_ATTACHMENTS) {
-      controller.report("每条消息最多添加 32 个附件或对话引用。"); return;
+      controller.report("每条消息最多添加 32 个附件或对话引用。"); return false;
     }
     try { validateUploadedFiles(combined, 'relay'); }
     catch (cause) {
-      controller.report(cause instanceof Error ? cause.message : "文件粘贴失败，请重新复制后再试。"); return;
+      controller.report(cause instanceof Error ? cause.message : "文件粘贴失败，请重新复制后再试。"); return false;
     }
     update((value) => ({ ...value, attachments: combined }));
+    return true;
   };
   const removeAttachment = (path: string) => update((value) =>
     ({ ...value, attachments: value.attachments?.filter((item) => attachmentKey(item) !== path) }));

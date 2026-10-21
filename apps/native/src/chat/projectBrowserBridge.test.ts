@@ -63,3 +63,36 @@ it('pins mutation and download roots and rejects malformed actions and external 
     .toMatchObject({ error: expect.any(String) });
   expect(options.client.mutate).toHaveBeenCalledOnce();
 });
+
+it('references files and folders through the native chat host without reading their contents', async () => {
+  const reference = vi.fn().mockResolvedValue(undefined);
+  const options = { ...fixture(), host: { copyPath: vi.fn(), reference } };
+  for (const directory of [false, true]) {
+    const entry = { path: '/project/含 空格', name: '含 空格', directory };
+    expect(await handleBrowserRequest(JSON.stringify({ type: 'request', id: 4, action: 'reference',
+      body: { ...entry, cwd: '/ignored' } }), options)).toEqual({ type: 'reply', id: 4 });
+    expect(reference).toHaveBeenLastCalledWith(entry);
+  }
+  expect(options.client.read).not.toHaveBeenCalled();
+  expect(options.client.mutate).not.toHaveBeenCalled();
+});
+
+it('rejects invalid references and reports composer rejection without acknowledging success', async () => {
+  const reference = vi.fn().mockRejectedValue(new Error('附件已满'));
+  const options = { ...fixture(), host: { copyPath: vi.fn(), reference } };
+  const send = (body: object) => handleBrowserRequest(JSON.stringify({
+    type: 'request', id: 5, action: 'reference', body,
+  }), options);
+  for (const body of [
+    { path: '/elsewhere/a', name: 'a', directory: false },
+    { path: '/project/../a', name: 'a', directory: false },
+    { path: '/project/a', name: '', directory: false },
+    { path: '/project/a', name: 'a', directory: 'false' },
+  ]) expect(await send(body)).toMatchObject({ error: expect.any(String) });
+  expect(reference).not.toHaveBeenCalled();
+  expect(await send({ path: '/project/a', name: 'a', directory: false }))
+    .toEqual({ type: 'reply', id: 5, error: '附件已满' });
+  options.connected = false;
+  await send({ path: '/project/a', name: 'a', directory: false });
+  expect(reference).toHaveBeenCalledOnce();
+});

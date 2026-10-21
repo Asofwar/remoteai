@@ -15,6 +15,7 @@ import { useFilePreferences, setFileAutoSave } from '../settings/filePreferences
 import { readBrowserSession, saveBrowserSession } from './projectBrowserSessions';
 import type { DocumentsSnapshot } from '../../../../shared/project-browser/documents';
 import { projectBrowserHost } from './projectBrowserHost';
+import { useChatFileReference } from '../../../../shared/chat/ChatFileReferences';
 
 export function ProjectBrowser({ client, cwd, connected, active, onClose }: {
   client: ProjectBrowserClient; cwd: string; connected: boolean; active: boolean; onClose: () => void;
@@ -24,8 +25,12 @@ export function ProjectBrowser({ client, cwd, connected, active, onClose }: {
   const styles = useStyles();
   const preferences = useFilePreferences();
   const webview = useRef<WebView>(null);
+  const reference = useChatFileReference();
+  const focusAfterClose = useRef<(() => void) | null>(null);
   const transfer = useMemo(() => new AbortController(), [client, cwd]);
-  const host = useMemo(() => projectBrowserHost(client, transfer.signal), [client, transfer]);
+  const host = useMemo(() => ({ ...projectBrowserHost(client, transfer.signal),
+    reference: async (entry: Parameters<typeof reference>[0]) => { focusAfterClose.current = reference(entry); },
+  }), [client, transfer, reference]);
   useEffect(() => () => transfer.abort(), [transfer]);
   const [html, setHtml] = useState('');
   const [error, setError] = useState('');
@@ -83,7 +88,9 @@ export function ProjectBrowser({ client, cwd, connected, active, onClose }: {
                 && 'tabs' in message.snapshot && Array.isArray(message.snapshot.tabs)) {
                 saveBrowserSession(client, cwd, message.snapshot as DocumentsSnapshot);
               }
-              onClose(); return;
+              onClose();
+              if (focusAfterClose.current) requestAnimationFrame(focusAfterClose.current);
+              return;
             }
             if (message.type === 'preferences' && 'delay' in message && typeof message.delay === 'number') {
               void setFileAutoSave(message.delay).then(saved => {

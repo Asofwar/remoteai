@@ -38,6 +38,7 @@ const client: ProjectBrowserClient = {
 const host: BrowserHost = {
   copyPath: path => request('copyPath', { path }),
   download: target => request('download', target),
+  reference: async entry => { await request('reference', entry); await close(); },
 };
 const element = document.getElementById('root');
 if (!element) throw new Error('Missing browser root');

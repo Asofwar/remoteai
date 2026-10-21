@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { test, expect } from '@playwright/test';
 import type { BrowserHostMessage } from '../../../shared/project-browser/nativeBridge';
 import type { DocumentsSnapshot } from '../../../shared/project-browser/documents';
+import type { ProjectFile } from '../../../shared/remote-chat/projectFiles';
 import { browserRequest, browserRoot, savedFiles } from './project-browser-fixture';
 import { longPress } from './project-browser-touch';
 const require = createRequire(import.meta.url);
@@ -28,6 +29,7 @@ test('bundled native editor: offline assets, mobile search/fold/save and close g
   const emit = (message: BrowserHostMessage) => page.evaluate(value => window.projectBrowserMessage(value), message);
   let closed = false;
   let snapshot: DocumentsSnapshot | undefined;
+  const references: ProjectFile[] = [];
   await page.exposeFunction('nativeBrowserRequest', async (raw: string) => {
     const message = JSON.parse(raw) as { type: string; snapshot?: DocumentsSnapshot };
     if (message.type === 'ready') {
@@ -36,7 +38,8 @@ test('bundled native editor: offline assets, mobile search/fold/save and close g
           '--bg': '#121614', '--line': '#35413a', '--green': '#61d6ad', '--browser-on-accent': '#121614' } });
     } else if (message.type === 'closed') { closed = true; snapshot = message.snapshot; }
     else {
-      const reply = await handleBrowserRequest(raw, { client, cwd: browserRoot, connected: true });
+      const reply = await handleBrowserRequest(raw, { client, cwd: browserRoot, connected: true,
+        host: { copyPath: async () => {}, reference: async entry => { references.push(entry); } } });
       if (reply) await emit(reply);
     }
   });
@@ -100,5 +103,20 @@ test('bundled native editor: offline assets, mobile search/fold/save and close g
     await expect(pane.getByRole('textbox', { name: '文件内容', exact: true })).toContainText('shared native draft');
   }
   await page.screenshot({ path: '../../.codex-tmp/project-browser-native-split.png', animations: 'disabled' });
+  for (const name of ['notes.txt', 'src']) {
+    closed = false;
+    await page.getByRole('button', { name: '返回文件列表', exact: true }).first().click();
+    await longPress(page, page.getByRole('treeitem', { name, exact: true }));
+    await page.screenshot({ path: `../../.codex-tmp/project-reference-native-${name}-menu.png` });
+    await page.getByRole('menuitem', { name: '引用文件', exact: true }).click();
+    await expect.poll(() => closed).toBe(true);
+    expect(snapshot?.tabs.find(tab => tab.path.endsWith('/main.ts'))?.text).toBe('shared native draft');
+    await page.reload();
+    await expect(page.locator('.pf-editor-pane')).toHaveCount(2);
+  }
+  expect(references).toEqual([
+    { path: `${browserRoot}/notes.txt`, name: 'notes.txt', directory: false },
+    { path: `${browserRoot}/src`, name: 'src', directory: true },
+  ]);
   expect(errors).toEqual([]);
 });

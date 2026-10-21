@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeft, Copy, Download, FilePlus, FolderOpen, FolderPlus,
-  Scissors, ClipboardPaste, Pencil, Trash2, Terminal, Link } from 'lucide-react';
+  Scissors, ClipboardPaste, Pencil, Trash2, Terminal, Link, Quote } from 'lucide-react';
 import type { BrowserHost } from './entryActions';
 import { normalizedPath } from './entryActions';
 import type { TreeCommand, TreeMenu as Menu } from './useTreeActions';
@@ -81,6 +81,7 @@ export function TreeMenu({ menu, host, canPaste, cwd, close, command, t }: {
       {stackedSubmenu === 'new' && newItems}
       {stackedSubmenu === 'open' && openItems}
       {!stackedSubmenu && <>
+        {item('reference', '引用文件', Quote, !host.reference)}
         {menu.entry.directory && <TreeSubmenu label={t('新建')} icon={FilePlus} active={submenu === 'new'}
           compact={compact} open={() => setSubmenu('new')}
           close={() => setSubmenu(current => current === 'new' ? undefined : current)}>{newItems}</TreeSubmenu>}

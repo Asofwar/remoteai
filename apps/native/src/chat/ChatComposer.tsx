@@ -1,4 +1,5 @@
 import { useComposerSuggestion } from '../../../../shared/chat/useComposerSuggestion';
+import { useComposerFileReferences } from '../../../../shared/chat/ChatFileReferences';
 import { ComposerSuggestion } from './ComposerSuggestion';
 import type { PromptSuggestionSource } from '../../../../shared/chat/nextPromptSuggestion';
 import { ComposerInput } from './ComposerInput';
@@ -140,6 +141,9 @@ export function ChatComposer({ projectPicker, suggestions, models, selection, se
   useEffect(() => { setProjectFiles(null); }, [cwd]);
   const action = composerAction({ running: running && !hasDraft, interrupted: interrupted && !goalMode.enabled, hasDraft });
   const attachmentBusy = sending || photos.busy || attachments.busy || queueEditor.loading;
+  useComposerFileReferences({ scope: `${threadId ?? ''}:${cwd}`,
+    enabled: active && !disabled && !attachmentBusy && !goalMode.enabled, add: attachments.add,
+    focus: () => menu.input.current?.focus() });
   const cannotSend = disabled || attachmentBusy || goalBusy || (goalMode.enabled && running)
     || (action === 'send' && !hasDraft);
   const actionDisabled = action === 'pause' ? !ready || pausing : cannotSend;

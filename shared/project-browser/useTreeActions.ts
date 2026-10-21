@@ -5,7 +5,7 @@ import { withinPath } from './entryActions';
 import type { ProjectDocuments } from './documents';
 
 export type TreeCommand = 'createFile' | 'createFolder' | 'cut' | 'copy' | 'copyPath' | 'paste'
-  | 'rename' | 'delete' | 'explorer' | 'terminal' | 'download';
+  | 'rename' | 'delete' | 'explorer' | 'terminal' | 'download' | 'reference';
 export interface TreeMenu { entry: ProjectFile; x: number; y: number }
 export interface TreePrompt { entry: ProjectFile; action: 'createFile' | 'createFolder' | 'rename' | 'delete' }
 interface Clipboard { entry: ProjectFile; cut: boolean }
@@ -55,6 +55,7 @@ export function useTreeActions(options: {
     }
     if (action === 'paste') { void paste(entry); return; }
     void run(async () => {
+      if (action === 'reference') await options.host.reference?.(entry);
       if (action === 'copyPath') { await options.host.copyPath(entry.path); setMessage('路径已复制。'); }
       if (action === 'explorer' || action === 'terminal') await options.host.open?.(entry, action);
       if (action === 'download') {

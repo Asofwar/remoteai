@@ -25,6 +25,14 @@ function object(value: unknown): Record<string, unknown> {
     ? value as Record<string, unknown> : {};
 }
 
+async function referenceEntry(target: Record<string, unknown>, path: string, host: BrowserHost) {
+  if (!host.reference || typeof target.directory !== 'boolean' || typeof target.name !== 'string'
+    || !target.name.trim() || target.name.length > 255 || /[\0\r\n]/.test(target.name)) {
+    throw new Error('操作未完成，请重试。');
+  }
+  await host.reference({ path, name: target.name, directory: target.directory });
+}
+
 /** The embedded viewer can only access the project selected by its native host. */
 export async function handleBrowserRequest(raw: string, options: {
   client: ProjectBrowserClient; cwd: string; connected: boolean; host?: BrowserHost;
@@ -44,9 +52,13 @@ export async function handleBrowserRequest(raw: string, options: {
     if (message.action === 'mutate') {
       return { type: 'reply', id, data: await options.client.mutate({ ...file, ...entryAction(target) }) };
     }
-    if (message.action === 'copyPath' || message.action === 'download') {
+    if (['copyPath', 'download', 'reference'].includes(String(message.action))) {
       if (!options.host || !withinPath(file.path, options.cwd)
         || file.path.replace(/\\/g, '/').split('/').includes('..')) throw new Error('操作未完成，请重试。');
+      if (message.action === 'reference') {
+        await referenceEntry(target, file.path, options.host);
+        return { type: 'reply', id };
+      }
       const data = message.action === 'copyPath' ? await options.host.copyPath(file.path)
         : await options.host.download?.(file);
       return { type: 'reply', id, data };

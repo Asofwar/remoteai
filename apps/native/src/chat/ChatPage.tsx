@@ -16,6 +16,7 @@ import { ChatOverlay } from './ChatOverlay';
 import { queueProps } from '../../../../shared/remote-chat/client/queueProps';
 import { ChatMessages } from './ChatMessages';
 import { ChatQuotesProvider } from './ChatQuotes';
+import { ChatFileReferencesProvider } from '../../../../shared/chat/ChatFileReferences';
 import { ChatProcessing } from './ChatProcessing';
 import { currentRunningTurn } from '../../../../shared/chat/runningTurn';
 import { ChatImageContext } from './ChatImage';
@@ -145,6 +146,7 @@ function ConnectedChat({ session, device, devices, selected, active: pageActive,
   {tokenSummary && pageActive && <TokenSummaryPage read={controller.readTokenSummary} ready={ready}
     foreground={foreground} deviceName={device?.name} onBack={closeTokenSummary} />}
   <View style={[styles.fill, tokenSummary && styles.hidden]}>
+  <ChatFileReferencesProvider enabled={active && !state.selectedArchived}>
   <ChatQuotesProvider active={active} scope={state.selected?.id ?? null}
     enabled={active && !state.selectedArchived}>
   <ChatDrawer ref={drawerRef} enabled={active && !pickingDevice}
@@ -245,5 +247,5 @@ function ConnectedChat({ session, device, devices, selected, active: pageActive,
     {searching && active && <ChatSearch state={state} controller={controller} onClose={() => setSearching(false)}
       select={(thread) => { setSearching(false); closeDrawer(() => { void controller.select(thread); }); }} />}
     </ChatOverlay>
-  </KeyboardAvoidingView></ChatDrawer></ChatQuotesProvider></View></>;
+  </KeyboardAvoidingView></ChatDrawer></ChatQuotesProvider></ChatFileReferencesProvider></View></>;
 }

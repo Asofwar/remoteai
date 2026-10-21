@@ -27,6 +27,7 @@ import { ConversationTokenStatus } from './ConversationTokenStatus';
 import { ProjectPicker } from "./ProjectPicker";
 import { GuiToolbox } from "./GuiToolbox";
 import { LocalProjectBrowser } from './LocalProjectBrowser';
+import { useComposerFileReferences } from '../../../../../shared/chat/ChatFileReferences';
 import { localGitClient } from "./localGitClient";
 import { SkillInput, type SkillInputHandle } from "./SkillInput";
 import { useNextPromptSuggestion } from './useNextPromptSuggestion';
@@ -67,6 +68,9 @@ export const Composer = forwardRef<ComposerHandle, {
     disabled: disabled || draftReading || !!dialog, addAttachments, addImages,
     setProject: controller.setProject, report: controller.report, focus: () => skillInput.current?.focus() });
   const reading = draftReading || drop.reading || dictating;
+  useComposerFileReferences({ scope: `${key}:${project}`,
+    enabled: active && !disabled && !reading && !goalMode.enabled,
+    add: reference => addAttachments([reference]), focus: () => skillInput.current?.focus() });
   const hasDraft = Boolean(draft.text.trim() || draft.images.length
     || draft.attachments?.length || draft.quotes?.length);
   const suggestion = useNextPromptSuggestion(state, { active,

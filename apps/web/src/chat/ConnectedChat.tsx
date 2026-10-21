@@ -26,6 +26,7 @@ import { visibleChatError } from '../../../../shared/remote-chat/chatError';
 import { TaskReviewProvider } from '../../../../shared/remote-chat/TaskReviewContext';
 import { ChatRetryProvider } from '../../../../shared/remote-chat/ChatRetryProvider';
 import { ChatQuotesProvider } from './ChatQuotes';
+import { ChatFileReferencesProvider } from '../../../../shared/chat/ChatFileReferences';
 import { ChatDetailsWorkspace } from './ChatDetailsWorkspace';
 import { ConversationChangesButton } from '../../../desktop/src/pages/codexGui/ConversationChangesButton';
 import { ChatAsyncQuestions } from './ChatAsyncQuestions';
@@ -140,6 +141,7 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
     <ChatFileContext.Provider value={{ threadId: state.selected?.id ?? null, ready, client: controller.files,
       load: controller.textPreview }}>
     <ChatDetailsWorkspace selected={state.selected?.id ?? null} active={active} enabled={showDesktopDiffs}>
+    <ChatFileReferencesProvider>
     <ChatQuotesProvider scope={state.selected?.id ?? null} sending={state.sending}
     enabled={active && !state.selectedArchived}>
     <div className="chat-conversation">
@@ -192,6 +194,6 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
       deviceName={device?.name} onClose={() => setTokenSummary(false)} />}
     {pickingDevice && <ChatDevices chooseLocal={chooseLocal} devices={devices} onClose={() => setPickingDevice(false)}
       choose={(id) => { chooseDevice(id); setPickingDevice(false); }} />}
-  </ChatQuotesProvider></ChatDetailsWorkspace>
+  </ChatQuotesProvider></ChatFileReferencesProvider></ChatDetailsWorkspace>
   </ChatFileContext.Provider></ChatImageContext.Provider></ImageAiContext.Provider>;
 }

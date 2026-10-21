@@ -1,7 +1,8 @@
-import { lazy, Suspense, useCallback, useMemo, useRef } from 'react';
+import { lazy, Suspense, useCallback, useContext, useMemo, useRef } from 'react';
 import { FolderSearch } from 'lucide-react';
 import { WorkspaceDrawerTab } from '../../../../../shared/chat/WorkspaceDrawerTab';
-import { workspaceTabId } from '../../../../../shared/chat/workspaceDrawer';
+import { WorkspaceDrawerContext, workspaceTabId } from '../../../../../shared/chat/workspaceDrawer';
+import { useChatFileReference } from '../../../../../shared/chat/ChatFileReferences';
 import type { ProjectBrowserClient } from '../../../../../shared/project-browser/protocol';
 import type { ProjectBrowserHandle } from '../../../../../shared/project-browser/ProjectBrowser';
 import { useGitTheme } from '../git/gitTheme';
@@ -22,8 +23,18 @@ export function ProjectBrowserDrawer({ client, cwd, connected, active, onClose,
   useLanguage();
   const theme = useGitTheme(desktopStyle);
   const browser = useRef<ProjectBrowserHandle>(null);
+  const reference = useChatFileReference();
+  const workspace = useContext(WorkspaceDrawerContext);
   const save = useCallback(() => browser.current?.saveActive(), []);
-  const actionsHost = useMemo(() => suppliedHost ?? browserHost(client), [suppliedHost, client]);
+  const hide = workspace?.tabs.hide;
+  const actionsHost = useMemo<BrowserHost>(() => ({
+    ...(suppliedHost ?? browserHost(client)),
+    reference: async entry => {
+      const focus = reference(entry);
+      hide?.();
+      requestAnimationFrame(focus);
+    },
+  }), [suppliedHost, client, reference, hide]);
   return <WorkspaceDrawerTab active={active}
     tab={{ id: workspaceTabId.files(cwd), title: t('文件浏览'), icon: FILES_ICON, save }}
     className="project-browser-drawer" style={theme}>

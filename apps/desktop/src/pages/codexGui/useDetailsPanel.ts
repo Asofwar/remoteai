@@ -1,33 +1,33 @@
 import { guiText } from "../../i18n/guiText";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DiffPanelEntry } from "./detailsContext";
 import { usePreviewHistory } from "./filePreview/usePreviewHistory";
+import type { WorkspaceTabs } from "../../../../../shared/chat/workspaceDrawer";
 
 const EMPTY_CHANGES: DiffPanelEntry = { id: "conversation-changes", get title() { return guiText("文件更改"); }, files: [] };
 
-export function useDetailsPanel({ selected, active, enabled, remoteFiles = false }: {
-  selected: string | null; active: boolean; enabled: boolean; remoteFiles?: boolean;
+export function useDetailsPanel({ selected, enabled, remoteFiles = false, drawer }: {
+  selected: string | null; enabled: boolean; remoteFiles?: boolean; drawer: WorkspaceTabs;
 }) {
   const [entry, setEntry] = useState<DiffPanelEntry | null>(null);
-  const [showingChanges, setShowingChanges] = useState(true);
-  const [minimized, setMinimized] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [viewId, setViewId] = useState(0);
-  const opener = useRef<HTMLElement | null>(null);
   const changes = useRef(EMPTY_CHANGES);
-  const rememberOpener = useCallback(() => {
-    // Switching tabs inside the drawer must not replace the original conversation trigger.
-    const focused = document.activeElement;
-    if (focused instanceof HTMLElement && !focused.closest("[data-details-panel]")) opener.current = focused;
-  }, []);
+  const rememberOpener = drawer.rememberOpener;
+  const openTab = drawer.open;
+  const hide = drawer.hide;
+  const showingChanges = drawer.selected === "changes";
+  const previousTab = useRef(drawer.selected);
   const reveal = useCallback((diff: boolean) => {
-    setShowingChanges(diff); setMinimized(false); setViewId(value => value + 1);
-  }, []);
+    openTab(diff ? "changes" : "preview");
+    if (diff) setViewId(value => value + 1);
+  }, [openTab]);
   const revealPreview = useCallback(() => reveal(false), [reveal]);
   const { preview, navigation, openFile, openRemoteFile, openWebsite, cancel, reset } = usePreviewHistory({
     onOpen: rememberOpener, onNavigate: revealPreview,
   });
-  const visible = Boolean((entry || preview) && !minimized && active && enabled);
+  const visible = drawer.visible && enabled
+    && Boolean((showingChanges && entry) || (drawer.selected === "preview" && preview));
   const open = useCallback((next: DiffPanelEntry) => {
     cancel(); rememberOpener(); setEntry(next); reveal(true);
   }, [cancel, rememberOpener, reveal]);
@@ -37,18 +37,21 @@ export function useDetailsPanel({ selected, active, enabled, remoteFiles = false
   }, []);
   const setConversationChanges = useCallback((next: DiffPanelEntry) => { changes.current = next; }, []);
   const close = useCallback(() => {
-    cancel(); reset(); setEntry(null); setExpanded(false); opener.current?.focus();
-  }, [cancel, reset]);
+    cancel(); hide();
+  }, [cancel, hide]);
   useEffect(() => {
-    reset(); setEntry(null); setMinimized(false); setExpanded(false);
+    if (previousTab.current !== drawer.selected && drawer.selected !== "preview") cancel();
+    previousTab.current = drawer.selected;
+  }, [drawer.selected, cancel]);
+  useLayoutEffect(() => {
+    reset(); setEntry(null); setExpanded(false);
     return cancel;
   }, [selected, enabled, reset, cancel]);
   const context = useMemo(() => ({ open, update, close, openFile, openWebsite, setConversationChanges,
     openRemoteFile: remoteFiles ? openRemoteFile : undefined, visible, showingChanges }),
   [open, update, close, openFile, openRemoteFile, remoteFiles, openWebsite, setConversationChanges,
     visible, showingChanges]);
-  return { context, entry, preview, navigation, showingChanges, visible, viewId, minimized, expanded, setExpanded,
-    minimize: () => { setMinimized(true); opener.current?.focus(); },
-    restore: () => setMinimized(false), showChanges: () => open(changes.current),
-    showPreview: () => { cancel(); reveal(false); } };
+  return { context, entry, preview, navigation, showingChanges, visible, viewId, expanded, setExpanded,
+    showChanges: () => { if (!entry) setEntry(changes.current); cancel(); openTab("changes"); },
+    showPreview: () => { cancel(); openTab("preview"); } };
 }

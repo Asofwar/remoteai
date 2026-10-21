@@ -73,7 +73,7 @@ for (const dark of [false, true]) {
     expect(bounds.y + bounds.height).toBeLessThan((await editor.boundingBox())!.y);
     await page.screenshot({ path: `../../.codex-tmp/running-changes-${dark ? "dark" : "light"}.png` });
     await badge.click();
-    await expect(page.getByRole("complementary", { name: "文件更改详情" })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "文件更改详情" })).toBeVisible();
     await expect(page.getByLabel("src/first.ts 的代码差异")).toContainText("new 0");
     await page.getByRole("button", { name: "关闭详情抽屉", exact: true }).click();
     backend.turn.diff = backend.turn.items.flatMap((item) => item.changes ?? []).map((file) =>

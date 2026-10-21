@@ -8,7 +8,7 @@ export async function checkGitDiffReview(page: Page, screenshotName: string) {
   await selected.check();
   await git.getByRole('textbox', { name: '提交说明' }).fill('保留这条提交说明');
   await git.getByRole('button', { name: '查看 src/app.ts', exact: true }).click();
-  const diff = git.getByRole('complementary', { name: '文件更改详情', exact: true });
+  const diff = page.getByRole('dialog', { name: '文件更改详情', exact: true });
   await expect(diff).toBeVisible();
   await expect(diff.getByLabel('src/app.ts 的代码差异', { exact: true })).toContainText('new code');
   await expect(diff.locator('.hljs-keyword')).toContainText('new');
@@ -21,16 +21,17 @@ export async function checkGitDiffReview(page: Page, screenshotName: string) {
   await page.screenshot({ path: `../../.codex-tmp/${screenshotName}-split.png` });
   await diff.getByRole('button', { name: '最小化详情抽屉', exact: true }).click();
   await expect(diff).toBeHidden();
-  await expect(selected).toBeChecked();
-  await expect(git.getByRole('textbox', { name: '提交说明' })).toHaveValue('保留这条提交说明');
-  await git.getByRole('button', { name: '恢复文件更改', exact: true }).click();
+  await page.getByRole('button', { name: '恢复文件更改', exact: true }).click();
   await expect(diff.getByRole('button', { name: '并排', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await diff.getByRole('button', { name: '还原抽屉宽度', exact: true }).click();
-  await diff.getByRole('button', { name: '关闭详情抽屉', exact: true }).click();
+  await diff.getByRole('tab', { name: 'Git', exact: true }).click();
+  await expect(selected).toBeChecked();
+  await expect(git.getByRole('textbox', { name: '提交说明' })).toHaveValue('保留这条提交说明');
   await git.getByRole('button', { name: '查看 src/app.ts', exact: true }).click();
   await expect(diff).toBeVisible();
   await diff.getByRole('button', { name: '关闭详情抽屉', exact: true }).press('Escape');
-  await expect(diff).toHaveCount(0);
+  await expect(diff).toBeHidden();
+  await page.getByRole('button', { name: '打开 Git', exact: true }).click();
   await expect(git).toBeVisible();
   await expect(selected).toBeChecked();
   await checkCommitDiff(page);
@@ -44,10 +45,10 @@ async function checkCommitDiff(page: Page) {
   await rows.first().click();
   await expect(git.locator('.git-commit-file')).toHaveCount(4);
   await git.getByRole('button', { name: '查看 src/chat/tools.ts', exact: true }).click();
-  const diff = git.getByRole('complementary', { name: '文件更改详情', exact: true });
+  const diff = page.getByRole('dialog', { name: '文件更改详情', exact: true });
   await expect(diff).toContainText('committed change');
   await expect(diff).toContainText('e950cd31');
-  await diff.getByRole('button', { name: '关闭详情抽屉', exact: true }).click();
+  await diff.getByRole('tab', { name: 'Git', exact: true }).click();
   await expect(git.locator('.git-commit-file')).toHaveCount(4);
   await git.getByRole('button', { name: '返回提交记录', exact: true }).click();
   // A tall drawer may load another page while opening the commit; keep every previously loaded row.

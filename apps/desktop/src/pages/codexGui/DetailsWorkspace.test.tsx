@@ -57,7 +57,7 @@ it("opens diff in a right panel and preserves layout when minimized, restored, a
   await act(async () => button("还原抽屉宽度").click());
   expect(panel().style.width).toBe("560px");
   await act(async () => panel().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
-  expect(panel()).toBeNull();
+  expect(panel().hidden).toBe(true);
   expect(document.activeElement).toBe(trigger());
 });
 

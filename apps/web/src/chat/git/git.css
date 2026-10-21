@@ -6,13 +6,14 @@
 .chat-tools-menu button:hover:not(:disabled) { background: #eef4f1; }
 .chat-tools-menu button:disabled { cursor: default; opacity: .4; }
 /* Resolve the portal theme before exposing it to the shared file review styles. */
-.chat-git-drawer .ant-drawer-content, .chat-git-drawer .git-drawer-surface {
+.chat-git-drawer .ant-drawer-content {
   --ink: var(--git-ink); --muted: var(--git-muted); --line: var(--git-border);
   --panel: var(--git-surface); --bg: var(--git-subtle);
   --green-soft: var(--git-accent-bg); --green-dark: var(--git-accent);
   --gui-border: var(--git-border); --gui-muted: var(--git-muted);
 }
 .chat-git-drawer .chat-terminal-device { color: var(--git-muted); }
+.git-workspace-device { margin: 8px 16px 0; flex-shrink: 0; }
 .git-menu input::placeholder, .git-commit-form textarea::placeholder { color: var(--git-muted); opacity: 1; }
 .chat-git { position: relative; display: flex; flex-direction: column; min-height: 0;
   width: 100%; color: var(--git-ink, #17211b); background: var(--git-surface, #fff); }

@@ -1,7 +1,9 @@
 import { t, useLanguage } from '../i18n';
 import { Drawer, Grid, Modal } from "antd";
 import { Popup, SafeArea } from "antd-mobile";
-import type { ReactNode } from "react";
+import { useContext, useId, type ReactNode } from "react";
+import { WorkspaceDrawerContext } from "../../../../shared/chat/workspaceDrawer";
+import { WorkspaceDrawerTab } from "../../../../shared/chat/WorkspaceDrawerTab";
 
 interface AdaptiveSheetProps {
   open: boolean;
@@ -17,6 +19,7 @@ interface AdaptiveSheetProps {
   className?: string;
   presentation?: "adaptive" | "drawer";
   afterOpenChange?: (open: boolean) => void;
+  tabId?: string;
 }
 
 export function AdaptiveSheet({
@@ -33,8 +36,11 @@ export function AdaptiveSheet({
   className,
   presentation = "adaptive",
   afterOpenChange,
+  tabId,
 }: AdaptiveSheetProps) {
   useLanguage();
+  const workspace = useContext(WorkspaceDrawerContext);
+  const generatedId = useId();
   const screens = Grid.useBreakpoint();
   const back = onBack && <button type="button" className="sheet-close" onClick={onBack}
     aria-label={t("返回上一层")}>‹</button>;
@@ -47,6 +53,11 @@ export function AdaptiveSheet({
   const titleContent = onBack || titleIcon
     ? <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>{back}{titleIcon}{heading}</div> : heading;
   if (presentation === "drawer") {
+    if (workspace) return <WorkspaceDrawerTab active={open}
+      tab={{ id: tabId ?? generatedId, title, icon: titleIcon }} onVisibilityChange={afterOpenChange}
+      className={`workspace-drawer-tab-scroll ${className ?? ''}`}>
+      {() => <>{(onBack || subtitle || titleAction) && titleContent}{children}</>}
+    </WorkspaceDrawerTab>;
     return <Drawer open={open} title={titleContent} placement="right" width={`min(${width}px, 100vw)`}
       afterOpenChange={afterOpenChange}
       className={className}

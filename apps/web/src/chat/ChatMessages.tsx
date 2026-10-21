@@ -16,7 +16,8 @@ import { useHistoryScroll } from './useHistoryScroll';
 import { ChatMessage } from './ChatMessage';
 import { ChatToolDetails } from './ChatToolDetails';
 import { ChatTurnDetails } from './ChatTurnDetails';
-import { ChatTurnSummary, type TurnPanel } from './ChatTurnSummary';
+import { ChatTurnSummary } from './ChatTurnSummary';
+import { useHistoryDrawers, type HistorySelection as Selection } from './useHistoryDrawers';
 import { ChatTurnTiming, desktopTimeline } from './ChatTurnTiming';
 import { ChatSelectionQuote } from './ChatSelectionQuote';
 import './messages.css';
@@ -24,10 +25,6 @@ import './desktopMessages.css';
 import type { Item, Turn } from './types';
 
 export type RenderUserMessage = (props: { item: Item; turn: Turn }) => ReactNode;
-
-type WorkSelection = { type: 'work' | 'activities'; id: string };
-type Selection = WorkSelection | { type: 'item'; id: string; back?: WorkSelection }
-  | { type: 'turn'; id: string; panel: TurnPanel };
 
 function WorkSummary({ entry, open, inline, desktop }: {
   entry: WorkEntry; open: () => void; inline: (id: string, value: boolean) => void;
@@ -126,6 +123,8 @@ function ChatMessageHistory({ props, scroll }: {
   const runningTurn = currentRunningTurn(turns);
   const runningSummary = timeline.find(entry => entry.kind === 'summary' && entry.turn.id === runningTurn?.id);
   const [selection, setSelection] = useState<Selection | null>(null);
+  const drawers = useHistoryDrawers(turns);
+  const open = (next: Selection) => { setSelection(drawers.open(next) ? null : next); };
   // Dismiss the previous layout's sheets before switching to inline work and docked reviews.
   useEffect(() => { setSelection(null); }, [desktop]);
   const work = selection?.type === 'work' ? findWorkEntry(entries, selection.id)
@@ -147,7 +146,7 @@ function ChatMessageHistory({ props, scroll }: {
       {timeline.map(entry => <Fragment key={entry.id}>
         {entry === runningSummary && props.processing}
         <div data-message-id={'item' in entry ? entry.item.id : entry.id} className={`chat-entry-${entry.kind}`}>
-          <TimelineEntry entry={entry} open={setSelection} inline={setInline} desktop={desktop}
+          <TimelineEntry entry={entry} open={open} inline={setInline} desktop={desktop}
             renderUserMessage={props.renderUserMessage} />
         </div>
       </Fragment>)}
@@ -162,11 +161,12 @@ function ChatMessageHistory({ props, scroll }: {
       subtitle={t("{value1} 项活动", { value1: work.items.length })} width={760} onClose={close}>
       <div className="chat-detail-stack">{work.items.map(item => <ChatMessage key={item.id} item={item} process
         running={work.turn.status === 'inProgress' && item.status !== 'completed'} onQuote={close}
-        onOpen={id => setSelection({ type: 'item', id,
+        onOpen={id => open({ type: 'item', id,
           back: { type: work.kind === 'activities' ? 'activities' : 'work', id: work.id } })} />)}</div>
     </AdaptiveSheet>}
     {item && <ChatToolDetails item={item} onClose={close}
       onBack={back ? () => setSelection(back) : undefined} />}
     {turn && selection?.type === 'turn' && <ChatTurnDetails turn={turn} panel={selection.panel} onClose={close} />}
+    {drawers.panels}
   </>;
 }

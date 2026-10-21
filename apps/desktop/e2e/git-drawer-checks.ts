@@ -7,9 +7,9 @@ export async function checkInternalGitDrawer(page: Page) {
   const panel = (await drawer.boundingBox())!;
   expect(panel.y).toBe(bounds.y);
   expect(panel.height).toBe(bounds.height);
-  expect(panel.width).toBeCloseTo(Math.min(800, page.viewportSize()!.width * .8), 0);
+  expect(panel.width).toBeCloseTo(560, 0);
   await expect(page.locator('.chat-git-drawer .ant-drawer-mask')).toHaveCount(0);
-  const grip = drawer.getByRole('separator', { name: '调整 Git 抽屉宽度' });
+  const grip = drawer.getByRole('separator', { name: '调整详情抽屉宽度' });
   const handle = (await grip.boundingBox())!;
   await page.mouse.move(handle.x + handle.width / 2, handle.y + 100);
   await page.mouse.down();
@@ -22,9 +22,9 @@ export async function checkInternalGitDrawer(page: Page) {
   expect((await drawer.boundingBox())!.width).toBeCloseTo(panel.width, 0);
   const message = drawer.getByRole('textbox', { name: '提交说明' });
   await message.fill('保留草稿');
-  await drawer.getByRole('button', { name: '最小化 Git', exact: true }).click();
+  await drawer.getByRole('button', { name: '最小化详情抽屉', exact: true }).click();
   await expect(drawer).toBeHidden();
-  await page.getByRole('button', { name: '恢复 Git', exact: true }).click();
+  await page.getByRole('button', { name: 'Git', exact: true }).click();
   await expect(message).toHaveValue('保留草稿');
   await message.fill('');
 }

@@ -27,7 +27,7 @@ for (const width of [540, 1440]) {
     await back.click(); await expect(markdown).toBeVisible();
     await forward.click();
     await expect(page.getByLabel("文件内容", { exact: true })).toContainText("Apache License");
-    const sidebar = await page.getByRole("complementary").boundingBox();
+    const sidebar = await page.locator('aside[data-details-panel]').boundingBox();
     const bounds = await back.boundingBox();
     expect(bounds!.x).toBeGreaterThanOrEqual(sidebar!.x);
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
@@ -121,8 +121,8 @@ test("image sizing and the file menu fit a narrow preview window", async ({ page
 
 test("file previews share the changes sidebar, resize, restore, and close without a popup", async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/e2e/file-preview-harness.html");
-  const sidebar = page.getByRole("complementary", { name: "预览详情" });
+  await page.goto("/e2e/file-preview-harness.html", { waitUntil: "domcontentloaded" });
+  const sidebar = page.getByRole("dialog", { name: "预览详情" });
   await expect(sidebar).toBeVisible();
   expect(context.pages()).toHaveLength(1);
   const content = page.getByRole("heading", { name: "项目说明" });
@@ -144,15 +144,15 @@ test("file previews share the changes sidebar, resize, restore, and close withou
   await page.getByRole("button", { name: "还原抽屉宽度" }).click();
   await page.screenshot({ path: "../../.codex-tmp/file-preview-sidebar.png" });
   await page.getByRole("button", { name: "关闭详情抽屉" }).click();
-  await expect(sidebar).toHaveCount(0);
-  await expect(page.locator("body")).toHaveAttribute("data-closed", /.+/);
+  await expect(sidebar).toBeHidden();
+  await expect(page.locator("body")).not.toHaveAttribute("data-closed", /.+/);
 });
 
 test("web links use the same sidebar with explicit browser and reload actions", async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/e2e/file-preview-harness.html?kind=website");
   await page.getByRole("link", { name: "查看网页" }).click();
-  const sidebar = page.getByRole("complementary", { name: "预览详情" });
+  const sidebar = page.getByRole("dialog", { name: "预览详情" });
   await expect(sidebar).toBeVisible();
   const frame = page.frameLocator('iframe[title="网页预览"]');
   await expect(frame.getByRole("heading", { name: "HTML 预览" })).toBeVisible();
@@ -178,5 +178,5 @@ test("web links use the same sidebar with explicit browser and reload actions", 
   await expect(page.getByLabel("操作结果")).toHaveText("edited");
   await page.screenshot({ path: "../../.codex-tmp/website-preview-sidebar.png" });
   await page.getByRole("button", { name: "关闭详情抽屉" }).click();
-  await expect(sidebar).toHaveCount(0);
+  await expect(sidebar).toBeHidden();
 });

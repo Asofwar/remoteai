@@ -198,7 +198,7 @@ for (const blocked of [false, true]) {
     await page.getByRole('button', { name: '打开 Git', exact: true }).click();
     await expect(page.locator('.git-project')).toContainText('/local/workspace');
     await checkGitDiffReview(page, `gui-local-git-diff-${blocked ? 'relay' : 'p2p'}`);
-    await page.getByRole('button', { name: '关闭 Git', exact: true }).click();
+    await page.getByRole('button', { name: '关闭详情抽屉', exact: true }).click();
     await chooseComputer(page, 'Office PC');
     await page.getByRole('button', { name: 'Office', exact: true }).click();
     await expect(page.locator('.chat-connection-status')).toContainText(blocked ? 'Relay' : 'P2P');
@@ -210,12 +210,12 @@ for (const blocked of [false, true]) {
     await expect(page.getByRole('button', { name: '打开工具箱', exact: true })).toHaveCount(0);
     await page.screenshot({ path: `../../.codex-tmp/gui-remote-git-${blocked ? 'relay' : 'p2p'}.png` });
     await page.locator('.gui-remote-project').getByRole('button', { name: '打开 Git', exact: true }).click();
-    await expect(page.locator('.git-project')).toContainText('F:/projects/demo');
-    await expect(page.locator('.chat-terminal-device')).toContainText('Office PC');
+    await expect(page.locator('.git-project:visible')).toContainText('F:/projects/demo');
+    await expect(page.locator('.chat-terminal-device:visible')).toContainText('Office PC');
     await expect.poll(() => office.evaluate(() => window.chatTest.demoState().operations
       .some(operation => operation.operation === 'guiGitChanges' && operation.cwd === 'F:/projects/demo'))).toBe(true);
     await checkGitDiffReview(page, `gui-remote-git-diff-${blocked ? 'relay' : 'p2p'}`);
-    await page.getByRole('button', { name: '关闭 Git', exact: true }).click();
+    await page.getByRole('button', { name: '关闭详情抽屉', exact: true }).click();
     const launcher = page.getByRole('button', { name: '打开远程桌面', exact: true });
     await expect(launcher).toBeVisible();
     const bounds = (await launcher.boundingBox())!;
@@ -243,7 +243,7 @@ for (const blocked of [false, true]) {
     await expect.poll(() => office.evaluate(() => window.chatTest.demoState().operations
       .some(operation => operation.operation === 'guiReconnect'))).toBe(true);
     await page.getByRole('button', { name: '查看文件更改' }).click();
-    const details = page.getByRole('complementary', { name: '文件更改详情' });
+    const details = page.getByRole('dialog', { name: '文件更改详情' });
     await expect(details).toContainText('remote edit');
     await page.getByRole('button', { name: '关闭详情抽屉' }).click();
     const summary = page.getByRole('region', { name: '本轮修改', exact: true });

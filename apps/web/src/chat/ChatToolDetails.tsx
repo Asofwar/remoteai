@@ -5,11 +5,11 @@ import { messageLabel } from '../../../../shared/chat/messageDetails';
 import { toolText } from '../../../../shared/chat/toolText';
 import { ChatQuoteButton } from './ChatQuotes';
 import { ChatToolContent } from './ChatToolContent';
-export function ChatToolDetails({ item, onClose, onBack }: {
-  item: Item; onClose: () => void; onBack?: () => void;
+export function ChatToolDetails({ item, onClose, onBack, tabId }: {
+  item: Item; onClose: () => void; onBack?: () => void; tabId?: string;
 }) {
   useLanguage();
-  return <AdaptiveSheet open title={t(messageLabel(item))} width={760} onClose={onClose} onBack={onBack}
+  return <AdaptiveSheet open tabId={tabId} title={t(messageLabel(item))} width={760} onClose={onClose} onBack={onBack}
     presentation={item.type === 'fileChange' ? 'drawer' : 'adaptive'}>
     <div className="chat-detail-stack">
       {item.status === 'inProgress' && <p className="chat-muted">{t("进行中…")}</p>}

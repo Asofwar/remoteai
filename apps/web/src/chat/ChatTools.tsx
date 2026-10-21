@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
+import { WorkspaceDrawerContext, workspaceTabId } from '../../../../shared/chat/workspaceDrawer';
 import { Popover } from 'antd';
 import { FolderSearch, GitBranch, Monitor, SquareTerminal, Wrench } from 'lucide-react';
 import type { GuiToolsClient } from '../../../../shared/remote-chat/guiTools';
@@ -16,8 +17,13 @@ interface Props {
 }
 export function ChatTools(props: Props) {
   const browsers = useProjectBrowsers();
+  const workspace = useContext(WorkspaceDrawerContext);
   return <>
-    <ProjectTools key={props.cwd} {...props} openFiles={() => browsers.open(props.cwd)} />
+    <ProjectTools key={props.cwd} {...props} openFiles={() => {
+      const id = workspaceTabId.files(props.cwd);
+      if (!workspace?.tabs.entries.some(tab => tab.id === id)) browsers.open(props.cwd);
+      workspace?.tabs.open(id);
+    }} />
     {browsers.projects.map(project => <ProjectBrowserDrawer key={project} client={props.client.projectBrowser}
       cwd={project} active={props.active && browsers.visible === project}
       connected={props.connected} onClose={browsers.close} />)}
@@ -25,6 +31,7 @@ export function ChatTools(props: Props) {
 }
 
 function ProjectTools({ client, openFiles, ...props }: Props & { openFiles: () => void }) {
+  const workspace = useContext(WorkspaceDrawerContext);
   const wide = useDesktopLayout();
   const [menu, setMenu] = useState(false);
   const [launchId, setLaunchId] = useState(0);
@@ -40,7 +47,9 @@ function ProjectTools({ client, openFiles, ...props }: Props & { openFiles: () =
         <button type="button" disabled={!props.connected}
           onClick={() => { setMenu(false); setLaunchId(value => value + 1); }}>
           <SquareTerminal size={20} />{t('终端')}</button>
-        <button type="button" onClick={() => { setMenu(false); setGit(true); }}>
+        <button type="button" onClick={() => {
+          setMenu(false); setGit(true); workspace?.tabs.open(workspaceTabId.git(props.cwd));
+        }}>
           <GitBranch size={20} />{t('Git')}</button>
         {!wide && <button type="button" disabled={!props.connected || !props.cwd}
           onClick={() => { setMenu(false); openFiles(); }}>

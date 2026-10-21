@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, useContext, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { DetailsWorkspace } from "./DetailsWorkspace";
@@ -7,6 +7,7 @@ import { ConversationChangesButton } from "./ConversationChangesButton";
 import { MessageLink } from "./MessageLink";
 import { filePreviewApi, type FilePreviewData } from "./filePreview/api";
 import { websitePreviewApi } from "./filePreview/websiteApi";
+import { DetailsContext } from "./detailsContext";
 
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => true, invoke: vi.fn() }));
 let root: Root;
@@ -22,6 +23,11 @@ function Fixture({ selected = "first", active = true }: { selected?: string; act
     <MessageLink href="./second.md">Second</MessageLink>
     <MessageLink href="https://example.com/page">Website</MessageLink>
   </DetailsWorkspace>;
+}
+function InitialPreview({ threadId }: { threadId: string }) {
+  const open = useContext(DetailsContext)?.openFile;
+  useEffect(() => { void open?.({ path: "./readme.md", threadId }); }, [open, threadId]);
+  return null;
 }
 
 beforeEach(async () => {
@@ -51,8 +57,29 @@ it("shares one drawer with file changes and keeps the file view when switching t
   expect(source.getAttribute("aria-pressed")).toBe("true");
   expect(filePreviewApi.close).not.toHaveBeenCalled();
   await click("关闭详情抽屉");
-  expect(host.querySelector("aside")).toBeNull();
-  expect(filePreviewApi.close).toHaveBeenCalledWith("first");
+  expect(host.querySelector("aside")?.hidden).toBe(true);
+  expect(filePreviewApi.close).not.toHaveBeenCalled();
+  await click("预览文件：./readme.md");
+  expect(host.querySelector("aside")?.hidden).toBe(false);
+  expect(source.getAttribute("aria-pressed")).toBe("true");
+  expect(filePreviewApi.open).toHaveBeenCalledOnce();
+});
+
+it("opens previews requested by child effects after workspace initialization and conversation changes", async () => {
+  for (const selected of ["auto", "next"]) {
+    await act(async () => root.render(<DetailsWorkspace selected={selected} active>
+      <InitialPreview threadId={selected} /></DetailsWorkspace>));
+    expect(preview()?.textContent).toContain("readme.md");
+    expect(host.querySelector("aside")?.hidden).toBe(false);
+  }
+});
+
+it("offers to open changes after switching away from a conversation with an open drawer", async () => {
+  await click("查看文件更改");
+  await act(async () => root.render(<Fixture selected="other" />));
+  expect(host.querySelector('[aria-label="查看文件更改"]')).not.toBeNull();
+  await click("查看文件更改");
+  expect(host.querySelector("aside")?.hidden).toBe(false);
 });
 
 it("releases replaced files and cancels pending reads when changing conversations", async () => {

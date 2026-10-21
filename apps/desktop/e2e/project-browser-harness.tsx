@@ -29,6 +29,7 @@ Object.assign(window, { browserActions });
 document.documentElement.dataset.theme = dark ? 'dark' : 'light';
 document.body.style.minWidth = '0';
 localStorage.setItem('codex-switch:language', 'zh');
+localStorage.setItem('codex-switch:gui-details-width', '960');
 
 function App() {
   const [connected, setConnected] = useState(true);

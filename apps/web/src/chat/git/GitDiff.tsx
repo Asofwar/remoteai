@@ -25,19 +25,15 @@ function GitDiffPreview({ value, detail }: { value: GitDiffValue; detail: DiffDe
       status: value.truncated ? '差异较大，仅显示部分内容。' : undefined };
   }, [id, detail.path, detail.commit?.hash, value]);
   const open = panel?.open;
-  const close = panel?.close;
   const update = panel?.update;
-  const setConversationChanges = panel?.setConversationChanges;
   const latest = useRef(entry);
   latest.current = entry;
   useEffect(() => {
     open?.(latest.current);
-    return close;
-  }, [id, detail, open, close]);
+  }, [id, detail, open]);
   useEffect(() => {
-    setConversationChanges?.(entry);
     update?.(entry);
-  }, [entry, update, setConversationChanges]);
+  }, [entry, update]);
   return null;
 }
 

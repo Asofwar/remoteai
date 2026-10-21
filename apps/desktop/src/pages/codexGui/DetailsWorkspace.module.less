@@ -12,14 +12,17 @@
 .drawer[hidden] { display: none; }
 .drawer[data-website] { animation: none; }
 .header { .drawer-header(); }
-.tabs { display: flex; align-items: center; flex: 1; min-width: 0; gap: 4px; }
+.tabs { display: flex; align-items: center; flex: 1; min-width: 0; gap: 4px; overflow-x: auto;
+  scrollbar-width: thin; }
 .tab { .drawer-tab(); cursor: pointer;
+  flex-shrink: 0;
   &[aria-selected='true'] { color: var(--ink); background: var(--green-soft); } }
 .controls { display: flex; gap: 3px; flex-shrink: 0;
   button { .drawer-control(); } }
 .content { overflow: auto; min-height: 0; padding: 14px 18px 24px; flex: 1; overscroll-behavior: contain; }
 .preview { min-height: 0; flex: 1; overflow: hidden; container-type: inline-size; }
-.content[hidden], .preview[hidden] { display: none; }
+.toolContent { display: flex; min-height: 0; min-width: 0; flex: 1; overflow: hidden; }
+.content[hidden], .preview[hidden], .toolContent[hidden] { display: none; }
 .host[data-dragging='true'] .preview { pointer-events: none; }
 .empty { margin: 28px 0; text-align: center; color: var(--gui-muted); font-size: 13px; }
 .resizeHandle { position: absolute; top: 0; bottom: 0; left: -5px; width: 10px; z-index: 2;

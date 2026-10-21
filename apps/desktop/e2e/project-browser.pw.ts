@@ -17,7 +17,7 @@ for (const mode of ['local', 'remote']) {
   test(`${mode}: tree, syntax, fold, find, edit/save, both resizers and conflict protection`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await openBrowser(page, mode);
-    const outer = page.getByRole('separator', { name: '调整文件浏览器宽度' });
+    const outer = page.getByRole('separator', { name: '调整详情抽屉宽度' });
     const before = Number(await outer.getAttribute('aria-valuenow'));
     const bounds = (await outer.boundingBox())!;
     await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + 180);

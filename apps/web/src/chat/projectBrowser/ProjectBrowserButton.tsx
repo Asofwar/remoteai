@@ -1,4 +1,6 @@
 import { useProjectBrowsers } from '../../../../../shared/project-browser/useProjectBrowsers';
+import { useContext } from 'react';
+import { WorkspaceDrawerContext, workspaceTabId } from '../../../../../shared/chat/workspaceDrawer';
 import { FolderSearch } from 'lucide-react';
 import type { ProjectBrowserClient } from '../../../../../shared/project-browser/protocol';
 import { ProjectBrowserDrawer } from './ProjectBrowserDrawer';
@@ -11,10 +13,16 @@ export function ProjectBrowserButton({ client, cwd, connected, active, className
 }) {
   useLanguage();
   const browsers = useProjectBrowsers();
+  const workspace = useContext(WorkspaceDrawerContext);
+  const id = workspaceTabId.files(cwd);
+  const visible = workspace?.tabs.visible && workspace.tabs.selected === id;
   return <>
     <button type="button" className={className} disabled={!active || !connected || !cwd}
-      aria-label={t('文件浏览')} aria-haspopup="dialog" aria-expanded={!!browsers.visible}
-      onClick={() => browsers.open(cwd)}>
+      aria-label={t('文件浏览')} aria-haspopup="dialog" aria-expanded={Boolean(visible)}
+      onClick={() => {
+        if (!workspace?.tabs.entries.some(tab => tab.id === id)) browsers.open(cwd);
+        workspace?.tabs.open(id);
+      }}>
       <FolderSearch size={16} /><span>{t('文件浏览')}</span></button>
     {browsers.projects.map(project => <ProjectBrowserDrawer key={project} client={client} cwd={project}
       connected={connected} active={active && browsers.visible === project}

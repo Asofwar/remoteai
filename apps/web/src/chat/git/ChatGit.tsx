@@ -1,5 +1,7 @@
 import { Spin } from 'antd';
-import { useState } from 'react';
+import { useContext, useState } from 'react';
+import { WorkspaceDrawerContext } from '../../../../../shared/chat/workspaceDrawer';
+import { useDesktopLayout } from '../../useDesktopLayout';
 import type { GitClient } from '../../../../../shared/remote-chat/gitTypes';
 import { parentGitDetail, useRemoteGit, type RemoteGit } from '../../../../../shared/remote-chat/useRemoteGit';
 import { useGitCommitFiles } from '../../../../../shared/remote-chat/useGitCommitFiles';
@@ -21,22 +23,25 @@ interface Props {
 }
 
 export function ChatGit(props: Props) {
+  const workspace = useContext(WorkspaceDrawerContext);
+  const desktop = useDesktopLayout();
+  const shared = Boolean(workspace && (desktop || props.desktopDiffs));
   const [visible, setVisible] = useState(false);
   const panel = useRemoteGit({ ...props, active: props.active && visible, refreshInterval: 1000 });
   return <GitDrawer {...props} onVisibilityChange={setVisible}>
-    {active => <GitContent {...props} active={active} panel={panel} />}</GitDrawer>;
+    {active => <GitContent {...props} desktopDiffs={shared || props.desktopDiffs}
+      active={active} panel={panel} shared={shared} />}</GitDrawer>;
 }
 
-function GitContent(props: Props & { panel: RemoteGit }) {
+function GitContent(props: Props & { panel: RemoteGit; shared: boolean }) {
   const { panel } = props;
   const diffPath = panel.detail?.kind === 'diff' ? panel.detail.path : undefined;
   const detail = props.desktopDiffs && panel.detail?.kind === 'diff' ? parentGitDetail(panel.detail) : panel.detail;
   const commitFiles = useGitCommitFiles(props.client, props.cwd, detail?.commit?.hash, props.active && props.connected);
-  return <ChatDetailsWorkspace selected={props.cwd} active={props.active} enabled={Boolean(props.desktopDiffs)}>
-    <div className="chat-git">
+  const content = <div className="chat-git">
       <GitToolbar panel={panel} connected={props.connected} />
-      {panel.fileAction && <GitFileActionDialog panel={panel} connected={props.connected} />}
-      {panel.revisionAction && <GitRevisionDialog panel={panel} connected={props.connected} />}
+      {props.active && panel.fileAction && <GitFileActionDialog panel={panel} connected={props.connected} />}
+      {props.active && panel.revisionAction && <GitRevisionDialog panel={panel} connected={props.connected} />}
       <div className="git-project" title={panel.changes?.root ?? props.cwd}>{panel.changes?.root ?? props.cwd}</div>
       {!props.cwd && <p className="git-notice">{t('请先选择一个项目。')}</p>}
       {!props.connected && <p className="git-notice">{t('电脑连接后即可使用 Git。')}</p>}
@@ -72,6 +77,8 @@ function GitContent(props: Props & { panel: RemoteGit }) {
         {!panel.loading && panel.tab === 'history' && <GitHistory panel={panel} connected={props.connected}
           onPatch={commit => enqueueGitPatch(props.client, props.cwd, commit.hash)} />}
       </>}
-    </div>
-    </ChatDetailsWorkspace>;
+    </div>;
+  if (props.shared) return content;
+  return <ChatDetailsWorkspace selected={props.cwd} active={props.active} enabled={Boolean(props.desktopDiffs)}>
+    {content}</ChatDetailsWorkspace>;
 }

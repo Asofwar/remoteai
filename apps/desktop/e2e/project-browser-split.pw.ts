@@ -43,7 +43,7 @@ for (const mode of ['local', 'remote']) {
     await expect.poll(async () => Number(await divider.getAttribute('aria-valuenow'))).toBeLessThan(45);
     await divider.focus(); await page.keyboard.press('ArrowRight');
     const ratio = await divider.getAttribute('aria-valuenow');
-    await page.getByRole('button', { name: '关闭文件浏览器' }).click();
+    await page.getByRole('button', { name: '关闭详情抽屉' }).click();
     await page.getByRole('button', { name: '文件浏览', exact: true }).click();
     await expect(panes).toHaveCount(2);
     await expect(divider).toHaveAttribute('aria-valuenow', ratio!);

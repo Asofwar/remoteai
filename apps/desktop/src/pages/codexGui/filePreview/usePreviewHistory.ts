@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { message } from "antd";
 import { guiText } from "../../../i18n/guiText";
 import { filePreviewApi, type FilePreviewData } from "./api";
@@ -49,6 +49,9 @@ export function usePreviewHistory({ onOpen, onNavigate }: { onOpen: () => void; 
   const visit = useCallback(async (target: Target, index?: number) => {
     const id = ++request.current;
     onOpen();
+    if (sameTarget(history.current.entries[history.current.index], target)) {
+      pending.current = false; setLoading(false); onNavigate(); return true;
+    }
     pending.current = true; setLoading(true);
     try {
       let next: Preview;
@@ -91,7 +94,8 @@ export function usePreviewHistory({ onOpen, onNavigate }: { onOpen: () => void; 
     if (!opened) void message.error({ content: guiText("预览未能打开，请稍后重试。"),
       style: { maxWidth: 400, marginInline: "auto" } });
   }, [visit]);
-  useEffect(() => { cancel(); reset(); return cancel; }, [api, cancel, reset]);
+  // Reset the owning computer before child effects can open a preview in the new workspace.
+  useLayoutEffect(() => { cancel(); reset(); return cancel; }, [api, cancel, reset]);
   useEffect(() => {
     if (preview?.kind === "file") return preview.release;
   }, [preview]);

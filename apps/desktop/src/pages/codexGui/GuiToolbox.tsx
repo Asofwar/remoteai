@@ -1,5 +1,6 @@
 import { guiText } from "../../i18n/guiText";
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useContext, useEffect, useState } from 'react';
+import { WorkspaceDrawerContext, workspaceTabId } from '../../../../../shared/chat/workspaceDrawer';
 import { Button, Popover } from 'antd';
 import { GitBranch, Wrench } from 'lucide-react';
 import type { GitClient } from '../../../../../shared/remote-chat/gitTypes';
@@ -20,17 +21,20 @@ interface Props {
 
 export function GuiToolbox(props: Props) {
   useLocalGitDownloads();
+  const workspace = useContext(WorkspaceDrawerContext);
   const [menu, setMenu] = useState(false);
   const [panel, setPanel] = useState<'git' | null>(null);
-  useEffect(() => { if (!props.active) { setMenu(false); setPanel(null); } }, [props.active]);
+  useEffect(() => { if (!props.active) setMenu(false); }, [props.active]);
+  const openGit = () => { setPanel('git'); workspace?.tabs.open(workspaceTabId.git(props.cwd)); };
+  const gitVisible = workspace?.tabs.visible && workspace.tabs.selected === workspaceTabId.git(props.cwd);
   return <>
     {props.trigger === 'git' ? <button type="button" className={workspaceStyles.trigger}
       disabled={!props.active || !props.connected || !props.cwd}
-      aria-label={guiText("打开 Git")} aria-haspopup="dialog" aria-expanded={panel === 'git' && props.active}
-      onClick={() => setPanel('git')}><GitBranch size={16} /><span>Git</span></button>
+      aria-label={guiText("打开 Git")} aria-haspopup="dialog" aria-expanded={Boolean(gitVisible)}
+      onClick={openGit}><GitBranch size={16} /><span>Git</span></button>
       : <Popover trigger="click" placement="bottomRight" open={menu && props.active} onOpenChange={setMenu}
       styles={{ root: { maxWidth: 400 } }} content={<div className={styles.menu} aria-label={guiText("工具箱")}>
-        <button type="button" disabled={!props.connected} onClick={() => { setMenu(false); setPanel('git'); }}>
+        <button type="button" disabled={!props.connected} onClick={() => { setMenu(false); openGit(); }}>
           <GitBranch size={18} /><span>Git</span></button>
       </div>}>
       <Button type="text" icon={<Wrench size={16} />} title={menu || panel ? undefined : guiText("工具箱")}

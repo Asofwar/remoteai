@@ -112,13 +112,12 @@ it("prevents overlapping history reads and discards a revisit superseded by a ne
   await click("返回上一页"); expect(heading()).toBe("second.md");
 });
 
-it.each(["close", "conversation", "disable"])("clears history on %s and cancels pending revisits", async action => {
+it.each(["conversation", "disable"])("clears history on %s and cancels pending revisits", async action => {
   await click("first.md"); await click("second.md");
   let resolve!: (value: FilePreviewData) => void;
   vi.mocked(filePreviewApi.open).mockReturnValueOnce(new Promise(done => { resolve = done; }));
   await click("返回上一页");
-  if (action === "close") await click("关闭详情抽屉");
-  else await act(async () => root.render(<Fixture selected="other" enabled={action !== "disable"} />));
+  await act(async () => root.render(<Fixture selected="other" enabled={action !== "disable"} />));
   await act(async () => resolve({ ...file("first.md"), sessionId: "cancelled" }));
   expect(host.querySelector("aside")).toBeNull();
   expect(filePreviewApi.close).toHaveBeenCalledWith("cancelled");
@@ -126,4 +125,18 @@ it.each(["close", "conversation", "disable"])("clears history on %s and cancels 
   await click("third.md");
   expect(button("返回上一页").disabled).toBe(true);
   expect(button("前往下一页").disabled).toBe(true);
+});
+
+it("keeps history when closed and ignores a late revisit without reopening the drawer", async () => {
+  await click("first.md"); await click("second.md");
+  let resolve!: (value: FilePreviewData) => void;
+  vi.mocked(filePreviewApi.open).mockReturnValueOnce(new Promise(done => { resolve = done; }));
+  await click("返回上一页"); await click("关闭详情抽屉");
+  await act(async () => resolve({ ...file("first.md"), sessionId: "cancelled" }));
+  expect(host.querySelector("aside")?.hidden).toBe(true);
+  expect(filePreviewApi.close).toHaveBeenCalledWith("cancelled");
+  expect(heading()).toBe("second.md");
+  await click("second.md");
+  await click("返回上一页");
+  expect(heading()).toBe("first.md");
 });

@@ -47,7 +47,7 @@ it('opens remote Markdown in the shared drawer and navigates nested links on the
   await click('交接文档');
   expect(panel()?.hidden).toBe(false);
   expect(content()?.textContent).toContain('远程交接文档');
-  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(document.querySelector('[role="dialog"]')).toBe(panel());
   expect(context.load).toHaveBeenLastCalledWith('remote-thread', 'F:/remote/docs/handoff.md', expect.any(Object));
   await click('后续文档');
   expect(host.querySelectorAll('aside')).toHaveLength(1);
@@ -73,19 +73,22 @@ it('retains source mode across drawer controls and clears the preview on convers
   expect(panel()).toBeNull();
   await click('交接文档');
   expect(context.load).toHaveBeenLastCalledWith('another-thread', 'F:/remote/docs/handoff.md', expect.any(Object));
-  await click('关闭详情抽屉'); expect(panel()).toBeNull();
+  await click('关闭详情抽屉'); expect(panel()?.hidden).toBe(true);
 });
 
-it('cancels a remote read when closed and ignores its late response', async () => {
+it('finishes a remote read while hidden and retains it when reopening the drawer', async () => {
   let resolve!: (value: { path: string; text: string }) => void;
   vi.mocked(context.load!).mockReturnValueOnce(new Promise(done => { resolve = done; }));
   await click('交接文档');
   expect(content()?.textContent).toContain('正在读取文件');
   const options = vi.mocked(context.load!).mock.calls[0][2];
   await click('关闭详情抽屉');
-  expect(options?.signal?.aborted).toBe(true);
+  expect(options?.signal?.aborted).toBe(false);
   await act(async () => resolve({ path: 'F:/remote/docs/handoff.md', text: '# Late' }));
-  expect(panel()).toBeNull();
+  expect(panel()?.hidden).toBe(true);
+  await click('交接文档');
+  expect(content()?.textContent).toContain('Late');
+  expect(context.load).toHaveBeenCalledOnce();
 });
 
 it('shows remote load failures in the drawer and keeps download available', async () => {

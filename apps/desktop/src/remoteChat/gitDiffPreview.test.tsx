@@ -57,7 +57,7 @@ it('uses highlighted file review, copies the patch and preserves split mode when
   await act(async () => restore.click());
   expect(split.getAttribute('aria-pressed')).toBe('true');
   await act(async () => button('关闭详情抽屉').click());
-  expect(panel()).toBeNull();
+  expect(panel()?.hidden).toBe(true);
 });
 
 it('ignores late diffs after selecting another file and does not reopen a closed review', async () => {
@@ -69,7 +69,7 @@ it('ignores late diffs after selecting another file and does not reopen a closed
   expect(panel()?.textContent).toContain('src/app.ts');
   await act(async () => button('关闭详情抽屉').click());
   await act(async () => finish({ text: patch.replaceAll('src/app.ts', 'slow.ts'), truncated: false }));
-  expect(panel()).toBeNull();
+  expect(panel()?.hidden).toBe(true);
 });
 
 it('keeps truncation notices and handles files without text changes', async () => {
@@ -91,5 +91,5 @@ it('updates changed files without reopening a minimized or closed review', async
   expect(panel()?.textContent).toContain('value = 3');
   await act(async () => button('关闭详情抽屉').click());
   await render('src/app.ts', 'v3');
-  expect(panel()).toBeNull();
+  expect(panel()?.hidden).toBe(true);
 });

@@ -37,6 +37,8 @@ test("file links show an application submenu, preserve line numbers and close on
   await expect(page.getByRole("menuitem", { name: "VS Code", exact: true })).toBeVisible();
   const menus = page.getByRole("menu");
   for (const menu of await menus.all()) expect((await menu.boundingBox())!.width).toBeLessThanOrEqual(400);
+  const parent = (await menus.first().boundingBox())!, submenu = (await menus.nth(1).boundingBox())!;
+  expect(submenu.x).toBeGreaterThanOrEqual(parent.x + parent.width - 1);
   await page.screenshot({ path: "../../.codex-tmp/file-menu-desktop.png", animations: "disabled" });
   await page.getByRole("menuitem", { name: "VS Code", exact: true }).click();
   await expect(page.getByLabel("操作结果")).toContainText('"line":12');

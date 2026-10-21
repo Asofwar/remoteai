@@ -1,7 +1,8 @@
 import { MoreHorizontal, RefreshCw } from 'lucide-react';
+import { useEffect } from 'react';
 import type { ProjectBrowserClient } from './protocol';
 import { useProjectTree, type DirectoryState } from './useProjectTree';
-import type { BrowserHost } from './entryActions';
+import { parentPath, type BrowserHost } from './entryActions';
 import type { ProjectDocuments } from './documents';
 import { ProjectTreeRow } from './ProjectTreeRow';
 import { useTreeActions } from './useTreeActions';
@@ -28,7 +29,12 @@ export function ProjectTree({ client, cwd, connected, selected, choose, t, host,
   host: BrowserHost; documents: ProjectDocuments;
 }) {
   const tree = useProjectTree(client, cwd, connected);
-  const actions = useTreeActions({ cwd, connected, host, documents, reload: tree.reload, choose });
+  const actions = useTreeActions({ cwd, connected, host, documents, choose });
+  useEffect(() => documents.subscribeEntries(({ request, path }) => {
+    const change = ['rename', 'move', 'delete'].includes(request.action)
+      ? { from: request.path, to: path, deleted: request.action === 'delete' } : undefined;
+    return tree.reload(request.action === 'createFolder' ? request.path : parentPath(path), change);
+  }), [documents, tree.reload]);
   const root = { path: cwd, name: cwd.split(/[\\/]/).filter(Boolean).at(-1) ?? cwd, directory: true };
   const rootGesture = useTreeGesture(position => actions.show({ entry: root, ...position }));
   return <nav className="pf-tree" aria-label={t('项目文件')}>

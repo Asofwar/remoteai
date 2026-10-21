@@ -5,6 +5,8 @@
   max-height: calc(100dvh - 16px); overflow-y: auto; padding: 5px; border: 1px solid var(--pf-border);
   border-radius: 9px; background: var(--pf-surface); box-shadow: 0 8px 28px #0003; color: var(--pf-ink); }
 .pf-tree-menu button { width: 100%; justify-content: flex-start; border-radius: 5px; }
+.pf-tree-menu button[aria-expanded=true] { background: var(--pf-hover); }
+.pf-tree-submenu { z-index: 1; }
 .pf-tree-menu button > span { flex: 1; text-align: left; white-space: normal; overflow-wrap: anywhere; }
 .pf-tree-menu [role=separator] { height: 1px; margin: 5px 4px; background: var(--pf-border); }
 .pf-browser .pf-danger { color: #d54e4e; }

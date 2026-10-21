@@ -41,7 +41,7 @@ export function FileMenu({ path, line, column, children, className, onReview, pr
     ...(vscode ? [{ key: "vscode", label: guiText("在 VS Code 中打开"),
       icon: <FileApplicationIcon application={vscode} />, onClick: () => openApplication("vscode") }] : []),
     { key: "openWith", label: guiText("打开方式"), icon: <FolderOpen size={16} />, disabled: !menu.desktop,
-      popupClassName: styles.popup, children: [
+      popupClassName: `${styles.popup} ${styles.submenu}`, children: [
         { key: "default", label: guiText("默认应用"), icon: <File size={16} />, onClick: () => openApplication("default") },
         ...applications,
         ...(menu.loading ? [{ key: "loading", label: guiText("正在查找应用…"), disabled: true }] : []),
@@ -67,7 +67,8 @@ export function FileMenu({ path, line, column, children, className, onReview, pr
   return <Dropdown trigger={onReview || previewsFile ? ["contextMenu"] : ["click", "contextMenu"]}
     open={menu.open} onOpenChange={menu.setOpen} autoFocus
     overlayClassName={styles.popup} overlayStyle={{ maxWidth: 400 }}
-    menu={{ items, builtinPlacements: SUBMENU_PLACEMENTS, expandIcon: <ChevronRight size={14} aria-hidden="true" />,
+    menu={{ items, triggerSubMenuAction: "hover", builtinPlacements: SUBMENU_PLACEMENTS,
+      expandIcon: <ChevronRight size={14} aria-hidden="true" />,
       onClick: () => menu.setOpen(false) }} disabled={menu.busy}>
     <button type="button" className={className ?? styles.link}
       aria-label={onReview ? guiText("查看 {value1} 的差异", { value1: path }) : guiText("{value1}：{value2}", { value1: previewsFile ? "预览文件" : "文件操作", value2: path })}

@@ -1,6 +1,8 @@
 import type { ProjectBrowserClient, ProjectDocument } from './protocol';
 import { browserError } from './useProjectTree';
 import { normalizedPath, withinPath, type EntryRequest } from './entryActions';
+import { editorGroups, editorLayoutIds, emptyGroup, mapEditorGroups, rebaseGroupPaths, removeGroupPaths,
+  resizeEditorSplit, splitEditorGroup, type EditorLayout, type SplitDirection } from './editorGroups';
 
 export interface DocumentTab {
   path: string;
@@ -18,17 +20,26 @@ export const isDirty = (tab: DocumentTab) => tab.document?.kind === 'text' && ta
 export const canSave = (tab: DocumentTab) =>
   isDirty(tab) && !tab.loading && !tab.saving && !tab.document?.readOnly;
 
-export interface DocumentsSnapshot { tabs: DocumentTab[]; activePath?: string; mutationPath?: string }
+export interface DocumentsSnapshot {
+  tabs: DocumentTab[]; activePath?: string; mutationPath?: string;
+  layout?: EditorLayout; activeGroupId?: string;
+}
+interface WorkspaceSnapshot extends DocumentsSnapshot { layout: EditorLayout; activeGroupId: string }
+interface EntryMutation { request: EntryRequest; path: string }
 
 /** Owns independent drafts and request identities for one project browser. */
 export class ProjectDocuments {
-  private snapshot: DocumentsSnapshot = { tabs: [] };
+  private snapshot: WorkspaceSnapshot = { tabs: [], layout: emptyGroup(), activeGroupId: 'main' };
   private listeners = new Set<() => void>();
+  private entryListeners = new Set<(change: EntryMutation) => Promise<void>>();
   private reads = new Map<string, symbol>();
 
   constructor(private client: ProjectBrowserClient, private cwd: string, initial?: DocumentsSnapshot) {
     if (initial) this.snapshot = {
       ...initial, mutationPath: undefined, tabs: initial.tabs.map(tab => ({ ...tab, saving: false })),
+      layout: initial.layout ?? { ...emptyGroup(), paths: initial.tabs.map(tab => tab.path),
+        activePath: initial.activePath },
+      activeGroupId: initial.activeGroupId ?? 'main',
     };
   }
 
@@ -37,8 +48,14 @@ export class ProjectDocuments {
     this.listeners.add(listener);
     return () => { this.listeners.delete(listener); };
   };
-  private publish(snapshot: DocumentsSnapshot) {
-    this.snapshot = snapshot;
+  subscribeEntries = (listener: (change: EntryMutation) => Promise<void>) => {
+    this.entryListeners.add(listener);
+    return () => { this.entryListeners.delete(listener); };
+  };
+  private publish(snapshot: WorkspaceSnapshot) {
+    const groups = editorGroups(snapshot.layout);
+    const active = groups.find(group => group.id === snapshot.activeGroupId) ?? groups[0];
+    this.snapshot = { ...snapshot, activeGroupId: active.id, activePath: active.activePath };
     this.listeners.forEach(listener => listener());
   }
   private update(path: string, changes: Partial<DocumentTab>) {
@@ -52,20 +69,28 @@ export class ProjectDocuments {
       if (needsRead && !this.reads.has(tab.path)) void this.reload(tab.path);
     }
   };
-  select = (path: string) => {
-    if (this.get(path)) this.publish({ ...this.snapshot, activePath: path });
+  focusGroup = (groupId: string) => {
+    if (groupId !== this.snapshot.activeGroupId) this.publish({ ...this.snapshot, activeGroupId: groupId });
   };
-  open = async (path: string) => {
+  select = (path: string, groupId = this.snapshot.activeGroupId) => {
+    if (!this.get(path)) return;
+    const layout = mapEditorGroups(this.snapshot.layout, group => group.id !== groupId ? group : {
+      ...group, paths: group.paths.includes(path) ? group.paths : [...group.paths, path], activePath: path,
+    });
+    this.publish({ ...this.snapshot, layout, activeGroupId: groupId });
+  };
+  open = async (path: string, groupId = this.snapshot.activeGroupId) => {
     if (this.snapshot.mutationPath) return;
     const existing = this.get(path);
     if (existing) {
-      this.select(path);
+      this.select(path, groupId);
       if (!existing.document && !existing.loading) await this.reload(path);
       return;
     }
     const tab: DocumentTab = { path, text: '', loading: true, saving: false, error: '', saved: false,
       editorVersion: 0, editedAt: 0 };
-    this.publish({ tabs: [...this.snapshot.tabs, tab], activePath: path });
+    this.publish({ ...this.snapshot, tabs: [...this.snapshot.tabs, tab] });
+    this.select(path, groupId);
     await this.reload(path);
   };
   reload = async (path: string) => {
@@ -113,15 +138,34 @@ export class ProjectDocuments {
     }
     return paths.every(path => { const tab = this.get(path); return !tab || !isDirty(tab); });
   };
-  close = (path: string) => {
-    if (this.snapshot.mutationPath) return;
-    if (this.get(path)?.saving) return;
-    this.reads.delete(path);
-    const index = this.snapshot.tabs.findIndex(tab => tab.path === path);
-    const tabs = this.snapshot.tabs.filter(tab => tab.path !== path);
-    const activePath = this.snapshot.activePath === path
-      ? tabs[Math.min(index, tabs.length - 1)]?.path : this.snapshot.activePath;
-    this.publish({ tabs, activePath });
+  close = (path: string, groupId = this.snapshot.activeGroupId) => { this.closeTabs(groupId, [path]); };
+  closeTabs = (groupId: string, paths: string[]) => {
+    if (this.snapshot.mutationPath || paths.some(path => this.get(path)?.saving)) return;
+    const layout = removeGroupPaths(this.snapshot.layout, groupId, paths);
+    const visible = new Set(editorGroups(layout).flatMap(group => group.paths));
+    for (const path of paths) { if (!visible.has(path)) this.reads.delete(path); }
+    this.publish({ ...this.snapshot, layout, tabs: this.snapshot.tabs.filter(tab => visible.has(tab.path)) });
+  };
+  lastViews = (groupId: string, paths: string[]) => {
+    const elsewhere = new Set(editorGroups(this.snapshot.layout).filter(group => group.id !== groupId)
+      .flatMap(group => group.paths));
+    return paths.filter(path => !elsewhere.has(path));
+  };
+  split = (options: { groupId: string; path: string; direction: SplitDirection; move: boolean }) => {
+    if (this.snapshot.mutationPath || !this.get(options.path)) return;
+    const groups = editorGroups(this.snapshot.layout);
+    if (!groups.some(group => group.id === options.groupId && group.paths.includes(options.path))) return;
+    const ids = new Set(editorLayoutIds(this.snapshot.layout));
+    let next = 1;
+    while (ids.has(`group-${next}`) || ids.has(`split-group-${next}`)) next += 1;
+    const id = `group-${next}`;
+    const layout = splitEditorGroup(this.snapshot.layout, { ...options, id });
+    this.publish({ ...this.snapshot, layout, activeGroupId: id });
+  };
+  resizeSplit = (id: string, ratio: number) => {
+    if (!Number.isFinite(ratio)) return;
+    this.publish({ ...this.snapshot, layout: resizeEditorSplit(this.snapshot.layout, id,
+      Math.max(0.1, Math.min(0.9, ratio))) });
   };
 
   /** Pause autosave across a tree mutation and rebase all affected drafts together. */
@@ -139,6 +183,7 @@ export class ProjectDocuments {
       if (request.action === 'rename' || request.action === 'move' || request.action === 'delete') {
         this.applyEntryChange(request, result.path);
       }
+      await Promise.all([...this.entryListeners].map(listener => listener({ request, path: result.path })));
       return result;
     } finally { this.publish({ ...this.snapshot, mutationPath: undefined }); }
   };
@@ -152,8 +197,8 @@ export class ProjectDocuments {
       ...tab, path: rebase(tab.path),
       document: tab.document ? { ...tab.document, path: rebase(tab.document.path) } : undefined,
     });
-    const activePath = this.snapshot.activePath ? rebase(this.snapshot.activePath) : undefined;
-    this.publish({ ...this.snapshot, tabs,
-      activePath: tabs.some(tab => tab.path === activePath) ? activePath : tabs.at(-1)?.path });
+    const layout = rebaseGroupPaths(this.snapshot.layout,
+      path => request.action === 'delete' && affected(path) ? undefined : rebase(path));
+    this.publish({ ...this.snapshot, tabs, layout });
   }
 }

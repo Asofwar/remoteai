@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ProjectFile } from '../remote-chat/projectFiles';
 import type { BrowserHost, EntryRequest } from './entryActions';
-import { parentPath, withinPath } from './entryActions';
+import { withinPath } from './entryActions';
 import type { ProjectDocuments } from './documents';
-import type { TreeChange } from './useProjectTree';
 
 export type TreeCommand = 'createFile' | 'createFolder' | 'cut' | 'copy' | 'copyPath' | 'paste'
   | 'rename' | 'delete' | 'explorer' | 'terminal' | 'download';
@@ -13,7 +12,7 @@ interface Clipboard { entry: ProjectFile; cut: boolean }
 
 export function useTreeActions(options: {
   cwd: string; connected: boolean; host: BrowserHost; documents: ProjectDocuments;
-  reload: (directory?: string, change?: TreeChange) => Promise<void>; choose: (path: string) => void;
+  choose: (path: string) => void;
 }) {
   const [menu, setMenu] = useState<TreeMenu>();
   const [prompt, setPrompt] = useState<TreePrompt>();
@@ -34,9 +33,6 @@ export function useTreeActions(options: {
   const change = async (request: EntryRequest) => {
     const result = await options.documents.mutate(request);
     setPrompt(undefined);
-    const changed = ['rename', 'move', 'delete'].includes(request.action)
-      ? { from: request.path, to: result.path, deleted: request.action === 'delete' } : undefined;
-    await options.reload(request.action === 'createFolder' ? request.path : parentPath(result.path), changed);
     if (request.action === 'createFile') options.choose(result.path);
   };
   const paste = (entry: ProjectFile) => run(async () => {

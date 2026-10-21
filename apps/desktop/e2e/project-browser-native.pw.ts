@@ -85,4 +85,20 @@ test('bundled native editor: offline assets, mobile search/fold/save and close g
   await editor.press('Control+s');
   await expect(page.getByRole('tab', { name: 'main.ts' }).locator('.pf-dirty-dot')).toHaveCount(0);
   expect(errors).toEqual([]);
+  await longPress(page, page.getByRole('tab', { name: 'main.ts', exact: true }), '标签页操作');
+  await page.getByRole('menuitem', { name: '向下拆分', exact: true }).click();
+  await expect(page.locator('.pf-editor-pane')).toHaveCount(2);
+  const secondEditor = page.locator('.pf-editor-pane').nth(1)
+    .getByRole('textbox', { name: '文件内容', exact: true });
+  await secondEditor.fill('shared native draft');
+  closed = false;
+  await emit({ type: 'close' });
+  await expect.poll(() => closed).toBe(true);
+  await page.reload();
+  await expect(page.locator('.pf-editor-pane')).toHaveCount(2);
+  for (const pane of await page.locator('.pf-editor-pane').all()) {
+    await expect(pane.getByRole('textbox', { name: '文件内容', exact: true })).toContainText('shared native draft');
+  }
+  await page.screenshot({ path: '../../.codex-tmp/project-browser-native-split.png', animations: 'disabled' });
+  expect(errors).toEqual([]);
 });

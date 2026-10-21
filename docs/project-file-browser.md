@@ -8,7 +8,13 @@
 
 文件区顶部支持多个标签，每个标签独立保留草稿，未保存时显示小圆点。点击文件名右侧的叉关闭标签；重新加载或关闭未保存的标签时可选择保存、放弃或取消。切换标签无需先保存，并保留撤销记录。
 
+标签支持右键菜单，触屏可长按打开。可关闭当前、其他、全部、未修改或右侧的标签，也可复制路径和重命名。批量关闭会逐个确认尚未保存的文件，取消时保留这些标签。Ctrl+F4 关闭当前标签。
+
+标签菜单支持向右、向下拆分，以及拆分并移动。每个编辑区域有独立的标签栏，文件树打开的文件进入当前区域；同一文件的多个视图共用草稿和保存状态。分隔线可拖动或用方向键调整，双击恢复均分。关闭文件的最后一个视图时才提示未保存修改，空区域会自动收起。窄屏将拆分区域上下排列，桌面、Web 和原生端关闭并重新打开文件浏览器后会保留布局。
+
 文件树支持右键菜单，手机 Web 和原生应用通过长按打开，滑动时取消长按，普通点击仍用于浏览。菜单提供新建文件／文件夹、剪切、复制、复制路径、粘贴、重命名和删除；项目标题旁的菜单可在根目录中新建或粘贴。删除需要确认，同名目标不会被覆盖，复制到同一目录时自动添加副本名称。
+
+文件与文件夹的二级菜单在鼠标悬停后从旁边展开，右侧空间不足时向左展开；方向键可进入和返回。窄屏保留点击进入及返回上一级的操作。
 
 本地桌面提供系统文件浏览器和终端入口；远程提供下载，文件夹自动打包为 ZIP，保留空目录和原始文件内容。Web、桌面远程和 Android 复用下载列表；iOS 将文件保存到应用文档目录并打开预览。重命名和移动会同步更新已打开标签的路径并保留草稿，复制前需保存涉及的修改。
 
@@ -30,7 +36,7 @@
 ## 验证
 
 - Rust：`cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --lib codex_gui::project_`。
-- 桌面：`npx vitest run src/remoteChat/projectBrowser.test.tsx src/remoteChat/operations.test.ts`。
+- 桌面：`npx vitest run src/remoteChat/projectBrowser src/remoteChat/operations.test.ts`。
 - 原生消息桥：`npm run test -w @codex-switch/native -- src/chat/projectBrowserBridge.test.ts`。
 - 界面与原生资源：`npm run test:chat:e2e -w @codex-switch/desktop -- project-browser`。
 - Android 独立测试包：在 `apps/native/android` 执行 `gradlew assembleRelease -I ../e2e/project-browser.init.gradle -PreactNativeArchitectures=arm64-v8a`，应用 ID 为 `com.codexswitch.mobile.filebrowsertest`。

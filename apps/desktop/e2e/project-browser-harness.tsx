@@ -9,6 +9,8 @@ import { createGuiToolsClient } from '../../../shared/remote-chat/guiTools';
 import type { ProjectBrowserRequest } from '../../../shared/project-browser/protocol';
 import { guiApi } from '../src/pages/codexGui/api';
 import { browserRequest, browserRoot, savedFiles, causeConflict } from './project-browser-fixture';
+import { ProjectBrowser } from '../../../shared/project-browser/ProjectBrowser';
+import type { BrowserHost } from '../../../shared/project-browser/entryActions';
 import '../src/styles.css';
 import 'antd/dist/reset.css';
 
@@ -18,6 +20,12 @@ const mode = params.get('mode') ?? 'local';
 const client = createGuiToolsClient(<T,>(request: object) => browserRequest<T>(request as ProjectBrowserRequest));
 guiApi.request = <T,>(request: object) => browserRequest<T>(request as ProjectBrowserRequest);
 Object.assign(window, { savedFiles, causeConflict });
+const browserActions: { path: string; action: string }[] = [];
+const fixtureHost: BrowserHost = {
+  copyPath: async path => { browserActions.push({ path, action: 'copyPath' }); },
+  open: async (entry, action) => { browserActions.push({ path: entry.path, action }); },
+};
+Object.assign(window, { browserActions });
 document.documentElement.dataset.theme = dark ? 'dark' : 'light';
 document.body.style.minWidth = '0';
 localStorage.setItem('codex-switch:language', 'zh');
@@ -25,6 +33,10 @@ localStorage.setItem('codex-switch:language', 'zh');
 function App() {
   const [connected, setConnected] = useState(true);
   const [project, setProject] = useState(browserRoot);
+  if (mode === 'standalone') return <div style={{ height: '100dvh' }}>
+    <ProjectBrowser client={client.projectBrowser} cwd={project} connected={connected} t={text => text}
+      host={fixtureHost} onClose={() => {}} preferences={{ delay: 0, change: () => {} }} />
+  </div>;
   return <ConfigProvider theme={{ algorithm: dark ? theme.darkAlgorithm : theme.defaultAlgorithm }}>
     <div style={{ height: '100dvh', background: dark ? '#121614' : '#f5f8f6' }}>
       <DetailsWorkspace selected={null} active>

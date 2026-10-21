@@ -18,6 +18,34 @@ async function save(page: Page, name = 'sample.bin') {
   return readFile((await download.path())!);
 }
 
+test('shows compression progress, cancels preparation, then saves all archive bytes', async ({ page }, info) => {
+  await open(page);
+  await page.getByRole('button', { name: '压缩下载文件夹', exact: true }).click();
+  const folder = card(page, 'folder');
+  await expect(folder).toContainText('正在统计文件…');
+  await expect(folder.getByRole('progressbar')).not.toHaveAttribute('value');
+  await page.evaluate(() => {
+    window.downloadFixture.archiveProgress = { phase: 'compressing', processedBytes: 50, totalBytes: 100,
+      completedFiles: 1, totalFiles: 4 };
+  });
+  await expect(folder).toContainText('正在压缩 · 50%');
+  await expect(folder).toContainText('已压缩 1 / 4 个文件');
+  await expect(folder.getByRole('progressbar')).toHaveAttribute('value', '50');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: info.outputPath('archive-progress.png') });
+  await folder.getByRole('button', { name: '暂停', exact: true }).click();
+  await expect(folder).toContainText('已暂停');
+  await expect.poll(() => page.evaluate(() => window.downloadFixture.closes)).toBe(1);
+  const polls = await page.evaluate(() => window.downloadFixture.archivePolls);
+  await page.waitForTimeout(600);
+  expect(await page.evaluate(() => window.downloadFixture.archivePolls)).toBe(polls);
+  await folder.getByRole('button', { name: '继续下载', exact: true }).click();
+  await expect(folder).toContainText('正在压缩 · 50%');
+  await page.evaluate(() => { window.downloadFixture.archiveReady = true; });
+  await expect(card(page, 'folder.zip')).toContainText('文件已就绪');
+  expect(await save(page, 'folder.zip')).toEqual(Buffer.alloc(4 * 1024 * 1024, 'A'));
+});
+
 test('pauses and resumes after reload, preserves complete bytes and deletes the cached download', async ({ page }) => {
   await open(page);
   await enqueue(page);

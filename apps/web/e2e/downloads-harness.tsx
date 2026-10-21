@@ -12,12 +12,16 @@ import '../src/chat/chat.css';
 import '../src/chat/messages.css';
 import { fixtureBulkClient } from './bulk-download-fixture';
 import { resumeFixture } from './download-resume-fixture';
+import { openPreparedDownload, type ArchiveProgress } from '../../../shared/remote-chat/archiveDownload';
 
 Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true });
 
 const fixture = { ...resumeFixture, size: 4 * 1024 * 1024, revision: 'first', corrupt: false,
   opens: 0, openFailures: 0, mimeType: 'application/octet-stream', textContent: '',
   offsets: [] as number[], closes: 0,
+  archiveReady: false, archivePolls: 0,
+  archiveProgress: { phase: 'scanning', processedBytes: 0, totalBytes: 0,
+    completedFiles: 0, totalFiles: 0 } as ArchiveProgress,
   bulk: false, recordBytes: 0, wireBytes: 0, cipherFailure: false, directAttempt: () => {},
   downloadLimit: (value: number) => setChatPolicy({ ...DEFAULT_CHAT_POLICY, fileDownloadMaxMb: value }),
   delay: 400, active: 0, peak: 0, windowSize: (value: number) =>
@@ -30,13 +34,18 @@ const bulk = fixtureBulkClient(fixture);
 fixture.directAttempt = bulk.directAttempt;
 const client: DownloadClient = {
   bulk: bulk.client,
-  open: async ({ path }) => {
+  open: (options, controls) => openPreparedDownload({ open: async ({ path, preparationId }) => {
+    if (path.endsWith('/folder') && !fixture.archiveReady) {
+      fixture.archivePolls++;
+      return { preparationId: preparationId ?? FILE_ID, progress: fixture.archiveProgress };
+    }
     fixture.opens++;
     if (fixture.openFailures-- > 0) throw new Error('Temporary download failure');
     return { id: path.endsWith('empty.txt') ? EMPTY_ID : FILE_ID,
-    size: path.endsWith('empty.txt') ? 0 : fixture.size, name: path.split('/').at(-1)!,
+    size: path.endsWith('empty.txt') ? 0 : fixture.size,
+    name: path.endsWith('/folder') ? 'folder.zip' : path.split('/').at(-1)!,
     mimeType: fixture.mimeType, revision: fixture.revision };
-  },
+  }, close: async () => { fixture.closes++; } }, options, controls),
   read: async ({ offset, length }) => {
     fixture.offsets.push(offset);
     fixture.peak = Math.max(fixture.peak, ++fixture.active);
@@ -84,6 +93,8 @@ function Harness() {
       <button onClick={() => setReady(value => !value)}>{ready ? '断开电脑' : '连接电脑'}</button>
       <button onClick={() => setMode(value => value === 'direct' ? 'relay' : 'direct')}>切换连接方式</button>
       <button onClick={() => setOwner(value => value === 'owner' ? 'other' : 'owner')}>切换用户</button>
+      <button onClick={() => { void downloadManager.enqueue({ owner, deviceId: 'computer', deviceName: '测试电脑',
+        scope: 'project', cwd: 'C:/project', path: 'C:/project/folder' }); }}>压缩下载文件夹</button>
     </nav>
     {visible && <DownloadManagerPage owner={owner} onBack={() => setVisible(false)} />}
     {!visible && <p>其他页面</p>}

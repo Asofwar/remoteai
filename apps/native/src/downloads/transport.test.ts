@@ -23,7 +23,22 @@ it('preserves the commit when opening a patch from a native download task', asyn
     path: 'commit.patch', gitCommit: 'a'.repeat(40) };
   await forwardDownloadRequest({ request: { ...request, source: patchSource }, client, native });
   expect(client.open).toHaveBeenCalledWith({ transferId: 'job', scope: 'project', cwd: '/repo',
-    path: 'commit.patch', gitCommit: 'a'.repeat(40) });
+    path: 'commit.patch', gitCommit: 'a'.repeat(40) },
+  expect.objectContaining({ signal: expect.any(AbortSignal), progress: expect.any(Function) }));
+});
+
+it('forwards compression progress to the same pending native request', async () => {
+  const { client, native } = setup();
+  native.preparationProgress = vi.fn().mockResolvedValue(undefined);
+  const progress = { phase: 'compressing' as const, processedBytes: 5, totalBytes: 10,
+    completedFiles: 0, totalFiles: 1 };
+  vi.mocked(client.open).mockImplementation(async (_options, controls) => {
+    await controls?.progress?.(progress);
+    return { id: 'handle', name: 'folder.zip', size: 5, mimeType: 'application/zip' };
+  });
+  await forwardDownloadRequest({ request, client, native });
+  expect(native.preparationProgress).toHaveBeenCalledWith(request.requestId, JSON.stringify(progress));
+  expect(native.accept).toHaveBeenCalledWith(request.requestId, expect.stringContaining('folder.zip'), false);
 });
 
 it('closes a late remote handle when pause or deletion won the race', async () => {

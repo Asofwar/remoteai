@@ -27,6 +27,7 @@ export interface DownloadTask {
   revision?: string;
   readyToSave?: boolean;
   savedBytes?: number;
+  preparation?: import('../../../../shared/remote-chat/archiveDownload').ArchiveProgress;
 }
 export interface DownloadConnection {
   owner: string;
@@ -52,6 +53,7 @@ export interface DownloadRequest {
   epoch?: string; manifestId?: string; block?: number; granted?: number; requestNumber?: number;
 }
 export interface DownloadNative {
+  preparationProgress?: (requestId: string, progress: string) => Promise<void>;
   bulkBinaryAvailable?: boolean;
   manifestPage?: (id: string, page: string) => Promise<void>;
   invalidateBulk?: (owner: string, deviceId: string) => Promise<void>;

@@ -1,5 +1,6 @@
 //! Project-scoped tree mutations. All filesystem work and the shared edit lock run off the UI thread.
 mod archive;
+mod archive_progress;
 mod paths;
 #[cfg(test)]
 mod tests;
@@ -10,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
 
 pub(super) use archive::create as archive;
+pub(super) use archive::create_with_progress as archive_with_progress;
+pub(super) use archive_progress::ArchiveProgress;
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum Error {
@@ -29,6 +32,8 @@ pub(crate) enum Error {
     TooMany,
     #[error("文件夹超过当前下载大小上限。")]
     TooLarge,
+    #[error("下载已暂停。")]
+    Cancelled,
     #[error("操作未完成，请确认文件仍存在且有访问权限。")]
     Operation,
 }

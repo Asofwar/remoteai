@@ -8,6 +8,7 @@ it.each([
   ['文件暂时无法读取，请确认文件存在且有读取权限。', 'FILE_UNAVAILABLE'],
   ['文件暂时无法读取，请确认文件仍在当前项目中，且大小未超过查看上限。', 'PREVIEW_UNAVAILABLE'],
   ['文件超过当前传输大小上限。', 'FILE_TOO_LARGE'],
+  ['文件夹超过当前下载大小上限。', 'FILE_TOO_LARGE'],
 ])('does not reconnect or automatically retry a rejected file: %s', (message, code) => {
   const error = normalizeFileError(new Error(message));
   expect(error).toBeInstanceOf(BulkError);

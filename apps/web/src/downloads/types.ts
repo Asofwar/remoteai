@@ -18,6 +18,7 @@ export interface DownloadTask {
   checkpoint?: import('../../../../shared/remote-chat/downloadManifest').DownloadCheckpoint;
   verified?: boolean;
   exported?: boolean;
+  preparation?: import('../../../../shared/remote-chat/archiveDownload').ArchiveProgress;
 }
 export interface DownloadConnection {
   owner: string; deviceId: string; deviceName: string; ready: boolean; mode: ConnectionMode;

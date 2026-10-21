@@ -3,7 +3,7 @@ import { t, useLanguage } from '../i18n';
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import type { DownloadTask } from './types';
-import { downloadDetail, downloadPercent, downloadStatus, formatBytes } from './presentation';
+import { downloadDetail, downloadPercent, downloadStatusLabel, formatBytes } from './presentation';
 import { colors, useStyles } from './styles';
 
 export function DownloadCard({ task, connected, busy, action, remove }: {
@@ -21,6 +21,8 @@ export function DownloadCard({ task, connected, busy, action, remove }: {
   const label = active ? t("暂停") : complete ? t("打开文件") : task.readyToSave ? t("再次保存") : t("继续下载");
   const icon = active ? 'pause-outline' : complete ? 'open-outline' : 'play-outline';
   const percent = downloadPercent(task);
+  const indeterminate = task.status === 'preparing' && task.preparation?.phase !== 'compressing';
+  const progressCaption = indeterminate ? '' : `${percent}%`;
   return <View style={styles.card}>
     <View style={styles.cardHeader}>
       <View style={styles.fileIcon}><Ionicons name="document-text-outline" size={23} color={color(colors.green, 'accent')} /></View>
@@ -33,9 +35,9 @@ export function DownloadCard({ task, connected, busy, action, remove }: {
       <View style={styles.statusRow}>
         <View style={[styles.statusBadge, paused && styles.pausedBadge, failed && styles.failedBadge]}>
           <Text style={[styles.status, paused && styles.paused, failed && styles.danger]}>
-            {downloadStatus[task.status]}</Text>
+            {downloadStatusLabel(task)}</Text>
         </View>
-        <Text style={styles.caption}>{complete ? formatBytes(task.size) : `${percent}%`}</Text>
+        <Text style={styles.caption}>{complete ? formatBytes(task.size) : progressCaption}</Text>
       </View>
       {!complete && <>
         <View accessibilityRole="progressbar" accessibilityLabel={t("{value1}下载进度", { value1: task.name })}

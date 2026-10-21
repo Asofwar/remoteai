@@ -24,7 +24,7 @@ export interface DownloadOpen extends DownloadLocation {
 export interface DownloadBrowse extends DownloadLocation { directory: string }
 export interface DownloadClient {
   bulk?: import('./bulkControl').BulkClient;
-  open: (options: DownloadOpen) => Promise<FileInfo>;
+  open: (options: DownloadOpen, controls?: import('./archiveDownload').DownloadPreparationOptions) => Promise<FileInfo>;
   browse: (options: DownloadBrowse) => Promise<ProjectFilesResponse>;
   read: (options: FileRead) => Promise<FileChunk>;
   close: (transferId: string, id: string) => Promise<unknown>;

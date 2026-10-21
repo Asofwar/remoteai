@@ -10,6 +10,7 @@ const fileErrors = new Map<string, BulkErrorCode>([
   ['图片暂时无法显示，请确认文件仍在当前任务目录中。', 'PREVIEW_UNAVAILABLE'],
   ['图片暂时无法显示，请确认文件可访问且图片格式受支持。', 'PREVIEW_UNAVAILABLE'],
   ['文件超过当前传输大小上限。', 'FILE_TOO_LARGE'],
+  ['文件夹超过当前下载大小上限。', 'FILE_TOO_LARGE'],
 ]);
 
 export function normalizeFileError(error: unknown): unknown {

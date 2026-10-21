@@ -56,12 +56,24 @@ fn video_mime_type(path: &Path, file: &mut File) -> Result<&'static str> {
 
 impl StreamFile {
     /// Hash generated files in bounded memory so reopened patch downloads can resume safely.
-    pub(super) fn generated(mut file: File, name: String, mime_type: String) -> Result<Self> {
+    pub(super) fn generated(file: File, name: String, mime_type: String) -> Result<Self> {
+        Self::generated_checked(file, name, mime_type, &mut || true)
+    }
+
+    pub(super) fn generated_checked(
+        mut file: File,
+        name: String,
+        mime_type: String,
+        check: &mut dyn FnMut() -> bool,
+    ) -> Result<Self> {
         use sha2::{Digest, Sha256};
         file.rewind().map_err(|_| GuiError::FileRead)?;
         let mut hash = Sha256::new();
         let mut buffer = [0; 64 * 1024];
         loop {
+            if !check() {
+                return Err(GuiError::FileExpired);
+            }
             let length = file.read(&mut buffer).map_err(|_| GuiError::FileRead)?;
             if length == 0 {
                 break;

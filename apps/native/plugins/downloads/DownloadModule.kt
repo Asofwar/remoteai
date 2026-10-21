@@ -41,6 +41,8 @@ class DownloadModule(private val context: ReactApplicationContext) : ReactContex
     run(promise) { engine.connection(owner, deviceId, window); null }
   @ReactMethod fun accept(requestId: String, result: String?, failed: Boolean, promise: Promise) =
     run(promise) { engine.accept(requestId, result, failed) }
+  @ReactMethod fun preparationProgress(requestId: String, progress: String, promise: Promise) =
+    run(promise) { engine.preparationProgress(requestId, JSONObject(progress)); null }
   @ReactMethod fun manifestPage(id: String, page: String, promise: Promise) =
     run(promise) { engine.manifestPage(id, page); null }
   @ReactMethod fun invalidateBulk(owner: String, deviceId: String, promise: Promise) =

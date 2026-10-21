@@ -1,4 +1,9 @@
 export const downloads: Readonly<Record<string, string>> = {
+  '正在统计文件…': 'Counting files…',
+  '正在压缩': 'Compressing',
+  '正在准备下载…': 'Preparing download…',
+  '已压缩 {done} / {total} 个文件': 'Compressed {done} / {total} files',
+  '压缩进度：{name}': 'Compression progress: {name}',
   '文件超过当前传输大小上限。': 'The file exceeds the current transfer size limit.',
   '视频暂时无法读取，请确认文件可访问，且格式为 MP4、MOV 或 WebM。':
     'Cannot read the video. Check that it is readable and uses MP4, MOV, or WebM format.',

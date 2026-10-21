@@ -43,6 +43,9 @@ pub(crate) struct Open {
     path: String,
     max_bytes: u64,
     pub(super) git_commit: Option<String>,
+    #[serde(default)]
+    prepare: bool,
+    preparation_id: Option<String>,
 }
 
 /// Patch content is generated privately, never written into the source repository.
@@ -145,6 +148,10 @@ pub(super) async fn open(
     options: Open,
 ) -> Result<GuiResponse> {
     uuid::Uuid::parse_str(&options.transfer_id).map_err(|_| GuiError::InvalidRequest)?;
+    if let Some(id) = options.preparation_id {
+        uuid::Uuid::parse_str(&id).map_err(|_| GuiError::InvalidRequest)?;
+        return streams.archive_status(options.transfer_id, id).await;
+    }
     let root = project_root(client, &options.location).await?;
     tauri::async_runtime::spawn_blocking(move || {
         let root = match root {
@@ -154,6 +161,16 @@ pub(super) async fn open(
         super::local_file::validate(&options.path)?;
         if root.join(&options.path).is_dir() {
             let root = root.canonicalize().map_err(|_| GuiError::ProjectFiles)?;
+            if options.prepare {
+                return streams.prepare_archive(
+                    root,
+                    StreamOpen {
+                        thread_id: options.transfer_id,
+                        path: options.path,
+                        max_bytes: options.max_bytes,
+                    },
+                );
+            }
             let (file, name) =
                 super::project_entries::archive(&root, &options.path, options.max_bytes)
                     .map_err(GuiError::ProjectEntry)?;

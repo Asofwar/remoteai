@@ -17,10 +17,16 @@ const checkCancelled = (signal: AbortSignal) => { if (signal.aborted) throw new 
 export async function transferDownload({ task, client, signal, update, mode }: Options) {
   checkCancelled(signal);
   const { scope, threadId, cwd, path, preview, gitCommit } = task.source;
-  const info = await client.open({ scope, threadId, cwd, path, preview, gitCommit, transferId: task.id });
+  const info = await client.open({ scope, threadId, cwd, path, preview, gitCommit, transferId: task.id }, {
+    signal, progress: preparation => {
+      task = { ...task, status: 'preparing', preparation, bytesPerSecond: undefined };
+      update(task);
+    },
+  });
   try {
     validateFileInfo(info, mode?.());
     checkCancelled(signal);
+    task = { ...task, preparation: undefined };
     if (client.bulk?.available()) {
       await transferBulkDownload({ task: { ...task, name: info.name, size: info.size, mimeType: info.mimeType },
         info, client: client.bulk, signal, update, mode });

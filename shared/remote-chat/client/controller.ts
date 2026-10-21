@@ -1,4 +1,5 @@
 import type { ChatConnection, ConnectionEvents } from './connection';
+import { openPreparedDownload } from '../archiveDownload';
 import { mergeTaskDelivery } from '../taskDelivery';
 import type { RemoteComposerCatalog } from '../composerCatalog';
 import type { ProjectFilesRequest, ProjectFilesResponse } from '../projectFiles';
@@ -707,10 +708,13 @@ export class ChatController {
   };
 
   downloads: import('../downloads').DownloadClient = {
-    open: (options) => options.preview
+    open: (options, controls) => options.preview
       ? this.connection.request('request', { operation: 'previewOpen', transferId: options.transferId,
         threadId: options.threadId, path: options.path, preview: options.preview })
-      : this.connection.request('request', { operation: 'downloadOpen', ...options }),
+      : openPreparedDownload({
+        open: body => this.connection.request('request', { operation: 'downloadOpen', ...body }),
+        close: (threadId, id) => this.files.close(threadId, id),
+      }, options, controls),
     browse: (options) => this.connection.request('request', { operation: 'downloadBrowse', ...options }),
     read: (request) => this.files.read(request),
     close: (transferId, id) => this.files.close(transferId, id),

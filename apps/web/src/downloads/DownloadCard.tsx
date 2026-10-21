@@ -1,6 +1,7 @@
 import { Download, ExternalLink, Pause, Play, Trash2 } from 'lucide-react';
 import { t } from '../i18n';
 import type { DownloadTask } from './types';
+import { archivePercent, archiveStatus } from '../../../../shared/remote-chat/archiveDownload';
 
 export function formatBytes(value: number) {
   if (value < 1024) return `${value} B`;
@@ -18,12 +19,21 @@ export function DownloadCard({ task, busy, connected, action, open, remove, text
   const completed = ['completed', 'ready', 'saving'].includes(task.status);
   const label = completed ? '保存到设备' : running ? '暂停' : '继续下载';
   const Icon = completed ? Download : running ? Pause : Play;
-  const percent = task.size ? Math.round(task.received / task.size * 100) : completed ? 100 : 0;
+  const preparation = task.status === 'preparing' ? task.preparation : undefined;
+  const downloadPercent = task.size ? Math.round(task.received / task.size * 100) : 0;
+  const percent = preparation ? archivePercent(preparation) : completed ? 100 : downloadPercent;
+  const status = preparation ? archiveStatus(preparation) : STATUS[task.status];
+  const detail = preparation ? text('已压缩 {done} / {total} 个文件', {
+    done: preparation.completedFiles, total: preparation.totalFiles,
+  }) : `${formatBytes(task.received)} / ${formatBytes(task.size)}`;
   return <article className="download-card" aria-label={task.name}>
-    <div className="download-task-heading"><strong>{task.name}</strong><span>{text(STATUS[task.status])}</span></div>
+    <div className="download-task-heading"><strong>{task.name}</strong><span>{text(status)}
+      {preparation?.phase === 'compressing' && ` · ${percent}%`}</span></div>
     <p className="download-path">{task.source.deviceName} · {task.source.path}</p>
-    <progress max={100} value={percent} aria-label={text('下载进度：{name}', { name: task.name })} />
-    <div className="download-task-meta"><span>{formatBytes(task.received)} / {formatBytes(task.size)}</span>
+    <progress max={100} value={percent} aria-label={text(
+      preparation ? '压缩进度：{name}' : '下载进度：{name}', { name: task.name })} />
+    <div className="download-task-meta"><span>
+      {task.status === 'preparing' && preparation?.phase !== 'compressing' ? text(status) : detail}</span>
       {task.status === 'downloading' && !!task.bytesPerSecond && <span>{formatBytes(task.bytesPerSecond)}/s</span>}
     </div>
     {task.message && <p role="status" className="download-notice">{text(task.message)}</p>}

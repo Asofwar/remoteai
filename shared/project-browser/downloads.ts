@@ -1,15 +1,19 @@
-import type { DownloadBrowse, DownloadClient, DownloadOpen } from '../remote-chat/downloads';
+import type { DownloadBrowse, DownloadClient } from '../remote-chat/downloads';
 import { downloadFile, type DownloadTarget, type FileInfo, type FileRequest } from '../remote-chat/fileDownload';
 import { fileDownloadByteLimit } from '../remote-chat/policy';
 import type { ConnectionMode } from '../remote-chat/protocol';
 import type { ProjectFileTarget } from './protocol';
+import { openPreparedDownload, type DownloadOpenRequest } from '../remote-chat/archiveDownload';
 
-type Request = FileRequest | ({ operation: 'downloadOpen'; maxBytes: number } & DownloadOpen)
+type Request = FileRequest | ({ operation: 'downloadOpen'; maxBytes: number } & DownloadOpenRequest)
   | ({ operation: 'downloadBrowse' } & DownloadBrowse);
 
 export function projectDownloads(request: <T>(body: Request) => Promise<T>, mode?: ConnectionMode): DownloadClient {
   return {
-    open: options => request({ operation: 'downloadOpen', ...options, maxBytes: fileDownloadByteLimit(mode) }),
+    open: (options, controls) => openPreparedDownload({
+      open: body => request({ operation: 'downloadOpen', ...body, maxBytes: fileDownloadByteLimit(mode) }),
+      close: (threadId, id) => request({ operation: 'fileClose', threadId, id }),
+    }, options, controls),
     browse: options => request({ operation: 'downloadBrowse', ...options }),
     read: options => request({ operation: 'fileRead', ...options, maxBytes: fileDownloadByteLimit(mode) }),
     close: (threadId, id) => request({ operation: 'fileClose', threadId, id }),
@@ -23,6 +27,7 @@ export function downloadProjectEntry(options: {
 }) {
   return downloadFile({ threadId: options.transferId, path: options.file.path, signal: options.signal,
     target: options.target, progress: options.progress,
-    client: { open: transferId => options.client.open({ scope: 'project', ...options.file, transferId }),
+    client: { open: transferId => options.client.open({ scope: 'project', ...options.file, transferId },
+      { signal: options.signal }),
       read: options.client.read, close: options.client.close } });
 }

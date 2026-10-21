@@ -79,6 +79,22 @@ class DownloadEngineTest : InstrumentationTestCase() {
 
   private fun bytes(offset: Long, length: Int) = ByteArray(length) { ((offset + it) % 251).toByte() }
 
+  fun testArchiveProgressDoesNotCompleteTheOpenAndIgnoresLateUpdates() {
+    taskId = run { engine.enqueue(source) } as String
+    val request = requests("open").last().getString("requestId")
+    val progress = JSONObject().put("phase", "compressing").put("processedBytes", 50)
+      .put("totalBytes", 100).put("completedFiles", 0).put("totalFiles", 1)
+    run { engine.preparationProgress(request, progress) }
+    assertEquals("preparing", snapshot().getString("status"))
+    assertEquals(50L, snapshot().getJSONObject("preparation").getLong("processedBytes"))
+    assertEquals(0, requests().size)
+    open(10)
+    assertFalse(snapshot().has("preparation"))
+    run { engine.preparationProgress(request, progress) }
+    assertEquals("downloading", snapshot().getString("status"))
+    assertFalse(snapshot().has("preparation"))
+  }
+
   private fun accept(packet: JSONObject, corrupt: Boolean = false): Boolean {
     val offset = packet.getLong("offset")
     val data = Base64.encodeToString(bytes(offset, packet.getInt("length")), Base64.NO_WRAP)

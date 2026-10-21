@@ -1,5 +1,6 @@
 import { t } from '../i18n';
 import type { DownloadTask } from './types';
+import { archivePercent, archiveStatus } from '../../../../shared/remote-chat/archiveDownload';
 
 const KIB = 1024;
 const MIB = KIB * KIB;
@@ -10,6 +11,7 @@ export function formatBytes(bytes: number) {
   return `${Math.round(bytes / KIB)} KB`;
 }
 export function downloadPercent(task: DownloadTask) {
+  if (task.status === 'preparing' && task.preparation) return archivePercent(task.preparation) ?? 0;
   if (task.status === 'completed') return 100;
   if (task.status === 'saving') return task.size ? Math.floor((task.savedBytes ?? 0) / task.size * 100) : 0;
   return task.size ? Math.min(100, Math.floor(task.received / task.size * 100)) : 0;
@@ -19,7 +21,17 @@ export const downloadStatus: Record<DownloadTask['status'], string> = {
   get saving() { return t('正在保存'); },
   get queued() { return t("等待下载"); }, get downloading() { return t("正在下载"); }, get paused() { return t("已暂停"); }, get completed() { return t("已完成"); }, get failed() { return t("下载中断"); },
 };
+export function downloadStatusLabel(task: DownloadTask) {
+  return task.status === 'preparing' && task.preparation
+    ? t(archiveStatus(task.preparation)) : downloadStatus[task.status];
+}
 export function downloadDetail(task: DownloadTask) {
+  if (task.status === 'preparing') {
+    if (!task.preparation || task.preparation.phase !== 'compressing') return downloadStatusLabel(task);
+    return t('已压缩 {done} / {total} 个文件', {
+      done: task.preparation.completedFiles, total: task.preparation.totalFiles,
+    });
+  }
   if (task.status === 'saving') return `${formatBytes(task.savedBytes ?? 0)} / ${formatBytes(task.size)}`;
   const speed = task.status === 'downloading' && task.bytesPerSecond
     ? ` · ${formatBytes(task.bytesPerSecond)}/s` : '';

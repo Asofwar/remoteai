@@ -14,9 +14,17 @@ pub(super) struct Entry {
 
 /// Plan the complete tree first; never follow links or partly copy an unsupported tree.
 pub(super) fn scan(source: &Path) -> Result<Vec<Entry>> {
+    scan_checked(source, &mut || Ok(()))
+}
+
+pub(super) fn scan_checked(
+    source: &Path,
+    check: &mut dyn FnMut() -> Result<()>,
+) -> Result<Vec<Entry>> {
     let mut entries = Vec::new();
     let mut pending = vec![source.to_owned()];
     while let Some(path) = pending.pop() {
+        check()?;
         if entries.len() + pending.len() >= MAX_ENTRIES {
             return Err(Error::TooMany);
         }
@@ -27,6 +35,7 @@ pub(super) fn scan(source: &Path) -> Result<Vec<Entry>> {
         if metadata.is_dir() {
             let mut children = Vec::new();
             for child in fs::read_dir(&path).map_err(|_| Error::Operation)? {
+                check()?;
                 if entries.len() + pending.len() + children.len() + 1 >= MAX_ENTRIES {
                     return Err(Error::TooMany);
                 }

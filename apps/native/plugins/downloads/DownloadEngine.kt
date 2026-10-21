@@ -177,7 +177,7 @@ internal class DownloadEngine(
       .filter { !saving.containsKey(it.id) && !retries.waiting(it.id) }
       .take(MAX_ACTIVE - active).forEach {
         if (it.data.optBoolean("readyToSave") && storage.part(it).length() == it.size) complete(it)
-        else { it.status = "preparing"; request(it, "open") }
+        else { it.status = "preparing"; it.data.remove("preparation"); request(it, "open") }
       }
     changed()
   }
@@ -231,6 +231,24 @@ internal class DownloadEngine(
     return true
   }
 
+  fun preparationProgress(requestId: String, progress: JSONObject) {
+    val task = jobs().values.find { it.pending[requestId]?.operation == "open" } ?: return
+    if (task.status != "preparing") return
+    require(progress.getString("phase") in listOf("scanning", "compressing", "finalizing"))
+    for (field in listOf("processedBytes", "totalBytes", "completedFiles", "totalFiles")) {
+      require(progress.getLong(field) in 0..9_007_199_254_740_991L)
+    }
+    require(progress.getLong("processedBytes") <= progress.getLong("totalBytes"))
+    require(progress.getLong("completedFiles") <= progress.getLong("totalFiles"))
+    task.data.put("preparation", progress)
+    val read = task.pending.getValue(requestId)
+    read.timeout?.cancel(false)
+    read.timeout = worker.schedule({
+      if (task.pending.containsKey(requestId)) failTask(task, "PATH_UNAVAILABLE")
+    }, maxOf(requestTimeout, PREPARE_TIMEOUT_MS), TimeUnit.MILLISECONDS)
+    changed()
+  }
+
   private fun failTask(task: DownloadTask, code: String?) {
     release(task); task.fail()
     if (code != null) task.data.put("message", bulkFailureMessage(code))
@@ -252,6 +270,7 @@ internal class DownloadEngine(
     require(name.isNotEmpty() && name !in listOf(".", "..") && name.length <= 255)
     require(name.none { it == '/' || it == '\\' || it.code < 32 || it.code == 127 })
     task.status = "downloading"
+    task.data.remove("preparation")
     if (info.has("bulk")) {
       task.data.put("size", size).put("name", name).put("mimeType", info.getString("mimeType"))
         .put("protocol", "bulk").put("message", "")

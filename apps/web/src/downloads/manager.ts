@@ -179,7 +179,7 @@ export class WebDownloadManager {
   }
   private async run(task: DownloadTask, connection: DownloadConnection, signal: AbortSignal) {
     try {
-      await this.persist({ ...task, status: task.source.gitCommit ? 'preparing' : 'downloading' });
+      await this.persist({ ...task, status: 'preparing', preparation: undefined });
       await transferDownload({ task, client: connection.client, signal,
         mode: () => this.connectionForSource(task.source)?.mode ?? 'offline',
         update: value => { task = value; this.update(value); } });

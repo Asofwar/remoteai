@@ -55,7 +55,9 @@ it('streams a generated ZIP through the direct fallback and closes its remote se
   await downloadProjectEntry({ client, file: { cwd: '/project', path: '/project/folder' }, transferId: id,
     signal: new AbortController().signal, target: async info => { expect(info.name).toBe('folder.zip'); return target; },
     progress: vi.fn() });
-  expect(client.open).toHaveBeenCalledWith({ scope: 'project', cwd: '/project', path: '/project/folder', transferId: id });
+  expect(client.open).toHaveBeenCalledWith(
+    { scope: 'project', cwd: '/project', path: '/project/folder', transferId: id },
+    expect.objectContaining({ signal: expect.any(AbortSignal) }));
   expect(target.write).toHaveBeenCalledWith('emlw');
   expect(target.finish).toHaveBeenCalledOnce();
   expect(client.close).toHaveBeenCalledWith(id, id);

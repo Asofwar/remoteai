@@ -1,4 +1,5 @@
 //! Task-scoped file handles with bounded reads, expiry and no whole-file buffering.
+mod archives;
 pub(crate) mod bulk;
 #[cfg(test)]
 mod bulk_tests;
@@ -81,6 +82,7 @@ pub(super) enum StreamKind {
 }
 
 pub(crate) struct FileStreams {
+    archives: archives::Archives,
     kind: StreamKind,
     sessions: Mutex<HashMap<String, Session>>,
     bulk_workers: Arc<tokio::sync::Semaphore>,
@@ -89,6 +91,7 @@ pub(crate) struct FileStreams {
 impl Default for FileStreams {
     fn default() -> Self {
         Self {
+            archives: archives::Archives::default(),
             kind: StreamKind::Video,
             sessions: Mutex::default(),
             bulk_workers: Arc::new(tokio::sync::Semaphore::new(2)),
@@ -219,6 +222,7 @@ impl FileStreams {
     }
 
     fn remove(&self, options: StreamClose) -> Result<()> {
+        self.archives.cancel(&options.thread_id, &options.id)?;
         let mut sessions = self.sessions.lock().map_err(|_| GuiError::FileRead)?;
         if sessions
             .get(&options.id)

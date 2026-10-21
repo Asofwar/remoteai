@@ -7,10 +7,6 @@ use serde_json::{json, Value};
 
 use super::{continuation, response};
 
-const MAX_EVENT_BYTES: usize = 8 * 1024 * 1024;
-const MAX_CONTENT_BYTES: usize = 16 * 1024 * 1024;
-const MAX_CONTENT_BLOCKS: usize = 1_024;
-
 struct Block {
     value: Value,
     arguments: String,
@@ -27,7 +23,6 @@ pub(super) struct MessagesReader<R> {
     stop_reason: Option<String>,
     started: bool,
     finished: bool,
-    content_bytes: usize,
 }
 
 impl<R: BufRead> MessagesReader<R> {
@@ -42,7 +37,6 @@ impl<R: BufRead> MessagesReader<R> {
             stop_reason: None,
             started: false,
             finished: false,
-            content_bytes: 0,
         }
     }
 
@@ -99,10 +93,7 @@ impl<R: BufRead> MessagesReader<R> {
 
     fn start_block(&mut self, event: &Value) -> io::Result<()> {
         let index = block_index(event)?;
-        if !self.started
-            || self.blocks.contains_key(&index)
-            || self.blocks.len() >= MAX_CONTENT_BLOCKS
-        {
+        if !self.started || self.blocks.contains_key(&index) {
             return Err(invalid_event());
         }
         let value = event["content_block"].clone();
@@ -118,10 +109,6 @@ impl<R: BufRead> MessagesReader<R> {
             }
             _ => return Err(invalid_event()),
         };
-        self.content_bytes = self.content_bytes.saturating_add(value.to_string().len());
-        if self.content_bytes > MAX_CONTENT_BYTES {
-            return Err(invalid_event());
-        }
         self.blocks.insert(
             index,
             Block {
@@ -154,10 +141,6 @@ impl<R: BufRead> MessagesReader<R> {
             _ => return Ok(()),
         };
         let text = text.as_str().ok_or_else(invalid_event)?;
-        self.content_bytes = self.content_bytes.saturating_add(text.len());
-        if self.content_bytes > MAX_CONTENT_BYTES {
-            return Err(invalid_event());
-        }
         if field == "input" {
             block.arguments.push_str(text);
         } else {
@@ -234,11 +217,7 @@ impl<R: BufRead> MessagesReader<R> {
 
     fn read_event_line(&mut self) -> io::Result<bool> {
         let mut line = String::new();
-        let count = self
-            .upstream
-            .by_ref()
-            .take((MAX_EVENT_BYTES + 1) as u64)
-            .read_line(&mut line)?;
+        let count = self.upstream.read_line(&mut line)?;
         if count == 0 {
             return Ok(false);
         }
@@ -248,9 +227,6 @@ impl<R: BufRead> MessagesReader<R> {
             return Ok(true);
         }
         if let Some(data) = line.strip_prefix("data:") {
-            if self.data.len().saturating_add(data.len()) > MAX_EVENT_BYTES {
-                return Err(invalid_event());
-            }
             if !self.data.is_empty() {
                 self.data.push('\n')
             }

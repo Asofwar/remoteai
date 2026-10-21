@@ -6,7 +6,7 @@ import { loadSseIdleTimeout, saveSseIdleTimeout, type SseIdleTimeoutSettings } f
 import { useSseIdleTimeout } from "./useSseIdleTimeout";
 
 vi.mock("../api/sseIdleTimeout", () => ({
-  DEFAULT_SSE_IDLE_TIMEOUT: { enabled: true, timeoutSeconds: 120 },
+  DEFAULT_SSE_IDLE_TIMEOUT: { enabled: true, timeoutSeconds: 240 },
   MAX_SSE_IDLE_TIMEOUT_SECONDS: 3600,
   loadSseIdleTimeout: vi.fn(),
   saveSseIdleTimeout: vi.fn(),

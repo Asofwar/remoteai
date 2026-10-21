@@ -43,6 +43,16 @@ fn upstream_response(
             .recv_timeout(Duration::from_secs(5))
             .unwrap()
             .unwrap();
+        if request.method() == &Method::Get {
+            assert!(request.url().contains("/models/"));
+            request
+                .respond(Response::from_string(r#"{"max_tokens":128000}"#))
+                .unwrap();
+            request = server
+                .recv_timeout(Duration::from_secs(5))
+                .unwrap()
+                .unwrap();
+        }
         let capture = Capture {
             path: request.url().to_string(),
             headers: request
@@ -93,6 +103,7 @@ fn native_http_uses_messages_path_and_provider_authentication() {
     .unwrap();
     let capture = worker.join().unwrap();
     assert_eq!(capture.path, "/v1/messages");
+    assert_eq!(capture.body["max_tokens"], 128_000);
     assert_eq!(capture.header("x-api-key"), Some("upstream-key"));
     assert_eq!(capture.header("anthropic-version"), Some("2023-06-01"));
     assert_eq!(capture.header("authorization"), None);

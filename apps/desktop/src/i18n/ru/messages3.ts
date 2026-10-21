@@ -131,6 +131,12 @@ export const messages3 = {
   "settings.sseIdleTimeout.description": "Применяется к ответам через прокси. Отключите ограничение, чтобы дождаться ответа даже при долгом обдумывании. Изменение действует для новых запросов.",
   "settings.sseIdleTimeout.enabled": "Ограничить ожидание без новых данных",
   "settings.sseIdleTimeout.duration": "Максимальное ожидание без новых данных",
+  "settings.proxyTransport.title": "Повторные попытки и перенаправления",
+  "settings.proxyTransport.description":
+    "При тайм-ауте подключения повторять попытку каждые 2 секунды, пока запрос не отправлен. "
+    + "Первая попытка не входит в счётчик. Значение 0 отключает соответствующую функцию.",
+  "settings.proxyTransport.retries": "Максимум повторных попыток",
+  "settings.proxyTransport.redirects": "Максимум перенаправлений",
   "settings.responseHeaderTimeout.title": "Ожидание начала ответа",
   "settings.responseHeaderTimeout.description": "Сколько ждать начала ответа после отправки запроса. "
     + "По умолчанию — 10 минут. Изменение действует для новых запросов.",

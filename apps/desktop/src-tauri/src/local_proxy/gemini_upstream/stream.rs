@@ -2,8 +2,6 @@ use super::{continuation, response};
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Read};
 
-const MAX_EVENT_BYTES: usize = 8 * 1024 * 1024;
-
 pub(super) struct GenerateContentReader<R> {
     source: R,
     pending: io::Cursor<Vec<u8>>,
@@ -73,14 +71,7 @@ impl<R: BufRead> GenerateContentReader<R> {
 
     fn read_line(&mut self) -> io::Result<bool> {
         let mut line = String::new();
-        let count = self
-            .source
-            .by_ref()
-            .take((MAX_EVENT_BYTES + 1) as u64)
-            .read_line(&mut line)?;
-        if count > MAX_EVENT_BYTES {
-            return Err(invalid_event());
-        }
+        let count = self.source.read_line(&mut line)?;
         if count == 0 {
             if !self.data.is_empty() {
                 self.event()?;
@@ -94,9 +85,6 @@ impl<R: BufRead> GenerateContentReader<R> {
             return Ok(true);
         }
         if let Some(data) = line.strip_prefix("data:") {
-            if self.data.len().saturating_add(data.len()) > MAX_EVENT_BYTES {
-                return Err(invalid_event());
-            }
             if !self.data.is_empty() {
                 self.data.push('\n')
             }

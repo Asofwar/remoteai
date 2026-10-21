@@ -1,7 +1,7 @@
 //! Detect response framing before adapting events or collecting a bounded JSON reply.
 use super::{history, Context};
 use crate::local_proxy::{
-    chat_bridge_response::{bounded_read, completed_response, sniff},
+    chat_bridge_response::{completed_response, read_response, sniff},
     forwarded_response_headers, status_ok, ChatSseReader, ReqwestResponse, UpstreamBody,
     UpstreamPayload,
 };
@@ -20,7 +20,7 @@ pub(super) fn receive(
         .and_then(|value| value.to_str().ok())
         .map(str::to_string);
     let body = if !status_ok(status) {
-        UpstreamBody::Buffered(bounded_read(response)?)
+        UpstreamBody::Buffered(read_response(response)?)
     } else {
         if context.streaming {
             response.select_streaming(true);
@@ -30,7 +30,7 @@ pub(super) fn receive(
         let body = if sse {
             from_events(reader, &context, pending)?
         } else {
-            super::buffered(&bounded_read(reader)?, &context, pending)?
+            super::buffered(&read_response(reader)?, &context, pending)?
         };
         content_type = Some(
             if context.streaming {

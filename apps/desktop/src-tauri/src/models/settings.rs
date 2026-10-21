@@ -55,6 +55,10 @@ pub(crate) struct AppSettings {
     #[serde(default)]
     pub(crate) sse_idle_timeout: SseIdleTimeoutSettings,
     #[serde(default)]
+    pub(crate) sse_idle_timeout_migrated: bool,
+    #[serde(default)]
+    pub(crate) proxy_transport: ProxyTransportSettings,
+    #[serde(default)]
     pub(crate) response_header_timeout: ResponseHeaderTimeoutSettings,
     /// Records the one-time migration from the legacy five-minute retry default.
     #[serde(default)]
@@ -289,6 +293,8 @@ impl Default for AppSettings {
             upstream_429_retry_timeout_seconds: default_upstream_429_retry_timeout_seconds(),
             upstream_429_retry_timeout_migrated: false,
             sse_idle_timeout: SseIdleTimeoutSettings::default(),
+            sse_idle_timeout_migrated: false,
+            proxy_transport: ProxyTransportSettings::default(),
             response_header_timeout: ResponseHeaderTimeoutSettings::default(),
             show_usage_network_errors: false,
             gpt_5_6_sol_context_window: default_gpt_5_6_sol_context_window(),

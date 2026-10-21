@@ -62,8 +62,9 @@ const OFFICIAL_CODEX_BASE_URL: &str = "https://chatgpt.com/backend-api/codex";
 // Upload inactivity and non-streaming response reads have independent budgets.
 // Response headers and SSE reads use separate settings; credential requests use this limit.
 const UPSTREAM_RESPONSE_IDLE_TIMEOUT: Duration = Duration::from_secs(120);
-const UPSTREAM_CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
-const UPSTREAM_TIMEOUT_ATTEMPT_LIMIT: usize = 3;
+const UPSTREAM_CONNECT_TIMEOUT: Duration = Duration::from_secs(60);
+const UPSTREAM_UPLOAD_IDLE_TIMEOUT: Duration = Duration::from_secs(240);
+const UPSTREAM_TIMEOUT_RETRY_DELAY: Duration = Duration::from_secs(2);
 const TOOL_SEARCH_PROXY_NAME: &str = "tool_search";
 const CUSTOM_TOOL_INPUT_FIELD: &str = "input";
 const CHAT_TOOL_NAME_MAX_LEN: usize = 64;

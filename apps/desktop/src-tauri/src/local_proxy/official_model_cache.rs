@@ -7,7 +7,6 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Runtime};
 
 const CACHE_TIMEOUT: Duration = Duration::from_secs(60);
-const MAX_CATALOG_BYTES: u64 = 2 * 1024 * 1024;
 pub(super) const UNAVAILABLE_MESSAGE: &str = "模型列表暂时无法获取，请稍后重试。";
 
 #[derive(Debug, thiserror::Error)]
@@ -30,6 +29,8 @@ pub(super) fn with_fallback<R: Runtime>(
     app: &AppHandle<R>,
     official: impl FnOnce() -> Result<UpstreamPayload, String>,
 ) -> Result<UpstreamPayload, String> {
+    let settings = crate::storage::read_app_settings(app)?;
+    let _transport_scope = super::transport_settings::RequestScope::enter(settings.proxy_transport);
     prefer_official(official, || fetch(app))
 }
 
@@ -113,6 +114,10 @@ fn fetch<R: Runtime>(app: &AppHandle<R>) -> Result<UpstreamPayload, CatalogError
         .unwrap_or(crate::models::DEFAULT_CLOUD_BASE_URL);
     let client = crate::system_proxy::apply(Client::builder())
         .timeout(CACHE_TIMEOUT)
+        .connect_timeout(super::UPSTREAM_CONNECT_TIMEOUT)
+        .redirect(super::transport_settings::redirect_policy(
+            settings.proxy_transport.max_redirects,
+        ))
         .build()?;
     request_catalog(&client, catalog_url(base)?)
 }
@@ -162,17 +167,14 @@ fn request_catalog(client: &Client, url: Url) -> Result<UpstreamPayload, Catalog
     })
 }
 
-fn read_catalog(reader: impl Read) -> Result<Vec<u8>, CatalogError> {
+fn read_catalog(mut reader: impl Read) -> Result<Vec<u8>, CatalogError> {
     let mut bytes = Vec::new();
-    reader.take(MAX_CATALOG_BYTES + 1).read_to_end(&mut bytes)?;
+    reader.read_to_end(&mut bytes)?;
     validate_catalog(&bytes)?;
     Ok(bytes)
 }
 
 fn validate_catalog(bytes: &[u8]) -> Result<(), CatalogError> {
-    if bytes.len() as u64 > MAX_CATALOG_BYTES {
-        return Err(CatalogError::Invalid);
-    }
     let value: Value = serde_json::from_slice(bytes).map_err(|_| CatalogError::Invalid)?;
     let models = value
         .get("models")

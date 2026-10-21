@@ -9,10 +9,21 @@ use std::{
 const IDLE: Duration = Duration::from_millis(300);
 const STEP: Duration = Duration::from_millis(90);
 
+#[test]
+fn transport_defaults_keep_separate_upload_and_response_timeouts() {
+    let limits = Timeouts::default();
+    assert_eq!(limits.upload_idle, Duration::from_secs(240));
+    assert_eq!(limits.sse_response_idle, Some(Duration::from_secs(240)));
+    assert_eq!(limits.response_idle, Duration::from_secs(120));
+    assert_eq!(
+        super::super::UPSTREAM_CONNECT_TIMEOUT,
+        Duration::from_secs(60)
+    );
+}
+
 fn timeouts() -> Timeouts {
     Timeouts {
         upload_idle: IDLE,
-        upload_total: Duration::from_secs(5),
         response_headers: IDLE,
         response_idle: IDLE,
         sse_response_idle: Some(IDLE),
@@ -102,22 +113,16 @@ fn stalled_upload_is_cancelled() {
 }
 
 #[test]
-fn progressing_upload_still_has_an_absolute_limit() {
-    let (url, server) = echo_server(Duration::ZERO);
-    let limits = Timeouts {
-        upload_total: IDLE,
-        ..timeouts()
+fn upload_progress_has_no_cumulative_deadline() {
+    let limits = timeouts();
+    let started = Instant::now();
+    let progress = Progress {
+        sent_bytes: 1,
+        updated_at: started + Duration::from_secs(3600),
     };
-    let result = tauri::async_runtime::block_on(delayed_upload(url, limits, STEP));
-    assert!(matches!(
-        result,
-        Err(Error::Timeout {
-            phase: Phase::Upload,
-            ..
-        })
-    ));
-    assert!(!result.unwrap_err().can_retry());
-    server.join().unwrap();
+    let (phase, deadline) = phase_deadline(progress, 2, limits);
+    assert!(matches!(phase, Phase::Upload));
+    assert_eq!(deadline, progress.updated_at + IDLE);
 }
 
 fn prepared_request(url: String, body: Vec<u8>) -> Request {
@@ -138,6 +143,8 @@ fn header_timeout_does_not_replay_a_post() {
             request.send()
         },
         Error::can_retry,
+        6,
+        |_| panic!("A submitted request must not retry"),
     );
     assert!(matches!(
         result,

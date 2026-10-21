@@ -100,6 +100,7 @@ import { useThemeColor } from "../../hooks/useThemeColor";
 import { useThemeMode } from "../../hooks/useThemeMode";
 import { useTokenUsagePreferences } from "../../hooks/useTokenUsagePreferences";
 import { useSseIdleTimeout } from "../../hooks/useSseIdleTimeout";
+import { useProxyTransport } from "../../hooks/useProxyTransport";
 import { useResponseHeaderTimeout } from "../../hooks/useResponseHeaderTimeout";
 import { useUpstream429RetryTimeout } from "../../hooks/useUpstream429RetryTimeout";
 import { useToast } from "../../hooks/useToast";
@@ -390,6 +391,7 @@ export function DashboardApp() {
   const themeMode = useThemeMode(page === "codexGui" && guiTheme.mode !== "inherit" ? guiTheme.mode : undefined);
   const tokenUsagePreferences = useTokenUsagePreferences(notify);
   const sseIdleTimeout = useSseIdleTimeout(notify);
+  const proxyTransport = useProxyTransport(notify);
   const responseHeaderTimeout = useResponseHeaderTimeout(notify);
   const upstream429RetryTimeout = useUpstream429RetryTimeout(notify);
   const manager = useAccountManager(notify, t, accountCloudSync);
@@ -1482,6 +1484,7 @@ export function DashboardApp() {
               codexUsageSummaryEnabled={tokenUsagePreferences.codexSummaryEnabled}
               tokenUsagePreferencesLoading={tokenUsagePreferences.loading}
               sseIdleTimeout={sseIdleTimeout}
+              proxyTransport={proxyTransport}
               responseHeaderTimeout={responseHeaderTimeout}
               upstream429RetryTimeoutSeconds={upstream429RetryTimeout.timeoutSeconds}
               upstream429RetryTimeoutLoading={upstream429RetryTimeout.loading}

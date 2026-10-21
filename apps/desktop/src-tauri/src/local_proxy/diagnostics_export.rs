@@ -59,7 +59,11 @@ fn diagnostic_export_metadata<R: Runtime>(app: &tauri::AppHandle<R>) -> String {
         "responseHeaderTimeoutSeconds": settings.as_ref().map(|value| value.response_header_timeout)
             .unwrap_or_default().duration().as_secs(),
         "responseIdleTimeoutSeconds": UPSTREAM_RESPONSE_IDLE_TIMEOUT.as_secs(),
-        "connectTimeoutSeconds": UPSTREAM_CONNECT_TIMEOUT.as_secs()
+        "connectTimeoutSeconds": UPSTREAM_CONNECT_TIMEOUT.as_secs(),
+        "uploadIdleTimeoutSeconds": UPSTREAM_UPLOAD_IDLE_TIMEOUT.as_secs(),
+        "uploadTotalTimeoutSeconds": Value::Null,
+        "networkRetryDelaySeconds": UPSTREAM_TIMEOUT_RETRY_DELAY.as_secs(),
+        "proxyTransport": settings.as_ref().map(|value| value.proxy_transport).unwrap_or_default()
     });
     format!("{metadata}\n")
 }

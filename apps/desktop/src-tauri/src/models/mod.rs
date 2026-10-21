@@ -4,6 +4,8 @@ include!("lan_keys.rs");
 include!("providers.rs");
 mod provider_request_options;
 pub(crate) use provider_request_options::ProviderRequestOptions;
+mod proxy_transport;
+pub(crate) use proxy_transport::ProxyTransportSettings;
 mod sse_idle_timeout;
 pub(crate) use sse_idle_timeout::SseIdleTimeoutSettings;
 mod response_header_timeout;

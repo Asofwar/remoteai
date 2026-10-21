@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-pub(crate) const DEFAULT_SSE_IDLE_TIMEOUT_SECONDS: u64 = 120;
+pub(crate) const DEFAULT_SSE_IDLE_TIMEOUT_SECONDS: u64 = 240;
 pub(crate) const MAX_SSE_IDLE_TIMEOUT_SECONDS: u64 = 3_600;
 
 /// Independent response-body timeout for all proxied SSE streams.
@@ -45,11 +45,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn legacy_settings_keep_two_minute_timeout() {
+    fn missing_settings_use_four_minute_timeout() {
         let settings: crate::models::AppSettings = serde_json::from_str("{}").unwrap();
         assert_eq!(
             settings.sse_idle_timeout.duration(),
-            Some(Duration::from_secs(120))
+            Some(Duration::from_secs(240))
         );
     }
 

@@ -9,6 +9,7 @@ import {
 } from "../../hooks/useTokenUsagePreferences";
 import { httpStatusOptions } from "../../utils/httpStatusOptions";
 import { SseIdleTimeoutCard } from "./SseIdleTimeoutCard";
+import { ProxyTransportCard } from "./ProxyTransportCard";
 import { ResponseHeaderTimeoutCard } from "./ResponseHeaderTimeoutCard";
 import { DurationTimePicker } from "./DurationTimePicker";
 import type { SettingsPageProps } from "./types";
@@ -222,6 +223,7 @@ export function UsageSettingsCards({ settings }: { settings: SettingsPageProps }
       <Upstream429RetryCard settings={settings} />
       <SseIdleTimeoutCard settings={settings} />
       <ResponseHeaderTimeoutCard settings={settings} />
+      <ProxyTransportCard settings={settings} />
       <UsageNetworkErrorsCard settings={settings} />
       <AutoDisableStatusCodesCard settings={settings} />
     </>

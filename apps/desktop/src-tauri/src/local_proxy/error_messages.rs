@@ -92,6 +92,9 @@ pub(super) fn transport(error: &str) -> Option<&'static str> {
 }
 
 pub(super) fn gui(error: &str) -> &str {
+    if super::anthropic_upstream::is_configuration_error(error) {
+        return error;
+    }
     if let Some(message) = transport(error) {
         return message;
     }

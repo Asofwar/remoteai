@@ -1,6 +1,7 @@
 //! Native Messages transport, sharing the established Responses tool and event mapping.
 
 mod continuation;
+mod output_limit;
 mod request;
 mod request_options;
 mod response;
@@ -23,6 +24,15 @@ use super::{CodexToolContext, UpstreamBody, UpstreamPayload};
 use crate::models::ProviderProfile;
 
 const ANTHROPIC_VERSION: &str = "2023-06-01";
+
+pub(super) fn is_configuration_error(error: &str) -> bool {
+    [
+        output_limit::OutputLimitError::Invalid,
+        output_limit::OutputLimitError::Unavailable,
+    ]
+    .iter()
+    .any(|known| known.to_string() == error)
+}
 
 struct RequestContext {
     model: String,
@@ -56,6 +66,7 @@ pub(super) fn forward(
     let mut request = request::convert(&input, &context.tools, &context.scope)
         .map_err(|error| error.to_string())?;
     super::provider_request_options::body(&mut request, provider);
+    output_limit::ensure(&mut request, headers, provider).map_err(|error| error.to_string())?;
     request_options::validate_after_overrides(&mut request).map_err(|error| error.to_string())?;
     let response = send(&request, headers, provider)?;
     receive(response, context)
@@ -69,6 +80,7 @@ pub(super) fn forward_messages(
 ) -> Result<UpstreamPayload, String> {
     let mut body = system_prompt::prepare(body);
     super::provider_request_options::body(&mut body, provider);
+    output_limit::ensure(&mut body, headers, provider).map_err(|error| error.to_string())?;
     let response = send(&body, headers, provider)?;
     let status = response.status().as_u16();
     let content_type = response
@@ -104,24 +116,30 @@ fn send(
 ) -> Result<super::ReqwestResponse, String> {
     let client = super::http_client()?;
     let url = super::provider_request_options::url(provider, "/messages");
+    super::send_with_timeout_retries(
+        || authenticated_request(client.post(&url), headers, provider).json(body),
+        "Messages request failed",
+    )
+}
+
+fn authenticated_request(
+    request: reqwest::blocking::RequestBuilder,
+    headers: &[(String, String)],
+    provider: &ProviderProfile,
+) -> reqwest::blocking::RequestBuilder {
     let headers = headers
         .iter()
         .filter(|(name, _)| !matches!(name.to_ascii_lowercase().as_str(), "anthropic-version"))
         .cloned()
         .collect::<Vec<_>>();
-    super::send_with_timeout_retries(
-        || {
-            let request = super::apply_forward_headers(client.post(&url), &headers, true)
-                .header("anthropic-version", ANTHROPIC_VERSION);
-            let request = if provider.api_key.trim().is_empty() {
-                request
-            } else {
-                request.header("x-api-key", provider.api_key.trim())
-            };
-            super::provider_request_options::headers(request.json(body), provider)
-        },
-        "Messages request failed",
-    )
+    let request = super::apply_forward_headers(request, &headers, true)
+        .header("anthropic-version", ANTHROPIC_VERSION);
+    let request = if provider.api_key.trim().is_empty() {
+        request
+    } else {
+        request.header("x-api-key", provider.api_key.trim())
+    };
+    super::provider_request_options::headers(request, provider)
 }
 
 fn receive(

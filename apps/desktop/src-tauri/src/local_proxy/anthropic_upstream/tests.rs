@@ -45,7 +45,7 @@ fn native_messages_preserve_instructions_images_and_parallel_tool_results() {
         "https://example.com/image.png"
     );
     assert_eq!(result["stream"], true);
-    assert_eq!(result["max_tokens"], 16_384);
+    assert!(result.get("max_tokens").is_none());
 }
 
 #[test]

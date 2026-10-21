@@ -136,6 +136,22 @@ fn unsuccessful_empty_and_invalid_official_catalogs_fall_back_to_admin_once() {
 
 struct BrokenReader;
 
+#[test]
+fn catalogs_larger_than_two_mib_are_read_and_validated_without_truncation() {
+    let bytes = json!({"models":[{"slug":"large", "description":"x".repeat(2 * 1024 * 1024)}]})
+        .to_string()
+        .into_bytes();
+    assert_eq!(read_catalog(Cursor::new(&bytes)).unwrap(), bytes);
+    for body in [
+        UpstreamBody::Buffered(bytes.clone()),
+        UpstreamBody::Streaming(Box::new(Cursor::new(bytes.clone()))),
+    ] {
+        let mut payload = validate_official_payload(official_payload(200, body)).unwrap();
+        let read = super::super::read_official_model_catalog_body(&mut payload.body).unwrap();
+        assert_eq!(read, bytes);
+    }
+}
+
 impl Read for BrokenReader {
     fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
         Err(std::io::Error::new(
@@ -146,12 +162,11 @@ impl Read for BrokenReader {
 }
 
 #[test]
-fn unreadable_and_oversized_official_bodies_fall_back_to_admin() {
+fn unreadable_and_invalid_official_bodies_fall_back_to_admin() {
     for body in [
         UpstreamBody::Streaming(Box::new(BrokenReader)),
         UpstreamBody::Streaming(Box::new(Cursor::new(b"invalid json"))),
-        UpstreamBody::Streaming(Box::new(std::io::repeat(b' '))),
-        UpstreamBody::Buffered(vec![b' '; MAX_CATALOG_BYTES as usize + 1]),
+        UpstreamBody::Buffered(vec![b' '; 2 * 1024 * 1024 + 1]),
     ] {
         let result = prefer_official(
             || Ok(official_payload(200, body)),
@@ -188,7 +203,7 @@ fn failed_or_invalid_admin_fallback_reports_model_discovery_failure() {
 }
 
 #[test]
-fn validates_addresses_and_rejects_duplicate_or_oversized_catalogs() {
+fn validates_addresses_and_rejects_duplicate_or_invalid_catalogs() {
     assert_eq!(
         catalog_url("https://example.test/api/").unwrap().path(),
         "/api/official-models"
@@ -201,7 +216,7 @@ fn validates_addresses_and_rejects_duplicate_or_oversized_catalogs() {
         assert!(catalog_url(address).is_err());
     }
     assert!(validate_catalog(br#"{"models":[{"slug":"x"},{"slug":"x"}]}"#).is_err());
-    assert!(validate_catalog(&vec![b' '; MAX_CATALOG_BYTES as usize + 1]).is_err());
+    assert!(validate_catalog(&vec![b' '; 2 * 1024 * 1024 + 1]).is_err());
 }
 
 #[test]

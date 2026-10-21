@@ -8,6 +8,7 @@ fn handle_proxy_request<R: Runtime>(
     session_request_id: Option<u64>,
 ) -> Result<UpstreamPayload, String> {
     let settings = read_app_settings(app)?;
+    let _transport_scope = transport_settings::RequestScope::enter(settings.proxy_transport);
     let _timeout_scope = sse_idle_timeout::RequestScope::enter(settings.sse_idle_timeout);
     let _header_timeout_scope =
         response_header_timeout::RequestScope::enter(settings.response_header_timeout);

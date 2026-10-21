@@ -176,8 +176,23 @@ fn migrate_upstream_429_retry_timeout(settings: &mut AppSettings) -> bool {
     true
 }
 
+fn migrate_sse_idle_timeout(settings: &mut AppSettings) -> bool {
+    const LEGACY_SSE_IDLE_TIMEOUT_SECONDS: u64 = 120;
+    if settings.sse_idle_timeout_migrated {
+        return false;
+    }
+    if settings.sse_idle_timeout.timeout_seconds == LEGACY_SSE_IDLE_TIMEOUT_SECONDS {
+        settings.sse_idle_timeout.timeout_seconds =
+            crate::models::SseIdleTimeoutSettings::default().timeout_seconds;
+    }
+    // Later edits, including a custom 120 seconds, must not be migrated again.
+    settings.sse_idle_timeout_migrated = true;
+    true
+}
+
 fn apply_app_settings_version_migration(settings: &mut AppSettings, current_version: &str) -> bool {
     let mut changed = migrate_upstream_429_retry_timeout(settings);
+    changed |= migrate_sse_idle_timeout(settings);
     if settings.codex_homes.is_empty() {
         if let Some(path) = settings.codex_home.as_deref().filter(|path| !path.trim().is_empty()) {
             settings.codex_homes.push(crate::models::CodexHomeEntry {

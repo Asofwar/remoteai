@@ -556,6 +556,7 @@ export interface AppSettings {
   autoDisableStatusCodes?: number[];
   upstream429RetryTimeoutSeconds?: number;
   sseIdleTimeout?: import("./api/sseIdleTimeout").SseIdleTimeoutSettings;
+  proxyTransport?: import("./api/proxyTransport").ProxyTransportSettings;
   responseHeaderTimeout?: import("./api/responseHeaderTimeout").ResponseHeaderTimeoutSettings;
   showUsageNetworkErrors?: boolean;
   gpt56SolContextWindow?: number;

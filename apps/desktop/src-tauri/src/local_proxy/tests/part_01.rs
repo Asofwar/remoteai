@@ -95,17 +95,36 @@ fn upstream_transport_errors_are_sanitized_for_client_responses() {
 }
 
 #[test]
+fn configured_timeout_retries_wait_two_seconds_between_attempts_only() {
+    for retries in [0, 1, 6, 9] {
+        let mut attempts = 0;
+        let mut delays = Vec::new();
+        let result: Result<(), &str> = retry_timeout_operation(
+            || { attempts += 1; Err("timeout") },
+            |error| *error == "timeout",
+            retries,
+            |delay| delays.push(delay),
+        );
+        assert_eq!(result, Err("timeout"));
+        assert_eq!(attempts, retries + 1);
+        assert_eq!(delays, vec![Duration::from_secs(2); retries as usize]);
+    }
+}
+
+#[test]
 fn timeout_operation_succeeds_when_the_third_attempt_recovers() {
     let attempts = AtomicUsize::new(0);
     let result = retry_timeout_operation(
         || {
             let attempt = attempts.fetch_add(1, AtomicOrdering::SeqCst) + 1;
-            if attempt < UPSTREAM_TIMEOUT_ATTEMPT_LIMIT {
+            if attempt < 3 {
                 return Err("timeout");
             }
             Ok("recovered")
         },
         |error| *error == "timeout",
+        2,
+        |_| {},
     );
 
     assert_eq!(result, Ok("recovered"));
@@ -121,6 +140,8 @@ fn timeout_operation_returns_after_three_consecutive_timeouts() {
             Err("timeout")
         },
         |error| *error == "timeout",
+        2,
+        |_| {},
     );
 
     assert_eq!(result, Err("timeout"));
@@ -136,6 +157,8 @@ fn timeout_operation_does_not_retry_other_failures() {
             Err("authentication failed")
         },
         |error| *error == "timeout",
+        2,
+        |_| {},
     );
 
     assert_eq!(result, Err("authentication failed"));

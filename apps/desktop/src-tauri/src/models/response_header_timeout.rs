@@ -49,7 +49,7 @@ mod tests {
         );
         assert_eq!(
             settings.sse_idle_timeout.duration(),
-            Some(Duration::from_secs(120))
+            Some(Duration::from_secs(240))
         );
     }
 

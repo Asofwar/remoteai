@@ -406,6 +406,35 @@ trigger a state refresh instead of silently dropping stream fragments. Desktop e
 The protocol was checked against `D:/github/codex/codex-rs/app-server-protocol` and the downloaded official
 release. Tests use a local Responses fixture rather than a paid model.
 
+## Proxy request limits
+
+Upstream connections wait up to 60 seconds. Uploads have no cumulative time limit;
+240 seconds without upload progress ends the request. SSE responses default to a
+240-second idle timeout, configurable in Settings. The previous saved default of
+120 seconds is migrated once; disabled timeouts and other saved durations are preserved.
+Response-header waiting and non-streaming response idle timeouts remain independent.
+
+Settings → Connection retries and redirects controls timeout retries (default 6,
+excluding the initial attempt) and HTTP redirects (default 10). Each retry waits
+2 seconds; setting a count to 0 disables that behavior. A timeout after any body
+bytes have entered transport is not replayed, since the upstream may already be
+processing the request. Model discovery keeps its existing overall deadline and
+official-to-Admin fallback rather than extending it with chat retries.
+
+Chat/Gemini responses that require buffering, Anthropic/Gemini event conversion,
+and proxy model catalog reads no longer impose byte or content-block caps.
+Protocol validation and the upstream model's own limits still apply.
+
+Messages conversion no longer supplies a fixed 16,384-token output length. Explicit
+client output lengths and Provider overrides are preserved. When no output length
+is supplied, the proxy retrieves `max_tokens` from the upstream model's
+`GET /models/{model_id}` endpoint, using the Provider's credentials and custom headers.
+Successful metadata is cached for 30 minutes and isolated by endpoint, model and
+authenticated request configuration. If the endpoint does not provide a positive
+maximum, the request asks the user to configure `max_tokens` in the Provider's
+custom request parameters. Custom full URLs ending in `/messages` use the sibling
+model endpoint; other full URL shapes require explicit configuration.
+
 ## Verification
 
 New conversations can search and switch local Git branches, create a branch, or create a local worktree

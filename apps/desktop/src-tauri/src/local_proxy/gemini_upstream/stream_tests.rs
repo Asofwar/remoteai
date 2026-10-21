@@ -16,6 +16,24 @@ fn convert(input: &str) -> String {
     output
 }
 
+#[test]
+fn native_stream_accepts_events_content_and_metadata_above_previous_limits() {
+    let text = "x".repeat(8 * 1024 * 1024 + 1);
+    let first = json!({"candidates":[{"content":{"parts":[{"text":text}]}}]});
+    let last = json!({"candidates":[{"content":{"parts":[{"text":text}]}, "finishReason":"STOP",
+        "groundingMetadata":{"extra":text}}]});
+    let output = convert(&format!("data: {first}\n\ndata: {last}\n\n"));
+    let result = terminal(&output);
+    assert_eq!(result["status"], "completed");
+    assert_eq!(
+        result["output"][0]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .len(),
+        text.len() * 2
+    );
+}
+
 pub(super) fn terminal(output: &str) -> Value {
     output
         .lines()

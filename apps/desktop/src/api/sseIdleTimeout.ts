@@ -5,7 +5,7 @@ export interface SseIdleTimeoutSettings {
   timeoutSeconds: number;
 }
 
-export const DEFAULT_SSE_IDLE_TIMEOUT: SseIdleTimeoutSettings = { enabled: true, timeoutSeconds: 120 };
+export const DEFAULT_SSE_IDLE_TIMEOUT: SseIdleTimeoutSettings = { enabled: true, timeoutSeconds: 240 };
 export const MAX_SSE_IDLE_TIMEOUT_SECONDS = 3_600;
 const PREVIEW_KEY = "codex-switch.sse-idle-timeout";
 

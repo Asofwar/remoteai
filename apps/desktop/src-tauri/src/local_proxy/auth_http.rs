@@ -126,6 +126,7 @@ fn http_client() -> Result<Client, String> {
     crate::system_proxy::apply(Client::builder())
         .timeout(timeout)
         .connect_timeout(UPSTREAM_CONNECT_TIMEOUT)
+        .redirect(transport_settings::redirect_policy(transport_settings::current().max_redirects))
         .build()
         .map_err(|error| format!("Failed to create proxy HTTP client: {error}"))
 }
@@ -140,6 +141,7 @@ fn send_with_timeout_retries(
         failover_transport::record(Some(&error));
         format!("{failure_context}: {error}")
     })?;
+    let retries = transport_settings::current().network_retry_count;
     let mut attempt = 0;
     let result = retry_timeout_operation(
         || {
@@ -147,9 +149,9 @@ fn send_with_timeout_retries(
             let result = request.send();
             diagnostic_http_result(&result, attempt);
             if result.as_ref().is_err_and(|error| request.can_retry(error))
-                && attempt < UPSTREAM_TIMEOUT_ATTEMPT_LIMIT
+                && attempt <= u64::from(retries)
             {
-                diagnostic_retry("transport_timeout", Duration::ZERO);
+                diagnostic_retry("transport_timeout", UPSTREAM_TIMEOUT_RETRY_DELAY);
                 crate::error_logs::record_proxy_error(
                     &format!("{failure_context}: request timed out; retrying."),
                     None,
@@ -158,6 +160,8 @@ fn send_with_timeout_retries(
             result
         },
         |error| request.can_retry(error),
+        retries,
+        thread::sleep,
     );
     failover_transport::record(result.as_ref().err());
     match result {
@@ -169,7 +173,7 @@ fn send_with_timeout_retries(
 fn transport_error_detail(
     error: &upstream_transport::Error,
     failure_context: &str,
-    attempts: usize,
+    attempts: u64,
 ) -> String {
     // Display alone hides nested DNS/TLS/socket failures. Keep the sanitized cause chain
     // until the response boundary so GUI and shared requests can explain the actual failure.
@@ -190,16 +194,19 @@ fn transport_error_detail(
 fn retry_timeout_operation<T, E>(
     mut operation: impl FnMut() -> Result<T, E>,
     is_timeout: impl Fn(&E) -> bool,
+    retry_count: u32,
+    mut wait: impl FnMut(Duration),
 ) -> Result<T, E> {
-    for attempt in 1..=UPSTREAM_TIMEOUT_ATTEMPT_LIMIT {
+    let mut remaining = retry_count;
+    loop {
         match operation() {
-            Err(error) if is_timeout(&error) && attempt < UPSTREAM_TIMEOUT_ATTEMPT_LIMIT => {
-                continue
+            Err(error) if remaining > 0 && is_timeout(&error) => {
+                remaining -= 1;
+                wait(UPSTREAM_TIMEOUT_RETRY_DELAY);
             }
             result => return result,
         }
     }
-    unreachable!("the retry loop always returns on its final attempt")
 }
 
 fn reqwest_method(method: &Method) -> Result<reqwest::Method, String> {

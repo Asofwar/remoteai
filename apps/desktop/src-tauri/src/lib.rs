@@ -570,6 +570,7 @@ pub fn run() {
             local_proxy::get_official_model_context_settings,
             local_proxy::set_official_model_context_window,
             local_proxy::set_upstream_429_retry_timeout,
+            local_proxy::transport_settings::set_proxy_transport,
             local_proxy::sse_idle_timeout::set_sse_idle_timeout,
             local_proxy::response_header_timeout::set_response_header_timeout,
             local_proxy::list_proxy_sessions,

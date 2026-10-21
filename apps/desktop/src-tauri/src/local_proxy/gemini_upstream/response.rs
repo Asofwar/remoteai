@@ -1,8 +1,6 @@
 use super::{continuation, BridgeError, Context, GENERATED_CALL_PREFIX};
 use serde_json::{json, Value};
 
-const MAX_PART_BYTES: usize = 16 * 1024 * 1024;
-
 #[derive(Default)]
 pub(super) struct State {
     pub(super) parts: Vec<Value>,
@@ -10,7 +8,6 @@ pub(super) struct State {
     pub(super) usage: Value,
     pub(super) reason: Option<String>,
     grounding: super::grounding::Grounding,
-    bytes: usize,
 }
 
 impl State {
@@ -40,14 +37,6 @@ impl State {
         if let Some(reason) = candidate["finishReason"].as_str() {
             self.reason = Some(reason.into())
         }
-        for name in ["groundingMetadata", "citationMetadata"] {
-            if let Some(value) = candidate.get(name) {
-                self.bytes = self.bytes.saturating_add(value.to_string().len());
-            }
-        }
-        if self.bytes > MAX_PART_BYTES {
-            return Err(BridgeError::InvalidResponse);
-        }
         self.grounding.observe(candidate);
         let mut delta = json!({});
         for part in candidate["content"]["parts"]
@@ -63,10 +52,6 @@ impl State {
     fn append_part(&mut self, part: &Value, delta: &mut Value) -> Result<(), BridgeError> {
         if part.get("inlineData").is_some() || part.get("fileData").is_some() {
             return Err(BridgeError::UnsupportedContent);
-        }
-        self.bytes = self.bytes.saturating_add(part.to_string().len());
-        if self.bytes > MAX_PART_BYTES {
-            return Err(BridgeError::InvalidResponse);
         }
         if let Some(text) = part["text"].as_str() {
             let field = if part["thought"] == true {

@@ -2,19 +2,19 @@ use serde_json::{json, Value};
 
 use super::super::CodexToolContext;
 
-const DEFAULT_MAX_TOKENS: u64 = 16_384;
 const MIN_THINKING_TOKENS: u64 = 1_024;
 const MEDIUM_THINKING_TOKENS: u64 = 4_096;
 const HIGH_THINKING_TOKENS: u64 = 8_192;
 
 pub(super) fn apply(input: &Value, result: &mut Value, context: &CodexToolContext) {
-    result["max_tokens"] = json!(input
+    if let Some(maximum) = input
         .get("max_output_tokens")
         .or_else(|| input.get("max_tokens"))
         .or_else(|| input.get("max_completion_tokens"))
-        .and_then(Value::as_u64)
-        .filter(|tokens| *tokens > 0)
-        .unwrap_or(DEFAULT_MAX_TOKENS));
+    {
+        // Preserve explicit values for validation; absence is resolved from model metadata later.
+        result["max_tokens"] = maximum.clone();
+    }
     for field in ["stream", "temperature", "top_p"] {
         if let Some(value) = input.get(field) {
             result[field] = value.clone();
@@ -95,7 +95,7 @@ fn apply_thinking(input: &Value, result: &mut Value) {
         };
         let available = result["max_tokens"]
             .as_u64()
-            .unwrap_or(DEFAULT_MAX_TOKENS)
+            .unwrap_or(budget + 1)
             .saturating_sub(1);
         if available < MIN_THINKING_TOKENS {
             return;

@@ -214,6 +214,7 @@ mod tests {
             cloud_base_url: None,
             last_started_version: Some("1.1.20".to_string()),
             upstream_429_retry_timeout_migrated: true,
+            sse_idle_timeout_migrated: true,
             ..AppSettings::default()
         };
 
@@ -222,6 +223,24 @@ mod tests {
             "1.1.20"
         ));
         assert!(settings.cloud_base_url.is_none());
+    }
+
+    #[test]
+    fn sse_timeout_migration_updates_only_the_old_default_and_only_once() {
+        for (seconds, expected) in [(120, 240), (600, 600), (240, 240)] {
+            let mut settings: AppSettings = serde_json::from_value(json!({
+                "sseIdleTimeout": { "enabled": false, "timeoutSeconds": seconds },
+                "lastStartedVersion": "1.4.2",
+            })).unwrap();
+            assert!(apply_app_settings_version_migration(&mut settings, "1.4.2"));
+            assert_eq!(settings.sse_idle_timeout.timeout_seconds, expected);
+            assert!(!settings.sse_idle_timeout.enabled);
+            settings.sse_idle_timeout.timeout_seconds = 120;
+            let serialized = serde_json::to_value(settings).unwrap();
+            let mut reloaded: AppSettings = serde_json::from_value(serialized).unwrap();
+            assert!(!apply_app_settings_version_migration(&mut reloaded, "1.4.2"));
+            assert_eq!(reloaded.sse_idle_timeout.timeout_seconds, 120);
+        }
     }
 
     #[test]

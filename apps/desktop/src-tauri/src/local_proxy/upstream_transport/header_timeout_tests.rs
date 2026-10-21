@@ -12,11 +12,11 @@ fn prepared_request_keeps_header_setting_independent_of_worker_and_other_timeout
     };
     assert_eq!(request.timeouts.response_headers, Duration::from_secs(900));
     assert_eq!(response_header_timeout::current(), Duration::from_secs(600));
-    assert_eq!(request.timeouts.upload_idle, Duration::from_secs(120));
+    assert_eq!(request.timeouts.upload_idle, Duration::from_secs(240));
     assert_eq!(request.timeouts.response_idle, Duration::from_secs(120));
     assert_eq!(
         request.timeouts.sse_response_idle,
-        Some(Duration::from_secs(120))
+        Some(Duration::from_secs(240))
     );
     assert_eq!(
         thread::spawn(response_header_timeout::current)

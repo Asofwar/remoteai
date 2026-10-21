@@ -930,6 +930,11 @@ const translations = {
       + "Changes apply to new requests.",
     "settings.sseIdleTimeout.enabled": "Limit waiting without new data",
     "settings.sseIdleTimeout.duration": "Maximum wait without new data",
+    "settings.proxyTransport.title": "Connection retries and redirects",
+    "settings.proxyTransport.description":
+      "Retry connection timeouts every 2 seconds before sending the request. Retries exclude the first attempt. Set either count to 0 to disable it.",
+    "settings.proxyTransport.retries": "Maximum retries",
+    "settings.proxyTransport.redirects": "Maximum redirects",
     "settings.responseHeaderTimeout.title": "Initial response wait",
     "settings.responseHeaderTimeout.description":
       "How long to wait for the service to start responding after sending a request. "
@@ -3577,6 +3582,11 @@ const translations = {
       "适用于所有代理的流式响应。关闭限制后，模型长时间思考时仍会继续等待。修改后对新请求生效。",
     "settings.sseIdleTimeout.enabled": "限制无数据等待时间",
     "settings.sseIdleTimeout.duration": "最长无数据等待时间",
+    "settings.proxyTransport.title": "连接重试与重定向",
+    "settings.proxyTransport.description":
+      "请求尚未发送时，连接超时后每隔 2 秒重试。重试次数不含首次请求；设为 0 可关闭对应功能。",
+    "settings.proxyTransport.retries": "最多重试次数",
+    "settings.proxyTransport.redirects": "最多重定向次数",
     "settings.responseHeaderTimeout.title": "首次响应等待",
     "settings.responseHeaderTimeout.description":
       "请求发送后，等待服务开始响应的最长时间。默认 10 分钟，修改后对新请求生效。",

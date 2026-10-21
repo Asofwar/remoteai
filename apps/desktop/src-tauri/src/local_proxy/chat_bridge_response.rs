@@ -2,7 +2,6 @@
 
 use super::*;
 
-const MAX_BUFFERED_BYTES: u64 = 128 * 1024 * 1024;
 const MAX_SNIFF_BYTES: usize = 4096;
 
 pub(super) struct Context {
@@ -30,7 +29,7 @@ pub(super) fn convert(
     let mut payload = if sse {
         convert_stream(Box::new(reader), context)?
     } else {
-        let bytes = bounded_read(reader)?;
+        let bytes = read_response(reader)?;
         let chat: Value = serde_json::from_slice(&bytes)
             .map_err(|_| "The service returned an unreadable response")?;
         convert_json(chat, context)?
@@ -65,7 +64,7 @@ fn convert_stream(
 }
 
 pub(super) fn completed_response(reader: impl Read) -> Result<Value, String> {
-    let bytes = bounded_read(reader)?;
+    let bytes = read_response(reader)?;
     String::from_utf8_lossy(&bytes)
         .lines()
         .filter_map(|line| line.strip_prefix("data: "))
@@ -119,16 +118,11 @@ fn convert_json(chat: Value, context: Context) -> Result<UpstreamPayload, String
     )
 }
 
-pub(super) fn bounded_read(mut reader: impl Read) -> Result<Vec<u8>, String> {
+pub(super) fn read_response(mut reader: impl Read) -> Result<Vec<u8>, String> {
     let mut bytes = Vec::new();
     reader
-        .by_ref()
-        .take(MAX_BUFFERED_BYTES + 1)
         .read_to_end(&mut bytes)
         .map_err(|_| "The service response could not be read")?;
-    if bytes.len() as u64 > MAX_BUFFERED_BYTES {
-        return Err("The service response is too large".into());
-    }
     Ok(bytes)
 }
 
@@ -166,6 +160,21 @@ pub(super) fn sniff<R: Read>(reader: R) -> Result<(bool, PrefixedReader<R>), Str
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn buffered_json_above_128_mib_is_read_completely() {
+        // Large JSON whitespace exercises the real response reader without cloning a huge value.
+        const PADDING: u64 = 128 * 1024 * 1024 + 1;
+        let reader = std::io::repeat(b' ')
+            .take(PADDING)
+            .chain(std::io::Cursor::new(
+                br#"{"choices":[{"message":{"content":"complete"}}]}"#,
+            ));
+        let bytes = read_response(reader).unwrap();
+        let value: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(value["choices"][0]["message"]["content"], "complete");
+        assert!(bytes.len() as u64 > PADDING);
+    }
 
     #[test]
     fn completed_json_and_stream_responses_can_restore_the_next_tool_result() {
@@ -303,7 +312,7 @@ mod tests {
             sniff(Box::new(std::io::Cursor::new(input.as_bytes().to_vec()))).unwrap();
         assert!(sse);
         assert_eq!(
-            bounded_read(reader).unwrap(),
+            read_response(reader).unwrap(),
             input.trim_start_matches('\u{feff}').as_bytes()
         );
     }

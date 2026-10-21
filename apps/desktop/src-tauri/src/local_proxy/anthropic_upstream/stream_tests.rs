@@ -42,6 +42,51 @@ fn complete(reason: &str) -> Vec<Value> {
     ]
 }
 
+#[test]
+fn native_stream_accepts_events_and_content_above_previous_byte_limits() {
+    let text = "x".repeat(8 * 1024 * 1024 + 1);
+    let mut events = vec![
+        start(),
+        json!({"type":"content_block_start", "index":0,
+        "content_block":{"type":"text", "text":""}}),
+    ];
+    for _ in 0..2 {
+        events.push(json!({"type":"content_block_delta", "index":0,
+            "delta":{"type":"text_delta", "text":text}}));
+    }
+    events.push(json!({"type":"content_block_stop", "index":0}));
+    events.extend(complete("end_turn"));
+    let result = terminal(&responses(events));
+    assert_eq!(result["status"], "completed");
+    assert_eq!(
+        result["output"][0]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .len(),
+        text.len() * 2
+    );
+}
+
+#[test]
+fn native_stream_accepts_more_than_1024_content_blocks() {
+    let mut events = vec![start()];
+    for index in 0..1025 {
+        events.push(json!({"type":"content_block_start", "index":index,
+            "content_block":{"type":"text", "text":"x"}}));
+        events.push(json!({"type":"content_block_stop", "index":index}));
+    }
+    events.extend(complete("end_turn"));
+    let result = terminal(&responses(events));
+    assert_eq!(result["status"], "completed");
+    assert_eq!(
+        result["output"][0]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .len(),
+        1025
+    );
+}
+
 fn terminal(output: &str) -> Value {
     output
         .lines()

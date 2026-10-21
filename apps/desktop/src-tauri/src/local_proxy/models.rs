@@ -1,4 +1,3 @@
-const MAX_OFFICIAL_MODEL_CATALOG_BYTES: u64 = 2 * 1024 * 1024;
 
 pub(crate) struct OfficialModelCatalogFetch {
     pub(crate) catalog: Value,
@@ -50,14 +49,10 @@ fn read_official_model_catalog_body(body: &mut UpstreamBody) -> Result<Vec<u8>, 
         UpstreamBody::Buffered(value) => bytes.extend_from_slice(value),
         UpstreamBody::Streaming(reader) => {
             reader
-                .take(MAX_OFFICIAL_MODEL_CATALOG_BYTES + 1)
                 .read_to_end(&mut bytes)
                 .map_err(|error| format!("Failed to read the official model catalog: {error}"))?;
         }
     };
-    if bytes.len() as u64 > MAX_OFFICIAL_MODEL_CATALOG_BYTES {
-        return Err("Official model catalog is too large".to_string());
-    }
     Ok(bytes)
 }
 

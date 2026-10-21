@@ -136,7 +136,9 @@ test('remote commit context actions and patches reach this browser download mana
   await row.click({ button: 'right' });
   await page.getByRole('menuitem', { name: '创建补丁…', exact: true }).click();
   await expect(drawer).toContainText('已加入下载管理。');
-  await drawer.getByRole('button', { name: '关闭 Git', exact: true }).click();
+  await drawer.getByRole('button', {
+    name: info.project.name === 'desktop' ? '关闭详情抽屉' : '关闭 Git', exact: true,
+  }).click();
   await navigate(page, '设置');
   await page.getByText('下载管理', { exact: true }).click();
   const card = page.getByRole('article', { name: '72c48df04444.patch', exact: true });
@@ -186,9 +188,13 @@ test('tools open Git changes, commit only checked files and draw merge history',
   await expect(drawer.getByRole('checkbox', { name: '选择 src/chat/tools.ts', exact: true })).toHaveCount(0);
   await app.check();
   await drawer.getByRole('button', { name: '查看 src/app.ts', exact: true }).click();
-  await expect(drawer.locator('.git-diff')).toContainText('+new code');
+  const desktop = info.project.name === 'desktop';
+  const diff = desktop ? page.getByRole('dialog', { name: '文件更改详情', exact: true })
+    : drawer.locator('.git-diff');
+  await expect(diff).toContainText('new code');
   await screenshot(page, info, 'git-diff');
-  await drawer.getByRole('button', { name: 'src/app.ts', exact: true }).click();
+  if (desktop) await diff.getByRole('tab', { name: 'Git', exact: true }).click();
+  else await drawer.getByRole('button', { name: 'src/app.ts', exact: true }).click();
   await expect(app).toBeChecked();
   const message = drawer.getByRole('textbox', { name: '提交说明' });
   await message.fill('更新应用');
@@ -223,12 +229,14 @@ test('tools open Git changes, commit only checked files and draw merge history',
   expect((await state(request)).operations.filter(op => op.operation === 'guiGitDiff')).toHaveLength(diffCount);
   await screenshot(page, info, 'git-commit-files');
   await drawer.getByRole('button', { name: '查看 src/chat/tools.ts', exact: true }).click();
-  await expect(drawer.locator('.git-diff')).toContainText('committed change');
-  await expect(drawer.locator('.git-diff')).toContainText('b/src/chat/tools.ts');
+  await expect(diff).toContainText('committed change');
+  if (desktop) await expect(diff.getByLabel('src/chat/tools.ts 的代码差异', { exact: true })).toBeVisible();
+  else await expect(diff).toContainText('b/src/chat/tools.ts');
   const commitDiff = (await state(request)).operations.filter(op => op.operation === 'guiGitDiff').at(-1);
   expect(commitDiff).toMatchObject({ path: 'src/chat/tools.ts', commit: 'e950cd31'.padEnd(40, '5') });
   await screenshot(page, info, 'git-commit-file-diff');
-  await drawer.getByRole('button', { name: '返回文件列表', exact: true }).click();
+  if (desktop) await diff.getByRole('tab', { name: 'Git', exact: true }).click();
+  else await drawer.getByRole('button', { name: '返回文件列表', exact: true }).click();
   await expect(drawer.locator('.git-commit-file')).toHaveCount(4);
   await drawer.getByRole('button', { name: '返回提交记录', exact: true }).click();
   await expect(drawer.locator('.git-history-row')).toHaveCount(6);
@@ -269,7 +277,7 @@ test('tools open Git changes, commit only checked files and draw merge history',
   expect(actions.map(op => op.action)).toEqual(['switch', 'fetch', 'update', 'pull', 'push']);
   expect(actions.find(op => op.action === 'update')?.strategy).toBe('merge');
   expect(actions.find(op => op.action === 'pull')?.strategy).toBe('rebase');
-  await drawer.getByRole('button', { name: '关闭 Git' }).click();
+  await drawer.getByRole('button', { name: desktop ? '关闭详情抽屉' : '关闭 Git', exact: true }).click();
   await page.getByRole('button', { name: '打开工具', exact: true }).click();
   await page.getByRole('button', { name: '终端', exact: true }).click();
   await expect(page.getByRole('dialog', { name: '远程终端', exact: true })).toBeVisible();

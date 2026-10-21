@@ -57,7 +57,8 @@ test('remote files preview on left click across peer versions; right click opens
   await link.click({ button: 'right' });
   await expect(page.getByRole('menuitem', { name: '在远程电脑上打开', exact: true })).toBeVisible();
   expect((await page.getByRole('menu').boundingBox())!.width).toBeLessThanOrEqual(400);
-  await expect(drawer).toHaveCount(0);
+  await expect(drawer).toBeHidden();
+  await expect(drawer).toHaveCount(1);
   await page.getByRole('menuitem', { name: '预览文件', exact: true }).click();
   await expect(drawer.getByRole('heading', { name: '远程文档', exact: true })).toBeVisible();
   await expect(page.getByLabel('文件操作结果')).toBeEmpty();
@@ -96,7 +97,8 @@ test('PC remote Markdown links use the shared right drawer with navigation and s
   const drawer = page.locator('aside[data-details-panel]');
   const preview = drawer.getByRole('region', { name: '文件预览', exact: true });
   await expect(preview.getByRole('heading', { name: '文件预览', exact: true })).toBeVisible();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(1);
+  await expect(drawer).toHaveAttribute('role', 'dialog');
   await expect.poll(async () => {
     const bounds = await drawer.boundingBox();
     return Math.abs(bounds!.x + bounds!.width - page.viewportSize()!.width);
@@ -120,7 +122,9 @@ test('PC remote Markdown links use the shared right drawer with navigation and s
   await expect(preview.getByRole('button', { name: '下载', exact: true })).toBeEnabled();
   await screenshot(page, info, 'remote-markdown-drawer');
   await drawer.getByRole('button', { name: '关闭详情抽屉' }).click();
-  await expect(drawer).toHaveCount(0);
+  await expect(drawer).toBeHidden();
+  await page.getByRole('button', { name: '交接文档', exact: true }).click();
+  await expect(preview.getByRole('heading', { name: '文件预览', exact: true })).toBeVisible();
 });
 
 test('previews HTML scripts in an isolated frame and retains source and download actions', async ({ page }) => {

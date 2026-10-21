@@ -137,7 +137,7 @@ test('keeps desktop chat beside independently collapsible menus and remembers th
     await header.getByRole('button', { name: '收起聊天列表' }).click();
     await expect(sidebar).toHaveCount(0);
     const mainToggle = (await page.locator('.main-menu-toggle svg').boundingBox())!;
-    const chatToggle = (await header.locator('.chat-back > svg').boundingBox())!;
+    const chatToggle = (await header.locator('.chat-list-avatar').boundingBox())!;
     expect(mainToggle.y + mainToggle.height / 2).toBe(chatToggle.y + chatToggle.height / 2);
     await screenshot(page, info, 'desktop-collapsed-menus');
     const text = await page.locator('.chat-markdown').last().innerText();

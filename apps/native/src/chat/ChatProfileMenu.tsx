@@ -7,6 +7,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { BottomSheet } from '../components/BottomSheet';
 import { SheetScrollView, SheetInset, SHEET_READABLE_WIDTH } from '../components/SheetScrollView';
 import type { GuiAccountChoice, GuiAccountsClient } from '../../../../shared/remote-chat/guiAccounts';
+import { guiAccountAvatar } from '../../../../shared/remote-chat/guiAccountAvatar';
 import { useGuiAccounts } from '../../../../shared/remote-chat/client/useGuiAccounts';
 import type { GuiToolsClient } from '../../../../shared/remote-chat/guiTools';
 import { ChatGuiUpdateSheet } from './ChatGuiUpdateSheet';
@@ -37,7 +38,7 @@ export function ChatProfileMenu(props: Props) {
   const current = accounts.snapshot?.choices.find((choice) =>
     selection?.kind === choice.kind && selection.id === choice.id);
   const name = current?.name || t("选择账户");
-  const initials = Array.from(current?.name.trim() || '').slice(0, 2).join('') || t("我");
+  const { initials } = guiAccountAvatar(accounts.snapshot, t("我"));
   const disabled = accounts.loading || Boolean(accounts.saving) || !ready || !accounts.snapshot?.running;
   const search = query.trim().toLowerCase();
   const choices = accounts.snapshot?.choices.filter((choice) =>

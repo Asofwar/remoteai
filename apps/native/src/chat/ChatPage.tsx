@@ -22,6 +22,7 @@ import { ChatImageContext } from './ChatImage';
 import { ChatImagePreviewProvider } from './ChatImagePreview';
 import { ChatFileProvider } from './ChatFilePreview';
 import { ChatThreads } from './ChatThreads';
+import { ChatListButton } from './ChatListButton';
 import { ChatProfileMenu } from './ChatProfileMenu';
 import { TokenSummaryPage } from '../tokenSummary/TokenSummaryPage';
 import { ChatSearch } from './ChatSearch';
@@ -163,8 +164,8 @@ function ConnectedChat({ session, device, devices, selected, active: pageActive,
       {...drawerSwipeHandlers}>
     <ChatOverlay>
     <View style={styles.header}>
-      <Pressable accessibilityRole="button" accessibilityLabel={t("打开聊天列表")} style={styles.back}
-        onPress={openDrawer}><Text style={styles.backText}>☰</Text></Pressable>
+      <ChatListButton client={controller.guiAccounts} active={active && foreground} ready={ready}
+        expanded={drawer} onPress={openDrawer} />
       <View style={styles.headerContent}>
         <Text numberOfLines={1} style={styles.headerTitle}>
           {state.selected ? threadPresentation(state.selected, state.sidebar, t).title : t("新聊天")}</Text>

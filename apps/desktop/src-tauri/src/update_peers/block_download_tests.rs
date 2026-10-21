@@ -1,8 +1,11 @@
 use super::*;
-use crate::update_peers::{
-    block_download, block_protocol, signaling::Lease, tests::network_fixture,
-};
-use csw_chat_connectivity::{Connection, Event};
+use crate::update_peers::{block_download, signaling::Lease, tests::network_fixture};
+
+#[path = "tests/block_recovery_fixture.rs"]
+mod recovery_fixture;
+
+const RECOVERY_SETUP_TIMEOUT: Duration = Duration::from_secs(45);
+const RECOVERY_TRANSFER_TIMEOUT: Duration = Duration::from_secs(40);
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn origin_ranges_finish_without_waiting_for_an_unresponsive_peer() {
@@ -47,94 +50,64 @@ async fn disconnected_source_does_not_discard_other_peers_blocks() {
         .await
         .unwrap();
     let snapshot = seed_service.cache.snapshot(&artifact.id).unwrap();
-    let coordinator = network_fixture::coordinator("block-recovery").await;
     let (sender, _receiver) = mpsc::channel(16);
-    let mut leases = Vec::new();
-    let mut workers = Vec::new();
-    let mut seeds = Vec::new();
     let (failed_request, observer) = watch::channel(false);
-    for index in 0..2 {
-        let mut config = network_fixture::client(&coordinator, &format!("block-recovery-{index}"));
-        config.desktop = true;
-        let seed = Connection::start_with_packets(config.clone()).unwrap();
-        seeds.push(seed.clone());
-        let snapshot = snapshot.clone();
-        let artifact = artifact.id.clone();
-        let policy = seed_service.policy.clone();
-        let failed_request = failed_request.clone();
-        let mut observer = observer.clone();
-        workers.push(tokio::spawn(async move {
-            if index == 0 {
-                disconnect_after_request(&seed, &snapshot.manifest, failed_request).await;
-            } else {
-                while !*observer.borrow_and_update() {
-                    observer.changed().await.unwrap();
-                }
-                let _result = block_protocol::seed(&seed, snapshot, &artifact, &policy).await;
-            }
-        }));
-        config.desktop = false;
-        leases.push(Lease::binary(config, sender.clone()).unwrap());
-    }
+    let mut seeds = vec![
+        recovery_fixture::Seed::start(
+            "block-recovery-broken",
+            snapshot.clone(),
+            recovery_fixture::Role::Disconnect(failed_request.clone()),
+        )
+        .await,
+        recovery_fixture::Seed::start(
+            "block-recovery-healthy",
+            snapshot,
+            recovery_fixture::Role::Recover(observer),
+        )
+        .await,
+    ];
+    let mut leases = seeds
+        .iter()
+        .map(|seed| Lease::binary(seed.config.clone(), sender.clone()).unwrap())
+        .collect();
     artifact.url = "http://127.0.0.1:9/unavailable".into();
-    let result = tokio::time::timeout(
-        Duration::from_secs(40),
-        block_download::download(&mut leases, &artifact, &seed_service, |_, _| {}),
-    )
-    .await;
+    let result = recover_after_preparation(&mut seeds, &mut leases, &artifact, &seed_service).await;
+    drop(leases);
     for seed in seeds {
-        seed.close();
+        seed.finish().await;
     }
-    for worker in workers {
-        worker.abort();
-    }
-    coordinator.stop().await;
-    assert_eq!(result.unwrap().unwrap(), bytes);
+    assert_eq!(result.unwrap(), bytes);
+    assert!(
+        *failed_request.borrow(),
+        "the first source never disconnected"
+    );
     assert!(seed_service.policy.metrics.retries.load(Ordering::Relaxed) >= 1);
     assert_eq!(origin.downloads.load(Ordering::Relaxed), 0);
 }
 
-async fn disconnect_after_request(
-    connection: &Connection,
-    manifest: &crate::update_peers::snapshot::Manifest,
-    requested: watch::Sender<bool>,
-) {
-    let mut sent = false;
-    while let Some(event) = connection.receive().await {
-        let Event::Data { text } = event else {
-            continue;
-        };
-        let frame: serde_json::Value = serde_json::from_str(&text).unwrap();
-        if frame["type"] == "read" {
-            if sent {
-                requested.send_replace(true);
-                connection.close();
-                return;
-            }
-            let index = frame["index"].as_u64().unwrap() as usize;
-            let length = manifest.length(index).unwrap();
-            connection
-                .send(
-                    serde_json::json!({"type":"block", "index":index, "length":length}).to_string(),
-                )
+async fn recover_after_preparation(
+    seeds: &mut [recovery_fixture::Seed],
+    leases: &mut Vec<Lease>,
+    artifact: &Artifact,
+    service: &Service,
+) -> std::result::Result<Vec<u8>, String> {
+    tokio::time::timeout(RECOVERY_SETUP_TIMEOUT, async {
+        for seed in seeds {
+            (&mut seed.ready)
                 .await
-                .unwrap();
-            for chunk in vec![73; length].chunks(64 * 1024) {
-                connection.send_packet(chunk.to_vec()).await.unwrap();
-            }
-            sent = true;
+                .map_err(|_| "recovery seed stopped during preparation".to_owned())?;
         }
-        if frame["type"] == "describe" {
-            connection
-                .send(
-                    serde_json::json!({"type":"manifest", "size":manifest.size,
-                "hashes":manifest.hashes})
-                    .to_string(),
-                )
-                .await
-                .unwrap();
-        }
-    }
+        Ok::<_, String>(())
+    })
+    .await
+    .map_err(|_| "recovery seeds did not become ready".to_owned())??;
+    tokio::time::timeout(
+        RECOVERY_TRANSFER_TIMEOUT,
+        block_download::download(leases, artifact, service, |_, _| {}),
+    )
+    .await
+    .map_err(|_| "recovery timed out after both sources became ready".to_owned())?
+    .map_err(|error| format!("recovery failed after both sources became ready: {error}"))
 }
 
 #[tokio::test]

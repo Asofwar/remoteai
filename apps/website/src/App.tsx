@@ -38,8 +38,8 @@ export function App({ language, path }: Route) {
       theme={{
         token: {
           colorPrimary: '#e92f73',
-          colorText: '#f4f4f5',
-          colorBgContainer: '#151518',
+          colorText: '#19191e',
+          colorBgContainer: '#fff',
           borderRadius: 8,
           fontFamily: 'Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
           controlHeight: 40,

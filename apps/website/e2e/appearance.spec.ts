@@ -5,24 +5,24 @@ const storageKey = 'remoteai-website-theme';
 const white = 'rgb(255, 255, 255)';
 const black = 'rgb(9, 9, 11)';
 
-test('defaults to dark, and remembers white across pages, languages and reloads', async ({ page, context }) => {
-  await page.emulateMedia({ colorScheme: 'light' });
+test('defaults to white, and remembers dark across pages, languages and reloads', async ({ page, context }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('./');
+  await expect(page.locator('html')).toHaveCSS('background-color', white);
+  await page.getByRole('button', { name: '切换深色主题', exact: true }).click();
   await expect(page.locator('html')).toHaveCSS('background-color', black);
-  await page.getByRole('button', { name: '切换纯白主题', exact: true }).click();
-  await expect(page.locator('html')).toHaveCSS('background-color', white);
   await page.getByRole('navigation', { name: '主导航', exact: true }).getByText('探索功能').click();
-  await expect(page.locator('html')).toHaveCSS('background-color', white);
+  await expect(page.locator('html')).toHaveCSS('background-color', black);
   await page.reload();
-  await expect(page.locator('html')).toHaveCSS('background-color', white);
+  await expect(page.locator('html')).toHaveCSS('background-color', black);
   await page.getByRole('link', { name: 'EN', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Switch to dark theme' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Switch to white theme' })).toBeVisible();
   const otherPage = await context.newPage();
   await otherPage.goto(`${basePath}guide/`);
-  await expect(otherPage.locator('html')).toHaveCSS('background-color', white);
-  await page.getByRole('button', { name: 'Switch to dark theme' }).click();
-  await expect(page.locator('html')).toHaveCSS('background-color', black);
   await expect(otherPage.locator('html')).toHaveCSS('background-color', black);
+  await page.getByRole('button', { name: 'Switch to white theme' }).click();
+  await expect(page.locator('html')).toHaveCSS('background-color', white);
+  await expect(otherPage.locator('html')).toHaveCSS('background-color', white);
   await otherPage.close();
 });
 
@@ -50,11 +50,11 @@ test('switching works when browser storage is blocked', async ({ page }) => {
     }
   });
   await page.goto('./');
-  await expect(page.locator('html')).toHaveCSS('background-color', black);
-  await page.getByRole('button', { name: '切换纯白主题', exact: true }).click();
   await expect(page.locator('html')).toHaveCSS('background-color', white);
   await page.getByRole('button', { name: '切换深色主题', exact: true }).click();
   await expect(page.locator('html')).toHaveCSS('background-color', black);
+  await page.getByRole('button', { name: '切换纯白主题', exact: true }).click();
+  await expect(page.locator('html')).toHaveCSS('background-color', white);
   expect(errors).toEqual([]);
 });
 

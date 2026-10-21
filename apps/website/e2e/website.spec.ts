@@ -76,6 +76,7 @@ test('core content, FAQ and mobile navigation remain usable without JavaScript',
   const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   await page.goto(`http://127.0.0.1:4175${basePath}features/codex-gui/`);
+  await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await expect(page.getByRole('heading', { name: '把上下文交代清楚，再开始' })).toBeVisible();
   await page.getByText('一定要先选择项目吗？', { exact: true }).click();
   await expect(page.locator('details[open]')).toContainText('不需要');
@@ -87,6 +88,7 @@ test('core content, FAQ and mobile navigation remain usable without JavaScript',
 
 test('capture desktop and mobile visual checkpoints', async ({ page }) => {
   await page.goto('./');
+  await page.getByRole('button', { name: '切换深色主题', exact: true }).click();
   await loadImages(page);
   await page.screenshot({ path: 'test-results/home-desktop-viewport.png' });
   await page.screenshot({ path: 'test-results/home-desktop.png', fullPage: true });

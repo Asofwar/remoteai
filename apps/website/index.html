@@ -3,11 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#09090b" />
+    <meta name="theme-color" content="#ffffff" />
     <script>
-      // Apply the saved theme before styles paint; dark is also the no-JavaScript default.
+      // Apply the saved theme before styles paint; white is also the no-JavaScript default.
       try {
-        const theme = localStorage.getItem('remoteai-website-theme') === 'light' ? 'light' : 'dark';
+        const theme = localStorage.getItem('remoteai-website-theme') === 'dark' ? 'dark' : 'light';
         document.documentElement.dataset.theme = theme;
         document.querySelector('meta[name="theme-color"]').content = theme === 'light' ? '#ffffff' : '#09090b';
       } catch {

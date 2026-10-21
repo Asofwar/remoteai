@@ -1,4 +1,4 @@
-:root {
+:root[data-theme='dark'] {
   color-scheme: dark;
   --ink: #f4f4f5;
   --muted: #a3a3ae;
@@ -20,7 +20,7 @@
   --green: #72dab2;
   --shadow: 0 28px 90px -35px #000b;
 }
-:root[data-theme='light'] {
+:root {
   color-scheme: light;
   --ink: #19191e;
   --muted: #5f5f6a;
@@ -72,11 +72,11 @@
 .theme-toggle > span {
   display: inline-flex;
 }
-.theme-toggle .show-in-light,
-[data-theme='light'] .theme-toggle .show-in-dark {
+.theme-toggle .show-in-dark,
+[data-theme='dark'] .theme-toggle .show-in-light {
   display: none;
 }
-[data-theme='light'] .theme-toggle .show-in-light {
+[data-theme='dark'] .theme-toggle .show-in-dark {
   display: inline-flex;
 }
 /* Controls follow the pre-paint theme, including before React hydrates. */

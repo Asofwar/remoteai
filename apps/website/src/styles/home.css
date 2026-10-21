@@ -3,6 +3,7 @@
   isolation: isolate;
 }
 .home-intro::before {
+  display: none;
   content: '';
   position: absolute;
   z-index: -1;
@@ -13,8 +14,8 @@
     radial-gradient(ellipse at 65% 3%, #df653732, transparent 40%),
     radial-gradient(ellipse at 85% 55%, #2563eb30, transparent 40%);
 }
-[data-theme='light'] .home-intro::before {
-  display: none;
+[data-theme='dark'] .home-intro::before {
+  display: block;
 }
 .hero {
   position: relative;

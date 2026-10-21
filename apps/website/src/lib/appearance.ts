@@ -11,7 +11,7 @@ export function applyAppearance(appearance: Appearance) {
 }
 
 export function toggleAppearance() {
-  const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
   applyAppearance(next);
   try {
     localStorage.setItem(APPEARANCE_KEY, next);
@@ -22,5 +22,5 @@ export function toggleAppearance() {
 
 export function syncAppearance(event: StorageEvent) {
   if (event.key !== APPEARANCE_KEY && event.key !== null) return;
-  applyAppearance(event.newValue === 'light' ? 'light' : 'dark');
+  applyAppearance(event.newValue === 'dark' ? 'dark' : 'light');
 }

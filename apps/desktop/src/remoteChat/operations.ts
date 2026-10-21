@@ -43,7 +43,7 @@ import { applyProjectOverride, effectiveProjectThread } from './projects';
 import { PROJECT_LIST_OPERATION } from '../../../../shared/remote-chat/projects';
 
 const OPERATIONS = new Set([
-  'projectFileRead', 'projectFileWrite',
+  'projectFileRead', 'projectFileWrite', 'projectEntryAction',
   'suggestNextPrompt',
   'guiGitGenerateMessage',
   'downloadOpen', 'downloadBrowse', 'previewOpen',
@@ -283,7 +283,7 @@ export class ChatOperations {
     applyProjectOverride(body);
     const result = await guiApi.request(body as unknown as Request);
     // File documents must stay byte-faithful; conversation image rewriting would corrupt embedded data URLs.
-    if (body.operation === 'projectFileRead' || body.operation === 'projectFileWrite') return result;
+    if (['projectFileRead', 'projectFileWrite', 'projectEntryAction'].includes(String(body.operation))) return result;
     this.titles.completed(body, result);
     if (body.operation === 'skills') return composerCatalog(result as SkillsResponse, body);
     if (body.operation === 'list') {

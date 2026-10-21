@@ -124,6 +124,21 @@ it.each(['projectFileRead', 'projectFileWrite'])('preserves literal image data i
   expect(reply.data).toEqual(data);
 });
 
+it.each(['createFolder', 'copy', 'move', 'rename', 'delete'])
+('deduplicates project tree action %s across remote retries', async action => {
+  const body = { operation: 'projectEntryAction', cwd: 'D:/remote', path: 'D:/remote/folder',
+    action, name: 'new', directory: 'D:/remote/target' };
+  const data = { path: 'D:/remote/new', directory: true };
+  vi.mocked(guiApi.request).mockResolvedValue(data);
+  const operations = new ChatOperations();
+  const request = { kind: 'request' as const, id: 'tree-action', method: 'request' as const, body };
+  const responses = await Promise.all([operations.execute(request), operations.execute(request)]);
+  expect(responses[0]).toMatchObject({ data });
+  expect(responses[1]).toEqual(responses[0]);
+  expect(await operations.execute(request)).toEqual(responses[0]);
+  expect(guiApi.request).toHaveBeenCalledExactlyOnceWith(body);
+});
+
 it('retains available skills when the plugin catalog fails', async () => {
   const skills = { data: [{ cwd: 'C:/project', skills: [], errors: [] }] };
   vi.mocked(guiApi.request).mockResolvedValueOnce(skills).mockRejectedValueOnce(new Error('unavailable'));

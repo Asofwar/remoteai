@@ -16,7 +16,7 @@ use std::{
 
 const MAX_BYTES: usize = 2 * 1024 * 1024;
 // Keep revision checks and replacement together. This lock is only acquired on blocking workers.
-static EDIT_LOCK: Mutex<()> = Mutex::new(());
+pub(super) static EDIT_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Target {

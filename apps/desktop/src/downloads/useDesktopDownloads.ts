@@ -24,7 +24,8 @@ export function useDesktopDownloads(options: {
       downloadManager.register({ owner: desktopDownloadOwner(identity), deviceId: device.deviceId,
         deviceName: device.name, ready: state.ready, mode: state.mode,
         threadId: state.selected?.id, cwd: state.selected?.cwd ?? state.draftProject?.cwd,
-        client: controller.downloads, files: controller.files, git: controller.guiTools.git });
+        client: controller.downloads, files: controller.files, git: controller.guiTools.git,
+        projectBrowser: controller.guiTools.projectBrowser });
     };
     update();
     const unsubscribe = controller.subscribe(update);

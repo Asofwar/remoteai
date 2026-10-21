@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ProjectFile, ProjectFilesResponse } from '../remote-chat/projectFiles';
 import type { ProjectBrowserClient } from './protocol';
+import { normalizedPath, withinPath } from './entryActions';
 
 export interface TreeRow { entry: ProjectFile; depth: number }
+export interface TreeChange { from: string; to: string; deleted: boolean }
 export interface DirectoryState { data?: ProjectFilesResponse; error?: string; loading?: boolean }
 export const browserError = (error: unknown) =>
   typeof error === 'string' ? error : error instanceof Error ? error.message : '文件暂时无法读取，请重试。';
@@ -54,5 +56,18 @@ export function useProjectTree(client: ProjectBrowserClient, cwd: string, connec
     });
     if (!directories[entry.path]?.data) void load(entry.path);
   };
-  return { directories, expanded, rows: flatten(directories, expanded), toggle, load, refresh };
+  const reload = async (openDirectory?: string, change?: TreeChange) => {
+    const next = new Set<string>();
+    for (const path of expanded) {
+      if (!change || !withinPath(path, change.from)) next.add(path);
+      else if (!change.deleted) {
+        next.add(normalizedPath(change.to) + normalizedPath(path).slice(normalizedPath(change.from).length));
+      }
+    }
+    if (openDirectory && normalizedPath(openDirectory) !== normalizedPath(cwd)) next.add(openDirectory);
+    generation.current += 1; pending.current.clear(); setDirectories({}); setExpanded(next);
+    const paths = new Set(['', ...next]);
+    await Promise.all([...paths].map(load));
+  };
+  return { directories, expanded, rows: flatten(directories, expanded), toggle, load, refresh, reload };
 }

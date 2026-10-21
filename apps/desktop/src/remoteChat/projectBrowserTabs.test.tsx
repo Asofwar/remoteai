@@ -26,7 +26,7 @@ beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.useFakeTimers();
   delay = 1000; connected = true;
-  client = { list: vi.fn(), read: vi.fn(async ({ path }) => document(path)),
+  client = { list: vi.fn(), mutate: vi.fn(), read: vi.fn(async ({ path }) => document(path)),
     save: vi.fn(async ({ path, text }) => document(path, text, '2')) };
   root = createRoot(globalThis.document.createElement('div'));
   await render();

@@ -36,6 +36,8 @@ pub(super) enum GuiError {
     ProjectFileWrite,
     #[error("文件超过 2 MB，暂不支持在这里编辑。")]
     ProjectFileTooLarge,
+    #[error(transparent)]
+    ProjectEntry(super::project_entries::Error),
     #[error("暂时无法读取文件夹，请确认文件夹仍可访问。")]
     ProjectDirectories,
     #[error("图片暂时无法显示，请确认文件可访问且图片格式受支持。")]

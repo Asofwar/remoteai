@@ -56,6 +56,7 @@ mod prediction_transport;
 mod preview_download;
 mod project_directories;
 mod project_editor;
+mod project_entries;
 mod project_files;
 mod prompt;
 mod protocol;
@@ -194,6 +195,7 @@ async fn execute_request(state: &GuiState, request: GuiRequest) -> Result<GuiRes
     let request = match request {
         GuiRequest::ProjectFileRead(target) => return project_editor::read(target).await,
         GuiRequest::ProjectFileWrite(request) => return project_editor::write(request).await,
+        GuiRequest::ProjectEntryAction(request) => return project_entries::execute(request).await,
         GuiRequest::DownloadOpen(options) if options.git_commit.is_some() => {
             return downloads::open_git_patch(Arc::clone(&state.downloads.0), options).await;
         }

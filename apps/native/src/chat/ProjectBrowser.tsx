@@ -14,6 +14,7 @@ import { createThemedStyles } from '../theme/styles';
 import { useFilePreferences, setFileAutoSave } from '../settings/filePreferences';
 import { readBrowserSession, saveBrowserSession } from './projectBrowserSessions';
 import type { DocumentsSnapshot } from '../../../../shared/project-browser/documents';
+import { projectBrowserHost } from './projectBrowserHost';
 
 export function ProjectBrowser({ client, cwd, connected, active, onClose }: {
   client: ProjectBrowserClient; cwd: string; connected: boolean; active: boolean; onClose: () => void;
@@ -23,6 +24,9 @@ export function ProjectBrowser({ client, cwd, connected, active, onClose }: {
   const styles = useStyles();
   const preferences = useFilePreferences();
   const webview = useRef<WebView>(null);
+  const transfer = useMemo(() => new AbortController(), [client, cwd]);
+  const host = useMemo(() => projectBrowserHost(client, transfer.signal), [client, transfer]);
+  useEffect(() => () => transfer.abort(), [transfer]);
   const [html, setHtml] = useState('');
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
@@ -87,7 +91,7 @@ export function ProjectBrowser({ client, cwd, connected, active, onClose }: {
               });
               return;
             }
-            void handleBrowserRequest(nativeEvent.data, { client, cwd, connected: connected && active })
+            void handleBrowserRequest(nativeEvent.data, { client, cwd, host, connected: connected && active })
               .then(reply => { if (reply) emit(reply); });
           }}
           onError={() => { setReady(false); setError('文件浏览器未能加载，请重新打开。'); }} />}

@@ -29,6 +29,8 @@ export class WebDownloadManager {
   snapshot = () => this.tasks;
   connection = () => this.current;
   connectionForFile = (files: DownloadConnection['files']) => this.connections.get(files);
+  connectionForProjectBrowser = (client: NonNullable<DownloadConnection['projectBrowser']>) =>
+    [...this.connections.values()].find(connection => connection.projectBrowser === client);
   connectionForGit = (git: NonNullable<DownloadConnection['git']>) =>
     [...this.connections.values()].find(connection => connection.git === git);
   connectionForSource = (source: Pick<DownloadSource, 'owner' | 'deviceId'>) =>

@@ -4,6 +4,7 @@ import type { ProjectBrowserClient } from '../../../../shared/project-browser/pr
 
 function fixture(connected = true) {
   const client: ProjectBrowserClient = {
+    mutate: vi.fn().mockResolvedValue({ path: '/project/renamed', directory: true }),
     list: vi.fn().mockResolvedValue({ entries: [] }),
     read: vi.fn().mockResolvedValue({ path: '/project/readme.txt', kind: 'text', text: 'hello', revision: '1' }),
     save: vi.fn().mockResolvedValue({ path: '/project/readme.txt', kind: 'text', text: 'updated', revision: '2' }),
@@ -41,4 +42,24 @@ it('returns save conflicts with the request ID so the editor can keep the draft'
   const result = await handleBrowserRequest(JSON.stringify({ type: 'request', id: 7, action: 'save',
     body: { path: '/project/readme.txt', text: 'mine', revision: 'old' } }), options);
   expect(result).toEqual({ type: 'reply', id: 7, error: '文件已在其他地方修改。' });
+});
+
+it('pins mutation and download roots and rejects malformed actions and external host paths', async () => {
+  const options = { ...fixture(), host: { copyPath: vi.fn(), download: vi.fn().mockResolvedValue('queued') } };
+  const send = (action: string, body: object) =>
+    handleBrowserRequest(JSON.stringify({ type: 'request', id: 3, action, body }), options);
+  await send('mutate', { cwd: '/other', path: '/project/folder', action: 'rename', name: 'renamed' });
+  expect(options.client.mutate).toHaveBeenCalledWith({
+    cwd: '/project', path: '/project/folder', action: 'rename', name: 'renamed',
+  });
+  await send('download', { cwd: '/other', path: '/project/folder' });
+  expect(options.host.download).toHaveBeenCalledWith({ cwd: '/project', path: '/project/folder' });
+  await send('copyPath', { path: '/project/folder' });
+  expect(options.host.copyPath).toHaveBeenCalledWith('/project/folder');
+  for (const path of ['/elsewhere', '/project/../secret']) {
+    expect(await send('download', { path })).toMatchObject({ error: expect.any(String) });
+  }
+  expect(await send('mutate', { path: '/project/folder', action: 'execute', command: 'no' }))
+    .toMatchObject({ error: expect.any(String) });
+  expect(options.client.mutate).toHaveBeenCalledOnce();
 });

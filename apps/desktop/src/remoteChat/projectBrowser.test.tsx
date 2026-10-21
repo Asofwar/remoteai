@@ -23,7 +23,7 @@ function Fixture() {
 beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   client = { list: vi.fn().mockResolvedValue({ directory: '/project', entries: [], parent: null, truncated: false }),
-    read: vi.fn().mockResolvedValue(doc()), save: vi.fn() };
+    read: vi.fn().mockResolvedValue(doc()), save: vi.fn(), mutate: vi.fn() };
   root = createRoot(document.createElement('div'));
   await act(async () => root.render(<Fixture />));
 });

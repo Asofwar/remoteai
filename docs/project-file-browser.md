@@ -8,6 +8,10 @@
 
 文件区顶部支持多个标签，每个标签独立保留草稿，未保存时显示小圆点。点击文件名右侧的叉关闭标签；重新加载或关闭未保存的标签时可选择保存、放弃或取消。切换标签无需先保存，并保留撤销记录。
 
+文件树支持右键菜单，手机 Web 和原生应用通过长按打开，滑动时取消长按，普通点击仍用于浏览。菜单提供新建文件／文件夹、剪切、复制、复制路径、粘贴、重命名和删除；项目标题旁的菜单可在根目录中新建或粘贴。删除需要确认，同名目标不会被覆盖，复制到同一目录时自动添加副本名称。
+
+本地桌面提供系统文件浏览器和终端入口；远程提供下载，文件夹自动打包为 ZIP，保留空目录和原始文件内容。Web、桌面远程和 Android 复用下载列表；iOS 将文件保存到应用文档目录并打开预览。重命名和移动会同步更新已打开标签的路径并保留草稿，复制前需保存涉及的修改。
+
 关闭抽屉只收起界面，当前连接中按项目保留标签、选中文件和修改，重新打开即可继续。桌面与 Web 保持编辑器挂载；原生端关闭前等待正在进行的保存完成，再由宿主保留草稿快照。这些草稿保存在内存中，不承诺刷新页面或重启应用后的恢复。
 
 设置页和文件浏览器内的设置均可调整自动保存：默认停止输入 1 秒后保存，可选 2、5、10 秒或关闭。支持保存按钮、Ctrl+S 和 macOS 的 ⌘S。后台标签也会自动保存；保存期间新增的修改仍标为未保存，且同一文件不会并发写入。保存冲突后暂停自动重试，保留草稿供手动处理；断线时保留草稿并禁用保存。原生编辑器在应用进入后台时保持挂载，避免丢失草稿。
@@ -16,6 +20,7 @@
 
 - `shared/project-browser`：三端共用的文件树、CodeMirror 编辑器、草稿状态和手机消息桥。
 - `projectFiles` 复用现有目录列表；`projectFileRead` 和 `projectFileWrite` 经本机或已认证远程聊天连接进入 Rust。
+- `projectEntryAction` 使用限定的操作类型和项目路径，复用保存互斥锁，远程重试按请求 ID 去重。树操作拒绝项目外路径、链接和特殊文件；递归操作限制文件数量，ZIP 同时校验原始内容和归档大小。
 - Rust 校验规范化后的文件路径必须位于所选项目内，拒绝网络地址、目录和超限文件。阻塞读写及互斥锁均运行在线程池中。
 - 保存携带读取时的内容摘要，暂存后再次校验，使用临时文件替换目标。外部修改导致保存失败时，编辑草稿保持不变；不会自动覆盖冲突。
 - 原生 WebView 只加载随应用打包的编辑器；禁止导航、网络和本机文件访问。项目根目录由原生宿主决定。
@@ -24,7 +29,7 @@
 
 ## 验证
 
-- Rust：`cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --test codex_switch_lib_tests codex_gui::project_`。
+- Rust：`cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --lib codex_gui::project_`。
 - 桌面：`npx vitest run src/remoteChat/projectBrowser.test.tsx src/remoteChat/operations.test.ts`。
 - 原生消息桥：`npm run test -w @codex-switch/native -- src/chat/projectBrowserBridge.test.ts`。
 - 界面与原生资源：`npm run test:chat:e2e -w @codex-switch/desktop -- project-browser`。

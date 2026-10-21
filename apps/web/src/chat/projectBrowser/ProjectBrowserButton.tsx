@@ -3,10 +3,11 @@ import { FolderSearch } from 'lucide-react';
 import type { ProjectBrowserClient } from '../../../../../shared/project-browser/protocol';
 import { ProjectBrowserDrawer } from './ProjectBrowserDrawer';
 import { t, useLanguage } from '../../i18n';
+import type { BrowserHost } from '../../../../../shared/project-browser/entryActions';
 
-export function ProjectBrowserButton({ client, cwd, connected, active, className, desktopStyle }: {
+export function ProjectBrowserButton({ client, cwd, connected, active, className, desktopStyle, host }: {
   client: ProjectBrowserClient; cwd: string; connected: boolean; active: boolean;
-  className?: string; desktopStyle?: boolean;
+  className?: string; desktopStyle?: boolean; host?: BrowserHost;
 }) {
   useLanguage();
   const browsers = useProjectBrowsers();
@@ -17,6 +18,6 @@ export function ProjectBrowserButton({ client, cwd, connected, active, className
       <FolderSearch size={16} /><span>{t('文件浏览')}</span></button>
     {browsers.projects.map(project => <ProjectBrowserDrawer key={project} client={client} cwd={project}
       connected={connected} active={active && browsers.visible === project}
-      desktopStyle={desktopStyle} onClose={browsers.close} />)}
+      desktopStyle={desktopStyle} host={host} onClose={browsers.close} />)}
   </>;
 }

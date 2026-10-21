@@ -1,5 +1,6 @@
 import type { ProjectBrowserClient, ProjectDocument } from './protocol';
 import { browserError } from './useProjectTree';
+import { normalizedPath, withinPath, type EntryRequest } from './entryActions';
 
 export interface DocumentTab {
   path: string;
@@ -17,7 +18,7 @@ export const isDirty = (tab: DocumentTab) => tab.document?.kind === 'text' && ta
 export const canSave = (tab: DocumentTab) =>
   isDirty(tab) && !tab.loading && !tab.saving && !tab.document?.readOnly;
 
-export interface DocumentsSnapshot { tabs: DocumentTab[]; activePath?: string }
+export interface DocumentsSnapshot { tabs: DocumentTab[]; activePath?: string; mutationPath?: string }
 
 /** Owns independent drafts and request identities for one project browser. */
 export class ProjectDocuments {
@@ -27,7 +28,7 @@ export class ProjectDocuments {
 
   constructor(private client: ProjectBrowserClient, private cwd: string, initial?: DocumentsSnapshot) {
     if (initial) this.snapshot = {
-      ...initial, tabs: initial.tabs.map(tab => ({ ...tab, saving: false })),
+      ...initial, mutationPath: undefined, tabs: initial.tabs.map(tab => ({ ...tab, saving: false })),
     };
   }
 
@@ -55,6 +56,7 @@ export class ProjectDocuments {
     if (this.get(path)) this.publish({ ...this.snapshot, activePath: path });
   };
   open = async (path: string) => {
+    if (this.snapshot.mutationPath) return;
     const existing = this.get(path);
     if (existing) {
       this.select(path);
@@ -68,7 +70,7 @@ export class ProjectDocuments {
   };
   reload = async (path: string) => {
     const tab = this.get(path);
-    if (!tab || tab.saving) return;
+    if (!tab || tab.saving || this.snapshot.mutationPath) return;
     const request = Symbol(path);
     this.reads.set(path, request);
     this.update(path, { loading: true, error: '' });
@@ -88,6 +90,7 @@ export class ProjectDocuments {
     if (tab && !tab.loading && !tab.document?.readOnly) this.update(path, { text, saved: false, editedAt: Date.now() });
   };
   save = async (path: string): Promise<boolean> => {
+    if (this.snapshot.mutationPath) return false;
     const tab = this.get(path);
     if (!tab || !canSave(tab) || !tab.document) return false;
     this.update(path, { saving: true, error: '', saved: false });
@@ -111,6 +114,7 @@ export class ProjectDocuments {
     return paths.every(path => { const tab = this.get(path); return !tab || !isDirty(tab); });
   };
   close = (path: string) => {
+    if (this.snapshot.mutationPath) return;
     if (this.get(path)?.saving) return;
     this.reads.delete(path);
     const index = this.snapshot.tabs.findIndex(tab => tab.path === path);
@@ -119,4 +123,37 @@ export class ProjectDocuments {
       ? tabs[Math.min(index, tabs.length - 1)]?.path : this.snapshot.activePath;
     this.publish({ tabs, activePath });
   };
+
+  /** Pause autosave across a tree mutation and rebase all affected drafts together. */
+  mutate = async (request: EntryRequest) => {
+    if (this.snapshot.mutationPath || this.snapshot.tabs.some(tab => tab.saving || tab.loading)) {
+      throw new Error('文件正在读写，请稍后重试。');
+    }
+    if (request.action === 'copy'
+      && this.snapshot.tabs.some(tab => withinPath(tab.path, request.path) && isDirty(tab))) {
+      throw new Error('请先保存此文件或文件夹中的修改，再复制。');
+    }
+    this.publish({ ...this.snapshot, mutationPath: request.path });
+    try {
+      const result = await this.client.mutate(request);
+      if (request.action === 'rename' || request.action === 'move' || request.action === 'delete') {
+        this.applyEntryChange(request, result.path);
+      }
+      return result;
+    } finally { this.publish({ ...this.snapshot, mutationPath: undefined }); }
+  };
+  private applyEntryChange(request: EntryRequest, destination: string) {
+    const affected = (path: string) => withinPath(path, request.path);
+    const rebase = (path: string) => affected(path)
+      ? normalizedPath(destination) + normalizedPath(path).slice(normalizedPath(request.path).length) : path;
+    let tabs = this.snapshot.tabs;
+    if (request.action === 'delete') tabs = tabs.filter(tab => !affected(tab.path));
+    else tabs = tabs.map(tab => !affected(tab.path) ? tab : {
+      ...tab, path: rebase(tab.path),
+      document: tab.document ? { ...tab.document, path: rebase(tab.document.path) } : undefined,
+    });
+    const activePath = this.snapshot.activePath ? rebase(this.snapshot.activePath) : undefined;
+    this.publish({ ...this.snapshot, tabs,
+      activePath: tabs.some(tab => tab.path === activePath) ? activePath : tabs.at(-1)?.path });
+  }
 }

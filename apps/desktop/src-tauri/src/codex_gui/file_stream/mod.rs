@@ -182,6 +182,19 @@ impl FileStreams {
         )?)
     }
 
+    /// An archive is held privately and released with the ordinary expiring download session.
+    pub(super) fn insert_archive(
+        &self,
+        transfer_id: String,
+        file: std::fs::File,
+        name: String,
+    ) -> Result<GuiResponse> {
+        response(self.insert_file(
+            StreamFile::generated(file, name, "application/zip".into())?,
+            transfer_id,
+        )?)
+    }
+
     fn read_chunk(&self, options: StreamRead) -> Result<StreamChunk> {
         let file = self.authorized_file(&options.id, &options.thread_id)?;
         let mut file = file.lock().map_err(|_| GuiError::FileRead)?;

@@ -1,5 +1,6 @@
 import type { ProjectBrowserRequest, ProjectDocument } from '../../../shared/project-browser/protocol';
 import type { ProjectFilesResponse } from '../../../shared/remote-chat/projectFiles';
+import { mutateFixture } from './project-browser-mutations';
 
 export const browserRoot = 'C:/project';
 const documents: Record<string, string> = {
@@ -10,20 +11,24 @@ const documents: Record<string, string> = {
   'nested/子目录/测试.py': 'def hello():\n    return "你好"\n',
 };
 const revisions: Record<string, number> = {};
+const directories = new Set(['', 'src', 'nested', 'nested/子目录']);
 export const savedFiles: { path: string; text: string }[] = [];
 export let conflict = false;
 export function causeConflict() { conflict = true; }
 
 export async function browserRequest<T>(request: ProjectBrowserRequest): Promise<T> {
   const path = request.operation === 'projectFiles' ? request.directory ?? '' : request.path;
-  const relative = path.replace(`${request.cwd}/`, '');
+  const relative = path === request.cwd ? '' : path.replace(`${request.cwd}/`, '');
+  if (request.operation === 'projectEntryAction') {
+    return mutateFixture(request, { documents, directories, revisions }) as T;
+  }
   if (request.operation === 'projectFiles') {
     const prefix = relative ? `${relative}/` : '';
     const names = new Map<string, boolean>();
-    for (const name of [...Object.keys(documents), 'archive.zip', 'huge.txt']) {
-      if (!name.startsWith(prefix)) continue;
+    for (const name of [...Object.keys(documents), ...directories, 'archive.zip', 'huge.txt']) {
+      if (!name.startsWith(prefix) || name === relative || !name) continue;
       const rest = name.slice(prefix.length).split('/');
-      names.set(rest[0], rest.length > 1);
+      names.set(rest[0], rest.length > 1 || directories.has(name));
     }
     const data: ProjectFilesResponse = { directory: path || request.cwd, parent: relative ? request.cwd : null,
       truncated: false, entries: [...names].map(([name, directory]) => ({

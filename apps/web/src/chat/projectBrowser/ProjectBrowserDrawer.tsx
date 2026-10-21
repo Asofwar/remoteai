@@ -10,19 +10,23 @@ import { useDesktopLayout } from '../../useDesktopLayout';
 import { useGitTheme } from '../git/gitTheme';
 import { t, useLanguage } from '../../i18n';
 import './projectBrowserDrawer.css';
+import type { BrowserHost } from '../../../../../shared/project-browser/entryActions';
+import { browserHost } from './browserHost';
 
 const Browser = lazy(() => import('../../../../../shared/project-browser/ProjectBrowser')
   .then(module => ({ default: module.ProjectBrowser })));
 const MIN_CHAT_WIDTH = 520;
 
-export function ProjectBrowserDrawer({ client, cwd, connected, active, onClose, desktopStyle = false }: {
+export function ProjectBrowserDrawer({ client, cwd, connected, active, onClose,
+  desktopStyle = false, host: suppliedHost }: {
   client: ProjectBrowserClient; cwd: string; connected: boolean; active: boolean;
-  onClose: () => void; desktopStyle?: boolean;
+  onClose: () => void; desktopStyle?: boolean; host?: BrowserHost;
 }) {
   useLanguage();
   const workspace = useContext(WorkspaceDrawerContext);
   const desktop = useDesktopLayout();
   const theme = useGitTheme(desktopStyle);
+  const actionsHost = useMemo(() => suppliedHost ?? browserHost(client), [suppliedHost, client]);
   const host = useMemo(() => ({ current: workspace?.host ?? null }), [workspace?.host]);
   const resize = useDrawerResize(host, { storageKey: 'codex-switch:project-files-width',
     defaultWidth: 960, defaultRatio: .85 });
@@ -70,7 +74,8 @@ export function ProjectBrowserDrawer({ client, cwd, connected, active, onClose, 
       </div>
     </header>
     <Suspense fallback={<p className="project-browser-loading" role="status">{t('正在加载…')}</p>}>
-      <Browser ref={browser} client={client} cwd={cwd} connected={connected} t={t} onClose={onClose} />
+      <Browser ref={browser} client={client} cwd={cwd} connected={connected} t={t} onClose={onClose}
+        host={actionsHost} />
     </Suspense>
   </aside>, workspace.host);
 }

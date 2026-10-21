@@ -16,7 +16,7 @@ export function useDownloadConnection(options: {
       downloadManager.bind({ owner: downloadOwner(session), deviceId, deviceName,
         ready: state.ready, mode: state.mode, windowSize: getChatPolicy().fileDownloadWindowSize,
         threadId: state.selected?.id, cwd: state.selected?.cwd ?? state.draftProject?.cwd,
-        client: controller.downloads, files: controller.files });
+        client: controller.downloads, files: controller.files, projectBrowser: controller.guiTools.projectBrowser });
     };
     update();
     const unsubscribe = controller.subscribe(update);

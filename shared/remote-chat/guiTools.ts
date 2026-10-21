@@ -1,5 +1,6 @@
 import type { TerminalRead, TerminalInfo, TerminalSize } from '../terminal/types';
 import { createProjectBrowserClient } from '../project-browser/protocol';
+import { projectDownloads } from '../project-browser/downloads';
 import { createGuiFilesClient } from './files';
 import type { TerminalLinkRequest, TerminalLinkReply } from '../terminal/links';
 import { desktopClient } from '../remote-desktop/protocol';
@@ -37,7 +38,7 @@ export function createGuiToolsClient(request: <T>(body: object) => Promise<T>,
   nativeMedia?: import('../remote-desktop/nativeMedia').NativeMediaFactory,
   stream?: import('../port-mapping/socket').MappingSocketFactory) {
   return {
-    projectBrowser: createProjectBrowserClient(request),
+    projectBrowser: createProjectBrowserClient(request, projectDownloads(request)),
     files: createGuiFilesClient(request, stream),
     projects: {
       list: () => request<ChatProject[]>({ operation: PROJECT_LIST_OPERATION }),

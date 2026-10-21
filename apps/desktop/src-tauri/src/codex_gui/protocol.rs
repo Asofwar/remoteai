@@ -39,6 +39,7 @@ pub(crate) enum GuiRequest {
     ProjectFiles(super::project_files::ProjectFilesRequest),
     ProjectFileRead(super::project_editor::Target),
     ProjectFileWrite(super::project_editor::Save),
+    ProjectEntryAction(super::project_entries::Request),
     ProjectDirectories {
         directory: String,
     },
@@ -235,7 +236,9 @@ impl GuiRequest {
             | Self::FileClose(_)
             | Self::FileManifest(_) => Err(GuiError::InvalidRequest),
             Self::ProjectFiles(_) => Err(GuiError::InvalidRequest),
-            Self::ProjectFileRead(_) | Self::ProjectFileWrite(_) => Err(GuiError::InvalidRequest),
+            Self::ProjectFileRead(_) | Self::ProjectFileWrite(_) | Self::ProjectEntryAction(_) => {
+                Err(GuiError::InvalidRequest)
+            }
             Self::ProjectDirectories { .. } => Err(GuiError::InvalidRequest),
             Self::TextPreview { .. } => Err(GuiError::InvalidRequest),
             Self::EditMessage(_) | Self::DeleteMessage(_) => Err(GuiError::InvalidRequest),

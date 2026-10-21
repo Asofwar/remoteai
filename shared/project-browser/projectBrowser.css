@@ -59,6 +59,8 @@
   flex-shrink: 0; overflow-x: auto; }
 .pf-editor-host { flex: 1; min-height: 0; min-width: 0; font-size: 13px; overflow: hidden; }
 .pf-editor-host .cm-editor { outline: none; }
+/* The chat page's generic focus ring would overlap the adjacent folding gutter. */
+.pf-editor-host .cm-content:focus { outline: none; }
 .pf-editor-host .cm-foldPlaceholder { color: var(--pf-muted); background: var(--pf-subtle); border-color: var(--pf-border); }
 .pf-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
   color: var(--pf-muted); text-align: center; padding: 24px; }

@@ -28,6 +28,19 @@ for (const mode of ['local', 'remote']) {
     await split.focus(); await page.keyboard.press('ArrowRight');
     await expect(split).toHaveAttribute('aria-valuenow', String(treeWidth + 20));
     await openCode(page);
+    // Match the real chat ancestor, including when its global styles load after the editor.
+    await page.evaluate(() => document.body.classList.add('chat-page'));
+    await page.addStyleTag({ content: '.chat-page :focus-visible { outline: 2px solid #14806f; outline-offset: 3px; }' });
+    const focusedEditor = page.getByRole('textbox', { name: '文件内容', exact: true });
+    await focusedEditor.focus();
+    await expect(focusedEditor).toHaveCSS('outline-style', 'none');
+    const lineNumber = page.locator('.cm-lineNumbers .cm-gutterElement').filter({ hasText: /^1$/ });
+    await lineNumber.click({ position: { x: 2, y: 8 } });
+    await expect(page.locator('.cm-foldPlaceholder')).toHaveCount(1);
+    await lineNumber.click({ position: { x: 2, y: 8 } });
+    await expect(page.locator('.cm-foldPlaceholder')).toHaveCount(0);
+    await focusedEditor.focus();
+    await page.screenshot({ path: `../../.codex-tmp/project-browser-focus-${mode}.png` });
     await expect(page.locator('.cm-content .ͼb, .cm-content .ͼd, .cm-content span[class]')).not.toHaveCount(0);
     await page.getByRole('button', { name: '全部折叠', exact: true }).click();
     await expect(page.locator('.cm-foldPlaceholder')).toHaveCount(1);

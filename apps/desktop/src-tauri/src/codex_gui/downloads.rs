@@ -151,6 +151,14 @@ pub(super) async fn open(
             Some(root) => root,
             None => volume_root(&options.path)?,
         };
+        super::local_file::validate(&options.path)?;
+        if root.join(&options.path).is_dir() {
+            let root = root.canonicalize().map_err(|_| GuiError::ProjectFiles)?;
+            let (file, name) =
+                super::project_entries::archive(&root, &options.path, options.max_bytes)
+                    .map_err(GuiError::ProjectEntry)?;
+            return streams.insert_archive(options.transfer_id, file, name);
+        }
         streams.insert_response(
             root,
             StreamOpen {

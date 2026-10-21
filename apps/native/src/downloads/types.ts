@@ -38,6 +38,7 @@ export interface DownloadConnection {
   cwd?: string;
   client: DownloadClient;
   files: FileClient;
+  projectBrowser?: import('../../../../shared/project-browser/protocol').ProjectBrowserClient;
 }
 export interface DownloadRequest {
   requestId: string;

@@ -23,4 +23,5 @@ export interface DownloadConnection {
   owner: string; deviceId: string; deviceName: string; ready: boolean; mode: ConnectionMode;
   threadId?: string; cwd?: string; client: DownloadClient; files: FileClient;
   git?: import('../../../../shared/remote-chat/gitTypes').GitClient;
+  projectBrowser?: import('../../../../shared/project-browser/protocol').ProjectBrowserClient;
 }

@@ -4,6 +4,7 @@ import { test, expect } from '@playwright/test';
 import type { BrowserHostMessage } from '../../../shared/project-browser/nativeBridge';
 import type { DocumentsSnapshot } from '../../../shared/project-browser/documents';
 import { browserRequest, browserRoot, savedFiles } from './project-browser-fixture';
+import { longPress } from './project-browser-touch';
 const require = createRequire(import.meta.url);
 const { handleBrowserRequest } = require('../../../shared/project-browser/nativeBridge') as
   typeof import('../../../shared/project-browser/nativeBridge');
@@ -44,6 +45,17 @@ test('bundled native editor: offline assets, mobile search/fold/save and close g
   });
   await page.route('**/native-browser.html', route => route.fulfill({ contentType: 'text/html', body: html }));
   await page.goto('/native-browser.html');
+  const folder = page.getByRole('treeitem', { name: 'src', exact: true });
+  await longPress(page, folder);
+  await expect(page.getByRole('menuitem', { name: '下载为 ZIP', exact: true })).toBeVisible();
+  await expect(folder).toHaveAttribute('aria-expanded', 'false');
+  await page.getByRole('menuitem', { name: '新建', exact: true }).click();
+  await page.getByRole('menuitem', { name: '新建文件夹', exact: true }).click();
+  await page.getByRole('textbox', { name: '名称', exact: true }).fill('native-folder');
+  await page.getByRole('button', { name: '确定', exact: true }).click();
+  await expect(page.getByRole('treeitem', { name: 'native-folder', exact: true })).toBeVisible();
+  // The create action expands its destination, so collapse it before the original navigation check.
+  await folder.click();
   await page.getByRole('treeitem', { name: 'src', exact: true }).click();
   await page.getByRole('treeitem', { name: 'main.ts', exact: true }).click();
   const editor = page.getByRole('textbox', { name: '文件内容', exact: true });

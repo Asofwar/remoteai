@@ -19,6 +19,17 @@ React 18 + Ant Design 5 + Vite 的静态多页官网。源码位于 `apps/websit
 WebP 和窄屏版本；小尺寸图片不会放大。跨设备和电脑助手使用代码绘制的流程示意，
 并在页面中标明“功能流程示意”。不包含真实用户的新录屏、凭据或虚构使用量。
 
+## 外观与首页展示
+
+官网默认使用深色主题，导航栏的太阳 / 月亮按钮可切换纯白主题。
+选择保存在 `remoteai-website-theme`，跨页面和语言保持一致，并同步到其他打开的标签页。
+`index.html` 在页面绘制前读取偏好；存储不可用时仍可切换当前页面，禁用 JavaScript 时默认深色。
+颜色集中在 `src/styles/theme.css`，页面和流程示意共用语义颜色变量。
+
+首页借鉴 Storybook 的标题、光晕和产品展示布局，保留 Remote AI 的品牌、内容与实际截图。
+`HomeShowcase` 提供四个产品预览，支持点击及方向键、Home / End 键切换；
+`HomeStories` 从已有功能资料组织图文介绍，详情页仍是完整的静态 HTML。
+
 ## 本地开发与检查
 
 在仓库根目录运行：
@@ -34,7 +45,8 @@ npm run test:website:e2e
 
 `check:website` 执行 TypeScript 检查、图片优化、客户端构建、React 静态渲染和
 导出验证。`test:website:e2e` 使用生产产物检查全部页面的 hydration、图片、
-导航、语言切换、手机布局与禁用 JavaScript 的访问，并保留视觉检查截图。
+导航、语言切换、手机布局与禁用 JavaScript 的访问，并保留黑白主题的视觉检查截图。
+外观测试还覆盖偏好记忆、跨标签同步、存储受限、React 加载前的纯白显示与演示区键盘操作。
 Windows 默认使用已安装的 Edge；CI 使用 Playwright Chromium。
 可设置 `WEBSITE_TEST_BROWSER` 覆盖浏览器 channel。
 

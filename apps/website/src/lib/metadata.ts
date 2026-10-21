@@ -111,7 +111,6 @@ export function renderHead(route: Route) {
     `<title>${escapeHtml(title)}</title>`,
     `<meta name="description" content="${escapeHtml(description)}">`,
     `<meta name="robots" content="${path === '404/' ? 'noindex, follow' : 'index, follow, max-image-preview:large'}">`,
-    '<meta name="theme-color" content="#274b39">',
     `<link rel="icon" type="image/png" href="${new URL('media/favicon.png', SITE_URL).pathname}">`,
     ...socialTags({ title, description, url, image, language }),
   ];

@@ -1,0 +1,132 @@
+.home-stories {
+  padding-block: 20px 40px;
+}
+.story-row {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  align-items: center;
+  gap: 75px;
+  padding-block: 80px;
+}
+.story-row + .story-row {
+  border-top: 1px solid var(--line);
+}
+.story-2 {
+  grid-template-columns: 1.15fr 0.85fr;
+}
+.story-2 .story-copy {
+  order: 2;
+}
+.story-copy .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--accent);
+}
+.story-copy .eyebrow span {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  width: 28px;
+  height: 28px;
+  font-size: 10px;
+  letter-spacing: 0;
+  border-radius: 7px;
+}
+.story-copy h2 {
+  font-size: clamp(28px, 3.2vw, 43px);
+}
+.story-copy > p:not(.eyebrow) {
+  color: var(--muted);
+  margin-top: 23px;
+  font-size: 15px;
+}
+.story-copy ul {
+  list-style: none;
+  margin: 25px 0 28px;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+.story-copy li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.story-copy li svg {
+  color: var(--accent);
+}
+.story-copy .text-link {
+  color: var(--accent);
+  font-size: 13px;
+}
+.story-visual {
+  display: block;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  transition:
+    border-color 0.2s,
+    transform 0.2s;
+}
+.story-visual:hover {
+  transform: translateY(-4px);
+  border-color: var(--line-hover);
+}
+.story-visual-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  font-size: 12px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+.story-visual img {
+  width: 100%;
+  height: auto;
+}
+.story-2 .eyebrow,
+.story-2 li svg,
+.story-2 .text-link {
+  color: var(--blue);
+}
+.story-3 .eyebrow,
+.story-3 li svg,
+.story-3 .text-link {
+  color: var(--green);
+}
+@media (max-width: 900px) {
+  .story-row {
+    gap: 30px;
+    padding-block: 60px;
+  }
+}
+@media (max-width: 640px) {
+  .home-stories {
+    padding-block: 0 10px;
+  }
+  .story-row {
+    grid-template-columns: 1fr;
+    gap: 30px;
+    padding-block: 50px;
+  }
+  .story-2 .story-copy {
+    order: 0;
+  }
+  .story-copy > p:not(.eyebrow) {
+    font-size: 14px;
+    margin-top: 18px;
+  }
+  .story-copy h2 {
+    font-size: 31px;
+  }
+  .story-copy ul {
+    gap: 11px;
+    margin-block: 22px;
+  }
+}

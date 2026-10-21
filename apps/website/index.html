@@ -3,6 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#09090b" />
+    <script>
+      // Apply the saved theme before styles paint; dark is also the no-JavaScript default.
+      try {
+        const theme = localStorage.getItem('remoteai-website-theme') === 'light' ? 'light' : 'dark';
+        document.documentElement.dataset.theme = theme;
+        document.querySelector('meta[name="theme-color"]').content = theme === 'light' ? '#ffffff' : '#09090b';
+      } catch {
+        // Storage can be blocked by browser privacy settings.
+      }
+    </script>
+    <noscript
+      ><style>
+        .theme-toggle,
+        .showcase-tabs {
+          display: none;
+        }
+      </style></noscript
+    >
     <!--site-head-->
   </head>
   <body>

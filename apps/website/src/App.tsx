@@ -37,10 +37,10 @@ export function App({ language, path }: Route) {
     <ConfigProvider
       theme={{
         token: {
-          colorPrimary: '#274b39',
-          colorText: '#19251e',
-          colorBgContainer: '#fff',
-          borderRadius: 9,
+          colorPrimary: '#e92f73',
+          colorText: '#f4f4f5',
+          colorBgContainer: '#151518',
+          borderRadius: 8,
           fontFamily: 'Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
           controlHeight: 40,
           controlHeightLG: 50,

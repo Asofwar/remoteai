@@ -1,26 +1,18 @@
-@media (max-width: 900px) {
+@media (max-width: 1000px) {
+  .hero-bottom {
+    display: block;
+  }
+  .hero-facts {
+    margin-top: 30px;
+  }
+  .hero h1 {
+    font-size: clamp(44px, 6.4vw, 68px);
+  }
   .section-heading {
     gap: 30px;
   }
   .section-heading > p {
     max-width: 280px;
-  }
-  .value-strip {
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 18px 30px;
-  }
-  .core-main {
-    padding: 28px;
-  }
-  .core-main h3 {
-    font-size: 27px;
-  }
-  .core-side .feature-card {
-    padding-left: 25px;
-  }
-  .core-side .icon-tile {
-    display: none;
   }
   .remote-inner {
     gap: 15px;
@@ -37,74 +29,46 @@
 }
 @media (max-width: 640px) {
   .hero {
-    padding-top: 52px;
-    padding-bottom: 28px;
+    padding-top: 48px;
+    padding-bottom: 30px;
   }
   .hero h1 {
-    font-size: clamp(34px, 8.8vw, 48px);
+    font-size: clamp(29px, 8vw, 48px);
     line-height: 1.3;
-    margin-top: 25px;
+    margin-block: 27px 22px;
   }
   .hero-description {
     font-size: 14px;
     margin-bottom: 25px;
   }
-  .hero-orbit {
-    width: 90px;
-    height: 90px;
-    top: 16px;
-    right: 10px;
-    opacity: 0.35;
-  }
   .hero-explore {
-    margin-top: 28px;
+    margin-top: 22px;
   }
-  .platform-caption {
+  .hero-facts {
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+  }
+  .hero-facts span {
+    font-size: 10px;
+  }
+  .hero-facts small {
     font-size: 9px;
-    gap: 8px;
+    margin-top: 7px;
+  }
+  .hero-facts svg {
+    width: 15px;
   }
   .hero .ant-btn-lg {
     padding-inline: 18px;
     font-size: 14px;
+    height: 46px;
   }
   .hero-badge {
     font-size: 10px;
   }
-  .workspace-stage {
-    padding: 14px 10px 12px;
-    border-radius: 12px;
-  }
-  .stage-heading {
-    margin-bottom: 12px;
-    font-size: 8px;
-  }
-  .stage-heading > span:last-child {
-    font-size: 6px;
-    letter-spacing: 0;
-  }
-  .stage-footer {
-    font-size: 8px;
-    margin-top: 11px;
-  }
-  .stage-footer span:last-child {
-    font-size: 7px;
-    letter-spacing: 0;
-  }
-  .value-strip {
-    padding: 22px 0;
-    gap: 16px 20px;
-    justify-content: flex-start;
-  }
-  .value-strip span {
-    font-size: 10px;
-    width: calc(50% - 10px);
-    gap: 6px;
-  }
-  .value-strip svg {
-    width: 13px;
-  }
   .section {
-    padding-block: 63px;
+    padding-block: 64px;
   }
   .section-heading {
     display: block;
@@ -114,19 +78,6 @@
     margin-top: 19px;
     max-width: 100%;
     font-size: 13px;
-  }
-  .core-grid {
-    grid-template-columns: 1fr;
-    gap: 15px;
-  }
-  .core-main h3 {
-    max-width: 300px;
-  }
-  .core-side .feature-card {
-    padding-left: 80px;
-  }
-  .core-side .icon-tile {
-    display: grid;
   }
   .remote-inner {
     grid-template-columns: 1fr;

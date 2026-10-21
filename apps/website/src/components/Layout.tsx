@@ -4,6 +4,7 @@ import { ArrowUpRight, Github, Languages, Menu } from 'lucide-react';
 import { copy } from '../content/copy';
 import type { Language } from '../content/types';
 import { asset, href, LINKS } from '../lib/site';
+import { ThemeToggle } from './ThemeToggle';
 
 interface LayoutProps {
   language: Language;
@@ -44,6 +45,7 @@ function Header({ language, path }: Omit<LayoutProps, 'children'>) {
           <Navigation language={language} path={path} />
         </nav>
         <div className="header-actions">
+          <ThemeToggle language={language} />
           <a
             className="language-link"
             href={href(otherLanguage, path === '404/' ? '' : path)}

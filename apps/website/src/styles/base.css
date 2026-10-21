@@ -1,16 +1,10 @@
 :root {
   font-family: Inter, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  color: #19251e;
-  background: #fafbf8;
+  color: var(--ink);
+  background: var(--paper);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  --ink: #19251e;
-  --muted: #667168;
-  --line: #dfe5dc;
-  --green: #274b39;
-  --lime: #d4ef91;
-  --paper: #fafbf8;
 }
 * {
   box-sizing: border-box;
@@ -39,12 +33,12 @@ summary {
 a:focus-visible,
 button:focus-visible,
 summary:focus-visible {
-  outline: 3px solid #60955c;
+  outline: 3px solid var(--accent);
   outline-offset: 5px;
 }
 ::selection {
-  background: #d4ef91;
-  color: #19251e;
+  background: var(--accent-strong);
+  color: #fff;
 }
 h1,
 h2,
@@ -55,7 +49,7 @@ figure {
 }
 h1,
 h2 {
-  font-weight: 600;
+  font-weight: 650;
   letter-spacing: -0.045em;
   white-space: pre-line;
   text-wrap: balance;
@@ -92,7 +86,7 @@ svg {
   font-size: 11px;
   letter-spacing: 0.15em;
   font-weight: 650;
-  color: #637064;
+  color: var(--accent);
   margin-bottom: 22px;
 }
 .text-link {
@@ -103,7 +97,7 @@ svg {
   font-weight: 600;
 }
 .text-link:hover {
-  color: #4d7945;
+  color: var(--accent);
 }
 .skip-link {
   position: fixed;
@@ -111,7 +105,8 @@ svg {
   left: 20px;
   z-index: 100;
   padding: 14px;
-  background: var(--lime);
+  background: var(--primary-bg);
+  color: var(--primary-ink);
 }
 .skip-link:focus {
   top: 12px;
@@ -120,9 +115,9 @@ svg {
   position: sticky;
   top: 0;
   z-index: 30;
-  background: rgb(250 251 248 / 94%);
+  background: var(--header);
   backdrop-filter: blur(16px);
-  border-bottom: 1px solid #e7ebe3;
+  border-bottom: 1px solid var(--line);
 }
 .header-inner {
   display: flex;
@@ -147,7 +142,7 @@ svg {
   align-items: center;
   margin-inline: auto;
   font-size: 14px;
-  color: #58645a;
+  color: var(--muted);
 }
 .desktop-nav a,
 .mobile-menu nav a {
@@ -157,12 +152,12 @@ svg {
 }
 .desktop-nav a:hover,
 .desktop-nav a[aria-current] {
-  color: #19251e;
+  color: var(--ink);
 }
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: 16px;
 }
 .language-link {
   display: flex;
@@ -181,7 +176,7 @@ svg {
   padding-inline: 24px;
 }
 .ant-btn-default {
-  border-color: #d4dcd1;
+  border-color: var(--line);
   background: transparent;
   box-shadow: none;
 }
@@ -208,11 +203,11 @@ svg {
   top: 70px;
   width: min(280px, calc(100vw - 40px));
   max-width: 400px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 15px;
-  box-shadow: 0 12px 40px #16211b12;
+  box-shadow: var(--shadow);
   display: grid;
   gap: 4px;
 }
@@ -223,7 +218,7 @@ svg {
 .site-footer {
   border-top: 1px solid var(--line);
   padding-top: 60px;
-  background: #f3f5ef;
+  background: var(--paper);
 }
 .footer-main {
   display: grid;
@@ -267,7 +262,7 @@ svg {
 .open-source-mark span {
   width: 6px;
   height: 6px;
-  background: #608658;
+  background: var(--green);
   border-radius: 50%;
 }
 .footer-bottom {
@@ -277,7 +272,7 @@ svg {
   gap: 14px;
   border-top: 1px solid var(--line);
   padding-block: 23px;
-  color: #737c70;
+  color: var(--subtle);
   font-size: 11px;
 }
 .closing-cta {
@@ -309,7 +304,7 @@ svg {
   top: 10%;
   font-size: 250px;
   font-weight: 200;
-  color: #eaf0df;
+  color: var(--line);
   z-index: -1;
 }
 .faq-section {
@@ -368,6 +363,21 @@ svg {
     grid-column: 1 / -1;
   }
 }
+@media (min-width: 641px) and (max-width: 780px) {
+  .header-inner {
+    gap: 16px;
+  }
+  .desktop-nav {
+    gap: 15px;
+    font-size: 12px;
+  }
+  .header-actions {
+    gap: 12px;
+  }
+  .header-download {
+    display: none;
+  }
+}
 @media (max-width: 640px) {
   .shell {
     padding-inline: 22px;
@@ -390,7 +400,10 @@ svg {
     display: none;
   }
   .header-actions {
-    gap: 12px;
+    gap: 8px;
+  }
+  .language-link > svg {
+    display: none;
   }
   .mobile-menu {
     display: block;

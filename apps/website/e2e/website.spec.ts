@@ -1,31 +1,35 @@
 import { expect, test, type Page } from '@playwright/test';
 import { basePath } from '../site.config.mjs';
 
-test('every exported page hydrates cleanly and every product image loads', async ({ page, request }) => {
-  const sitemap = await request.get(`${basePath}sitemap.xml`);
-  const paths = [...(await sitemap.text()).matchAll(/<loc>(.*?)<\/loc>/g)].map((match) => new URL(match[1]).pathname);
-  const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
-  page.on('console', (message) => {
-    if (message.type() === 'error') errors.push(message.text());
+for (const appearance of ['dark', 'light']) {
+  test(`every exported page hydrates and loads its images in ${appearance}`, async ({ page, request }) => {
+    await page.addInitScript((value) => localStorage.setItem('remoteai-website-theme', value), appearance);
+    const sitemap = await request.get(`${basePath}sitemap.xml`);
+    const paths = [...(await sitemap.text()).matchAll(/<loc>(.*?)<\/loc>/g)].map((match) => new URL(match[1]).pathname);
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    page.on('console', (message) => {
+      if (message.type() === 'error') errors.push(message.text());
+    });
+    for (const path of [...paths, `${basePath}404.html`]) {
+      await page.goto(path);
+      await expect(page.locator('h1')).toBeVisible();
+      // Long pages can have images outside the browser's lazy-loading distance.
+      await loadImages(page);
+      await expect
+        .poll(() =>
+          page
+            .locator('img')
+            .evaluateAll((images) =>
+              images.every((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0),
+            ),
+        )
+        .toBe(true);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    }
+    expect(errors).toEqual([]);
   });
-  for (const path of [...paths, `${basePath}404.html`]) {
-    await page.goto(path);
-    await expect(page.locator('h1')).toBeVisible();
-    await page.locator('footer').scrollIntoViewIfNeeded();
-    await expect
-      .poll(() =>
-        page
-          .locator('img')
-          .evaluateAll((images) =>
-            images.every((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0),
-          ),
-      )
-      .toBe(true);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  }
-  expect(errors).toEqual([]);
-});
+}
 
 test('navigation, feature filters, language switch and FAQ work', async ({ page }) => {
   await page.goto('./');
@@ -84,6 +88,7 @@ test('core content, FAQ and mobile navigation remain usable without JavaScript',
 test('capture desktop and mobile visual checkpoints', async ({ page }) => {
   await page.goto('./');
   await loadImages(page);
+  await page.screenshot({ path: 'test-results/home-desktop-viewport.png' });
   await page.screenshot({ path: 'test-results/home-desktop.png', fullPage: true });
   await page.goto('features/codex-gui/');
   await loadImages(page);
@@ -93,6 +98,14 @@ test('capture desktop and mobile visual checkpoints', async ({ page }) => {
   await loadImages(page);
   await page.screenshot({ path: 'test-results/home-mobile-viewport.png' });
   await page.screenshot({ path: 'test-results/home-mobile.png', fullPage: true });
+  await page.getByRole('button', { name: '切换纯白主题', exact: true }).click();
+  await page.screenshot({ path: 'test-results/home-white-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await loadImages(page);
+  await page.screenshot({ path: 'test-results/home-white-desktop-viewport.png' });
+  await page.screenshot({ path: 'test-results/home-white-desktop.png', fullPage: true });
+  await page.goto('features/remote-workspace/');
+  await page.screenshot({ path: 'test-results/feature-white-desktop.png', fullPage: true });
 });
 
 async function loadImages(page: Page) {

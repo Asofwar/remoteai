@@ -23,20 +23,12 @@ const zh = {
     contents: '本页内容',
   },
   home: {
-    eyebrow: 'OPEN SOURCE. OPEN POSSIBILITIES.',
     badge: '开源的 Codex 图形化工作台',
-    title: ['把想法变成现实。', '在你喜欢的屏幕上。'],
-    description: '与 AI 一起写代码、推进项目、管理模型。从电脑到浏览器和手机，让工作顺着你的节奏继续。',
+    title: ['想法，代码，下一步。', '都在一个工作台。'],
+    description: '用自然语言推进项目，把对话、模型和工具连在一起。从电脑到浏览器和手机，随时接着做。',
     platforms: 'Windows · macOS · Linux',
     explore: '看看它如何工作',
-    stageTitle: '你的项目，你的工作台。',
-    stageNote: 'CODEX GUI / 真实产品界面',
     pillars: ['自然语言编程', '跨设备继续任务', '账号与模型管理', 'Apache-2.0 开源'],
-    introLabel: 'ONE WORKSPACE. MORE POSSIBILITIES.',
-    introTitle: '从第一个想法，到下一次交付。',
-    introBody: '把零散的操作串成连贯的工作：提出目标，补充上下文，跟进执行，再看清每一处改动。',
-    coreTitle: '为专注而设计，\n为完整工作流而生。',
-    coreBody: '不止是一个聊天窗口。项目、工具、账号和用量，在同一个工作台里各就各位。',
     remoteLabel: 'PICK UP WHERE YOU LEFT OFF',
     remoteTitle: '离开书桌，\n不用离开思路。',
     remoteBody: '电脑运行项目，浏览器和手机连接工作区。换个屏幕查看进展，继续提出下一步要求。',
@@ -151,29 +143,19 @@ const en: typeof zh = {
     contents: 'On this page',
   },
   home: {
-    eyebrow: 'OPEN SOURCE. OPEN POSSIBILITIES.',
     badge: 'An open-source workspace for Codex',
-    title: ['Bring your ideas to life.', 'On your favorite screen.'],
+    title: ['Your ideas. Your code.', 'One connected workspace.'],
     description:
-      'Build with AI, move projects forward, and manage your models. From desktop to ' +
-      'browser and phone, keep work moving at your pace.',
+      'Build through conversation. Bring your projects, models, and tools together. ' +
+      'Pick up where you left off, from desktop to browser and phone.',
     platforms: 'Windows · macOS · Linux',
     explore: 'See how it works',
-    stageTitle: 'Your projects. Your workspace.',
-    stageNote: 'CODEX GUI / PRODUCT INTERFACE',
     pillars: [
       'Build through conversation',
       'Continue across devices',
       'Manage accounts & models',
       'Apache-2.0 open source',
     ],
-    introLabel: 'ONE WORKSPACE. MORE POSSIBILITIES.',
-    introTitle: 'From the first idea to the next delivery.',
-    introBody:
-      'Turn separate actions into a connected workflow: describe the goal, add context, ' +
-      'follow execution, and review the changes.',
-    coreTitle: 'Made for focus.\nBuilt for the whole workflow.',
-    coreBody: 'More than a conversation. Projects, tools, accounts, and usage each have a place in one workspace.',
     remoteLabel: 'PICK UP WHERE YOU LEFT OFF',
     remoteTitle: 'Leave the desk.\nKeep the momentum.',
     remoteBody:

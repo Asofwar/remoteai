@@ -8,7 +8,7 @@
 }
 .connection-art .orbit {
   position: absolute;
-  border: 1px solid #abc88a22;
+  border: 1px solid var(--line);
   border-radius: 50%;
   z-index: -1;
 }
@@ -23,14 +23,14 @@
 .connection-host {
   width: 88%;
   max-width: 400px;
-  background: #203d2d;
-  border: 1px solid #647e51;
+  background: var(--surface-raised);
+  border: 1px solid var(--line-hover);
   border-radius: 11px;
-  box-shadow: 0 20px 55px #0c1c1b40;
+  box-shadow: 0 20px 55px #0003;
   transform: rotate(-3deg);
 }
 .mini-window-bar {
-  border-bottom: 1px solid #425b36;
+  border-bottom: 1px solid var(--line);
   height: 32px;
   display: flex;
   align-items: center;
@@ -41,10 +41,10 @@
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: #739261;
+  background: var(--subtle);
 }
 .mini-window-bar b {
-  color: #b3c99e;
+  color: var(--muted);
   font-size: 9px;
   font-weight: 400;
   margin-left: auto;
@@ -52,17 +52,17 @@
 .connection-editor {
   display: flex;
   min-height: 180px;
-  color: #d9e7ca;
+  color: var(--ink);
 }
 .editor-sidebar {
   display: flex;
   align-items: center;
   flex-direction: column;
   padding: 21px 15px;
-  border-right: 1px solid #3f5734;
+  border-right: 1px solid var(--line);
   width: 58px;
   gap: 18px;
-  color: #a2ba85;
+  color: var(--accent);
 }
 .editor-sidebar svg {
   width: 17px;
@@ -70,7 +70,7 @@
 .editor-sidebar i {
   width: 14px;
   height: 3px;
-  background: #657c51;
+  background: var(--line-hover);
   border-radius: 2px;
 }
 .editor-code {
@@ -83,11 +83,11 @@
     monospace;
 }
 .editor-code em {
-  color: #c6e887;
+  color: var(--accent);
   font-style: normal;
 }
 .code-comment {
-  color: #98af82;
+  color: var(--subtle);
   margin-bottom: 14px;
 }
 .editor-status {
@@ -99,13 +99,13 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #c0d0ae;
+  color: var(--muted);
 }
 .editor-status > span {
   height: 5px;
   width: 5px;
   border-radius: 50%;
-  background: #cce995;
+  background: var(--green);
 }
 .device-node {
   position: absolute;
@@ -113,15 +113,15 @@
   align-items: center;
   gap: 12px;
   padding: 16px 20px;
-  border: 1px solid #678250;
-  background: #2c4732;
+  border: 1px solid var(--line-hover);
+  background: var(--surface-raised);
   border-radius: 12px;
-  color: #d6e7c4;
-  box-shadow: 0 12px 25px #0a1a1420;
+  color: var(--ink);
+  box-shadow: 0 12px 25px #0002;
   font-size: 11px;
 }
 .device-node > svg:last-child {
-  color: #c4e38b;
+  color: var(--blue);
 }
 .browser-node {
   left: 4%;
@@ -132,22 +132,22 @@
   right: 0;
   top: 44px;
   transform: rotate(7deg);
-  background: #d0e7a5;
-  color: #2f462a;
+  background: var(--surface-raised);
+  color: var(--ink);
 }
 .phone-node > svg:last-child {
-  color: #527634;
+  color: var(--blue);
 }
 .connection-label {
   position: absolute;
   bottom: 13px;
-  color: #b2c299;
+  color: var(--muted);
   font-size: 9px;
   letter-spacing: 0.03em;
 }
 .connection-label > span {
   display: inline-block;
-  background: #aac874;
+  background: var(--green);
   width: 4px;
   height: 4px;
   border-radius: 50%;
@@ -160,7 +160,7 @@
 }
 .computer-art {
   padding: 48px 20px 32px;
-  color: #dfebd3;
+  color: var(--ink);
   max-width: 880px;
   margin-inline: auto;
   text-align: center;
@@ -173,7 +173,7 @@
   font-size: 11px;
   letter-spacing: 0.12em;
   margin-bottom: 45px;
-  color: #b6d695;
+  color: var(--blue);
 }
 .computer-art-flow {
   display: grid;
@@ -187,8 +187,8 @@
   align-items: center;
   gap: 23px;
   padding: 30px 10px;
-  background: #2a4633;
-  border: 1px solid #526c40;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
   border-radius: 14px;
 }
 .computer-art-step:not(:last-child)::after {
@@ -196,10 +196,10 @@
   position: absolute;
   right: -27px;
   top: 45%;
-  color: #a6c57e;
+  color: var(--accent);
 }
 .computer-art-step > svg {
-  color: #c6e58f;
+  color: var(--accent);
 }
 .computer-art-step strong {
   font-size: 14px;
@@ -209,11 +209,11 @@
   align-self: flex-start;
   margin-left: 8px;
   font-size: 10px;
-  color: #a8bc96;
+  color: var(--subtle);
 }
 .computer-art > p {
   font-size: 11px;
-  color: #b4c6a4;
+  color: var(--muted);
   margin-top: 29px;
 }
 @media (max-width: 900px) {

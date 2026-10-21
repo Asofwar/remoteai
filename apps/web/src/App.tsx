@@ -266,7 +266,7 @@ function AppShell() {
   const [menuVisible, setMenuVisible] = usePanelVisibility('main-menu');
   const dispatch = useAppDispatch();
   const { session } = useAppSelector((state) => state.auth);
-  const { page, profile, devices, refreshing, lastRefreshAt, error } = useAppSelector((state) => state.data);
+  const { page, profile, devices, refreshing, error } = useAppSelector((state) => state.data);
   const lastRefreshRef = useRef(Date.now());
   const totpManager = useTotpVault(session);
   const onlineCount = devices.filter((item) => item.online).length;
@@ -276,10 +276,6 @@ function AppShell() {
     Toast.show({ icon: "fail", content: t(error) });
     dispatch(clearDataError());
   }, [dispatch, error]);
-
-  useEffect(() => {
-    if (session && lastRefreshAt === null) void dispatch(refreshAll());
-  }, [dispatch, lastRefreshAt, session]);
 
   useEffect(() => {
     if (!session) return;

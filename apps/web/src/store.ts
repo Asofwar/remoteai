@@ -258,6 +258,7 @@ const dataSlice = createSlice({
     .addCase(bootstrapApp.fulfilled, (state, action) => {
       state.loading = false;
       if (action.payload.data) Object.assign(state, action.payload.data);
+      state.lastRefreshAt = usageUpdatedAt(state.accounts);
       if ("error" in action.payload && action.payload.error) state.error = action.payload.error;
     })
     .addCase(bootstrapApp.rejected, (state, action) => {

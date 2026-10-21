@@ -17,7 +17,50 @@ test.beforeEach(async ({ page, request }) => {
   await expect(page.getByText('欢迎回来', { exact: true })).toBeHidden();
   await navigate(page, '账号');
   await expect(page.getByRole('button', { name: '批量刷新用量' })).toBeEnabled();
-  await request.post(`${fixture}/test/usage`, { data: {} });
+  expect(await operations(request)).toHaveLength(0);
+});
+
+test('loads cached usage on login and session restore without refreshing the PC', async ({ page, request }) => {
+  await expect(page.locator('.account-row-meter b').first()).toHaveText('57%');
+  const updatedAt = page.locator('.accounts-toolbar > span');
+  await expect(updatedAt).not.toContainText('未刷新');
+  const cachedTime = await updatedAt.innerText();
+  await page.reload();
+  await navigate(page, '账号');
+  await expect(page.locator('.account-row-meter b').first()).toHaveText('57%');
+  await expect(updatedAt).toHaveText(cachedTime);
+  await expect(page.getByRole('button', { name: '批量刷新用量' })).toBeEnabled();
+  expect(await operations(request)).toHaveLength(0);
+});
+
+test('restores a session without cached usage without refreshing the PC', async ({ page, request }) => {
+  await page.route('**/sync/accounts/web-summary', async route => {
+    const response = await route.fetch();
+    const data = await response.json() as { accounts: Array<{ usage: object }> };
+    await route.fulfill({ response, json: { ...data, accounts: data.accounts.map(account => ({
+      ...account, usage: { primary: null, secondary: null, fetchedAt: null },
+    })) } });
+  });
+  await page.reload();
+  await navigate(page, '账号');
+  await expect(page.locator('.account-row-meter b')).toHaveText(['--', '--', '--', '--']);
+  await expect(page.locator('.accounts-toolbar > span')).toContainText('未刷新');
+  await expect(page.getByRole('button', { name: '批量刷新用量' })).toBeEnabled();
+  expect(await operations(request)).toHaveLength(0);
+});
+
+test('waits for the configured interval before refreshing usage', async ({ page, request }) => {
+  await page.clock.install();
+  await page.evaluate(() => localStorage.setItem('codex-switch.web.refresh-minutes.v1', '2'));
+  await page.reload();
+  await navigate(page, '账号');
+  await expect(page.locator('.account-row-meter b').first()).toHaveText('57%');
+  await page.clock.fastForward(60_000);
+  expect(await operations(request)).toHaveLength(0);
+  await page.clock.fastForward(60_000);
+  await expect.poll(async () => (await operations(request)).length).toBe(4);
+  await expect(page.locator('.account-row-meter b').first()).toHaveText('64%');
+  expect((await operations(request)).every(item => item.action === 'refresh')).toBe(true);
 });
 
 test('refreshes all and individual usage on the PC without calling server usage APIs', async ({ page, request }, info) => {

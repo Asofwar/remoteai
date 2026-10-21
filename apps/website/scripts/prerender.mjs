@@ -12,10 +12,12 @@ if (!template.includes('<!--site-head-->') || !template.includes('<!--site-body-
   throw new Error('The build template is missing prerender placeholders.');
 }
 
+const languageTags = { zh: 'zh-CN', en: 'en', ru: 'ru' };
+
 function html(route) {
   const result = render(route);
   return template
-    .replace('lang="zh-CN"', `lang="${route.language === 'zh' ? 'zh-CN' : 'en'}"`)
+    .replace('lang="zh-CN"', `lang="${languageTags[route.language]}"`)
     .replace('<div id="root">', `<div id="root" data-language="${route.language}" data-path="${route.path}">`)
     .replace('<!--site-head-->', () => result.head)
     .replace('<!--site-body-->', () => result.body);

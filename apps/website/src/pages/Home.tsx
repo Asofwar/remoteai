@@ -4,6 +4,7 @@ import { copy, homeFaqs } from '../content/copy';
 import { features } from '../content/features';
 import type { Language } from '../content/types';
 import { href, LINKS } from '../lib/site';
+import { ui } from '../lib/ui-text';
 import { ClosingCta, Faq } from '../components/Shared';
 import { ConnectionIllustration } from '../components/ProductFigure';
 import { FeatureCard } from '../components/FeatureCard';
@@ -56,12 +57,8 @@ function DetailsSection({ language }: { language: Language }) {
       <div className="open-source-banner">
         <Github size={36} strokeWidth={1.4} aria-hidden="true" />
         <div>
-          <h3>{language === 'zh' ? '开放的代码，一起创造更多。' : 'Open code. Shared possibilities.'}</h3>
-          <p>
-            {language === 'zh'
-              ? '查看源码，提交反馈，或一起完善下一个版本。'
-              : 'Read the source, share feedback, or help shape the next release.'}
-          </p>
+          <h3>{ui(language, 'openCodeTitle')}</h3>
+          <p>{ui(language, 'openCodeBody')}</p>
         </div>
         <a className="text-link" href={LINKS.repository}>
           GitHub

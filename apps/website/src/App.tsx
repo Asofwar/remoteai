@@ -8,6 +8,7 @@ import { FeatureDetail } from './pages/FeatureDetail';
 import { Download } from './pages/Download';
 import { Guide } from './pages/Guide';
 import { href } from './lib/site';
+import { ui } from './lib/ui-text';
 
 export interface Route {
   language: Language;
@@ -24,9 +25,9 @@ function Page({ language, path }: Route) {
   return (
     <section className="shell not-found">
       <p className="eyebrow">404 / REMOTE AI</p>
-      <h1>{language === 'zh' ? '这一页，暂时找不到。' : 'This page could not be found.'}</h1>
+      <h1>{ui(language, 'notFoundTitle')}</h1>
       <a className="text-link" href={href(language)}>
-        {language === 'zh' ? '返回首页' : 'Return home'} ↗
+        {ui(language, 'returnHome')} ↗
       </a>
     </section>
   );

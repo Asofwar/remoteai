@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from "react";
-import { App as AntApp, Avatar, Button, Dropdown, Layout, Menu, Segmented, Space, Tooltip, Typography } from "antd";
+import { App as AntApp, Avatar, Button, Dropdown, Layout, Menu, Segmented, Select, Space, Tooltip, Typography } from "antd";
 import type { MenuProps } from "antd";
 import {
   Activity,
@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { LANGUAGE_OPTIONS, type Language, type TranslationKey } from "../../i18n";
 import { useI18n } from "../../i18n-context";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import type { MenuKey, Permission, Profile } from "../../types";
 import { getLatestAndroidApkUrl } from "../../utils/releaseDownloads";
 import "./AdminShell.css";
@@ -68,6 +69,10 @@ const menuLabelKeys: Record<MenuKey, TranslationKey> = {
   approvals: "nav.approvals",
 };
 
+// Matches the compact header block in styles.css: there is no room for
+// the full language Segmented next to the page title and the avatar.
+const COMPACT_HEADER_QUERY = "(max-width: 620px)";
+
 const menuPermissions: Record<MenuKey, Permission> = {
   chatTraffic: "admin.chat-traffic.read",
   dashboard: "admin.dashboard.read",
@@ -105,6 +110,7 @@ export function AdminShell({
 }: AdminShellProps) {
   const { message } = AntApp.useApp();
   const { language, setLanguage, t } = useI18n();
+  const compactHeader = useMediaQuery(COMPACT_HEADER_QUERY);
   const menuItems = useMemo<MenuProps["items"]>(() => {
     const permissions = new Set(profile?.permissions ?? []);
     const items = [
@@ -175,12 +181,22 @@ export function AdminShell({
           <div className="header-actions">
             <div className="language-control" aria-label={t("language.label")}>
               <Languages size={15} />
-              <Segmented
-                size="small"
-                value={language}
-                options={[...LANGUAGE_OPTIONS]}
-                onChange={(value) => setLanguage(value as Language)}
-              />
+              {compactHeader ? (
+                <Select
+                  size="small"
+                  value={language}
+                  options={[...LANGUAGE_OPTIONS]}
+                  aria-label={t("language.label")}
+                  onChange={(value) => setLanguage(value)}
+                />
+              ) : (
+                <Segmented
+                  size="small"
+                  value={language}
+                  options={[...LANGUAGE_OPTIONS]}
+                  onChange={(value) => setLanguage(value as Language)}
+                />
+              )}
             </div>
             <Tooltip title={dark ? t("header.lightTheme") : t("header.darkTheme")}>
               <Button

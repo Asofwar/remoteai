@@ -172,6 +172,15 @@
   padding-block: 85px;
   align-items: center;
 }
+.remote-copy {
+  min-width: 0;
+}
+/* A longer translated label wraps inside the button instead of widening the column. */
+.remote-copy .ant-btn {
+  height: auto;
+  min-height: 50px;
+  white-space: normal;
+}
 .remote-copy .eyebrow {
   color: var(--blue);
 }

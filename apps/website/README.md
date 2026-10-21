@@ -5,7 +5,7 @@ React 18 + Ant Design 5 + Vite 的静态多页官网。源码位于 `apps/websit
 
 ## 页面与内容
 
-- 中文和英文各 15 页，共 30 个可直接访问的页面。
+- 中文、英文和俄文各 15 页，共 45 个可直接访问的页面。中文位于根路径，英文和俄文分别位于 `en/` 和 `ru/`。
 - 首页、功能总览、下载页、快速上手指南。
 - 11 个独立功能页：Codex GUI、跨设备工作区、会话管理、多账号管理、
   Provider 与本地代理、Token 分析、Skills 与插件、电脑助手、
@@ -14,6 +14,9 @@ React 18 + Ant Design 5 + Vite 的静态多页官网。源码位于 `apps/websit
   常见问题、相关功能和仓库资料链接。
 - 功能文案位于 `src/content/features-*.ts`，通用文案位于 `src/content/copy.ts`。
   修改功能时同步维护中文和英文，核对该条目 `source` 指向的项目文档。
+- 俄文文案单独存放：通用文案在 `src/content/copy-ru.ts`，功能文案按 slug 存放在
+  `src/content/features-ru.ts`。俄文缺失的条目在页面中显示英文，构建时输出警告，不会阻止发布。
+- 导航、示意图和页面元信息中的短文案集中在 `src/lib/ui-text.ts`，每条包含中文、英文和俄文。
 
 配图复用 `docs/assets/codex-switch-*.png` 中的产品截图。构建时由 Sharp 生成
 WebP 和窄屏版本；小尺寸图片不会放大。跨设备和电脑助手使用代码绘制的流程示意，
@@ -93,7 +96,8 @@ Remove-Item Env:WEBSITE_URL
 - 每个地址都有完整静态 HTML，正文、步骤、FAQ 和导航不依赖客户端执行。
 - 服务端提取 Ant Design 样式，避免页面等待 JavaScript 才获得基本外观。
 - 使用语义标题、图片说明、内部链接、独立 title / description。
-- 输出 canonical、`zh-CN` / `en` / `x-default` hreflang、Open Graph 和 Twitter 元信息。
+- 输出 canonical、`zh-CN` / `en` / `ru` / `x-default` hreflang、Open Graph（含 `og:locale:alternate`）
+  和 Twitter 元信息。`x-default` 指向中文页面。
 - 结构化数据包含 WebSite、WebPage、SoftwareApplication、BreadcrumbList，
   以及与页面可见问答一致的 FAQPage。没有虚构评分、评论或价格。
 - 生成 `sitemap.xml`、`robots.txt`、每页 `index.md` 和聚合索引 `llms.txt`。

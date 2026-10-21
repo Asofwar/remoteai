@@ -11,9 +11,21 @@ const htmlFiles = urls.map((url) => ({
   url,
   html: readFileSync(resolve(dist, new URL(url).pathname.slice(basePath.length), 'index.html'), 'utf8'),
 }));
+const languageTags = { zh: 'zh-CN', en: 'en', ru: 'ru' };
+const prefixes = { zh: '', en: 'en/', ru: 'ru/' };
 
-test('exports both languages, every feature, and crawlable content without JavaScript', () => {
-  assert.equal(urls.length, 30);
+function pageLanguage(url) {
+  const path = new URL(url).pathname.slice(basePath.length);
+  if (path.startsWith('en/')) return { language: 'en', path: path.slice(3) };
+  if (path.startsWith('ru/')) return { language: 'ru', path: path.slice(3) };
+  return { language: 'zh', path };
+}
+
+test('exports every language, every feature, and crawlable content without JavaScript', () => {
+  assert.equal(urls.length, 45);
+  for (const language of Object.keys(languageTags)) {
+    assert.equal(urls.filter((url) => pageLanguage(url).language === language).length, 15, language);
+  }
   const titles = new Set();
   for (const { url, html } of htmlFiles) {
     assert.equal((html.match(/<h1\b/g) ?? []).length, 1, url);
@@ -26,9 +38,16 @@ test('exports both languages, every feature, and crawlable content without JavaS
     assert.ok(!titles.has(title), `Duplicate title: ${title}`);
     titles.add(title);
     assert.ok(html.includes(`rel="canonical" href="${url}"`), url);
-    assert.ok(html.includes('hreflang="zh-CN"') && html.includes('hreflang="en"'), url);
-    const english = new URL(url).pathname.slice(basePath.length).startsWith('en/');
-    assert.ok(html.includes(`<html lang="${english ? 'en' : 'zh-CN'}">`), url);
+    const { language, path } = pageLanguage(url);
+    for (const [other, tag] of Object.entries(languageTags)) {
+      const alternate = new URL(`${prefixes[other]}${path}`, siteUrl).href;
+      assert.ok(html.includes(`rel="alternate" hreflang="${tag}" href="${alternate}"`), `${url} ${tag}`);
+    }
+    assert.ok(html.includes(`rel="alternate" hreflang="x-default" href="${new URL(path, siteUrl).href}"`), url);
+    assert.ok(html.includes(`<html lang="${languageTags[language]}">`), url);
+    const locale = { zh: 'zh_CN', en: 'en_US', ru: 'ru_RU' }[language];
+    assert.ok(html.includes(`<meta property="og:locale" content="${locale}">`), url);
+    assert.equal((html.match(/property="og:locale:alternate"/g) ?? []).length, 2, url);
     const graphs = [...html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/g)];
     assert.equal(graphs.length, 1, url);
     assert.ok(
@@ -37,6 +56,27 @@ test('exports both languages, every feature, and crawlable content without JavaS
     );
     assert.ok(html.includes('data-css-hash'), `Missing prerendered Ant Design styles: ${url}`);
     assert.ok(!html.includes('css-dev-only-do-not-override'), `Server styles differ from the production client: ${url}`);
+  }
+});
+
+test('English and Russian pages never fall back to Chinese text', () => {
+  for (const { url, html } of htmlFiles.filter(({ url }) => pageLanguage(url).language !== 'zh')) {
+    // The language switch names Chinese in Chinese; nothing else on these pages may use Han characters.
+    const text = html.replace(/<a [^>]*hreflang="zh-CN"[^>]*>中文<\/a>/i, '');
+    assert.equal(text.match(/\p{Script=Han}+/u)?.[0], undefined, url);
+    const markdown = readFileSync(resolve(dist, new URL(url).pathname.slice(basePath.length), 'index.md'), 'utf8');
+    assert.equal(markdown.match(/\p{Script=Han}+/u)?.[0], undefined, `${url}index.md`);
+  }
+});
+
+test('the language switch links every page to the same page in the other languages', () => {
+  for (const { url, html } of htmlFiles) {
+    const { language, path } = pageLanguage(url);
+    const links = [...html.matchAll(/<a class="language-link" href="([^"]+)"/g)].map((match) => match[1]);
+    const expected = Object.keys(prefixes)
+      .filter((other) => other !== language)
+      .map((other) => `${basePath}${prefixes[other]}${path}`);
+    assert.deepEqual(links, expected, url);
   }
 });
 

@@ -701,10 +701,22 @@ body {
   }
 
   .app-header {
+    gap: 8px;
     padding: 0 12px;
   }
 
+  .app-header .brand-copy {
+    min-width: 0;
+  }
+
+  .app-header .brand-copy strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .header-actions {
+    flex-shrink: 0;
     gap: 6px;
   }
 
@@ -715,6 +727,10 @@ body {
 
   .language-control .ant-segmented {
     min-width: 96px;
+  }
+
+  .language-control .ant-select {
+    width: 96px;
   }
 
   .login-brand-row {

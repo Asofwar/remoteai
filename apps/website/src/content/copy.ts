@@ -1,3 +1,5 @@
+import { ru, ruHomeFaqs } from './copy-ru';
+import { withEnglishFallback } from './fallback';
 import type { Language } from './types';
 
 const zh = {
@@ -119,6 +121,8 @@ const zh = {
     text: '产品文本资料',
   },
 };
+
+export type SiteCopy = typeof zh;
 
 const en: typeof zh = {
   nav: { features: 'Features', guide: 'Guide', download: 'Download', github: 'GitHub', menu: 'Open navigation' },
@@ -278,7 +282,11 @@ const en: typeof zh = {
   },
 };
 
+// Russian copy lives in copy-ru.ts; anything it lacks falls back to English.
+const russian = withEnglishFallback(ru, en, 'copy');
+
 export function copy(language: Language) {
+  if (language === 'ru') return russian;
   return language === 'en' ? en : zh;
 }
 
@@ -335,4 +343,6 @@ export const homeFaqs = {
         'requirements.',
     },
   ],
+  ru: ruHomeFaqs,
 };
+homeFaqs.ru = withEnglishFallback(homeFaqs.ru, homeFaqs.en, 'homeFaqs');

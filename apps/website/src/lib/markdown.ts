@@ -1,6 +1,6 @@
 import type { Route } from '../App';
 import { copy, homeFaqs } from '../content/copy';
-import { features, findFeature } from '../content/features';
+import { featureContent, features, findFeature } from '../content/features';
 import { pageMetadata } from './metadata';
 import { pagePath, SITE_URL, sourceUrl, LINKS } from './site';
 
@@ -12,7 +12,7 @@ function featureText(route: Route) {
   const feature = findFeature(route.path.split('/')[1]);
   if (!feature) return '';
   const t = copy(route.language);
-  const content = feature[route.language];
+  const content = featureContent(feature, route.language);
   return [
     `## ${t.common.audience}\n\n${content.audience}`,
     ...content.sections.map(
@@ -51,11 +51,13 @@ export function renderMarkdown(route: Route) {
     );
   else
     sections.push(
-      ...features.map(
-        (feature) =>
-          `## ${feature[language].title}\n\n${feature[language].summary}\n\n` +
-          `[${t.common.learn}](${new URL(pagePath(language, `features/${feature.slug}/`), SITE_URL).href})`,
-      ),
+      ...features.map((feature) => {
+        const content = featureContent(feature, language);
+        return (
+          `## ${content.title}\n\n${content.summary}\n\n` +
+          `[${t.common.learn}](${new URL(pagePath(language, `features/${feature.slug}/`), SITE_URL).href})`
+        );
+      }),
       ...(path ? [] : [faqText(homeFaqs[language])]),
     );
   sections.push(`[GitHub](${LINKS.repository}) · [Apache-2.0](${LINKS.license})`);

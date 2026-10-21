@@ -1,4 +1,6 @@
-export type Language = 'zh' | 'en';
+export type Language = 'zh' | 'en' | 'ru';
+/** Languages stored next to each feature. Russian feature text lives in features-ru.ts. */
+export type SourceLanguage = Exclude<Language, 'ru'>;
 
 export interface FeatureSection {
   title: string;
@@ -22,7 +24,7 @@ export interface Feature {
   number: string;
   category: 'build' | 'connect' | 'manage' | 'personalize';
   image: string;
-  imageAlt: Record<Language, string>;
+  imageAlt: Record<SourceLanguage, string>;
   imageKind?: 'diagram' | 'compact';
   source: string;
   related: string[];

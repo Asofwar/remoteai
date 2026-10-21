@@ -1,9 +1,10 @@
 import { useState, type KeyboardEvent } from 'react';
 import { ArrowUpRight, Check, Command, LockKeyhole } from 'lucide-react';
 import { copy } from '../content/copy';
-import { features } from '../content/features';
+import { featureContent, featureImageAlt, features } from '../content/features';
 import type { Language } from '../content/types';
 import { href } from '../lib/site';
+import { ui } from '../lib/ui-text';
 import { ProductImage } from './ProductFigure';
 import { FeatureIcon } from './FeatureIcon';
 
@@ -33,7 +34,7 @@ export function HomeShowcase({ language }: { language: Language }) {
   const t = copy(language);
   return (
     <section id="workspace" className="workspace-section shell">
-      <div className="showcase-tabs" role="tablist" aria-label={language === 'zh' ? '产品演示' : 'Product preview'}>
+      <div className="showcase-tabs" role="tablist" aria-label={ui(language, 'showcaseTabs')}>
         {showcaseFeatures.map((item, index) => (
           <button
             key={item.slug}
@@ -47,7 +48,7 @@ export function HomeShowcase({ language }: { language: Language }) {
             onKeyDown={(event) => moveTab(event, setSelected)}
           >
             <FeatureIcon slug={item.slug} size={17} />
-            {item[language].title}
+            {featureContent(item, language).title}
           </button>
         ))}
       </div>
@@ -60,12 +61,12 @@ export function HomeShowcase({ language }: { language: Language }) {
               <i />
             </span>
             <span className="stage-address">
-              <LockKeyhole size={11} /> Remote AI / {feature[language].title}
+              <LockKeyhole size={11} /> Remote AI / {featureContent(feature, language).title}
             </span>
             <Command size={15} aria-hidden="true" />
           </div>
           <div className="stage-image">
-            <ProductImage name={feature.image} alt={feature.imageAlt[language]} priority />
+            <ProductImage name={feature.image} alt={featureImageAlt(feature, language)} priority />
           </div>
         </div>
         <div className="stage-footer">

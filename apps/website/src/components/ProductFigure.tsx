@@ -1,7 +1,9 @@
 import { Check, Command, Laptop, Monitor, MousePointer2, Smartphone, Terminal } from 'lucide-react';
 import { copy } from '../content/copy';
+import { featureImageAlt } from '../content/features';
 import type { Feature, Language } from '../content/types';
 import { asset } from '../lib/site';
+import { ui } from '../lib/ui-text';
 
 const dimensions: Record<string, [number, number]> = {
   'codex-gui': [1700, 925],
@@ -37,17 +39,8 @@ export function ProductImage({ name, alt, priority = false }: { name: string; al
 }
 
 export function ConnectionIllustration({ language }: { language: Language }) {
-  const zh = language === 'zh';
   return (
-    <div
-      className="connection-art"
-      role="img"
-      aria-label={
-        zh
-          ? '电脑运行项目，浏览器与手机连接同一工作区的示意图'
-          : 'A host computer connected to browser and mobile workspaces'
-      }
-    >
+    <div className="connection-art" role="img" aria-label={ui(language, 'connectionArt')}>
       <div className="orbit orbit-one" />
       <div className="orbit orbit-two" />
       <div className="connection-host">
@@ -73,34 +66,31 @@ export function ConnectionIllustration({ language }: { language: Language }) {
             <span>];</span>
             <div className="editor-status">
               <span />
-              {zh ? '项目在电脑上运行' : 'Running on your computer'}
+              {ui(language, 'connectionRunning')}
             </div>
           </div>
         </div>
       </div>
       <div className="device-node browser-node">
         <Laptop size={25} />
-        <span>{zh ? '浏览器' : 'Browser'}</span>
+        <span>{ui(language, 'connectionBrowser')}</span>
         <Check size={13} />
       </div>
       <div className="device-node phone-node">
         <Smartphone size={25} />
-        <span>{zh ? '移动端' : 'Mobile'}</span>
+        <span>{ui(language, 'connectionMobile')}</span>
         <Check size={13} />
       </div>
       <div className="connection-label">
         <span />
-        {zh ? '一个工作区，多种连接方式' : 'One workspace. More ways in.'}
+        {ui(language, 'connectionCaption')}
       </div>
     </div>
   );
 }
 
 function ComputerIllustration({ language }: { language: Language }) {
-  const labels =
-    language === 'zh'
-      ? ['描述目标', '查看与操作应用', '检查实际结果']
-      : ['Describe a goal', 'Inspect & operate', 'Check the result'];
+  const labels = [ui(language, 'computerGoal'), ui(language, 'computerOperate'), ui(language, 'computerCheck')];
   const icons = [Command, MousePointer2, Check];
   return (
     <div className="computer-art" role="img" aria-label={labels.join(' → ')}>
@@ -120,11 +110,7 @@ function ComputerIllustration({ language }: { language: Language }) {
           );
         })}
       </div>
-      <p>
-        {language === 'zh'
-          ? '清晰的目标 · 可见的过程 · 可核对的结果'
-          : 'A clear goal. Visible actions. Verifiable results.'}
-      </p>
+      <p>{ui(language, 'computerCaption')}</p>
     </div>
   );
 }
@@ -138,7 +124,7 @@ export function ProductFigure({
   language: Language;
   priority?: boolean;
 }) {
-  let content = <ProductImage name={feature.image} alt={feature.imageAlt[language]} priority={priority} />;
+  let content = <ProductImage name={feature.image} alt={featureImageAlt(feature, language)} priority={priority} />;
   if (feature.image === 'remote-workspace') content = <ConnectionIllustration language={language} />;
   if (feature.image === 'computer-use') content = <ComputerIllustration language={language} />;
   return (

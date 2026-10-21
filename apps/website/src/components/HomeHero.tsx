@@ -2,6 +2,7 @@ import { ArrowDown, ArrowUpRight, Code2, Monitor, Sparkles } from 'lucide-react'
 import { copy } from '../content/copy';
 import type { Language } from '../content/types';
 import { href } from '../lib/site';
+import { ui } from '../lib/ui-text';
 import { Actions } from './Shared';
 
 export function HomeHero({ language }: { language: Language }) {
@@ -23,18 +24,18 @@ export function HomeHero({ language }: { language: Language }) {
           <p className="hero-description">{t.home.description}</p>
           <Actions language={language} />
         </div>
-        <div className="hero-facts" aria-label={language === 'zh' ? '平台与协议' : 'Platforms and license'}>
+        <div className="hero-facts" aria-label={ui(language, 'heroFacts')}>
           <div>
             <Monitor size={19} />
             <span>
               {t.home.platforms}
-              <small>{language === 'zh' ? '桌面端' : 'Desktop'}</small>
+              <small>{ui(language, 'heroDesktop')}</small>
             </span>
           </div>
           <div>
             <Code2 size={19} />
             <span>
-              Apache-2.0<small>{language === 'zh' ? '开源，自由探索' : 'Open source. Yours to explore.'}</small>
+              Apache-2.0<small>{ui(language, 'heroOpenSource')}</small>
             </span>
           </div>
         </div>

@@ -159,12 +159,18 @@ svg {
   align-items: center;
   gap: 16px;
 }
-.language-link {
+.language-switch {
   display: flex;
-  gap: 7px;
+  gap: 10px;
   align-items: center;
   font-size: 12px;
   font-weight: 600;
+}
+.language-switch > svg {
+  margin-right: -3px;
+}
+.language-link {
+  padding-block: 6px;
 }
 .ant-btn {
   display: inline-flex;
@@ -402,7 +408,10 @@ svg {
   .header-actions {
     gap: 8px;
   }
-  .language-link > svg {
+  .language-switch {
+    gap: 8px;
+  }
+  .language-switch > svg {
     display: none;
   }
   .mobile-menu {

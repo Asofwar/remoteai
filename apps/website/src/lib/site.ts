@@ -11,8 +11,17 @@ export const LINKS = {
   issues: 'https://github.com/piperhex/remoteai/issues',
 };
 
+export const languages: Language[] = ['zh', 'en', 'ru'];
+/** BCP 47 tags for `<html lang>`, `hreflang` and structured data. */
+export const languageTags: Record<Language, string> = { zh: 'zh-CN', en: 'en', ru: 'ru' };
+
+export function isLanguage(value: unknown): value is Language {
+  return languages.includes(value as Language);
+}
+
 export function pagePath(language: Language, path = '') {
-  return `${language === 'en' ? 'en/' : ''}${path}`;
+  // Chinese is served from the site root; other languages use a prefix such as `en/`.
+  return `${language === 'zh' ? '' : `${language}/`}${path}`;
 }
 
 export function href(language: Language, path = '') {
@@ -29,9 +38,10 @@ export function sourceUrl(path: string) {
 
 export function readRoute(pathname: string) {
   const path = pathname.startsWith(BASE_PATH) ? pathname.slice(BASE_PATH.length) : '404/';
-  const language: Language = path.startsWith('en/') || path === 'en' ? 'en' : 'zh';
+  const language =
+    languages.find((item) => item !== 'zh' && (path === item || path.startsWith(`${item}/`))) ?? 'zh';
   const relative = path
-    .replace(/^en\/?/, '')
+    .slice(pagePath(language).length)
     .replace(/index\.html$/, '')
     .replace(/\/+$/, '');
   return { language, path: relative ? `${relative}/` : '' };

@@ -3,7 +3,8 @@ import { Button } from 'antd';
 import { ArrowUpRight, Github, Languages, Menu } from 'lucide-react';
 import { copy } from '../content/copy';
 import type { Language } from '../content/types';
-import { asset, href, LINKS } from '../lib/site';
+import { asset, href, languages, languageTags, LINKS } from '../lib/site';
+import { languageLabels, languageNames, ui } from '../lib/ui-text';
 import { ThemeToggle } from './ThemeToggle';
 
 interface LayoutProps {
@@ -31,7 +32,7 @@ function Navigation({ language, path }: Omit<LayoutProps, 'children'>) {
 
 function Header({ language, path }: Omit<LayoutProps, 'children'>) {
   const t = copy(language);
-  const otherLanguage = language === 'zh' ? 'en' : 'zh';
+  const target = path === '404/' ? '' : path;
   return (
     <header className="site-header">
       <div className="shell header-inner">
@@ -41,20 +42,28 @@ function Header({ language, path }: Omit<LayoutProps, 'children'>) {
             Remote<span className="brand-ai"> AI</span>
           </span>
         </a>
-        <nav className="desktop-nav" aria-label={language === 'zh' ? '主导航' : 'Main navigation'}>
+        <nav className="desktop-nav" aria-label={ui(language, 'mainNavigation')}>
           <Navigation language={language} path={path} />
         </nav>
         <div className="header-actions">
           <ThemeToggle language={language} />
-          <a
-            className="language-link"
-            href={href(otherLanguage, path === '404/' ? '' : path)}
-            lang={otherLanguage === 'zh' ? 'zh-CN' : 'en'}
-            hrefLang={otherLanguage === 'zh' ? 'zh-CN' : 'en'}
-          >
+          <div className="language-switch" role="group" aria-label={ui(language, 'languageSwitch')}>
             <Languages size={17} aria-hidden="true" />
-            {language === 'zh' ? 'EN' : '中文'}
-          </a>
+            {languages
+              .filter((other) => other !== language)
+              .map((other) => (
+                <a
+                  key={other}
+                  className="language-link"
+                  href={href(other, target)}
+                  lang={languageTags[other]}
+                  hrefLang={languageTags[other]}
+                  title={languageNames[other] === languageLabels[other] ? undefined : languageNames[other]}
+                >
+                  {languageLabels[other]}
+                </a>
+              ))}
+          </div>
           <Button className="header-download" type="primary" href={href(language, 'download/')}>
             {t.nav.download}
             <ArrowUpRight size={15} aria-hidden="true" />
@@ -63,7 +72,7 @@ function Header({ language, path }: Omit<LayoutProps, 'children'>) {
             <summary aria-label={t.nav.menu}>
               <Menu size={22} aria-hidden="true" />
             </summary>
-            <nav aria-label={language === 'zh' ? '移动导航' : 'Mobile navigation'}>
+            <nav aria-label={ui(language, 'mobileNavigation')}>
               <Navigation language={language} path={path} />
               <a href={href(language, 'download/')}>{t.nav.download}</a>
             </nav>

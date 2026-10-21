@@ -1,11 +1,16 @@
 import { App as AntApp, ConfigProvider, theme } from "antd";
+import type { ConfigProviderProps } from "antd";
 import enUS from "antd/locale/en_US";
+import ruRU from "antd/locale/ru_RU";
 import zhCN from "antd/locale/zh_CN";
 import { AdminConsole } from "./AdminConsole";
 import { PasswordResetPage } from "./pages/PasswordResetPage";
 import { I18nProvider } from "./i18n-context";
 import { useLanguage } from "./hooks/useLanguage";
 import { useThemeMode } from "./hooks/useThemeMode";
+import type { Language } from "./i18n";
+
+const antdLocales: Record<Language, ConfigProviderProps["locale"]> = { zh: zhCN, en: enUS, ru: ruRU };
 
 export function App() {
   const [dark, setDark] = useThemeMode();
@@ -14,7 +19,7 @@ export function App() {
 
   return (
     <ConfigProvider
-      locale={language === "zh" ? zhCN : enUS}
+      locale={antdLocales[language]}
       theme={{
         algorithm: dark ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: {

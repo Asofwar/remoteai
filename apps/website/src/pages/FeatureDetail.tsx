@@ -1,6 +1,6 @@
 import { ArrowLeft, ArrowUpRight, Check } from 'lucide-react';
 import { copy } from '../content/copy';
-import { features } from '../content/features';
+import { featureContent, features } from '../content/features';
 import type { Feature, Language } from '../content/types';
 import { href, sourceUrl } from '../lib/site';
 import { Actions, ClosingCta, Faq } from '../components/Shared';
@@ -10,7 +10,7 @@ import { FeatureCard } from '../components/FeatureCard';
 
 function FeatureBody({ feature, language }: { feature: Feature; language: Language }) {
   const t = copy(language);
-  const content = feature[language];
+  const content = featureContent(feature, language);
   return (
     <div className="feature-editorial">
       <aside className="feature-toc">
@@ -72,7 +72,7 @@ function FeatureBody({ feature, language }: { feature: Feature; language: Langua
 
 export function FeatureDetail({ feature, language }: { feature: Feature; language: Language }) {
   const t = copy(language);
-  const content = feature[language];
+  const content = featureContent(feature, language);
   const related = features.filter((item) => feature.related.includes(item.slug));
   return (
     <>

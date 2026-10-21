@@ -263,6 +263,7 @@
   border-radius: 15px;
   background: var(--surface);
   padding: 32px;
+  min-width: 0;
 }
 .download-card > svg {
   color: var(--accent);
@@ -288,6 +289,10 @@
   width: 100%;
   font-size: 13px;
   margin-top: 18px;
+  /* A longer translated label wraps inside the button instead of widening the card. */
+  height: auto;
+  min-height: 50px;
+  white-space: normal;
 }
 .download-availability {
   font-size: 11px;

@@ -1,4 +1,5 @@
 import { ArrowUpRight } from 'lucide-react';
+import { featureContent, featureImageAlt } from '../content/features';
 import type { Feature, Language } from '../content/types';
 import { href } from '../lib/site';
 import { FeatureIcon } from './FeatureIcon';
@@ -13,7 +14,7 @@ export function FeatureCard({
   language: Language;
   visual?: boolean;
 }) {
-  const content = feature[language];
+  const content = featureContent(feature, language);
   return (
     <a
       className={`feature-card ${visual ? 'feature-card-visual' : ''}`}
@@ -29,7 +30,7 @@ export function FeatureCard({
       <p>{content.summary}</p>
       {visual && !feature.imageKind && (
         <div className="feature-card-image">
-          <ProductImage name={feature.image} alt={feature.imageAlt[language]} />
+          <ProductImage name={feature.image} alt={featureImageAlt(feature, language)} />
         </div>
       )}
       <span className="card-number">/{feature.number}</span>

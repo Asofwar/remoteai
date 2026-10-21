@@ -1,32 +1,38 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, errorText } from "../api";
+import { ApiError, api, errorText } from "../api";
+import { msg, useT } from "../i18n";
 
 interface Progress { type?: string; stage?: string; completed?: number; total?: number }
 interface Job {
   status: "running" | "completed" | "failed" | "cancelled";
   events: { sequence: number; event: Progress }[]; error?: string;
 }
+/** Import progress as data: `label` is a Chinese source string, translated when it is rendered. */
+interface JobProgress { label: string; completed?: number; total?: number }
 
-const labels: Record<string, string> = {
-  parse: "正在读取文档", download: "正在读取网页", recognize: "正在识别内容", index: "正在整理知识",
+const stages: Record<string, string> = {
+  parse: msg("正在读取文档"), download: msg("正在读取网页"), recognize: msg("正在识别内容"), index: msg("正在整理知识"),
 };
+const stageLabel = (stage = "") =>
+  Object.prototype.hasOwnProperty.call(stages, stage) ? stages[stage] : msg("正在处理");
 
 export function useKnowledgeJob(options: {
   scope: string; onComplete: () => Promise<void>; onError: (error: string) => void;
 }) {
   const { scope, onComplete, onError } = options;
+  const t = useT();
   const storageKey = `coze-import-${scope}`;
   const [jobId, setJobId] = useState(() => sessionStorage.getItem(storageKey) ?? "");
   const [starting, setStarting] = useState(false);
-  const [progress, setProgress] = useState("");
+  const [progress, setProgress] = useState<JobProgress>();
   const pending = useRef(false);
   const start = useCallback(async (method: string, params: unknown) => {
     if (pending.current || jobId) return;
-    pending.current = true; setStarting(true); setProgress("正在准备导入"); onError("");
+    pending.current = true; setStarting(true); setProgress({ label: msg("正在准备导入") }); onError("");
     try {
       const result = await api<{ id: string }>(method, params);
       sessionStorage.setItem(storageKey, result.id); setJobId(result.id);
-    } catch (error) { onError(errorText(error)); setProgress(""); }
+    } catch (error) { onError(errorText(error)); setProgress(undefined); }
     finally { pending.current = false; setStarting(false); }
   }, [jobId, onError, storageKey]);
   useEffect(() => {
@@ -41,22 +47,22 @@ export function useKnowledgeJob(options: {
         for (const { sequence, event } of job.events) {
           after = sequence;
           if (event.type !== "progress") continue;
-          const count = event.total ? `（${event.completed ?? 0} / ${event.total}）` : "";
-          setProgress(`${labels[event.stage ?? ""] ?? "正在处理"}${count}`);
+          setProgress({ label: stageLabel(event.stage), completed: event.completed, total: event.total });
         }
         if (job.status === "running") { timer = setTimeout(() => void poll(), 500); return; }
         sessionStorage.removeItem(storageKey); setJobId("");
-        setProgress(job.status === "completed" ? "导入完成" : job.status === "cancelled" ? "已取消导入" : "");
-        if (job.status === "failed") onError(job.error || "导入未完成，请重试。");
+        setProgress(job.status === "completed" ? { label: msg("导入完成") }
+          : job.status === "cancelled" ? { label: msg("已取消导入") } : undefined);
+        // job.error is the untranslated Rust message; the panel translates errors when it renders them.
+        if (job.status === "failed") onError(job.error || msg("导入未完成，请重试。"));
         if (job.status === "completed") await onComplete();
       } catch (error) {
         if (!active) return;
-        const message = errorText(error);
-        if (message.includes("未找到这项内容")) {
-          sessionStorage.removeItem(storageKey); setJobId(""); setProgress("");
-          onError("上次导入已结束或连接已重启，请检查文档列表。"); return;
+        if (error instanceof ApiError && error.status === 404) {
+          sessionStorage.removeItem(storageKey); setJobId(""); setProgress(undefined);
+          onError(msg("上次导入已结束或连接已重启，请检查文档列表。")); return;
         }
-        onError(message);
+        onError(errorText(error));
         timer = setTimeout(() => void poll(), 2000);
       }
     };
@@ -65,8 +71,12 @@ export function useKnowledgeJob(options: {
   }, [jobId, onComplete, onError, storageKey]);
   const cancel = async () => {
     if (!jobId) return;
-    try { await api("job_cancel", { id: jobId }); setProgress("正在取消导入"); }
+    try { await api("job_cancel", { id: jobId }); setProgress({ label: msg("正在取消导入") }); }
     catch (error) { onError(errorText(error)); }
   };
-  return { busy: starting || Boolean(jobId), progress, start, cancel, cancellable: Boolean(jobId) };
+  const label = progress ? t(progress.label) : "";
+  const text = progress?.total
+    ? t("{stage}（{completed} / {total}）", { stage: label, completed: progress.completed ?? 0, total: progress.total })
+    : label;
+  return { busy: starting || Boolean(jobId), progress: text, start, cancel, cancellable: Boolean(jobId) };
 }

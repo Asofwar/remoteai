@@ -18,6 +18,9 @@ on:
   pull_request:
     paths:
       - "apps/coze/**"
+      - "shared/coze/**"
+      - "shared/i18n/language.ts"
+      - "shared/i18n/testLocale.ts"
       - "package-lock.json"
       - "scripts/*coze*"
       - ".github/workflows/coze-runtime.yml"

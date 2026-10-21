@@ -17,6 +17,16 @@ export const cozeEnglish: Readonly<Record<string, string>> = {
     'Download Coze to get started. Then use it on this computer and make your tools available to Codex GUI.',
   '打开 Coze': 'Open Coze',
   '下载并开始使用': 'Download and get started',
+  // Desktop runtime errors (apps/desktop/src-tauri/src/coze/mod.rs).
+  'Coze 正在准备中，请稍候。': 'Preparing Coze. Please wait.',
+  '请先下载 Coze，再开始使用。': 'Download Coze before you start.',
+  'Coze 下载未完成，请检查网络后重试。': 'The Coze download did not finish. Check your network and try again.',
+  '下载内容未通过验证，请重新下载。': 'The download failed verification. Download it again.',
+  '无法保存 Coze，请检查磁盘空间后重试。': 'Could not save Coze. Check disk space and try again.',
+  'Coze 未能启动，请重试。': 'Could not start Coze. Please try again.',
+  '当前设备暂不支持 Coze。': 'Coze is not supported on this device yet.',
+  '已有其他同名工具，请先在设置中移除或重命名后重试。':
+    'Another tool has the same name. Remove or rename it in settings, then try again.',
 };
 
 export const cozeRussian: Readonly<Record<string, string>> = {
@@ -38,4 +48,14 @@ export const cozeRussian: Readonly<Record<string, string>> = {
     'Скачайте Coze, чтобы работать на этом компьютере и подключать свои инструменты к Codex GUI.',
   '打开 Coze': 'Открыть Coze',
   '下载并开始使用': 'Скачать и начать',
+  // Desktop runtime errors (apps/desktop/src-tauri/src/coze/mod.rs).
+  'Coze 正在准备中，请稍候。': 'Идёт подготовка Coze. Подождите.',
+  '请先下载 Coze，再开始使用。': 'Сначала скачайте Coze.',
+  'Coze 下载未完成，请检查网络后重试。': 'Не удалось скачать Coze. Проверьте подключение к сети и повторите попытку.',
+  '下载内容未通过验证，请重新下载。': 'Загруженные данные не прошли проверку. Скачайте их заново.',
+  '无法保存 Coze，请检查磁盘空间后重试。': 'Не удалось сохранить Coze. Проверьте место на диске и повторите попытку.',
+  'Coze 未能启动，请重试。': 'Не удалось запустить Coze. Повторите попытку.',
+  '当前设备暂不支持 Coze。': 'Coze пока не поддерживается на этом устройстве.',
+  '已有其他同名工具，请先在设置中移除或重命名后重试。':
+    'Уже есть другой инструмент с таким именем. Удалите или переименуйте его в настройках и повторите попытку.',
 };

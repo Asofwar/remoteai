@@ -12,6 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const FORMAT: &str = "remoteai-coze-template";
 const MAX_ITEMS: usize = 128;
+const BUILTIN_ID: &str = "builtin-knowledge-assistant";
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -114,8 +115,14 @@ pub fn list(db: &Database) -> Result<Value> {
 }
 
 pub fn get(db: &Database, id: &str) -> Result<Bundle> {
-    if id == "builtin-knowledge-assistant" {
-        return builtin();
+    get_localized(db, id, None)
+}
+
+/// Reads a template. `language` (`zh`, `en` or `ru`) only selects the copy of the built-in
+/// template; saved templates are user data and stay as saved. Unknown values mean Chinese.
+pub fn get_localized(db: &Database, id: &str, language: Option<&str>) -> Result<Bundle> {
+    if id == BUILTIN_ID {
+        return builtin(language);
     }
     validate_id(id)?;
     let body: String = db
@@ -129,7 +136,13 @@ pub fn get(db: &Database, id: &str) -> Result<Bundle> {
 }
 
 pub fn install(db: &Database, id: &str) -> Result<Value> {
-    let mut bundle = get(db, id)?;
+    install_localized(db, id, None)
+}
+
+/// Installs a template; `language` picks the built-in template's names, descriptions and
+/// prompt as in [`get_localized`]. Installed resources are user data and never re-translated.
+pub fn install_localized(db: &Database, id: &str, language: Option<&str>) -> Result<Value> {
+    let mut bundle = get_localized(db, id, language)?;
     validate(&bundle)?;
     let mapping: BTreeMap<_, _> = bundle
         .resources
@@ -261,17 +274,79 @@ fn builtin_entries() -> Vec<Value> {
     ]
 }
 
-fn builtin() -> Result<Bundle> {
-    serde_json::from_value(json!({"format":FORMAT,"version":1,"name":"知识问答助手",
-        "description":"回答资料中的问题，附上引用。","entryId":"00000000-0000-4000-8000-000000000003",
+/// Names, descriptions and the agent prompt of the built-in template in one language.
+/// Installing copies them into the user's resources, so they are localized once, at install.
+struct BuiltinCopy {
+    name: &'static str,
+    description: &'static str,
+    knowledge_name: &'static str,
+    knowledge_description: &'static str,
+    agent_name: &'static str,
+    agent_description: &'static str,
+    agent_prompt: &'static str,
+    app_name: &'static str,
+    app_description: &'static str,
+}
+
+const BUILTIN_ZH: BuiltinCopy = BuiltinCopy {
+    name: "知识问答助手",
+    description: "回答资料中的问题，附上引用。",
+    knowledge_name: "问答资料",
+    knowledge_description: "导入助手需要参考的资料。",
+    agent_name: "资料助手",
+    agent_description: "从资料库回答问题。",
+    agent_prompt: "根据资料回答问题并引用出处。没有依据时请说明。",
+    app_name: "知识问答应用",
+    app_description: "包含资料库和问答助手。",
+};
+
+const BUILTIN_EN: BuiltinCopy = BuiltinCopy {
+    name: "Knowledge Q&A assistant",
+    description: "Answers questions from your materials with citations.",
+    knowledge_name: "Q&A materials",
+    knowledge_description: "Import the materials the assistant should refer to.",
+    agent_name: "Materials assistant",
+    agent_description: "Answers questions from the knowledge base.",
+    agent_prompt: "Answer questions based on the materials and cite your sources. \
+        If the materials don't support an answer, say so.",
+    app_name: "Knowledge Q&A app",
+    app_description: "Includes the knowledge base and the Q&A assistant.",
+};
+
+const BUILTIN_RU: BuiltinCopy = BuiltinCopy {
+    name: "Помощник по базе знаний",
+    description: "Отвечает на вопросы по материалам и приводит ссылки на источники.",
+    knowledge_name: "Материалы для ответов",
+    knowledge_description: "Импортируйте материалы, на которые будет опираться помощник.",
+    agent_name: "Помощник по материалам",
+    agent_description: "Отвечает на вопросы по базе знаний.",
+    agent_prompt: "Отвечайте на вопросы по материалам и указывайте источники. \
+        Если в материалах нет ответа, сообщите об этом.",
+    app_name: "Приложение для ответов по базе знаний",
+    app_description: "Включает базу знаний и помощника для ответов на вопросы.",
+};
+
+/// `en` and `ru` select a translation; anything else, including no language, keeps Chinese.
+fn builtin_copy(language: Option<&str>) -> &'static BuiltinCopy {
+    match language {
+        Some("en") => &BUILTIN_EN,
+        Some("ru") => &BUILTIN_RU,
+        _ => &BUILTIN_ZH,
+    }
+}
+
+fn builtin(language: Option<&str>) -> Result<Bundle> {
+    let copy = builtin_copy(language);
+    serde_json::from_value(json!({"format":FORMAT,"version":1,"name":copy.name,
+        "description":copy.description,"entryId":"00000000-0000-4000-8000-000000000003",
         "resources":[
-            {"id":"00000000-0000-4000-8000-000000000001","kind":"knowledge","name":"问答资料",
-                "description":"导入助手需要参考的资料。","draft":{}},
-            {"id":"00000000-0000-4000-8000-000000000002","kind":"agent","name":"资料助手",
-                "description":"从资料库回答问题。","draft":{"model":"","prompt":"根据资料回答问题并引用出处。没有依据时请说明。",
+            {"id":"00000000-0000-4000-8000-000000000001","kind":"knowledge","name":copy.knowledge_name,
+                "description":copy.knowledge_description,"draft":{}},
+            {"id":"00000000-0000-4000-8000-000000000002","kind":"agent","name":copy.agent_name,
+                "description":copy.agent_description,"draft":{"model":"","prompt":copy.agent_prompt,
                     "knowledgeIds":["00000000-0000-4000-8000-000000000001"],"temperature":0.3}},
-            {"id":"00000000-0000-4000-8000-000000000003","kind":"app","name":"知识问答应用",
-                "description":"包含资料库和问答助手。","draft":{"entryId":"00000000-0000-4000-8000-000000000002",
+            {"id":"00000000-0000-4000-8000-000000000003","kind":"app","name":copy.app_name,
+                "description":copy.app_description,"draft":{"entryId":"00000000-0000-4000-8000-000000000002",
                     "resourceIds":["00000000-0000-4000-8000-000000000001","00000000-0000-4000-8000-000000000002"]}}
         ]})).map_err(|_| Error::Invalid)
 }
@@ -328,6 +403,112 @@ mod tests {
         let imported = save(&db, bundle)?;
         install(&db, imported["id"].as_str().ok_or(Error::Invalid)?)?;
         assert_eq!(resources::list(&db)?.len(), 9);
+        Ok(())
+    }
+
+    fn has_han(text: &str) -> bool {
+        text.chars().any(|c| {
+            matches!(c, '\u{3000}'..='\u{303f}' | '\u{3400}'..='\u{4dbf}'
+                | '\u{4e00}'..='\u{9fff}' | '\u{ff00}'..='\u{ffef}')
+        })
+    }
+
+    /// Drops the localized texts so only ids, kinds and drafts remain.
+    fn without_copy(mut value: Value) -> Value {
+        if let Some(object) = value.as_object_mut() {
+            object.remove("name");
+            object.remove("description");
+            object.remove("prompt");
+            for child in object.values_mut() {
+                *child = without_copy(child.take());
+            }
+        } else if let Some(items) = value.as_array_mut() {
+            for child in items {
+                *child = without_copy(child.take());
+            }
+        }
+        value
+    }
+
+    #[test]
+    fn builtin_template_keeps_the_chinese_copy_without_a_known_language() -> Result<()> {
+        let original: Bundle = serde_json::from_value(json!({"format":FORMAT,"version":1,"name":"知识问答助手",
+            "description":"回答资料中的问题，附上引用。","entryId":"00000000-0000-4000-8000-000000000003",
+            "resources":[
+                {"id":"00000000-0000-4000-8000-000000000001","kind":"knowledge","name":"问答资料",
+                    "description":"导入助手需要参考的资料。","draft":{}},
+                {"id":"00000000-0000-4000-8000-000000000002","kind":"agent","name":"资料助手",
+                    "description":"从资料库回答问题。","draft":{"model":"","prompt":"根据资料回答问题并引用出处。没有依据时请说明。",
+                        "knowledgeIds":["00000000-0000-4000-8000-000000000001"],"temperature":0.3}},
+                {"id":"00000000-0000-4000-8000-000000000003","kind":"app","name":"知识问答应用",
+                    "description":"包含资料库和问答助手。","draft":{"entryId":"00000000-0000-4000-8000-000000000002",
+                        "resourceIds":["00000000-0000-4000-8000-000000000001","00000000-0000-4000-8000-000000000002"]}}
+            ]}))
+        .map_err(|_| Error::Invalid)?;
+        let expected = json!(original).to_string();
+        for language in [None, Some("zh"), Some(""), Some("RU"), Some("fr")] {
+            assert_eq!(
+                json!(builtin(language)?).to_string(),
+                expected,
+                "{language:?}"
+            );
+        }
+        let temp = tempfile::tempdir()?;
+        let db = Database::open(temp.path())?;
+        assert_eq!(json!(get(&db, BUILTIN_ID)?).to_string(), expected);
+        Ok(())
+    }
+
+    #[test]
+    fn builtin_template_is_translated_for_english_and_russian() -> Result<()> {
+        let chinese = without_copy(json!(builtin(None)?));
+        for language in ["en", "ru"] {
+            let bundle = builtin(Some(language))?;
+            validate(&bundle)?;
+            let text = json!(bundle).to_string();
+            assert!(!has_han(&text), "{language}: {text}");
+            assert_eq!(without_copy(json!(bundle)), chinese, "{language}");
+            let copy = builtin_copy(Some(language));
+            for field in [copy.agent_prompt, copy.description, copy.app_description] {
+                assert!(
+                    !field.contains(['\r', '\n']) && !field.contains("  "),
+                    "{field:?}"
+                );
+            }
+        }
+        assert_ne!(
+            json!(builtin(Some("en"))?).to_string(),
+            json!(builtin(Some("ru"))?).to_string()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn localized_install_stores_the_translated_copy() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let db = Database::open(temp.path())?;
+        let installed = install_localized(&db, BUILTIN_ID, Some("ru"))?;
+        let app = resources::get(&db, installed["entryId"].as_str().ok_or(Error::Invalid)?)?;
+        assert_eq!(app.name, BUILTIN_RU.app_name);
+        assert_eq!(app.description, BUILTIN_RU.app_description);
+        let agent_id = app.draft["entryId"].as_str().ok_or(Error::Invalid)?;
+        let agent = resources::get(&db, agent_id)?;
+        assert_eq!(agent.name, BUILTIN_RU.agent_name);
+        assert_eq!(agent.draft["prompt"], BUILTIN_RU.agent_prompt);
+        let knowledge_id = agent.draft["knowledgeIds"][0]
+            .as_str()
+            .ok_or(Error::Invalid)?;
+        assert_eq!(
+            resources::get(&db, knowledge_id)?.name,
+            BUILTIN_RU.knowledge_name
+        );
+        assert!(resources::list(&db)?
+            .iter()
+            .all(|resource| !has_han(&resource.name) && !has_han(&resource.description)));
+        assert_eq!(
+            get_localized(&db, BUILTIN_ID, Some("en"))?.name,
+            BUILTIN_EN.name
+        );
         Ok(())
     }
 }

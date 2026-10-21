@@ -119,11 +119,16 @@ pub enum Command {
     ExportTemplate {
         id: String,
     },
+    /// `language` (`zh`, `en`, `ru`) only localizes the built-in template; it is optional.
     GetTemplate {
         id: String,
+        #[serde(default)]
+        language: Option<String>,
     },
     InstallTemplate {
         id: String,
+        #[serde(default)]
+        language: Option<String>,
     },
     DeleteTemplate {
         id: String,
@@ -261,8 +266,14 @@ fn dispatch_inner(services: &Services, command: Command) -> Result<Value> {
         Command::ListTemplates => crate::catalog::list(db),
         Command::SaveTemplate(bundle) => crate::catalog::save(db, bundle),
         Command::ExportTemplate { id } => Ok(json!(crate::catalog::export(db, &id)?)),
-        Command::GetTemplate { id } => Ok(json!(crate::catalog::get(db, &id)?)),
-        Command::InstallTemplate { id } => crate::catalog::install(db, &id),
+        Command::GetTemplate { id, language } => Ok(json!(crate::catalog::get_localized(
+            db,
+            &id,
+            language.as_deref()
+        )?)),
+        Command::InstallTemplate { id, language } => {
+            crate::catalog::install_localized(db, &id, language.as_deref())
+        }
         Command::DeleteTemplate { id } => {
             crate::catalog::delete(db, &id)?;
             Ok(json!({}))
@@ -370,5 +381,37 @@ fn table_command(db: &Database, command: Command) -> Result<Value> {
         } => crate::tables::write(db, &table_id, id.as_deref(), value),
         Command::DeleteTableRow { table_id, id } => crate::tables::delete(db, &table_id, &id),
         _ => Err(Error::Invalid),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn command(value: Value) -> Option<Command> {
+        serde_json::from_value(value).ok()
+    }
+
+    #[test]
+    fn template_commands_accept_an_optional_language() {
+        assert!(matches!(
+            command(json!({"method":"install_template","params":{"id":"x"}})),
+            Some(Command::InstallTemplate { id, language: None }) if id == "x"
+        ));
+        assert!(matches!(
+            command(json!({"method":"install_template","params":{"id":"x","language":"ru"}})),
+            Some(Command::InstallTemplate { language: Some(language), .. }) if language == "ru"
+        ));
+        assert!(matches!(
+            command(json!({"method":"get_template","params":{"id":"x","language":null}})),
+            Some(Command::GetTemplate { language: None, .. })
+        ));
+        assert!(matches!(
+            command(json!({"method":"get_template","params":{"id":"x","language":"en"}})),
+            Some(Command::GetTemplate { language: Some(language), .. }) if language == "en"
+        ));
+        assert!(
+            command(json!({"method":"install_template","params":{"id":"x","lang":"ru"}})).is_none()
+        );
     }
 }

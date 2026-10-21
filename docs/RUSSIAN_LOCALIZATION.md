@@ -18,6 +18,17 @@ The review of `bbbc02617b7c4bf8c7cbfcea58ffa1bfe579ad62` also fixes inherited-pr
 - Use guiText/t only for application copy, never user or assistant content. Subscribe rendered consumers to language changes; do not use translated values as protocol identifiers or state comparisons.
 - Preserve boundary spaces in fragments, and prefer complete messages with placeholders. Interpolate once so user values containing braces or replacement tokens stay intact.
 
+### Coze editor
+
+The Coze editor (`apps/coze/ui`) ships in the separately signed Coze runtime package, not in the desktop app. It has its own dictionaries and does not import the shared ones: they are large, and some short shared keys mean something else in Coze (`应用` is "Apply" there, but "App" in Coze).
+
+- Dictionaries: `apps/coze/ui/src/i18n/en/<area>.ts` and `apps/coze/ui/src/i18n/ru/<area>.ts`, keyed by the Chinese source string. `i18n/index.ts` merges them with `import.meta.glob`, so a new area needs no aggregator edit. Resource kind names with their plural and gender forms are in `i18n/kinds.ts`. Chinese output is the source text itself.
+- Wrap copy in `t()`. Use `msg()` for Chinese text that is stored now and translated where it is displayed (error state, constants), and `verbatim()` for protocol values and classifier patterns. Rust runtime messages reach the editor in Chinese and are translated at render time; `api()` and `errorText()` never translate. Default data (node names, prompts, sample values) is localized once, when it is created.
+- `i18n/coverage.test.ts` requires en and ru entries for every `t()` and `msg()` literal, matching placeholders, no Han characters in translations and no Chinese literal outside `t()`, `msg()` or `verbatim()`. Coze unit tests run in the zh-CN locale (`shared/i18n/testLocale.ts`).
+- Language source: the runtime serves the editor on a new random port at each start, so browser storage in the editor does not persist. The desktop appends `lang=<zh|en|ru>` to the iframe URL fragment once per runtime URL, and the editor keeps it in sessionStorage `coze-language`. Live changes arrive in the `language` field of the `remoteai:coze:state` bridge message (`CozeDesktopState` in `shared/coze/desktopBridge.ts`), so the iframe does not reload and drafts survive. Without either (access links opened in a browser, older desktop builds), `deviceLanguage()` decides: Chinese locales get Chinese, all others English. The antd locale and the document language follow the selected language.
+- Release: editor and Rust changes reach users only with a new signed Coze runtime release. Bump `apps/coze/Cargo.toml`, `apps/coze/Cargo.lock`, `apps/coze/package.json` and `apps/coze/runtime.json` together (tag `coze-v<version>`), publish the release with `.github/workflows/coze-runtime.yml`, and ship a desktop build that embeds the new `runtime.json`. Until then, desktop builds download `coze-v0.2.2`, whose editor is Chinese only. Older runtimes ignore the `lang` fragment parameter and the extra bridge field.
+- Verification: in `apps/coze`, run `npx vitest run` and `npx tsc -p ui/tsconfig.json --noEmit`; run the Playwright specs with `npm run test:e2e -w @codex-switch/coze`. The Coze README is available in [English](../apps/coze/README_EN.md) and [Russian](../apps/coze/README_RU.md).
+
 ## Verification
 
 - Run native `check` and `test`, desktop `build` and `test`, and web `check`. Native tests cover dictionary completeness, placeholder parity, data preservation, preference races and write failures.

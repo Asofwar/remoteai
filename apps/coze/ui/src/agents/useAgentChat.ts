@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, errorText } from "../api";
+import { msg } from "../i18n";
 import type { Message, Resource } from "../types";
 
 interface ToolTrace { id: string; name: string; input?: unknown; output?: unknown }
@@ -62,7 +63,10 @@ export function useAgentChat({ resourceId, save, published = false }: Options) {
         setConversation(job.result.conversationId);
         setMessages(await api<Message[]>("messages", { id: job.result.conversationId }));
         setLive("");
-      } else { setError(job.status === "cancelled" ? "已停止生成。" : job.error ?? "回答未完成，请重试。"); }
+      } else {
+        // Untranslated sources (job.error is the runtime's text); AgentPreview renders them with t().
+        setError(job.status === "cancelled" ? msg("已停止生成。") : job.error ?? msg("回答未完成，请重试。"));
+      }
       await refresh();
     } catch (error) { if (!active.current.stopped) setError(errorText(error)); }
     active.current.id = undefined;

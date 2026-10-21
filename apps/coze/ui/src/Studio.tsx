@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, App, Button, Dropdown, Empty, Input, Modal, Spin, Upload } from "antd";
 import { Bot, BookOpen, Database, FileText, GitBranch, Plus, Search, Wrench, Boxes } from "lucide-react";
 import { api, errorText } from "./api";
-import { defaultDraft, labels, type Kind, type Resource } from "./types";
+import { defaultDraft, type Kind, type Resource } from "./types";
+import { msg, useKindCopy, useT } from "./i18n";
 import { ResourceEditor } from "./ResourceEditor";
 import { BackupButton } from "./projects/BackupButton";
 import { TemplateLibrary } from "./projects/TemplateLibrary";
@@ -14,7 +15,9 @@ const icons = { app: Boxes, agent: Bot, workflow: GitBranch, knowledge: BookOpen
 const kinds: Kind[] = ["app", "agent", "workflow", "knowledge", "prompt", "table", "plugin"];
 
 export function Studio() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
+  const t = useT();
+  const copy = useKindCopy();
   const [resources, setResources] = useState<Resource[]>([]);
   const [selected, setSelected] = useState<Resource>();
   const [kind, setKind] = useState<Kind>("agent");
@@ -48,7 +51,7 @@ export function Studio() {
     setBusy(true);
     try {
       const resource = await api<Resource>("save_resource", {
-        kind: creating, name, description: "", draft: defaultDraft(creating),
+        kind: creating, name, description: "", draft: defaultDraft(creating, t),
       });
       setKind(creating); saved(resource); setCreating(undefined); setName("");
     } catch (error) { setError(errorText(error)); }
@@ -58,12 +61,13 @@ export function Studio() {
     && `${item.name} ${item.description}`.toLowerCase().includes(search.toLowerCase()));
   const navigate = (item: Kind) => {
     const go = () => { setKind(item); setSelected(undefined); setDirty(false); };
-    if (dirty) Modal.confirm({ title: "放弃未保存的修改？", width: 400, onOk: go, okText: "放弃修改", cancelText: "继续编辑" });
+    if (dirty) modal.confirm({ title: t("放弃未保存的修改？"), width: 400, onOk: go,
+      okText: t("放弃修改"), cancelText: t("继续编辑") });
     else go();
   };
   const importResource = async (file: File) => {
     try {
-      if (file.size > 4 * 1024 * 1024) throw new Error("请选择不超过 4 MB 的导出文件。");
+      if (file.size > 4 * 1024 * 1024) throw new Error(msg("请选择不超过 4 MB 的导出文件。"));
       const value: unknown = JSON.parse(await file.text());
       if (value && typeof value === "object" && "format" in value && value.format === "remoteai-coze-template") {
         const template = await api<{id: string}>("save_template",value);
@@ -73,68 +77,68 @@ export function Studio() {
         setKind(imported.kind); saved(imported); return;
       }
       if (!value || typeof value !== "object" || !("format" in value) || value.format !== "remoteai-coze"
-        || !("resource" in value)) throw new Error("请选择从 Remote AI Coze 导出的文件。");
+        || !("resource" in value)) throw new Error(msg("请选择从 Remote AI Coze 导出的文件。"));
       const resource = value.resource as Resource;
-      if (!kinds.includes(resource.kind)) throw new Error("文件中的内容类型暂不支持。");
+      if (!kinds.includes(resource.kind)) throw new Error(msg("文件中的内容类型暂不支持。"));
       const imported = await api<Resource>("save_resource", { kind: resource.kind, name: resource.name,
         description: resource.description, draft: resource.draft });
       setKind(imported.kind); saved(imported);
     } catch (error) { setError(errorText(error)); }
   };
-  if (!access) return <main className="studio-main">{error ? <Alert type="error" message={error} /> : <Spin />}</main>;
+  if (!access) return <main className="studio-main">{error ? <Alert type="error" message={t(error)} /> : <Spin />}</main>;
   if (access.role !== "owner") return <main className="studio-main">
-    {error && <Alert type="error" message={error} />}
+    {error && <Alert type="error" message={t(error)} />}
     <SharedAppView access={access} resources={resources} onSaved={saved} />
   </main>;
   return <div className={`studio ${selected?.kind === "workflow" ? "studio-workflow" : ""}`}>
-    <aside className="studio-nav" aria-label="Coze 导航">
+    <aside className="studio-nav" aria-label={t("Coze 导航")}>
       <header className="studio-brand"><div className="brand"><span>C</span><strong>Coze</strong></div>
-        <small>你的 AI 创作空间</small></header>
-      <nav className="studio-nav-items" aria-label="创作空间">{kinds.map((item) => {
+        <small>{t("你的 AI 创作空间")}</small></header>
+      <nav className="studio-nav-items" aria-label={t("创作空间")}>{kinds.map((item) => {
         const Icon = icons[item];
         return <button key={item} className={`studio-nav-button ${kind === item ? "selected" : ""}`}
-          aria-label={labels[item]} aria-current={kind === item ? "page" : undefined}
-          onClick={() => navigate(item)}><Icon size={18} /><span>{labels[item]}</span></button>;
+          aria-label={copy[item].section} aria-current={kind === item ? "page" : undefined}
+          onClick={() => navigate(item)}><Icon size={18} /><span>{copy[item].section}</span></button>;
       })}</nav>
       <div className="studio-nav-footer"><BackupButton onRestored={() => { setSelected(undefined); void refresh(); }} />
       <TemplateLibrary onInstalled={(id) => { void refresh();
-        if (dirty) { void message.success("模板已创建，当前修改已保留。"); return; }
+        if (dirty) { void message.success(t("模板已创建，当前修改已保留。")); return; }
         void api<Resource>("get_resource", { id }).then((resource) => { setKind(resource.kind); saved(resource); })
           .catch((error: unknown) => setError(errorText(error))); }} />
       <StopCozeButton />
       </div>
     </aside>
     <main className="studio-main">
-      {error && <Alert type="error" message={error} closable onClose={() => setError("")} />}
+      {error && <Alert type="error" message={t(error)} closable onClose={() => setError("")} />}
       {selected ? <ResourceEditor key={selected.id} resource={selected} resources={resources}
         onSaved={saved} onDirty={setDirty} onBack={() => { setSelected(undefined); setDirty(false); void refresh(); }} /> : <>
-        <header className="collection-header"><div><h1>{labels[kind]}</h1>
-          <p>{kind === "knowledge" ? "让文件成为可检索、可引用的知识。" : "从想法出发，创建可以反复使用的 AI 能力。"}</p></div>
+        <header className="collection-header"><div><h1>{copy[kind].section}</h1>
+          <p>{kind === "knowledge" ? t("让文件成为可检索、可引用的知识。") : t("从想法出发，创建可以反复使用的 AI 能力。")}</p></div>
           <div className="collection-actions"><Upload accept=".json" showUploadList={false}
-            beforeUpload={(file) => { void importResource(file); return false; }}><Button>导入</Button></Upload>
-          <Dropdown menu={{ items: kinds.map((key) => ({ key, label: `新建${labels[key]}` })),
+            beforeUpload={(file) => { void importResource(file); return false; }}><Button>{t("导入")}</Button></Upload>
+          <Dropdown menu={{ items: kinds.map((key) => ({ key, label: copy[key].create })),
             onClick: ({ key }) => setCreating(key as Kind) }}>
-            <Button type="primary" icon={<Plus size={16} />} onClick={() => setCreating(kind)}>新建{labels[kind]}</Button>
+            <Button type="primary" icon={<Plus size={16} />} onClick={() => setCreating(kind)}>{copy[kind].create}</Button>
           </Dropdown>
           </div>
         </header>
-        <Input className="resource-search" prefix={<Search size={16} />} placeholder="搜索名称或描述"
+        <Input className="resource-search" prefix={<Search size={16} />} placeholder={t("搜索名称或描述")}
           value={search} onChange={(event) => setSearch(event.target.value)} allowClear />
-        {loading ? <Spin /> : filtered.length === 0 ? <Empty description={`还没有${labels[kind]}`}>
-          <Button onClick={() => setCreating(kind)}>创建第一个{labels[kind]}</Button></Empty> :
+        {loading ? <Spin /> : filtered.length === 0 ? <Empty description={copy[kind].empty}>
+          <Button onClick={() => setCreating(kind)}>{copy[kind].first}</Button></Empty> :
           <div className="resource-grid">{filtered.map((resource) => {
             const Icon = icons[resource.kind];
             return <button key={resource.id} className="resource-card" onClick={() => setSelected(resource)}>
               <div className="resource-icon"><Icon size={24} /></div><strong>{resource.name}</strong>
-              <p>{resource.description || "添加描述，方便下次找到。"}</p>
-              <small>{resource.mcpEnabled ? "已接入 Codex GUI" : "仅自己可见"}</small>
+              <p>{resource.description || t("添加描述，方便下次找到。")}</p>
+              <small>{resource.mcpEnabled ? t("已接入 Codex GUI") : t("仅自己可见")}</small>
             </button>;
           })}</div>}
       </>}
     </main>
-    <Modal title={`新建${creating ? labels[creating] : ""}`} open={Boolean(creating)} onCancel={() => setCreating(undefined)}
-      onOk={() => void create()} confirmLoading={busy} okText="创建" cancelText="取消" width={400}>
-      <Input autoFocus aria-label="名称" placeholder="给它起个名字" maxLength={100}
+    <Modal title={copy[creating ?? kind].create} open={Boolean(creating)} onCancel={() => setCreating(undefined)}
+      onOk={() => void create()} confirmLoading={busy} okText={t("创建")} cancelText={t("取消")} width={400}>
+      <Input autoFocus aria-label={t("名称")} placeholder={t("给它起个名字")} maxLength={100}
         value={name} onChange={(event) => setName(event.target.value)} onPressEnter={() => void create()} />
     </Modal>
   </div>;

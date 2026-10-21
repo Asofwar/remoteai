@@ -1,5 +1,7 @@
 # Coze 的 Rust 本地运行包
 
+> For English documentation, see [README_EN.md](README_EN.md). Русская версия — [README_RU.md](README_RU.md).
+
 Remote AI 通过左侧「插件」下方的 `coze` 入口安装此可选组件。首次打开只检查状态，用户点击下载后才获取独立签名包。主安装包不包含运行程序、编辑器或向量模型。
 
 没有打包或启动上游 Go 后端，也不需要 Docker、MySQL、Redis、Elasticsearch、Milvus、Python 或 Node.js 运行环境。

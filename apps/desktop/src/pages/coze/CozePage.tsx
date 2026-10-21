@@ -2,11 +2,13 @@ import { Alert, Button, Progress, Space } from "antd";
 import { BookOpen, Bot, Download, GitBranch } from "lucide-react";
 import { isDesktopApp } from "../../api/backend";
 import { guiText } from "../../i18n/guiText";
+import { useGuiLanguage } from "../../i18n/useGuiLanguage";
 import { useCoze } from "./useCoze";
 import { CozeWorkspace } from "./CozeWorkspace";
 import styles from "./CozePage.module.less";
 
 export default function CozePage({ active }: { active: boolean }) {
+  useGuiLanguage();
   const coze = useCoze(active);
   const status = coze.status;
   if (!isDesktopApp) return <div className={styles.welcome}>
@@ -23,7 +25,7 @@ export default function CozePage({ active }: { active: boolean }) {
     <Space className={styles.features} size={24}><span><Bot size={19} />{guiText("智能体")}</span>
       <span><GitBranch size={19} />{guiText("工作流")}</span><span><BookOpen size={19} />{guiText("知识库")}</span></Space>
     <p>{guiText("首次使用需下载所需内容。完成后即可在本机使用，创建的工具可供 Codex GUI 调用。")}</p>
-    {coze.error && <Alert type="error" message={coze.error} />}
+    {coze.error && <Alert type="error" message={guiText(coze.error)} />}
     {coze.busy && <div className={styles.progress}><Progress percent={progress} status="active" />
       <small>{phase}</small></div>}
     <Button type="primary" size="large" icon={<Download size={17} />} loading={coze.busy}

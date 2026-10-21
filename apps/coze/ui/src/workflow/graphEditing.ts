@@ -1,25 +1,29 @@
 import type { Edge, Graph } from "../types";
+import { msg } from "../i18n";
 
 export const MAX_NODES = 200;
 const MAX_EDGES = 800;
 export const isTerminal = (type: string) => ["end", "break", "continue"].includes(type);
 export const edgeId = (edge: Edge) => JSON.stringify([edge.source, edge.target, edge.port ?? null]);
 
-/** Drafts may be disconnected; only reject connections that cannot become executable. */
+/**
+ * Drafts may be disconnected; only reject connections that cannot become executable.
+ * Returns the untranslated Chinese source; translate it with `t()` where it is shown.
+ */
 export function connectionError(graph: Graph, edge: Edge): string | undefined {
   const source = graph.nodes.find((node) => node.id === edge.source);
   const target = graph.nodes.find((node) => node.id === edge.target);
-  if (!source || !target) return "请连接画布中的节点。";
-  if (source.id === target.id) return "不能连接节点自身。";
-  if (target.type === "start" || isTerminal(source.type)) return "请从输出端口连接到输入端口。";
-  if ((source.type === "condition") !== (typeof edge.port === "boolean")) return "请选择条件分支。";
-  if (graph.edges.some((item) => edgeId(item) === edgeId(edge))) return "这两个端口已经连接。";
-  if (graph.edges.length >= MAX_EDGES) return "连线数量已达到上限。";
+  if (!source || !target) return msg("请连接画布中的节点。");
+  if (source.id === target.id) return msg("不能连接节点自身。");
+  if (target.type === "start" || isTerminal(source.type)) return msg("请从输出端口连接到输入端口。");
+  if ((source.type === "condition") !== (typeof edge.port === "boolean")) return msg("请选择条件分支。");
+  if (graph.edges.some((item) => edgeId(item) === edgeId(edge))) return msg("这两个端口已经连接。");
+  if (graph.edges.length >= MAX_EDGES) return msg("连线数量已达到上限。");
   const pending = [target.id];
   const visited = new Set<string>();
   while (pending.length) {
     const id = pending.pop()!;
-    if (id === source.id) return "这条连线会形成回路，请使用循环节点。";
+    if (id === source.id) return msg("这条连线会形成回路，请使用循环节点。");
     if (visited.has(id)) continue;
     visited.add(id);
     pending.push(...graph.edges.filter((item) => item.source === id).map((item) => item.target));

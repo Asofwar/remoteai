@@ -4,6 +4,7 @@ import { Copy, Trash2 } from "lucide-react";
 import { Background, Panel, ReactFlow, ReactFlowProvider, SelectionMode, useEdgesState, useNodesState,
   useReactFlow, type Connection, type NodePositionChange } from "@xyflow/react";
 import type { Graph } from "../types";
+import { useT } from "../i18n";
 import { connectionError, edgeId, MAX_NODES, removeSelection } from "./graphEditing";
 import { fromConnection, toEdges, toNodes } from "./flowAdapter";
 import { WorkflowNode, type CanvasNode } from "./WorkflowNode";
@@ -25,8 +26,9 @@ export function Canvas(props: Props) {
 }
 
 function WorkflowCanvas({ graph, selected, onSelect, onChange, history }: Props) {
+  const t = useT();
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNode>(toNodes(graph, selected));
-  const [edges, setEdges, onEdgesChange] = useEdgesState(toEdges(graph));
+  const [edges, setEdges, onEdgesChange] = useEdgesState(toEdges(graph, t));
   // Reconnection hit targets must not cover an unselected short line.
   const interactiveEdges = useMemo(() => edges.map((edge) => ({ ...edge,
     reconnectable: edge.selected === true })), [edges]);
@@ -36,20 +38,20 @@ function WorkflowCanvas({ graph, selected, onSelect, onChange, history }: Props)
   useCanvasResize(container);
   const { message } = App.useApp();
   useEffect(() => setNodes(toNodes(graph, selected)), [graph, selected, setNodes]);
-  useEffect(() => setEdges(toEdges(graph)), [graph, setEdges]);
+  useEffect(() => setEdges(toEdges(graph, t)), [graph, setEdges, t]);
   const connect = (connection: Connection, replaced?: string) => {
     const edge = fromConnection(connection);
     const base = { ...graph, edges: graph.edges.filter((item) => edgeId(item) !== replaced) };
     const error = connectionError(base, edge);
-    if (error) { void message.info(error); return; }
+    if (error) { void message.info(t(error)); return; }
     onChange({ ...base, edges: [...base.edges, edge] });
   };
   const add = (type: string) => {
-    if (graph.nodes.length >= MAX_NODES) { void message.info("节点数量已达到上限。"); return; }
+    if (graph.nodes.length >= MAX_NODES) { void message.info(t("节点数量已达到上限。")); return; }
     const rect = container.current?.getBoundingClientRect();
     if (!rect) return;
     const position = flow.screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
-    const node = { ...newNode(type, graph.nodes.length), x: position.x - 120, y: position.y - 50 };
+    const node = { ...newNode(type, graph.nodes.length, t), x: position.x - 120, y: position.y - 50 };
     onChange({ ...graph, nodes: [...graph.nodes, node] }); onSelect(node.id);
   };
   const remove = () => {
@@ -60,7 +62,9 @@ function WorkflowCanvas({ graph, selected, onSelect, onChange, history }: Props)
   const duplicate = () => {
     const node = graph.nodes.find((node) => node.id === selected);
     if (!node || node.type === "start" || graph.nodes.length >= MAX_NODES) return;
-    const copy = { ...node, id: newNode(node.type, 0).id, name: `${node.name} 副本`, x: node.x + 40, y: node.y + 140 };
+    // The copy's name becomes user data: localize the suffix once, now.
+    const copy = { ...node, id: newNode(node.type, 0).id, name: t("{name} 副本", { name: node.name }),
+      x: node.x + 40, y: node.y + 140 };
     onChange({ ...graph, nodes: [...graph.nodes, copy] }); onSelect(copy.id);
   };
   const shortcut = (event: KeyboardEvent) => {
@@ -78,7 +82,7 @@ function WorkflowCanvas({ graph, selected, onSelect, onChange, history }: Props)
   const hasSelection = nodes.some((node) => node.selected) || edges.some((edge) => edge.selected);
   const selectedEdges = edges.filter((edge) => edge.selected).length;
   const onlyEdges = selectedEdges > 0 && !nodes.some((node) => node.selected);
-  return <div ref={container} className="workflow-canvas" aria-label="工作流画布" tabIndex={0}
+  return <div ref={container} className="workflow-canvas" aria-label={t("工作流画布")} tabIndex={0}
     onKeyDown={shortcut} onPointerDownCapture={() => container.current?.focus({ preventScroll: true })}>
     <ReactFlow nodes={nodes} edges={interactiveEdges} nodeTypes={nodeTypes} onNodesChange={(changes) => {
       onNodesChange(changes);
@@ -107,15 +111,15 @@ function WorkflowCanvas({ graph, selected, onSelect, onChange, history }: Props)
         edges: graph.edges.filter((edge) => edgeId(edge) !== reconnecting.current) }, fromConnection(connection))}>
       <Background color="var(--border)" gap={20} size={1.5} />
       <Panel position="top-left"><Space><NodePalette onAdd={add} />{hasSelection && <>
-        <Button aria-label="复制节点" icon={<Copy size={15} />} onClick={duplicate}
+        <Button aria-label={t("复制节点")} icon={<Copy size={15} />} onClick={duplicate}
           disabled={!selected || graph.nodes.find((node) => node.id === selected)?.type === "start"} />
-        <Button danger aria-label="删除所选" icon={<Trash2 size={15} />} onClick={remove}>
-          {onlyEdges ? "删除连线" : "删除所选"}</Button>
+        <Button danger aria-label={t("删除所选")} icon={<Trash2 size={15} />} onClick={remove}>
+          {onlyEdges ? t("删除连线") : t("删除所选")}</Button>
         {onlyEdges && <span className="edge-selection-hint" role="status">
-          已选中 {selectedEdges} 条连线 · Delete 删除</span>}
+          {t("已选中 {count} 条连线 · Delete 删除", { count: selectedEdges })}</span>}
       </>}</Space></Panel>
       <CanvasControls graph={graph} onChange={onChange} history={history} />
-      <Panel position="bottom-right" className="canvas-hint">拖拽圆点连线 · 滚轮缩放 · Shift 框选</Panel>
+      <Panel position="bottom-right" className="canvas-hint">{t("拖拽圆点连线 · 滚轮缩放 · Shift 框选")}</Panel>
     </ReactFlow>
   </div>;
 }

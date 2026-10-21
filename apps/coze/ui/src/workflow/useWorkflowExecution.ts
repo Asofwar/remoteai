@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { api, errorText } from "../api";
 import type { InputField, Json } from "../types";
+import { msg } from "../i18n";
 
+// `error` holds untranslated text (Rust messages or the sources below); render it with t(error).
 export interface Interaction { id: string; nodeId: string; prompt: string; fields: InputField[]; choices: string[] }
 export interface Run {
   id: string; status: string; output: Json; error?: string; trace: Json[];
@@ -45,7 +47,7 @@ export function useWorkflowExecution() {
         }
         if (job.result) setRun(job.result);
         if (job.error) setError(job.error);
-        if (job.status === "cancelled" && !job.result) setError("运行已停止。");
+        if (job.status === "cancelled" && !job.result) setError(msg("运行已停止。"));
         setBusy(false); setJobId(undefined);
       } catch (error) {
         if (!active) return;

@@ -44,14 +44,14 @@ const classes = path.join(output, 'checks.jar');
 const dex = path.join(output, 'checks-dex.jar');
 const sources = ['UpdateOriginBlocks.kt', 'UpdateFiles.kt', 'UpdateBlockPlan.kt', 'UpdateRequestWindow.kt',
   'UpdateMirrorUrl.kt', 'UpdateCheckpoint.kt', 'UpdateBlockSession.kt', 'UpdateBlockWire.kt',
-  'UpdateDownloadSnapshot.kt']
+  'UpdateDownloadSnapshot.kt', 'UpdateDownloadCancellation.kt']
   .map(name => path.join(root, 'apps/native/plugins/appUpdate', name));
 sources.push(path.join(root, 'apps/native/plugins/connectivity/NativeConnectivity.kt'));
 const storageSources = ['DownloadStorage.kt', 'DownloadTask.kt', 'DownloadImages.kt', 'BulkDownloadStorage.kt',
   'BulkManifest.kt', 'BulkDownloadFailure.kt'].map(name => path.join(root, 'apps/native/plugins/downloads', name));
 storageSources.push(path.join(root, 'apps/native/plugins/chatPacketCipher/PacketCipher.kt'));
 const checks = ['UpdateOriginChecks.kt', 'UpdateDownloadProbe.kt', 'UpdateStorageChecks.kt', 'UpdateTestStorage.kt',
-  'UpdatePipelineChecks.kt', 'UpdateSnapshotChecks.kt']
+  'UpdatePipelineChecks.kt', 'UpdateSnapshotChecks.kt', 'UpdateCancellationChecks.kt']
   .map(name => fileURLToPath(new URL(`./update-download/${name}`, import.meta.url)));
 await exec(java, ['-cp', compiler.join(path.delimiter), 'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler',
   '-no-stdlib', '-no-reflect', '-jvm-target', '1.8', '-classpath', [android, compiler[1]].join(path.delimiter),

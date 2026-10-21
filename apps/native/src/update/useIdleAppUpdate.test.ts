@@ -29,11 +29,12 @@ it('automatically prepares a new release once after an idle minute, always with 
   expect(state.check).toHaveBeenCalledOnce();
 });
 
-it.each(['cellular', 'background', 'ignored', 'downloaded'])('does not start when %s', async reason => {
+it.each(['cellular', 'background', 'ignored', 'downloaded', 'cancelled'])('does not start when %s', async reason => {
   if (reason === 'cellular') state.wifi.mockResolvedValue(false);
   if (reason === 'background') state.app.currentState = 'background';
   if (reason === 'ignored') state.ignored.mockResolvedValue(release.version);
   if (reason === 'downloaded') state.refresh.mockResolvedValue({ status: 'downloaded' });
+  if (reason === 'cancelled') state.refresh.mockResolvedValue({ status: 'cancelled', version: release.version });
   mount(); await vi.advanceTimersByTimeAsync(60_000);
   expect(state.start).not.toHaveBeenCalled();
 });

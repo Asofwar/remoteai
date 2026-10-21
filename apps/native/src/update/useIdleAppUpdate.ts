@@ -21,6 +21,7 @@ export function useIdleAppUpdate() {
         const state = await refreshAndroidUpdateDownloadState();
         if (!active() || state.status === 'downloading' || state.status === 'downloaded') return;
         const result = await checkForAppUpdate();
+        if (state.status === 'cancelled' && state.version === result.release.version) return;
         const ignored = await startupUpdateOptions.readIgnoredVersion();
         const wifi = await canAutoDownload();
         if (!wifi || !active() || AppState.currentState !== 'active') return;

@@ -1,10 +1,11 @@
 import React, { Children, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { StartupUpdatePrompt } from './StartupUpdatePrompt';
-import type { AppRelease } from './appUpdate';
+import type { AppRelease, AndroidUpdateDownloadState } from './appUpdate';
 
 const state = vi.hoisted(() => ({ release: null as AppRelease | null,
-  ignore: vi.fn(), dismiss: vi.fn(), download: vi.fn(), error: '' }));
+  ignore: vi.fn(), dismiss: vi.fn(), download: vi.fn(), error: '',
+  downloadState: { status: 'idle' } as AndroidUpdateDownloadState }));
 vi.mock('react', async (original) => ({ ...await original<typeof React>(),
   useState: () => [state.error, (error: string) => { state.error = error; }] ,
   useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),
@@ -14,7 +15,7 @@ vi.mock('../../../../shared/app-update/useStartupUpdate', () => ({
 }));
 vi.mock('./startupUpdate', () => ({ startupUpdateOptions: {} }));
 vi.mock('./updateActions', () => ({ beginAppUpdateDownload: state.download }));
-vi.mock('./useAndroidUpdateDownloadState', () => ({ useAndroidUpdateDownloadState: () => ({ status: 'idle' }) }));
+vi.mock('./useAndroidUpdateDownloadState', () => ({ useAndroidUpdateDownloadState: () => state.downloadState }));
 vi.mock('react-native', () => ({ Modal: 'Modal', Pressable: 'Pressable', Text: 'Text', View: 'View',
   StyleSheet: { create: <T,>(value: T) => value } }));
 
@@ -37,6 +38,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.stubGlobal('React', React);
   state.error = '';
+  state.downloadState = { status: 'idle' };
   state.release = { version: '1.6.0' } as AppRelease;
   state.ignore.mockResolvedValue(undefined);
 });
@@ -71,4 +73,11 @@ it('keeps storage failures visible inside the modal', async () => {
 it('renders nothing when the startup check has no eligible release', () => {
   state.release = null;
   expect(StartupUpdatePrompt()).toBeNull();
+});
+
+it('does not prompt again for a cancelled version, but still prompts for a newer release', () => {
+  state.downloadState = { status: 'cancelled', version: '1.6.0' };
+  expect(StartupUpdatePrompt()).toBeNull();
+  state.release = { version: '1.7.0' } as AppRelease;
+  expect(text(StartupUpdatePrompt())).toContain('v1.7.0');
 });

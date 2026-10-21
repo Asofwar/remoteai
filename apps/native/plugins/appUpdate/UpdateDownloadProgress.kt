@@ -7,7 +7,9 @@ import com.facebook.react.modules.core.DeviceEventManagerModule
 import org.json.JSONObject
 
 /** Counts accepted bytes, excluding restored blocks and duplicate requests. */
-internal class UpdateDownloadProgress(private val context: ReactApplicationContext, input: JSONObject) {
+internal class UpdateDownloadProgress(
+  private val context: ReactApplicationContext, input: JSONObject, private val control: UpdateDownloadControl,
+) {
   val report = UpdateDownloadReport(input)
   private val path = input.getString("path")
   private val notification = UpdateDownloadNotification(context, input)
@@ -38,6 +40,7 @@ internal class UpdateDownloadProgress(private val context: ReactApplicationConte
 
   @Synchronized
   fun publish(verifying: Boolean = false, force: Boolean = false) {
+    control.checkActive()
     val now = SystemClock.elapsedRealtime()
     if (!force && !verifying && now - emittedAt < REFRESH_MS) return
     val elapsed = now - sampleAt
@@ -62,7 +65,9 @@ internal class UpdateDownloadProgress(private val context: ReactApplicationConte
     notification.progress(received, total, speed, verifying)
   }
 
-  fun finish(success: Boolean) { notification.finish(success) }
+  fun finish(success: Boolean) {
+    if (control.isCancelled) UpdateDownloadNotification.dismiss(context) else notification.finish(success)
+  }
 
   companion object { private const val REFRESH_MS = 1_000L }
 }

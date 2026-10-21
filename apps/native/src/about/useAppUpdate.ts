@@ -1,7 +1,7 @@
 import { t } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Toast } from '../components/AppToast';
-import { checkForAppUpdate, installDownloadedAndroidUpdate,
+import { cancelAndroidUpdateDownload, checkForAppUpdate, installDownloadedAndroidUpdate,
   type AppUpdateCheck } from '../update/appUpdate';
 import { useAndroidUpdateDownloadState } from '../update/useAndroidUpdateDownloadState';
 import { beginAppUpdateDownload } from '../update/updateActions';
@@ -34,6 +34,9 @@ export function useAppUpdate() {
     if (downloadState.status !== 'downloaded') return;
     void installDownloadedAndroidUpdate(downloadState.path).catch(() => Toast.fail(t("无法开始安装，请稍后重试")));
   };
+  const cancelDownload = () => {
+    void cancelAndroidUpdateDownload().catch(() => Toast.fail(t('未能取消更新，请重试。')));
+  };
   return { checking, updateCheck, downloadState, error, checkForUpdate,
-    beginDownload: beginAppUpdateDownload, installDownloaded };
+    beginDownload: beginAppUpdateDownload, installDownloaded, cancelDownload };
 }

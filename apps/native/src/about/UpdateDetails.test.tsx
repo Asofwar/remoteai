@@ -9,7 +9,8 @@ vi.mock('react', async (importOriginal) => ({
 
   useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),
 }));
-vi.mock('react-native', () => ({ Text: 'Text', View: 'View', ActivityIndicator: 'Spinner', StyleSheet: {
+vi.mock('react-native', () => ({
+  Text: 'Text', View: 'View', Pressable: 'Button', ActivityIndicator: 'Spinner', StyleSheet: {
   create: <T,>(styles: T) => styles, hairlineWidth: 1,
 } }));
 vi.mock('./styles', () => ({ useStyles: () => ({}) }));
@@ -17,6 +18,7 @@ vi.mock('./useAppUpdate', () => ({ openReleasePage: observed.openReleasePage }))
 
 interface Props {
   children?: unknown; accessibilityRole?: string; accessibilityValue?: { now: number }; onPress?: () => void;
+  disabled?: boolean;
 }
 interface RenderedNode { props: Props; children: RenderedNode[]; text: string }
 
@@ -40,7 +42,7 @@ function details(notes: string, overrides: Partial<ReturnType<typeof useAppUpdat
   vi.stubGlobal('React', React);
   const update: ReturnType<typeof useAppUpdate> = {
     checking: false, error: '', downloadState: { status: 'idle' },
-    checkForUpdate: vi.fn(), beginDownload: vi.fn(), installDownloaded: vi.fn(),
+    checkForUpdate: vi.fn(), beginDownload: vi.fn(), installDownloaded: vi.fn(), cancelDownload: vi.fn(),
     updateCheck: { currentVersion: '1.5.29', updateAvailable: true, release: {
       version: '1.5.31', tagName: 'v1.5.31', title: 'Remote AI', notes, publishedAt: null,
       releaseUrl: 'https://example.com/release', androidAsset: null,
@@ -67,6 +69,27 @@ it('shows formatted changes instead of the release download catalogue and raw Ma
   expect(observed.openReleasePage).toHaveBeenCalledWith('https://example.com/compare');
 });
 
+it.each([false, true])('shows a cancel action during download, cancelling=%s', cancelling => {
+  const cancelDownload = vi.fn();
+  const nodes = details('', { cancelDownload,
+    downloadState: { status: 'downloading', version: '2.0.0', cancelling } });
+  const text = nodes.map(node => node.text).join('');
+  expect(text).toContain(cancelling ? '正在取消…' : '取消更新');
+  const button = nodes.find(node => node.props.accessibilityRole === 'button');
+  expect(button?.props.disabled).toBe(cancelling);
+  if (!cancelling) {
+    button?.props.onPress?.();
+    expect(cancelDownload).toHaveBeenCalledOnce();
+  }
+});
+
+it('shows a cancelled download without a spinner or failure message', () => {
+  const nodes = details('', { downloadState: { status: 'cancelled', version: '2.0.0' } });
+  const text = nodes.map(node => node.text).join('');
+  expect(text).toContain('下载已取消，可随时重新下载。');
+  expect(text).not.toMatch(/下载失败|正在下载|下载进度/);
+  expect(nodes.some(node => node.props.accessibilityRole === 'progressbar')).toBe(false);
+});
 it('keeps the end of long release notes visible', () => {
   const text = details('- 更新内容。\n'.repeat(200) + '\n最后一项修复。').map((node) => node.text).join('');
   expect(text).toContain('最后一项修复。');

@@ -8,6 +8,7 @@ import java.security.MessageDigest
 object UpdateDownloadProbe {
   @JvmStatic fun main(args: Array<String>) {
     UpdateSnapshotChecks.run()
+    UpdateCancellationChecks.run()
     UpdateOriginChecks.run()
     UpdatePipelineChecks.run()
     UpdateStorageChecks.run()

@@ -10,12 +10,12 @@ vi.mock('../settings/styles', () => ({ useStyles: () => ({}) }));
 
 afterEach(() => vi.unstubAllGlobals());
 
-it('provides an enabled retry action for a failed update download', () => {
+it.each(['failed', 'cancelled'])('provides an enabled retry action for a %s update download', status => {
   vi.stubGlobal('React', React);
   const beginDownload = vi.fn();
   const release = { version: '1.5.31' };
   const update = {
-    downloadState: { status: 'failed', version: release.version, message: '下载未完成，请重新下载。' },
+    downloadState: { status, version: release.version, message: '下载未完成，请重新下载。' },
     updateCheck: { updateAvailable: true, release }, checking: false, error: '', beginDownload,
   } as unknown as ReturnType<typeof useAppUpdate>;
   const button = VersionUpdateButton({ update });

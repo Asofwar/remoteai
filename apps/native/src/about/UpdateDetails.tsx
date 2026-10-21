@@ -1,5 +1,5 @@
 import { getLocale, t, useLanguage } from '../i18n';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import type { useAppUpdate } from './useAppUpdate';
 import { useStyles } from './styles';
 import { ReleaseNotes } from './ReleaseNotes';
@@ -13,8 +13,17 @@ function DownloadStatus({ update }: { update: UpdateState }) {
   const state = update.downloadState;
   if (state.status === 'idle') return null;
   if (state.status === 'downloading') return <View style={styles.status}>
-    <Text style={styles.statusTitle}>{t("正在下载 v")}{state.version}</Text>
+    <View style={styles.statusHeading}>
+      <Text style={styles.statusTitle}>{t("正在下载 v")}{state.version}</Text>
+      <Pressable accessibilityRole="button" accessibilityState={{ disabled: Boolean(state.cancelling) }}
+        disabled={Boolean(state.cancelling)} onPress={update.cancelDownload} style={styles.cancelButton}>
+        <Text style={styles.cancelText}>{state.cancelling ? t('正在取消…') : t('取消更新')}</Text>
+      </Pressable>
+    </View>
     <UpdateDownloadProgress progress={state.progress} />
+  </View>;
+  if (state.status === 'cancelled') return <View style={styles.status}>
+    <Text style={styles.detail}>{t('下载已取消，可随时重新下载。')}</Text>
   </View>;
   if (state.status === 'failed') return <View style={styles.status}>
     <Text style={[styles.statusTitle, styles.error]}>v{state.version}{' '}{t("下载失败")}</Text>

@@ -5,11 +5,12 @@ import { Platform } from 'react-native';
 import appConfig from '../../app.json';
 import { getAndroidDownloadSnapshot } from './androidDownloadStatus';
 import { downloadSharedAndroidUpdate, downloadOfficialAndroidUpdate,
-  nativeUpdatePath, verifyAndroidPackage } from './androidSharedDownload';
+  cancelNativeAndroidUpdate, nativeUpdatePath, verifyAndroidPackage } from './androidSharedDownload';
 import { compareAppVersions, versionFromReleaseMetadata } from '../../../../shared/app-update/version';
 import { subscribeAndroidDownloadProgress, type AndroidDownloadProgress } from './androidDownloadProgress';
 import { prepareUpdateNotifications } from './androidUpdateNotifications';
 import { AndroidDownloadReporting } from './androidDownloadReporting';
+import { AndroidUpdateAttempt, AndroidUpdateCancelled } from './androidUpdateAttempt';
 
 export { compareAppVersions } from '../../../../shared/app-update/version';
 export { versionFromReleaseMetadata } from './version';
@@ -50,7 +51,8 @@ export interface AppUpdateCheck {
 
 export type AndroidUpdateDownloadState =
   | { status: 'idle' }
-  | { status: 'downloading'; version: string; progress?: AndroidDownloadProgress }
+  | { status: 'downloading'; version: string; progress?: AndroidDownloadProgress; cancelling?: boolean }
+  | { status: 'cancelled'; version: string }
   | { status: 'downloaded'; version: string; path: string }
   | { status: 'failed'; version: string; message: string };
 
@@ -59,6 +61,7 @@ interface StoredAndroidUpdate {
   path: string;
   expectedSize: number;
   sha256?: string;
+  cancelled?: boolean;
 }
 
 interface GitHubReleaseAsset {
@@ -79,9 +82,12 @@ interface GitHubRelease {
 }
 
 type DownloadListener = (state: AndroidUpdateDownloadState) => void;
+interface DownloadAttempt { control: AndroidUpdateAttempt; preparation: Promise<StoredAndroidUpdate> }
 
 let downloadState: AndroidUpdateDownloadState = { status: 'idle' };
 let activeDownload: Promise<string> | null = null;
+let activeAttempt: DownloadAttempt | null = null;
+let activeCancellation: Promise<void> | null = null;
 let stateRefresh: Promise<AndroidUpdateDownloadState> | null = null;
 const downloadListeners = new Set<DownloadListener>();
 
@@ -215,6 +221,7 @@ async function restoreAndroidUpdateDownloadState(): Promise<AndroidUpdateDownloa
     await SecureStore.deleteItemAsync(UPDATE_METADATA_KEY);
     return { status: 'idle' };
   }
+  if (stored.cancelled) return { status: 'cancelled', version: stored.version };
   try {
     const { status, progress } = await getAndroidDownloadSnapshot(stored.path, stored.expectedSize);
     if (status === 'pending' || status === 'running' || status === 'paused') {
@@ -230,12 +237,12 @@ async function restoreAndroidUpdateDownloadState(): Promise<AndroidUpdateDownloa
 }
 
 export function refreshAndroidUpdateDownloadState(): Promise<AndroidUpdateDownloadState> {
-  if (Platform.OS !== 'android' || activeDownload) return Promise.resolve(downloadState);
+  if (Platform.OS !== 'android' || activeDownload || activeCancellation) return Promise.resolve(downloadState);
   if (stateRefresh) return stateRefresh;
   const previousState = downloadState;
   stateRefresh = restoreAndroidUpdateDownloadState().then((nextState) => {
     // A new download may have started while storage or the system query was pending.
-    if (!activeDownload && downloadState === previousState) publishDownloadState(nextState);
+    if (!activeDownload && !activeCancellation && downloadState === previousState) publishDownloadState(nextState);
     return downloadState;
   }).finally(() => { stateRefresh = null; });
   return stateRefresh;
@@ -258,52 +265,84 @@ async function prepareAndroidDownload(release: AppRelease, wifiOnly: boolean): P
 export async function startAndroidUpdateDownload(release: AppRelease, options: { wifiOnly?: boolean } = {}) {
   if (Platform.OS !== 'android') throw new Error(t("应用内安装目前仅支持 Android"));
   if (!release.androidAsset) throw new Error(t("该版本没有可用的 Android 安装包"));
+  await activeCancellation;
+  if (activeDownload) return activeDownload;
+  if (options.wifiOnly) await checkAutomaticDownloadAllowed(release.version);
+  // Another caller may have started while the automatic check read storage.
   if (activeDownload) return activeDownload;
   const androidAsset = release.androidAsset;
-
+  const attempt = { control: new AndroidUpdateAttempt(),
+    preparation: prepareAndroidDownload(release, options.wifiOnly === true) };
+  activeAttempt = attempt;
   publishDownloadState({ status: 'downloading', version: release.version, progress: {
     receivedBytes: 0, totalBytes: androidAsset.size, bytesPerSecond: 0, phase: 'downloading',
   } });
-  activeDownload = (async () => {
-    let unsubscribe: (() => void) | undefined;
-    const reporting = new AndroidDownloadReporting(androidAsset.size);
-    try {
-      const stored = await prepareAndroidDownload(release, options.wifiOnly === true);
-      unsubscribe = subscribeAndroidDownloadProgress(stored.path, progress => {
-        publishDownloadState({ status: 'downloading', version: release.version, progress });
-      });
-      const downloadedPath = await downloadAndroidPackage({ release, path: stored.path,
-        wifiOnly: options.wifiOnly === true, reporting });
-      publishDownloadState({ status: 'downloading', version: release.version, progress: {
-        receivedBytes: androidAsset.size, totalBytes: androidAsset.size, bytesPerSecond: 0, phase: 'verifying',
-      } });
-      reporting.verify();
-      if (!await verifyAndroidPackage({ path: downloadedPath, size: androidAsset.size, sha256: androidAsset.sha256 })) {
-        throw new Error(t("下载未完成，请重新下载。"));
-      }
-      reporting.finish(true);
-      const completed = { ...stored, path: downloadedPath };
-      await SecureStore.setItemAsync(UPDATE_METADATA_KEY, JSON.stringify(completed));
-      publishDownloadState({ status: 'downloaded', version: release.version, path: downloadedPath });
-      return downloadedPath;
-    } catch (error) {
-      reporting.finish(false);
-      const message = t("下载未完成，请重新下载。");
-      await SecureStore.deleteItemAsync(UPDATE_METADATA_KEY).catch(() => undefined);
-      publishDownloadState({ status: 'failed', version: release.version, message });
-      throw error;
-    } finally {
-      unsubscribe?.();
-      activeDownload = null;
-    }
-  })();
+  activeDownload = runAndroidDownload({ release, attempt, wifiOnly: options.wifiOnly === true });
   return activeDownload;
+}
+
+async function checkAutomaticDownloadAllowed(version: string) {
+  const stored = await readStoredAndroidUpdate();
+  const cancelled = stored?.cancelled && stored.version === version;
+  const locallyCancelled = downloadState.status === 'cancelled' && downloadState.version === version;
+  if (cancelled || locallyCancelled || activeCancellation) throw new AndroidUpdateCancelled();
+}
+
+async function runAndroidDownload({ release, attempt, wifiOnly }: {
+  release: AppRelease; attempt: DownloadAttempt; wifiOnly: boolean;
+}) {
+  let unsubscribe: (() => void) | undefined;
+  const reporting = new AndroidDownloadReporting(release.androidAsset!.size);
+  try {
+    const stored = await attempt.preparation;
+    await attempt.control.checkActive();
+    unsubscribe = subscribeAndroidDownloadProgress(stored.path, progress => {
+      if (!attempt.control.acceptsProgress) return;
+      publishDownloadState({ status: 'downloading', version: release.version, progress });
+    });
+    const path = await downloadAndroidPackage({ release, path: stored.path, wifiOnly, reporting,
+      checkActive: () => attempt.control.checkActive() });
+    await finishAndroidDownload({ stored: { ...stored, path }, control: attempt.control, reporting });
+    return path;
+  } catch (error) {
+    await attempt.control.checkActive();
+    if (error instanceof AndroidUpdateCancelled) throw error;
+    reporting.finish(false);
+    const message = t("下载未完成，请重新下载。");
+    await SecureStore.deleteItemAsync(UPDATE_METADATA_KEY).catch(() => undefined);
+    publishDownloadState({ status: 'failed', version: release.version, message });
+    throw error;
+  } finally {
+    unsubscribe?.();
+    activeDownload = null;
+    activeAttempt = null;
+  }
+}
+
+async function finishAndroidDownload({ stored, control, reporting }: {
+  stored: StoredAndroidUpdate; control: AndroidUpdateAttempt; reporting: AndroidDownloadReporting;
+}) {
+  await control.checkActive();
+  publishDownloadState({ status: 'downloading', version: stored.version, progress: {
+    receivedBytes: stored.expectedSize, totalBytes: stored.expectedSize, bytesPerSecond: 0, phase: 'verifying',
+  } });
+  reporting.verify();
+  if (!await verifyAndroidPackage({ path: stored.path, size: stored.expectedSize, sha256: stored.sha256 })) {
+    throw new Error(t("下载未完成，请重新下载。"));
+  }
+  await control.checkActive();
+  await SecureStore.setItemAsync(UPDATE_METADATA_KEY, JSON.stringify(stored));
+  await control.checkActive();
+  reporting.finish(true);
+  publishDownloadState({ status: 'downloaded', version: stored.version, path: stored.path });
 }
 
 async function downloadAndroidPackage(options: {
   release: AppRelease; path: string; wifiOnly: boolean; reporting: AndroidDownloadReporting;
+  checkActive(): Promise<void>;
 }) {
   const peerPath = await downloadSharedAndroidUpdate(options);
+  await options.checkActive();
   if (peerPath) return peerPath;
   options.reporting.useOrigin();
   const official = downloadOfficialAndroidUpdate(options);
@@ -311,6 +350,7 @@ async function downloadAndroidPackage(options: {
   // Older native binaries cannot enforce Wi-Fi on DownloadManager jobs: never auto-start those jobs.
   if (options.wifiOnly) throw new Error(t("下载未完成，请重新下载。"));
   const util = await blobUtil();
+  await options.checkActive();
   const response = await util.config({ addAndroidDownloads: {
     useDownloadManager: true, notification: true, mediaScannable: true, path: options.path,
     title: `Remote AI ${options.release.version}`, description: t("下载完成后可安装更新"), mime: APK_MIME_TYPE,
@@ -318,11 +358,40 @@ async function downloadAndroidPackage(options: {
   return response.path() || options.path;
 }
 
+export function cancelAndroidUpdateDownload(): Promise<void> {
+  if (activeCancellation) return activeCancellation;
+  if (Platform.OS !== 'android' || downloadState.status !== 'downloading') return Promise.resolve();
+  const previous = downloadState;
+  const attempt = activeAttempt;
+  const download = activeDownload;
+  publishDownloadState({ ...previous, cancelling: true });
+  const storedUpdate = (async () => {
+    await stateRefresh;
+    const stored = attempt ? await attempt.preparation : await readStoredAndroidUpdate();
+    if (!stored) throw new Error('Update download unavailable');
+    return stored;
+  })();
+  const stop = async () => cancelNativeAndroidUpdate((await storedUpdate).path);
+  const stopping = attempt ? attempt.control.cancel(stop) : stop();
+  activeCancellation = (async () => {
+    await stopping;
+    // The old attempt must finish before saving cancellation or allowing a new download.
+    await download?.catch(() => undefined);
+    const stored = await storedUpdate;
+    await SecureStore.setItemAsync(UPDATE_METADATA_KEY, JSON.stringify({ ...stored, cancelled: true }));
+    publishDownloadState({ status: 'cancelled', version: stored.version });
+  })().catch(error => {
+    if (downloadState.status === 'downloading') publishDownloadState({ ...downloadState, cancelling: false });
+    throw error;
+  }).finally(() => { activeCancellation = null; });
+  return activeCancellation;
+}
+
 export async function installDownloadedAndroidUpdate(path: string) {
   if (Platform.OS !== 'android') throw new Error(t("应用内安装目前仅支持 Android"));
   const util = await blobUtil();
   const stored = await readStoredAndroidUpdate();
-  if (!stored || stored.path !== path
+  if (!stored || stored.cancelled || stored.path !== path
     || !await verifyAndroidPackage({ path, size: stored.expectedSize, sha256: stored.sha256 })) {
     throw new Error(t("下载未完成，请重新下载。"));
   }

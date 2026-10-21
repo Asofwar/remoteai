@@ -15,6 +15,7 @@ export function StartupUpdatePrompt() {
   const [error, setError] = useState('');
   const release = update.release;
   if (!release || download.status === 'downloading' || download.status === 'downloaded') return null;
+  if (download.status === 'cancelled' && download.version === release.version) return null;
 
   const ignore = () => {
     setError('');

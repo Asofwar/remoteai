@@ -13,13 +13,14 @@ function updateAction(update: UpdateState) {
   const { downloadState, updateCheck, checking } = update;
   if (downloadState.status === 'downloaded') return { label: t("立即安装"), onPress: update.installDownloaded };
   if (downloadState.status === 'downloading') {
+    if (downloadState.cancelling) return { label: t('正在取消…'), busy: true };
     if (downloadState.progress?.phase === 'verifying') return { label: t('正在校验'), busy: true };
     const percent = updateDownloadPercent(downloadState.progress);
     return { label: percent === null ? t('下载中') : t('下载中 · {percent}%', { percent }), busy: true };
   }
   if (checking) return { label: t("检查中"), busy: true };
   if (updateCheck?.updateAvailable) {
-    return { label: downloadState.status === 'failed' ? t("重新下载") : t("更新"),
+    return { label: ['failed', 'cancelled'].includes(downloadState.status) ? t("重新下载") : t("更新"),
       onPress: () => update.beginDownload(updateCheck.release) };
   }
   if (update.error) return { label: t("重试"), onPress: () => void update.checkForUpdate() };

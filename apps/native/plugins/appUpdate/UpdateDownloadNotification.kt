@@ -63,5 +63,8 @@ internal class UpdateDownloadNotification(private val context: Context, input: J
   companion object {
     private const val CHANNEL_ID = "app-update-download"
     private const val NOTIFICATION_ID = 7302
+    fun dismiss(context: Context) {
+      context.getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
+    }
   }
 }

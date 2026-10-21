@@ -32,7 +32,7 @@ module.exports = function withAppUpdate(config) {
       'UpdateBlockDownload.kt', 'UpdateBlockPlan.kt', 'UpdateRequestWindow.kt', 'UpdateMirrorUrl.kt',
       'UpdateOriginBlocks.kt', 'UpdateCheckpoint.kt',
       'UpdateDownloadProgress.kt', 'UpdateDownloadReport.kt', 'UpdateDownloadNotification.kt',
-      'UpdateDownloadSnapshot.kt']) {
+      'UpdateDownloadSnapshot.kt', 'UpdateDownloadCancellation.kt']) {
       await fs.copyFile(path.join(__dirname, 'appUpdate', name), path.join(target, name));
     }
     return result;

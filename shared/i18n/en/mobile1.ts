@@ -1,4 +1,8 @@
 export const mobile1: Readonly<Record<string, string>> = {
+  '取消更新': 'Cancel update',
+  '正在取消…': 'Cancelling…',
+  '下载已取消，可随时重新下载。': 'Download cancelled. You can download it again at any time.',
+  '未能取消更新，请重试。': 'Could not cancel the update. Please try again.',
   " · 预估 ":
     " · Estimated ",
   "{value1} 个账号消耗额度失败":

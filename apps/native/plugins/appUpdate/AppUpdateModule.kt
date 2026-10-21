@@ -6,13 +6,15 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicReference
 import org.json.JSONObject
 
 class AppUpdateModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
   private val worker = Executors.newFixedThreadPool(2)
-  private val downloading = AtomicBoolean(false)
+  private val cancellationWorker = Executors.newSingleThreadExecutor()
+  private val activeDownload = AtomicReference<UpdateDownloadControl?>()
+  private val cancelledPath = AtomicReference<String?>()
   private val activeSharedDownload = AtomicReference<UpdateBlockDownload?>()
   private val files = UpdateFiles(context)
   override fun getName() = "AppUpdate"
@@ -57,33 +59,51 @@ class AppUpdateModule(private val context: ReactApplicationContext) : ReactConte
     downloadOfficial(context, files, input, progress)
   }
 
+  @ReactMethod
+  fun cancelDownload(path: String, promise: Promise) = task(promise, cancellationWorker) {
+    // Remember cancellation before looking up the worker, including downloads still queued on the bridge.
+    cancelledPath.set(path)
+    val active = activeDownload.get()?.takeIf { it.path == path }
+    if (active == null) cancelSystemUpdateDownload(context, path)
+    else { active.cancel(); active.awaitFinished() }
+    UpdateDownloadNotification.dismiss(context)
+    true
+  }
+
   private fun download(options: String, promise: Promise, reported: Boolean = false,
     action: (JSONObject, UpdateDownloadProgress) -> String) = task(promise) {
-    check(downloading.compareAndSet(false, true))
+    val input = JSONObject(options)
+    val path = input.getString("path")
+    files.target(path)
+    val control = UpdateDownloadControl(path)
+    check(activeDownload.compareAndSet(null, control))
     var progress: UpdateDownloadProgress? = null
     var complete = false
     try {
-      val input = JSONObject(options)
-      files.target(input.getString("path"))
-      val reporter = UpdateDownloadProgress(context, input)
+      if (cancelledPath.get() == path) control.cancel()
+      control.checkActive()
+      val reporter = UpdateDownloadProgress(context, input, control)
       progress = reporter
       reporter.restore(0)
       val path = try { action(input, reporter) } catch (error: Exception) {
-        if (!reported) throw error
+        if (!reported || control.isCancelled) throw error
         reporter.report.interrupted(error)
         return@task reporter.report.finish(null)
       }
+      control.checkActive()
       complete = true
       if (reported) reporter.report.finish(path) else path
     } finally {
-      progress?.finish(complete)
-      downloading.set(false)
+      try { progress?.finish(complete) } finally {
+        activeDownload.compareAndSet(control, null)
+        control.finish()
+      }
     }
   }
 
-  private fun task(promise: Promise, action: () -> Any) {
+  private fun task(promise: Promise, executor: ExecutorService = worker, action: () -> Any) {
     try {
-      worker.execute {
+      executor.execute {
         try { promise.resolve(action()) }
         catch (_: Exception) { promise.reject("UPDATE_UNAVAILABLE", "更新下载未完成，请稍后重试。") }
       }
@@ -109,6 +129,7 @@ class AppUpdateModule(private val context: ReactApplicationContext) : ReactConte
 
   override fun invalidate() {
     worker.shutdown()
+    cancellationWorker.shutdown()
     super.invalidate()
   }
 }

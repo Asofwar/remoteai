@@ -6,6 +6,7 @@ import { updateMirrorUrl } from '../../../../shared/app-update/mirrorUrl';
 import { updateNotificationLabels } from './androidUpdateNotifications';
 import type { DownloadReport } from '../../../../shared/app-update/downloadReport';
 import type { AndroidDownloadReporting } from './androidDownloadReporting';
+import { AndroidUpdateCancelled } from './androidUpdateAttempt';
 
 interface UpdateModule {
   sharingProtocol?: number;
@@ -17,10 +18,16 @@ interface UpdateModule {
   addUpdatePeers?(options: string): Promise<boolean>;
   downloadOfficial(options: string): Promise<string>;
   verifyPackage(options: string): Promise<boolean>;
+  cancelDownload?(path: string): Promise<boolean>;
 }
 const module = () => NativeModules.AppUpdate as UpdateModule | undefined;
 export const canAutoDownload = () => module()?.canAutoDownload?.() ?? Promise.resolve(false);
 export const nativeUpdatePath = (version: string) => module()?.updatePath?.(version);
+
+export async function cancelNativeAndroidUpdate(path: string) {
+  const native = module();
+  if (!native?.cancelDownload || !await native.cancelDownload(path)) throw new Error('Update cancellation unavailable');
+}
 
 export async function verifyAndroidPackage(options: { path: string; size: number; sha256?: string }) {
   const native = module();
@@ -30,6 +37,7 @@ export async function verifyAndroidPackage(options: { path: string; size: number
 
 export async function downloadSharedAndroidUpdate(options: {
   release: AppRelease; path: string; wifiOnly: boolean; reporting: AndroidDownloadReporting;
+  checkActive?(): Promise<void>;
 }): Promise<string | null> {
   const native = module();
   const asset = options.release.androidAsset;
@@ -43,12 +51,14 @@ export async function downloadSharedAndroidUpdate(options: {
     const { loadSession } = await import('../api/client');
     const session = await loadSession();
     const artifact = await native.artifactId(JSON.stringify(metadata));
+    await options.checkActive?.();
     if (session) {
       lease = await (native.addUpdatePeers
         ? watchUpdatePeers({ session, artifact, onPeers: configs => native.addUpdatePeers!(JSON.stringify({ artifact, configs })) })
         : findUpdatePeers(session, artifact, { protocol: native.sharingProtocol === 2 ? 2 : 0 }))
         .catch(() => undefined);
     }
+    await options.checkActive?.();
     const input = JSON.stringify({ ...metadata, path: options.path,
       mirrorUrl: session ? updateMirrorUrl(session.baseUrl, asset.downloadUrl) : undefined,
       notification: updateNotificationLabels(),
@@ -62,7 +72,8 @@ export async function downloadSharedAndroidUpdate(options: {
     }
     if (session) options.reporting.capture(session, result.report);
     return result.path;
-  } catch {
+  } catch (error) {
+    if (error instanceof AndroidUpdateCancelled) throw error;
     // Peer lookup, transport, file and integrity failures all return to the original GitHub URL.
     return null;
   } finally { listener?.remove(); lease?.close(); }

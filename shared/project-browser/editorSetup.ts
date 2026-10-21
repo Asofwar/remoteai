@@ -32,7 +32,7 @@ export const editorTheme = EditorView.theme({
   '.cm-scroller': { overflow: 'auto', fontFamily: 'Consolas, "SFMono-Regular", monospace', lineHeight: '1.6' },
   '.cm-content': { caretColor: 'var(--pf-ink)', padding: '12px 0' },
   '.cm-gutters': { backgroundColor: 'var(--pf-subtle)', color: 'var(--pf-muted)',
-    borderRight: '1px solid var(--pf-border)' },
+    borderRight: '1px solid var(--pf-border)', userSelect: 'none', WebkitUserSelect: 'none' },
   '.cm-lineNumbers .cm-gutterElement': { cursor: 'pointer' },
   '.cm-foldGutter .cm-gutterElement': { padding: '0', cursor: 'pointer' },
   // Use the first visual line's height so wrapping never moves the arrow below its line number.

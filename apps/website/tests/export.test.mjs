@@ -36,6 +36,7 @@ test('exports both languages, every feature, and crawlable content without JavaS
       url,
     );
     assert.ok(html.includes('data-css-hash'), `Missing prerendered Ant Design styles: ${url}`);
+    assert.ok(!html.includes('css-dev-only-do-not-override'), `Server styles differ from the production client: ${url}`);
   }
 });
 

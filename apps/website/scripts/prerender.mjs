@@ -1,7 +1,10 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { render, renderMarkdown, routes, pageMetadata } from '../.prerender/entry-server.js';
 import { siteUrl } from '../site.config.mjs';
+
+// External React/Ant Design modules must use the same production mode as the client bundle.
+process.env.NODE_ENV = 'production';
+const { render, renderMarkdown, routes, pageMetadata } = await import('../.prerender/entry-server.js');
 
 const dist = resolve('dist');
 const template = await readFile(resolve(dist, 'index.html'), 'utf8');

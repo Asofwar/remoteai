@@ -25,12 +25,12 @@ let browser;
 before(async () => { browser = await chromium.launch({ headless: true }); });
 after(async () => { await browser?.close(); });
 
-async function loadComposer(page, authMethod = "no-auth") {
+async function loadComposer(page, options = {}) {
   await page.setContent(`<div contenteditable="true" aria-label="Message"></div>
     <div><div><div><button data-composer-navigation-target="reasoning">Model</button></div></div></div>`);
-  await page.evaluate(authMethod => {
+  await page.evaluate(({ authMethod = "no-auth", provider, host = "local", active = true }) => {
     window.subscriptions = new Set();
-    const query = { queryKey: ["models", "list", "local", authMethod], isActive: () => true };
+    const query = { queryKey: ["models", "list", host, authMethod, 100, provider], isActive: () => active };
     window.modelQuery = query;
     const cache = {
       getAll: () => [query],
@@ -41,13 +41,14 @@ async function loadComposer(page, authMethod = "no-auth") {
     };
     const client = { getQueryCache: () => cache, invalidateQueries() {}, setQueryData() {} };
     window.__codexRoot = { _internalRoot: { current: { memoizedProps: { client } } } };
+    window.__CODEX_SWITCH_FAST_MODE_AVAILABLE__ = true;
     window.summary = { enabled: true, totalTokens: 4790000, estimatedCostUsd: 12, primaryRemainingPercent: 90 };
     window.usageRequests = 0;
     window.codexSwitchRequestUsageSummary = () => {
       window.usageRequests += 1;
       if (window.summary) window.__CODEX_SWITCH_SPEED_SELECTOR__?.updateUsage(window.summary);
     };
-  }, authMethod);
+  }, options);
 }
 
 test("restores a missing composer on reattachment and reload without a model refresh", async () => {
@@ -64,18 +65,36 @@ test("restores a missing composer on reattachment and reload without a model ref
       await expect(page.locator("[data-codex-switch-speed-selector]")).toHaveCount(1);
       assert.equal(await page.evaluate(() => window.subscriptions.size), 1);
       await expect(page.locator("[contenteditable]")).toHaveText("Keep this draft");
-      await expect(page.locator("[data-speed-controls]")).toBeHidden();
+      await expect(page.locator("[data-speed-controls]")).toBeVisible();
     }
   } finally {
     await page.close();
   }
 });
 
+test("logged-in proxy usage survives reattachment and reload without duplicate speed controls", async () => {
+  const page = await browser.newPage();
+  try {
+    for (let reload = 0; reload < 2; reload += 1) {
+      await page.goto("about:blank");
+      await loadComposer(page, { authMethod: "chatgpt", provider: "codex-switch-local" });
+      for (let attachment = 0; attachment < 2; attachment += 1) {
+        assert.equal(await page.evaluate(restore()), true);
+        await expect(page.locator("[data-today-tokens]")).toHaveText("4.79M");
+        await expect(page.locator("[data-trailing-balance]")).toHaveText("90%");
+        await expect(page.locator("[data-speed-controls]")).toBeHidden();
+        await expect(page.locator("[data-codex-switch-speed-selector]")).toHaveCount(1);
+        assert.equal(await page.evaluate(() => window.subscriptions.size), 1);
+      }
+    }
+  } finally { await page.close(); }
+});
+
 test("typing stays responsive during an unanswered refresh and stale data recovers", async () => {
   const page = await browser.newPage();
   try {
     await page.clock.install();
-    await loadComposer(page);
+    await loadComposer(page, { authMethod: "chatgpt", provider: "codex-switch-local" });
     await page.evaluate(restore());
     await page.clock.runFor(1);
     await expect(page.locator("[data-today-tokens]")).toHaveText("4.79M");
@@ -100,10 +119,18 @@ test("typing stays responsive during an unanswered refresh and stale data recove
 test("reattachment and reload never install proxy statistics outside proxy mode", async () => {
   const page = await browser.newPage();
   try {
-    for (const [proxyRunning, authMethod] of [[false, "chatgpt"], [false, "no-auth"], [true, "chatgpt"]]) {
+    const scenarios = [
+      { proxyRunning: false, authMethod: "chatgpt", provider: "codex-switch-local" },
+      { proxyRunning: false, authMethod: "no-auth" },
+      { authMethod: "chatgpt" },
+      { authMethod: "chatgpt", provider: "other-provider" },
+      { authMethod: "chatgpt", provider: "codex-switch-local", host: "remote" },
+      { authMethod: "chatgpt", provider: "codex-switch-local", active: false },
+    ];
+    for (const { proxyRunning = true, ...options } of scenarios) {
       await page.goto("about:blank");
       await page.clock.install();
-      await loadComposer(page, authMethod);
+      await loadComposer(page, options);
       for (let attachment = 0; attachment < 2; attachment += 1) {
         assert.equal(await page.evaluate(restore(proxyRunning)), true);
         await page.clock.runFor(10000);
@@ -119,7 +146,7 @@ test("stopping the proxy removes pending statistics and restart restores one res
   const page = await browser.newPage();
   try {
     await page.clock.install();
-    await loadComposer(page);
+    await loadComposer(page, { authMethod: "chatgpt", provider: "codex-switch-local" });
     await page.evaluate(restore());
     await page.clock.runFor(1);
     await expect(page.locator("[data-today-tokens]")).toHaveText("4.79M");
@@ -145,6 +172,48 @@ test("stopping the proxy removes pending statistics and restart restores one res
     await expect(page.locator("[data-codex-switch-speed-selector]")).toHaveCount(1);
     await expect(page.locator("[data-today-tokens]")).toHaveText("5M");
     await expect(page.locator("[contenteditable]")).toHaveText("Draft survives proxy changes");
+  } finally { await page.close(); }
+});
+
+test("logged-in provider changes update usage visibility immediately", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.clock.install();
+    await loadComposer(page, { authMethod: "chatgpt", provider: "codex-switch-local" });
+    await page.evaluate(restore());
+    await expect(page.locator("[data-today-usage]")).toBeVisible();
+    await page.evaluate(() => {
+      window.modelQuery.queryKey[5] = "other-provider";
+      for (const listener of window.subscriptions) listener({ query: window.modelQuery });
+    });
+    await expect(page.locator("[data-codex-switch-speed-selector]")).toHaveCount(0);
+    const requests = await page.evaluate(() => window.usageRequests);
+    await page.clock.runFor(10000);
+    assert.equal(await page.evaluate(() => window.usageRequests), requests);
+    await page.evaluate(() => {
+      window.modelQuery.queryKey[5] = "codex-switch-local";
+      for (const listener of window.subscriptions) listener({ query: window.modelQuery });
+    });
+    await expect(page.locator("[data-today-tokens]")).toHaveText("4.79M");
+    await expect(page.locator("[data-speed-controls]")).toBeHidden();
+    await expect(page.locator("[data-codex-switch-speed-selector]")).toHaveCount(1);
+  } finally { await page.close(); }
+});
+
+test("login changes retain local proxy usage while updating speed controls", async () => {
+  const page = await browser.newPage();
+  try {
+    await loadComposer(page, { provider: "codex-switch-local" });
+    await page.evaluate(restore());
+    for (const authMethod of ["chatgpt", "no-auth"]) {
+      await page.evaluate(authMethod => {
+        window.modelQuery.queryKey[3] = authMethod;
+        for (const listener of window.subscriptions) listener({ query: window.modelQuery });
+      }, authMethod);
+      await expect(page.locator("[data-today-tokens]")).toHaveText("4.79M");
+      await expect(page.locator("[data-speed-controls]")).toBeVisible({ visible: authMethod === "no-auth" });
+      await expect(page.locator("[data-codex-switch-speed-selector]")).toHaveCount(1);
+    }
   } finally { await page.close(); }
 });
 

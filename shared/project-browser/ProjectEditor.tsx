@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Compartment, EditorState, Transaction } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
-import { basicSetup } from 'codemirror';
 import { indentWithTab, undo, redo } from '@codemirror/commands';
 import { foldAll, unfoldAll } from '@codemirror/language';
 import { openSearchPanel, search } from '@codemirror/search';
 import { ChevronsDownUp, ChevronsUpDown, Redo2, Search, Undo2, WrapText } from 'lucide-react';
 import { editorHighlighting, editorLanguage, editorPhrases, editorTheme, textFolding } from './editorSetup';
+import { editorExtensions } from './editorExtensions';
 import type { BrowserTranslate } from './ProjectTree';
 
 interface Props {
@@ -30,7 +30,7 @@ export function ProjectEditor(props: Props) {
     const editor = new EditorView({
       parent: host.current,
       state: EditorState.create({ doc: props.text, extensions: [
-        basicSetup, editorTheme, editorHighlighting, editorPhrases(props.t), search({ top: true }),
+        editorExtensions(props.t), editorTheme, editorHighlighting, editorPhrases(props.t), search({ top: true }),
         EditorState.lineSeparator.of(props.text.includes('\r\n') ? '\r\n' : '\n'),
         EditorView.contentAttributes.of({ 'aria-label': props.t('文件内容'), spellcheck: 'false',
           autocorrect: 'off', autocapitalize: 'off' }),

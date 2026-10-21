@@ -33,6 +33,12 @@ export const editorTheme = EditorView.theme({
   '.cm-content': { caretColor: 'var(--pf-ink)', padding: '12px 0' },
   '.cm-gutters': { backgroundColor: 'var(--pf-subtle)', color: 'var(--pf-muted)',
     borderRight: '1px solid var(--pf-border)' },
+  '.cm-lineNumbers .cm-gutterElement': { cursor: 'pointer' },
+  '.cm-foldGutter .cm-gutterElement': { padding: '0', cursor: 'pointer' },
+  // Use the first visual line's height so wrapping never moves the arrow below its line number.
+  '.cm-foldGutter span': { display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    width: '16px', height: '1.6em', padding: '0', verticalAlign: 'top' },
+  '.cm-foldGutter svg': { display: 'block' },
   '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: 'var(--pf-hover)' },
   '.cm-panels': { color: 'var(--pf-ink)', backgroundColor: 'var(--pf-surface)', borderColor: 'var(--pf-border)' },
   '.cm-search': { padding: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' },

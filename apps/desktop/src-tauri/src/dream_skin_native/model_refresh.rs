@@ -162,7 +162,8 @@ fn codex_model_refresh_expression(
         CODEX_SPEED_SELECTOR_OVERLAY.replace("__CODEX_SWITCH_SERVICE_TIER__", &service_tier);
     let composer_query_client = include_str!("composer_query_client.js");
     let composer_status_setup = include_str!("composer_status.js");
-    let context_usage_overlay = context_usage_overlay_expression(crate::local_proxy::is_running());
+    let proxy_running = crate::local_proxy::is_running();
+    let context_usage_overlay = context_usage_overlay_expression(proxy_running);
     Ok(format!(
         r#"(async () => {{
   // A timed-out CDP call leaves its renderer promise alive, so newer refreshes must supersede it here.
@@ -172,6 +173,7 @@ fn codex_model_refresh_expression(
   const isCurrentRefresh = () => window[refreshSequenceKey] === refreshSequence;
   const supersededRefresh = {{ refreshed: false, reason: "superseded-model-refresh" }};
   const expectedModels = {models};
+  const proxyRunning = {proxy_running};
   const fastModeModels = new Set({fast_mode_models});
   window.__CODEX_SWITCH_FAST_MODE_AVAILABLE__ = fastModeModels.size > 0;
   const imageInputModels = new Set({image_input_models});

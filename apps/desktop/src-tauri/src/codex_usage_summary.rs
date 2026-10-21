@@ -39,7 +39,7 @@ pub(crate) fn load(
     app: &tauri::AppHandle,
     settings: &crate::models::AppSettings,
 ) -> Result<CodexUsageSummary, String> {
-    if !settings.codex_usage_summary_enabled {
+    if !settings.codex_usage_summary_enabled || !crate::local_proxy::is_running() {
         return Ok(CodexUsageSummary {
             language: settings.language.clone(),
             enabled: false,

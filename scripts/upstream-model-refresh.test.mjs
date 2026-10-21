@@ -39,6 +39,7 @@ function modelRefreshExpression(models, capabilities = {}) {
     return [model, selected?.reasoningEffort ?? "high"];
   }));
   const substitutions = {
+    proxy_running: String(capabilities.proxyRunning ?? true),
     models: JSON.stringify(models),
     fast_mode_models: JSON.stringify(capabilities.fastModeModels ?? []),
     image_input_models: JSON.stringify(capabilities.imageInputModels ?? []),
@@ -248,7 +249,7 @@ function assertVisibleCatalog(observer, models, capabilities) {
   assert.equal(result.hasModelSupportingUltraReasoningEffort, efforts.includes("ultra"));
 }
 
-test("ChatGPT login permits daily usage while model requests are pending without adding a Fast control", async () => {
+test("ChatGPT login hides proxy usage and Fast controls while model requests are pending", async () => {
   const harness = createHarness({ queryKey: ["models", "list", "local", "chatgpt", 100] });
   // An inactive no-auth cache entry must not enable a duplicate Fast control.
   harness.client.cache.add(new ModelQuery());
@@ -257,14 +258,28 @@ test("ChatGPT login permits daily usage while model requests are pending without
   const refresh = harness.refresh(upstreamModels, cachedOfficialCapabilities);
   try {
     assert.equal(harness.client.pendingRequests, 1);
-    assert.equal(harness.window.__CODEX_SWITCH_COMPOSER_STATUS_ALLOWED__, true);
+    assert.equal(harness.window.__CODEX_SWITCH_COMPOSER_STATUS_ALLOWED__, false);
     assert.equal(harness.window.__CODEX_SWITCH_FAST_MODE_ALLOWED__, false);
     harness.client.cache.notify("updated", harness.query);
-    assert.equal(harness.window.__CODEX_SWITCH_COMPOSER_STATUS_ALLOWED__, true);
+    assert.equal(harness.window.__CODEX_SWITCH_COMPOSER_STATUS_ALLOWED__, false);
   } finally {
     releaseFetch();
     await refresh;
   }
+});
+
+test("stopping the proxy hides usage even before the active no-auth query changes", async () => {
+  const harness = createHarness();
+  await harness.refresh(upstreamModels, cachedOfficialCapabilities);
+  assert.equal(harness.window.__CODEX_SWITCH_COMPOSER_STATUS_ALLOWED__, true);
+  await harness.refresh([], { ...cachedOfficialCapabilities, proxyRunning: false });
+  assert.equal(harness.window.__CODEX_SWITCH_COMPOSER_STATUS_ALLOWED__, false);
+  assert.equal(harness.window.__CODEX_SWITCH_FAST_MODE_ALLOWED__, false);
+  harness.client.cache.notify("updated", harness.query);
+  assert.equal(harness.window.__CODEX_SWITCH_COMPOSER_STATUS_ALLOWED__, false);
+  await harness.refresh(upstreamModels, cachedOfficialCapabilities);
+  assert.equal(harness.window.__CODEX_SWITCH_COMPOSER_STATUS_ALLOWED__, true);
+  assert.equal(harness.window.__CODEX_SWITCH_FAST_MODE_ALLOWED__, true);
 });
 
 test("login changes refresh composer visibility and ignore inactive local or active remote queries", async () => {
@@ -284,17 +299,17 @@ test("login changes refresh composer visibility and ignore inactive local or act
   harness.client.cache.add(chatgpt);
   harness.addObserver(chatgpt);
   harness.client.cache.notify("observerAdded", chatgpt);
-  assert.equal(harness.window.__CODEX_SWITCH_COMPOSER_STATUS_ALLOWED__, true);
+  assert.equal(harness.window.__CODEX_SWITCH_COMPOSER_STATUS_ALLOWED__, false);
   assert.equal(harness.window.__CODEX_SWITCH_FAST_MODE_ALLOWED__, false);
   harness.client.cache.notify("updated", chatgpt);
-  assert.equal(updates, 2);
+  assert.equal(updates, 1);
   chatgpt.observers = [];
   harness.client.cache.notify("observerRemoved", chatgpt);
   harness.addObserver();
   harness.client.cache.notify("observerAdded", harness.query);
   assert.equal(harness.window.__CODEX_SWITCH_COMPOSER_STATUS_ALLOWED__, true);
   assert.equal(harness.window.__CODEX_SWITCH_FAST_MODE_ALLOWED__, true);
-  assert.equal(updates, 4);
+  assert.equal(updates, 2);
 });
 
 test("an upstream catalog replaces the stale single-model picker list", async () => {

@@ -14,9 +14,10 @@ const substitutions = {
   status,
 };
 const template = sync.match(/r#"(\(\(\) => \{\{[\s\S]*?\}\}\)\(\))"#/)[1];
-const restore = template.replace(/\{\{|\}\}|\{([a-z_]+)\}/g, (token, key) => {
+const restore = (proxyRunning = true) => template.replace(/\{\{|\}\}|\{([a-z_]+)\}/g, (token, key) => {
   if (token === "{{") return "{";
   if (token === "}}") return "}";
+  if (key === "proxy_running") return String(proxyRunning);
   assert.ok(Object.hasOwn(substitutions, key));
   return substitutions[key];
 });
@@ -24,12 +25,13 @@ let browser;
 before(async () => { browser = await chromium.launch({ headless: true }); });
 after(async () => { await browser?.close(); });
 
-async function loadComposer(page) {
+async function loadComposer(page, authMethod = "no-auth") {
   await page.setContent(`<div contenteditable="true" aria-label="Message"></div>
     <div><div><div><button data-composer-navigation-target="reasoning">Model</button></div></div></div>`);
-  await page.evaluate(() => {
+  await page.evaluate(authMethod => {
     window.subscriptions = new Set();
-    const query = { queryKey: ["models", "list", "local", "chatgpt"], isActive: () => true };
+    const query = { queryKey: ["models", "list", "local", authMethod], isActive: () => true };
+    window.modelQuery = query;
     const cache = {
       getAll: () => [query],
       subscribe: listener => {
@@ -40,10 +42,12 @@ async function loadComposer(page) {
     const client = { getQueryCache: () => cache, invalidateQueries() {}, setQueryData() {} };
     window.__codexRoot = { _internalRoot: { current: { memoizedProps: { client } } } };
     window.summary = { enabled: true, totalTokens: 4790000, estimatedCostUsd: 12, primaryRemainingPercent: 90 };
+    window.usageRequests = 0;
     window.codexSwitchRequestUsageSummary = () => {
+      window.usageRequests += 1;
       if (window.summary) window.__CODEX_SWITCH_SPEED_SELECTOR__?.updateUsage(window.summary);
     };
-  });
+  }, authMethod);
 }
 
 test("restores a missing composer on reattachment and reload without a model refresh", async () => {
@@ -53,10 +57,10 @@ test("restores a missing composer on reattachment and reload without a model ref
       await page.goto("about:blank");
       await loadComposer(page);
       await page.locator("[contenteditable]").fill("Keep this draft");
-      assert.equal(await page.evaluate(restore), true);
+      assert.equal(await page.evaluate(restore()), true);
       await expect(page.locator("[data-today-tokens]")).toHaveText("4.79M");
       await expect(page.locator("[data-trailing-balance]")).toHaveText("90%");
-      await page.evaluate(restore);
+      await page.evaluate(restore());
       await expect(page.locator("[data-codex-switch-speed-selector]")).toHaveCount(1);
       assert.equal(await page.evaluate(() => window.subscriptions.size), 1);
       await expect(page.locator("[contenteditable]")).toHaveText("Keep this draft");
@@ -72,7 +76,7 @@ test("typing stays responsive during an unanswered refresh and stale data recove
   try {
     await page.clock.install();
     await loadComposer(page);
-    await page.evaluate(restore);
+    await page.evaluate(restore());
     await page.clock.runFor(1);
     await expect(page.locator("[data-today-tokens]")).toHaveText("4.79M");
     await page.evaluate(() => { window.summary = null; });
@@ -91,4 +95,81 @@ test("typing stays responsive during an unanswered refresh and stale data recove
   } finally {
     await page.close();
   }
+});
+
+test("reattachment and reload never install proxy statistics outside proxy mode", async () => {
+  const page = await browser.newPage();
+  try {
+    for (const [proxyRunning, authMethod] of [[false, "chatgpt"], [false, "no-auth"], [true, "chatgpt"]]) {
+      await page.goto("about:blank");
+      await page.clock.install();
+      await loadComposer(page, authMethod);
+      for (let attachment = 0; attachment < 2; attachment += 1) {
+        assert.equal(await page.evaluate(restore(proxyRunning)), true);
+        await page.clock.runFor(10000);
+        await expect(page.locator("[data-codex-switch-speed-selector]")).toHaveCount(0);
+        assert.equal(await page.evaluate(() => window.usageRequests), 0);
+        assert.equal(await page.evaluate(() => window.subscriptions.size), 1);
+      }
+    }
+  } finally { await page.close(); }
+});
+
+test("stopping the proxy removes pending statistics and restart restores one responsive overlay", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.clock.install();
+    await loadComposer(page);
+    await page.evaluate(restore());
+    await page.clock.runFor(1);
+    await expect(page.locator("[data-today-tokens]")).toHaveText("4.79M");
+    await page.evaluate(() => {
+      window.previousOverlay = window.__CODEX_SWITCH_SPEED_SELECTOR__;
+      window.summary = null;
+      window.previousOverlay.requestUsage();
+    });
+    await page.evaluate(restore(false));
+    const requests = await page.evaluate(() => window.usageRequests);
+    await page.evaluate(() => window.previousOverlay.updateUsage({
+      enabled: true, totalTokens: 5000000, estimatedCostUsd: 13, primaryRemainingPercent: 89,
+    }));
+    await page.clock.runFor(30000);
+    await expect(page.locator("[data-codex-switch-speed-selector]")).toHaveCount(0);
+    assert.equal(await page.evaluate(() => window.usageRequests), requests);
+    await page.locator("[contenteditable]").fill("Draft survives proxy changes");
+    await page.evaluate(() => {
+      window.summary = { enabled: true, totalTokens: 5000000, estimatedCostUsd: 13 };
+    });
+    await page.evaluate(restore());
+    await page.clock.runFor(1);
+    await expect(page.locator("[data-codex-switch-speed-selector]")).toHaveCount(1);
+    await expect(page.locator("[data-today-tokens]")).toHaveText("5M");
+    await expect(page.locator("[contenteditable]")).toHaveText("Draft survives proxy changes");
+  } finally { await page.close(); }
+});
+
+test("switching to ChatGPT login removes usage without waiting for another model refresh", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.clock.install();
+    await loadComposer(page);
+    await page.evaluate(restore());
+    await page.clock.runFor(1);
+    await expect(page.locator("[data-today-usage]")).toBeVisible();
+    await page.evaluate(() => {
+      window.modelQuery.queryKey[3] = "chatgpt";
+      for (const listener of window.subscriptions) listener({ query: window.modelQuery });
+    });
+    const requests = await page.evaluate(() => window.usageRequests);
+    await page.clock.runFor(10000);
+    await expect(page.locator("[data-codex-switch-speed-selector]")).toHaveCount(0);
+    assert.equal(await page.evaluate(() => window.usageRequests), requests);
+    await page.evaluate(() => {
+      window.modelQuery.queryKey[3] = "no-auth";
+      for (const listener of window.subscriptions) listener({ query: window.modelQuery });
+    });
+    await page.clock.runFor(1);
+    await expect(page.locator("[data-today-usage]")).toBeVisible();
+    await expect(page.locator("[data-codex-switch-speed-selector]")).toHaveCount(1);
+  } finally { await page.close(); }
 });

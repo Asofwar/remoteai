@@ -339,21 +339,19 @@
         assert!(!expression.contains("openSubmenu"));
         assert!(!expression.contains("button.h-token-button-composer"));
         assert!(expression.contains("window.__CODEX_SWITCH_COMPOSER_STATUS_ALLOWED__ = allowed"));
-        assert!(expression.contains("const hasActiveLocalModelQuery = (authMethod = null) =>"));
+        assert!(expression.contains("const hasActiveProxyModelQuery = () =>"));
         assert!(expression.contains("const syncComposerStatus = () =>"));
         assert!(expression.contains("window.__CODEX_SWITCH_REFRESH_SPEED_SELECTOR__?.()"));
         assert!(expression.contains("__CODEX_SWITCH_COMPOSER_STATUS_OBSERVER__"));
         assert!(expression.contains("patchState.unsubscribe?.()"));
         assert!(expression.contains("if (matchesModelsQuery(event?.query)) syncComposerStatus()"));
         assert!(expression.contains("__CODEX_SWITCH_FAST_MODE_ALLOWED__"));
-        assert!(expression.contains("const allowed = hasActiveLocalModelQuery()"));
-        assert!(expression.contains(
-            "const fastModeAllowed = fastModeModels.size > 0 && hasActiveLocalModelQuery(\"no-auth\")"
-        ));
+        assert!(expression.contains("const allowed = proxyRunning && hasActiveProxyModelQuery()"));
+        assert!(expression.contains("const fastModeAllowed = allowed && fastModeModels.size > 0"));
         assert!(expression.contains("if (changed) window.__CODEX_SWITCH_REFRESH_SPEED_SELECTOR__?.()"));
         assert!(expression.contains("state.fastModeAllowed || state.usage.enabled"));
         assert!(expression.contains("controls.hidden = !state.fastModeAllowed"));
-        assert!(expression.contains("authMethod === null || key[3] === authMethod"));
+        assert!(expression.contains("key[3] === \"no-auth\""));
         assert!(!expression.contains("authMethod = \"chatgpt\""));
         assert!(!expression.contains("featureRequirements.fast_mode"));
     }

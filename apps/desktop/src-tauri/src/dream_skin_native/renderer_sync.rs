@@ -65,8 +65,10 @@ fn composer_restore_expression() -> Result<String, String> {
     let overlay = CODEX_SPEED_SELECTOR_OVERLAY.replace("__CODEX_SWITCH_SERVICE_TIER__", &tier);
     let query_client = include_str!("composer_query_client.js");
     let status = include_str!("composer_status.js");
+    let proxy_running = crate::local_proxy::is_running();
     Ok(format!(
         r#"(() => {{
+        const proxyRunning = {proxy_running};
         const queryClient = {query_client};
         if (!queryClient) return false;
         const matchesModelsQuery = query => Array.isArray(query?.queryKey) &&
@@ -89,8 +91,14 @@ fn restore_composer(session: &mut CdpSession) -> Result<(), String> {
 }
 
 fn renderer_sync_healthy(target: &CdpTarget, port: u16) -> bool {
+    // Proxy changes must refresh visibility even when the renderer's query cache is unchanged.
+    let probe = format!(
+        "({COMPOSER_SYNC_PROBE}) && \
+         window.__CODEX_SWITCH_COMPOSER_STATUS_OBSERVER__?.proxyRunning === {}",
+        crate::local_proxy::is_running()
+    );
     renderer_bindings_healthy(target)
-        && evaluate_for_binding(target, port, COMPOSER_SYNC_PROBE)
+        && evaluate_for_binding(target, port, &probe)
             .is_ok_and(|value| value.as_bool() == Some(true))
 }
 

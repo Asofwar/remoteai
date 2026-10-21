@@ -40,7 +40,7 @@ test('collapsed download icon counts active tasks and receives the download anim
   expect(points.at(-1)!.x).toBeCloseTo(destination.x + destination.width / 2, 0);
   expect(points.at(-1)!.y).toBeCloseTo(destination.y + destination.height / 2, 0);
   await expect(count).toHaveText('1');
-  await expect(count).toHaveCSS('color', 'rgb(255, 107, 107)');
+  await expect(count).toHaveCSS('color', 'rgb(53, 173, 167)');
   const badge = (await count.boundingBox())!;
   expect(badge.y).toBeLessThan(destination.y);
   expect(badge.x).toBeGreaterThan(destination.x);

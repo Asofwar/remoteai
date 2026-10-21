@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { test, expect } from '@playwright/test';
 import type { BrowserHostMessage } from '../../../shared/project-browser/nativeBridge';
+import type { DocumentsSnapshot } from '../../../shared/project-browser/documents';
 import { browserRequest, browserRoot, savedFiles } from './project-browser-fixture';
 const require = createRequire(import.meta.url);
 const { handleBrowserRequest } = require('../../../shared/project-browser/nativeBridge') as
@@ -25,13 +26,14 @@ test('bundled native editor: offline assets, mobile search/fold/save and close g
   const client = createProjectBrowserClient(browserRequest);
   const emit = (message: BrowserHostMessage) => page.evaluate(value => window.projectBrowserMessage(value), message);
   let closed = false;
+  let snapshot: DocumentsSnapshot | undefined;
   await page.exposeFunction('nativeBrowserRequest', async (raw: string) => {
-    const message = JSON.parse(raw) as { type: string };
+    const message = JSON.parse(raw) as { type: string; snapshot?: DocumentsSnapshot };
     if (message.type === 'ready') {
-      await emit({ type: 'settings', cwd: browserRoot, connected: true, labels: {},
+      await emit({ type: 'settings', cwd: browserRoot, connected: true, labels: {}, autoSaveDelay: 0, snapshot,
         theme: { '--ink': '#e6e8eb', '--panel': '#1b201e', '--muted': '#a2aaa7',
           '--bg': '#121614', '--line': '#35413a', '--green': '#61d6ad', '--browser-on-accent': '#121614' } });
-    } else if (message.type === 'closed') closed = true;
+    } else if (message.type === 'closed') { closed = true; snapshot = message.snapshot; }
     else {
       const reply = await handleBrowserRequest(raw, { client, cwd: browserRoot, connected: true });
       if (reply) await emit(reply);
@@ -58,11 +60,17 @@ test('bundled native editor: offline assets, mobile search/fold/save and close g
   await expect(page.getByText('已保存', { exact: true })).toBeVisible();
   expect(savedFiles.at(-1)?.text).toBe('export const 手机编辑 = true;\n');
   await editor.fill('keep my unsaved draft');
-  await emit({ type: 'close' });
+  await page.getByRole('button', { name: '关闭文件 main.ts', exact: true }).click();
   await expect(page.getByRole('alertdialog')).toBeVisible();
   expect(closed).toBe(false);
   await page.screenshot({ path: '../../.codex-tmp/project-browser-native-dark.png' });
-  await page.getByRole('button', { name: '放弃修改', exact: true }).click();
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+  await emit({ type: 'close' });
   await expect.poll(() => closed).toBe(true);
+  await page.reload();
+  await expect(editor).toContainText('keep my unsaved draft');
+  await expect(page.getByRole('tab', { name: 'main.ts' }).locator('.pf-dirty-dot')).toBeVisible();
+  await editor.press('Control+s');
+  await expect(page.getByRole('tab', { name: 'main.ts' }).locator('.pf-dirty-dot')).toHaveCount(0);
   expect(errors).toEqual([]);
 });

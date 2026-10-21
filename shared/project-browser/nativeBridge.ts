@@ -1,7 +1,9 @@
 import { PROJECT_FILE_LIMIT, type ProjectBrowserClient } from './protocol';
+import type { DocumentsSnapshot } from './documents';
 
 export interface BrowserSettings {
   type: 'settings'; cwd: string; connected: boolean; labels: Record<string, string>; theme: Record<string, string>;
+  autoSaveDelay?: number; snapshot?: DocumentsSnapshot;
 }
 export interface BrowserReply { type: 'reply'; id: number; data?: unknown; error?: string }
 export type BrowserHostMessage = BrowserSettings | BrowserReply | { type: 'close' };

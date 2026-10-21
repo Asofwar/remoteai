@@ -9,16 +9,18 @@ import { t } from '../i18n';
 import './git/git.css';
 import { ProjectBrowserDrawer } from './projectBrowser/ProjectBrowserDrawer';
 import { useDesktopLayout } from '../useDesktopLayout';
+import { useProjectBrowsers } from '../../../../shared/project-browser/useProjectBrowsers';
 
 interface Props {
   client: GuiToolsClient; cwd: string; active: boolean; connected: boolean; deviceName?: string;
 }
 export function ChatTools(props: Props) {
-  const [project, setProject] = useState<string>();
+  const browsers = useProjectBrowsers();
   return <>
-    <ProjectTools key={props.cwd} {...props} openFiles={() => setProject(value => value ?? props.cwd)} />
-    {project && <ProjectBrowserDrawer client={props.client.projectBrowser} cwd={project}
-      active={props.active} connected={props.connected} onClose={() => setProject(undefined)} />}
+    <ProjectTools key={props.cwd} {...props} openFiles={() => browsers.open(props.cwd)} />
+    {browsers.projects.map(project => <ProjectBrowserDrawer key={project} client={props.client.projectBrowser}
+      cwd={project} active={props.active && browsers.visible === project}
+      connected={props.connected} onClose={browsers.close} />)}
   </>;
 }
 

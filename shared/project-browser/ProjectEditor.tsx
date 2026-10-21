@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Compartment, EditorState } from '@codemirror/state';
+import { Compartment, EditorState, Transaction } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
 import { indentWithTab, undo, redo } from '@codemirror/commands';
@@ -19,6 +19,7 @@ export function ProjectEditor(props: Props) {
   const view = useRef<EditorView>();
   const settings = useRef({ editable: new Compartment(), wrapping: new Compartment(), language: new Compartment() });
   const latest = useRef(props);
+  const synchronizing = useRef(false);
   latest.current = props;
   const [wrap, setWrap] = useState(false);
   const [languageError, setLanguageError] = useState(false);
@@ -36,7 +37,7 @@ export function ProjectEditor(props: Props) {
         editable.of(EditorState.readOnly.of(props.readOnly)), wrapping.of([]), language.of(syntax ? [] : textFolding),
         keymap.of([indentWithTab, { key: 'Mod-s', run: () => { latest.current.save(); return true; } }]),
         EditorView.updateListener.of(update => {
-          if (update.docChanged) latest.current.onChange(update.state.sliceDoc());
+          if (update.docChanged && !synchronizing.current) latest.current.onChange(update.state.sliceDoc());
         }),
       ] }),
     });
@@ -58,6 +59,16 @@ export function ProjectEditor(props: Props) {
     };
     // A document version remounts this editor; keystrokes must not recreate it or reset history.
   }, []);
+  useEffect(() => {
+    const editor = view.current;
+    if (!editor || editor.state.sliceDoc() === props.text) return;
+    // Another view of the same project may have edited this draft while this editor was hidden.
+    synchronizing.current = true;
+    try {
+      editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: props.text },
+        annotations: Transaction.addToHistory.of(false) });
+    } finally { synchronizing.current = false; }
+  }, [props.text]);
   useEffect(() => {
     view.current?.dispatch({ effects: settings.current.editable.reconfigure(EditorState.readOnly.of(props.readOnly)) });
   }, [props.readOnly]);

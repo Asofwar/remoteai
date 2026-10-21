@@ -7,8 +7,10 @@ import { setInterfaceLanguage } from '../../../shared/i18n/interfaceLanguage';
 import { createProjectBrowserClient } from '../../../shared/project-browser/protocol';
 import { browserRequest, browserRoot } from '../../desktop/e2e/project-browser-fixture';
 import { ProjectBrowser } from '../src/chat/ProjectBrowser';
+import { setFileAutoSave } from '../src/settings/filePreferences';
 
 setInterfaceLanguage('zh');
+void setFileAutoSave(0);
 const client = createProjectBrowserClient(browserRequest);
 
 function Fixture() {

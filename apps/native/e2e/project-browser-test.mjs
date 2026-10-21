@@ -76,9 +76,14 @@ try {
   await screenshot('editing-keyboard');
   await adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
   await tap('关闭文件浏览器');
+  await find('打开文件浏览');
+  await tap('打开文件浏览');
+  assert.ok((await find('文件内容', 'EditText')).text.includes('native_edit'), 'Draft survives closing the drawer');
+  await tap('关闭文件 main.ts');
   await find('保留文件修改？');
   await screenshot('unsaved');
   await tap('保存并继续');
+  await tap('关闭文件浏览器');
   await find('打开文件浏览');
   await tap('打开文件浏览');
   await openCode();

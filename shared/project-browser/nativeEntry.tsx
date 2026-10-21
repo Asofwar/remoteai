@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { ProjectBrowser, type ProjectBrowserHandle } from './ProjectBrowser';
 import type { BrowserHostMessage, BrowserSettings } from './nativeBridge';
 import type { ProjectBrowserClient } from './protocol';
+import { autoSaveDelay } from './preferences';
 
 declare global {
   interface Window {
@@ -13,15 +14,17 @@ declare global {
 
 const REQUEST_TIMEOUT = 60_000;
 const pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void;
-  timer: ReturnType<typeof setTimeout> }>();
+  timer: ReturnType<typeof setTimeout>; action: string; finished: Promise<void>; finish: () => void }>();
 let nextId = 0;
 const send = (message: unknown) => window.ReactNativeWebView?.postMessage(JSON.stringify(message));
 const request = <T,>(action: string, body: object) => new Promise<T>((resolve, reject) => {
   const id = ++nextId;
+  let finish!: () => void;
+  const finished = new Promise<void>(resolve => { finish = resolve; });
   const timer = setTimeout(() => {
-    pending.delete(id); reject(new Error('请求超时，请重试。'));
+    pending.delete(id); reject(new Error('请求超时，请重试。')); finish();
   }, REQUEST_TIMEOUT);
-  pending.set(id, { resolve: value => resolve(value as T), reject, timer });
+  pending.set(id, { resolve: value => resolve(value as T), reject, timer, action, finished, finish });
   send({ type: 'request', id, action, body });
 });
 const client: ProjectBrowserClient = {
@@ -33,13 +36,26 @@ const element = document.getElementById('root');
 if (!element) throw new Error('Missing browser root');
 const root = createRoot(element);
 const browser = createRef<ProjectBrowserHandle>();
+let closing = false;
+let currentSettings: BrowserSettings | undefined;
+async function close() {
+  if (closing) return;
+  closing = true;
+  if (currentSettings) render(currentSettings);
+  // Finish writes before disposing the WebView so its saved revisions remain accurate on reopen.
+  await Promise.all([...pending.values()].filter(task => task.action === 'save').map(task => task.finished));
+  send({ type: 'closed', snapshot: browser.current?.snapshot() });
+}
 function render(settings: BrowserSettings) {
+  currentSettings = settings;
   for (const [name, value] of Object.entries(settings.theme)) {
     if (/^--[\w-]+$/.test(name)) document.documentElement.style.setProperty(name, value);
   }
   root.render(<ProjectBrowser key={settings.cwd} ref={browser} client={client} cwd={settings.cwd}
-    connected={settings.connected} t={text => settings.labels[text] ?? text}
-    onClose={() => send({ type: 'closed' })} />);
+    connected={settings.connected && !closing} t={text => settings.labels[text] ?? text}
+    initialSnapshot={settings.snapshot} preferences={{ delay: autoSaveDelay(settings.autoSaveDelay),
+      change: delay => { send({ type: 'preferences', delay }); render({ ...settings, autoSaveDelay: delay }); } }}
+    onClose={() => { void close(); }} />);
 }
 window.projectBrowserMessage = message => {
   if (message.type === 'settings') { render(message); return; }
@@ -48,5 +64,6 @@ window.projectBrowserMessage = message => {
   if (!task) return;
   clearTimeout(task.timer); pending.delete(message.id);
   if (message.error) task.reject(new Error(message.error)); else task.resolve(message.data);
+  task.finish();
 };
 send({ type: 'ready' });

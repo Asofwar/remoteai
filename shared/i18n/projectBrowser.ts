@@ -1,4 +1,17 @@
 export const projectBrowserEnglish: Readonly<Record<string, string>> = {
+  '打开的文件': 'Open files',
+  '关闭文件': 'Close file',
+  '文件浏览设置': 'File browser settings',
+  '文件自动保存': 'Auto-save files',
+  '关闭自动保存': 'Off',
+  '1 秒': '1 second',
+  '2 秒': '2 seconds',
+  '5 秒': '5 seconds',
+  '10 秒': '10 seconds',
+  '停止输入后自动保存。关闭后，可点击保存或按 Ctrl+S（Mac：⌘S）。':
+    'Save after you stop typing. When off, click Save or press Ctrl+S (Mac: ⌘S).',
+  '此文件有未保存的修改。': 'This file has unsaved changes.',
+  '未能保存设置，请重试。': 'Unable to save settings. Please try again.',
   '文件浏览': 'Browse files',
   '关闭文件浏览器': 'Close file browser',
   '展开文件浏览器': 'Expand file browser',
@@ -62,6 +75,19 @@ export const projectBrowserEnglish: Readonly<Record<string, string>> = {
 };
 
 export const projectBrowserRussian: Readonly<Record<string, string>> = {
+  '打开的文件': 'Открытые файлы',
+  '关闭文件': 'Закрыть файл',
+  '文件浏览设置': 'Настройки файлов',
+  '文件自动保存': 'Автосохранение файлов',
+  '关闭自动保存': 'Выключено',
+  '1 秒': '1 секунда',
+  '2 秒': '2 секунды',
+  '5 秒': '5 секунд',
+  '10 秒': '10 секунд',
+  '停止输入后自动保存。关闭后，可点击保存或按 Ctrl+S（Mac：⌘S）。':
+    'Сохранение после ввода. Если выключено, нажмите «Сохранить» или Ctrl+S (Mac: ⌘S).',
+  '此文件有未保存的修改。': 'В этом файле есть несохранённые изменения.',
+  '未能保存设置，请重试。': 'Не удалось сохранить настройки. Повторите попытку.',
   '文件浏览': 'Файлы проекта',
   '关闭文件浏览器': 'Закрыть файлы проекта',
   '展开文件浏览器': 'Развернуть файлы проекта',

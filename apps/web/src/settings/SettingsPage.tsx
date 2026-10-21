@@ -23,13 +23,16 @@ import { profileRole } from '../i18n/profile';
 import './styles.css';
 import { DownloadManagerPage } from '../downloads/DownloadManagerPage';
 import { downloadOwner } from '../downloads/manager';
+import { AutoSaveSettings } from '../../../../shared/project-browser/AutoSaveSettings';
+import { useBrowserPreferences } from '../../../../shared/project-browser/useBrowserPreferences';
 
 type Panel = 'profile' | 'identity' | 'refresh' | 'totp' | 'password' | 'about'
-  | 'language' | 'downloads' | 'desktop' | 'theme' | null;
+  | 'language' | 'downloads' | 'desktop' | 'theme' | 'files' | null;
 
 export function SettingsPage({ totpManager }: { totpManager: ReturnType<typeof useTotpVault> }) {
   useLanguage();
   const mode = useThemeMode();
+  const filePreferences = useBrowserPreferences();
   const dispatch = useAppDispatch();
   const session = useAppSelector(state => state.auth.session);
   const profile = useAppSelector(state => state.data.profile) ?? session?.profile;
@@ -59,6 +62,7 @@ export function SettingsPage({ totpManager }: { totpManager: ReturnType<typeof u
           <SettingsRow label={t('外观')} value={t(mode === 'dark' ? '暗黑' : '明亮')} icon={Contrast}
             onClick={() => setPanel('theme')} />
           <SettingsRow label={t('下载管理')} icon={Download} onClick={() => setPanel('downloads')} />
+          <SettingsRow label={t('文件自动保存')} icon={RefreshCw} onClick={() => setPanel('files')} />
           <SettingsRow label={t("语言")} value={languageLabel(getLanguage())} icon={Languages}
             onClick={() => setPanel('language')} />
           <SettingsRow label={t("自动刷新用量")} value={t("{value1} 分钟", { value1: minutes })} icon={RefreshCw}
@@ -80,6 +84,9 @@ export function SettingsPage({ totpManager }: { totpManager: ReturnType<typeof u
       <Button className="settings-logout" block color="danger" fill="outline" onClick={() => void logout()}>
         <LogOut size={21} />{t("退出登录")}</Button>
     </div>
+    <AdaptiveSheet open={panel === 'files'} title={t('文件浏览设置')} onClose={close} width={400}>
+      <div className="settings-sync"><AutoSaveSettings preferences={filePreferences} t={t} /></div>
+    </AdaptiveSheet>
     <AdaptiveSheet open={panel === 'profile' || panel === 'identity'} onClose={close} width={400}
       title={panel === 'identity' ? t("身份信息") : t("用户信息")}>
       <dl className="settings-profile-details"><dt>{t("邮箱")}</dt><dd>{email}</dd><dt>{t("身份")}</dt><dd>{role}</dd></dl>

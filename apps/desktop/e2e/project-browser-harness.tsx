@@ -24,16 +24,19 @@ localStorage.setItem('codex-switch:language', 'zh');
 
 function App() {
   const [connected, setConnected] = useState(true);
+  const [project, setProject] = useState(browserRoot);
   return <ConfigProvider theme={{ algorithm: dark ? theme.darkAlgorithm : theme.defaultAlgorithm }}>
     <div style={{ height: '100dvh', background: dark ? '#121614' : '#f5f8f6' }}>
       <DetailsWorkspace selected={null} active>
         <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
           <span>聊天</span>
-          {mode === 'local' && <LocalProjectBrowser cwd={browserRoot} active connected={connected} />}
+          {mode === 'local' && <LocalProjectBrowser cwd={project} active connected={connected} />}
           {mode === 'remote' && <ProjectBrowserButton client={client.projectBrowser} cwd="D:/remote"
             active connected={connected} />}
           {mode === 'mobile' && <ChatTools client={client} cwd={browserRoot} active connected={connected} />}
           <button type="button" onClick={() => setConnected(value => !value)}>切换连接</button>
+          <button type="button" onClick={() => setProject(value => value === browserRoot ? 'C:/other' : browserRoot)}>
+            切换项目</button>
         </div>
       </DetailsWorkspace>
     </div>

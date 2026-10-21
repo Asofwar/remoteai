@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useProjectBrowsers } from '../../../../../shared/project-browser/useProjectBrowsers';
 import { FolderSearch } from 'lucide-react';
 import type { ProjectBrowserClient } from '../../../../../shared/project-browser/protocol';
 import { ProjectBrowserDrawer } from './ProjectBrowserDrawer';
@@ -9,14 +9,14 @@ export function ProjectBrowserButton({ client, cwd, connected, active, className
   className?: string; desktopStyle?: boolean;
 }) {
   useLanguage();
-  // Retain the opened project and its draft even if the conversation changes behind the drawer.
-  const [openedProject, setOpenedProject] = useState<string>();
+  const browsers = useProjectBrowsers();
   return <>
     <button type="button" className={className} disabled={!active || !connected || !cwd}
-      aria-label={t('文件浏览')} aria-haspopup="dialog" aria-expanded={!!openedProject}
-      onClick={() => setOpenedProject(value => value ?? cwd)}>
+      aria-label={t('文件浏览')} aria-haspopup="dialog" aria-expanded={!!browsers.visible}
+      onClick={() => browsers.open(cwd)}>
       <FolderSearch size={16} /><span>{t('文件浏览')}</span></button>
-    {openedProject && <ProjectBrowserDrawer client={client} cwd={openedProject} connected={connected}
-      active={active} desktopStyle={desktopStyle} onClose={() => setOpenedProject(undefined)} />}
+    {browsers.projects.map(project => <ProjectBrowserDrawer key={project} client={client} cwd={project}
+      connected={connected} active={active && browsers.visible === project}
+      desktopStyle={desktopStyle} onClose={browsers.close} />)}
   </>;
 }

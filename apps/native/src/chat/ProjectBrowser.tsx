@@ -11,6 +11,9 @@ import { projectBrowserEnglish } from '../../../../shared/i18n/projectBrowser';
 import { t, useLanguage } from '../i18n';
 import { useThemeColor } from '../theme/store';
 import { createThemedStyles } from '../theme/styles';
+import { useFilePreferences, setFileAutoSave } from '../settings/filePreferences';
+import { readBrowserSession, saveBrowserSession } from './projectBrowserSessions';
+import type { DocumentsSnapshot } from '../../../../shared/project-browser/documents';
 
 export function ProjectBrowser({ client, cwd, connected, active, onClose }: {
   client: ProjectBrowserClient; cwd: string; connected: boolean; active: boolean; onClose: () => void;
@@ -18,6 +21,7 @@ export function ProjectBrowser({ client, cwd, connected, active, onClose }: {
   const language = useLanguage();
   const color = useThemeColor();
   const styles = useStyles();
+  const preferences = useFilePreferences();
   const webview = useRef<WebView>(null);
   const [html, setHtml] = useState('');
   const [error, setError] = useState('');
@@ -38,13 +42,14 @@ export function ProjectBrowser({ client, cwd, connected, active, onClose }: {
     void load().catch(() => { if (!cancelled) setError('文件浏览器未能加载，请重新打开。'); });
     return () => { cancelled = true; };
   }, []);
-  const update = () => emit({ type: 'settings', cwd, connected: connected && active,
+  const update = () => emit({ type: 'settings', cwd, connected: connected && active && preferences.ready,
+    autoSaveDelay: preferences.delay, snapshot: readBrowserSession(client, cwd),
     labels: Object.fromEntries(Object.keys(projectBrowserEnglish).map(text => [text, t(text)])),
     theme: { '--ink': color('#202c29', 'ink'), '--muted': color('#718078', 'muted'),
       '--panel': color('#fff', 'surface'), '--bg': color('#f5f8f6', 'canvas'),
       '--line': color('#dfe5e1', 'border'), '--green': color('#138475', 'accent'),
       '--browser-on-accent': color('#fff', 'canvas') } });
-  useEffect(() => { if (ready) update(); }, [ready, connected, active, cwd, language, color]);
+  useEffect(() => { if (ready) update(); }, [ready, connected, active, cwd, language, color, preferences]);
   // Backgrounding the app must not unmount the WebView and discard its unsaved document.
   return <Modal visible animationType="slide" onRequestClose={close}
     supportedOrientations={['portrait', 'landscape-left', 'landscape-right']}>
@@ -69,7 +74,19 @@ export function ProjectBrowser({ client, cwd, connected, active, onClose }: {
             try { message = JSON.parse(nativeEvent.data); } catch { return; }
             if (!message || typeof message !== 'object' || !('type' in message)) return;
             if (message.type === 'ready') { setReady(true); update(); return; }
-            if (message.type === 'closed') { onClose(); return; }
+            if (message.type === 'closed') {
+              if ('snapshot' in message && message.snapshot && typeof message.snapshot === 'object'
+                && 'tabs' in message.snapshot && Array.isArray(message.snapshot.tabs)) {
+                saveBrowserSession(client, cwd, message.snapshot as DocumentsSnapshot);
+              }
+              onClose(); return;
+            }
+            if (message.type === 'preferences' && 'delay' in message && typeof message.delay === 'number') {
+              void setFileAutoSave(message.delay).then(saved => {
+                if (!saved) setError('未能保存设置，请重试。');
+              });
+              return;
+            }
             void handleBrowserRequest(nativeEvent.data, { client, cwd, connected: connected && active })
               .then(reply => { if (reply) emit(reply); });
           }}

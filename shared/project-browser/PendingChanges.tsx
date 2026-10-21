@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 import type { BrowserTranslate } from './ProjectTree';
 
-export function PendingChanges({ saving, connected, error, cancel, discard, save, t }: {
+export function PendingChanges({ saving, connected, error, path, cancel, discard, save, t }: {
   saving: boolean; connected: boolean; error: string; cancel: () => void; discard: () => void;
-  save: () => void; t: BrowserTranslate;
+  save: () => void; t: BrowserTranslate; path: string;
 }) {
   const host = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -21,7 +21,7 @@ export function PendingChanges({ saving, connected, error, cancel, discard, save
         event.preventDefault();
         buttons[(index + (event.shiftKey ? -1 : 1) + buttons.length) % buttons.length]?.focus();
       }}>
-      <strong>{t('保留文件修改？')}</strong><p>{t('当前文件有未保存的修改。')}</p>
+      <strong>{t('保留文件修改？')}</strong><p>{path.split(/[\\/]/).at(-1)}<br />{t('此文件有未保存的修改。')}</p>
       <div>
         <button type="button" disabled={saving} onClick={cancel}>{t('取消')}</button>
         <button type="button" disabled={saving} onClick={discard}>{t('放弃修改')}</button>

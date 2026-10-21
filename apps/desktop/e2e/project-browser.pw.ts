@@ -47,7 +47,7 @@ for (const mode of ['local', 'remote']) {
     await page.getByRole('button', { name: '保存', exact: true }).click();
     await expect(page.getByRole('alert')).toContainText('其他地方修改');
     await expect(editor).toContainText('conflict');
-    await page.getByRole('button', { name: '关闭文件浏览器' }).click();
+    await page.getByRole('button', { name: '关闭文件 main.ts', exact: true }).click();
     await expect(page.getByRole('alertdialog')).toBeVisible();
     await page.getByRole('button', { name: '取消', exact: true }).click();
     await expect(editor).toContainText('conflict');
@@ -60,6 +60,9 @@ test('mobile tool menu, file navigation, plain text, find, unsaved guard and key
   await openBrowser(page, 'mobile');
   await expect(page.getByRole('separator', { name: '调整文件树宽度' })).toBeHidden();
   await page.getByRole('treeitem', { name: 'notes.txt', exact: true }).click();
+  await page.getByRole('button', { name: '文件浏览设置' }).click();
+  await page.getByLabel('文件自动保存', { exact: true }).selectOption('0');
+  await page.getByRole('button', { name: '文件浏览设置' }).click();
   const editor = page.getByRole('textbox', { name: '文件内容', exact: true });
   await expect(editor).toContainText('Project notes');
   await expect(page.getByRole('tree')).toBeHidden();
@@ -70,13 +73,16 @@ test('mobile tool menu, file navigation, plain text, find, unsaved guard and key
   await editor.fill('my unsaved notes');
   await page.getByRole('button', { name: '返回文件列表' }).click();
   await page.getByRole('treeitem', { name: 'settings.json', exact: true }).click();
-  await expect(page.getByRole('alertdialog')).toBeVisible();
+  await expect(page.getByRole('alertdialog')).toBeHidden();
+  await page.getByRole('tab', { name: 'notes.txt', exact: true }).click();
+  await expect(editor).toContainText('my unsaved notes');
+  await page.getByRole('button', { name: '关闭文件 notes.txt', exact: true }).click();
   await page.getByRole('button', { name: '保存并继续' }).click();
   await expect(editor).toContainText('"enabled"');
   await page.setViewportSize({ width: 390, height: 430 });
   await page.getByRole('button', { name: '查找', exact: true }).click();
   await page.getByPlaceholder('查找', { exact: true }).fill('enabled');
-  await expect(page.locator('.cm-searchMatch')).not.toHaveCount(0);
+  await expect(page.locator('.pf-file-panel:not([hidden]) .cm-searchMatch')).not.toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await page.screenshot({ path: '../../.codex-tmp/project-browser-mobile.png' });
 });

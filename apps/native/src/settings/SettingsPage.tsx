@@ -16,6 +16,7 @@ import { RefreshIntervalSheet } from './RefreshIntervalSheet';
 import { SettingsRow } from './SettingsRow';
 import { DesktopVersionSheet } from './DesktopVersionSheet';
 import { settingsColors, useStyles } from './styles';
+import { FileAutoSaveSheet } from './FileAutoSaveSheet';
 
 interface SettingsPageProps {
   session: AuthSession;
@@ -30,7 +31,7 @@ interface SettingsPageProps {
 }
 
 type SettingsPanel = 'profile' | 'identity' | 'refresh' | 'totp' | 'password' | 'logout'
-  | 'desktop' | 'language' | 'theme' | null;
+  | 'desktop' | 'language' | 'theme' | 'files' | null;
 
 function identityLabel(profile?: UserProfile | null) {
   if (!profile) return t("加载中…");
@@ -76,6 +77,8 @@ export function SettingsPage({ session, profile, globalRefreshMinutes, onGlobalR
           background="#f4f4ff" onPress={() => setPanel('identity')} />
       </View>
       <View style={styles.group}>
+        <SettingsRow label={t('文件自动保存')} icon="save-outline"
+          color={color(settingsColors.green, 'accent')} background="#e5fbf3" divider onPress={() => setPanel('files')} />
         <SettingsRow label={t("自动刷新用量")} value={t("{value1} 分钟", { value1: globalRefreshMinutes })} icon="sync-outline"
           color={color(settingsColors.green, 'accent')} background="#e5fbf3" divider onPress={() => setPanel('refresh')} />
         <SettingsRow label={t("2FA 密钥")} value={totpManager.cloudSyncEnabled ? t("已开启") : t("未开启")}
@@ -124,6 +127,7 @@ export function SettingsPage({ session, profile, globalRefreshMinutes, onGlobalR
     </BottomSheet>
     {panel === 'language' && <LanguageSheet onClose={close} />}
     {panel === 'theme' && <ThemeSheet onClose={close} />}
+    {panel === 'files' && <FileAutoSaveSheet onClose={close} />}
     {panel === 'password' && <PasswordSheet session={session} onClose={close} />}
     {panel === 'desktop' && <DesktopVersionSheet session={session} onClose={close} />}
     <BottomSheet visible={panel === 'logout'} title={t("退出登录")} onClose={close} actions={[

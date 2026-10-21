@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppRelease } from './appUpdate';
 
 const native = vi.hoisted(() => ({
@@ -57,7 +57,57 @@ beforeEach(() => {
   native.listen.mockReturnValue({ remove: native.remove });
 });
 
+afterEach(() => { vi.useRealTimers(); });
+
 describe('Android update recovery after restarting the app', () => {
+  it('restores system download bytes after restart, updates speed, and offers the completed APK', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    native.status.mockResolvedValue('running');
+    const snapshot = vi.fn().mockResolvedValue({ status: 'running', receivedBytes: 40, totalBytes: 100 });
+    const verify = vi.fn().mockResolvedValue(true);
+    native.modules.AppUpdate = { getDownloadSnapshot: snapshot, getDownloadStatus: native.status,
+      verifyPackage: verify };
+    const update = await import('./appUpdate');
+    const listener = vi.fn();
+    const unsubscribe = update.subscribeAndroidUpdateDownload(listener);
+    expect(await update.refreshAndroidUpdateDownloadState()).toEqual({
+      status: 'downloading', version: stored.version,
+      progress: { receivedBytes: 40, totalBytes: 100, bytesPerSecond: 0, phase: 'downloading' },
+    });
+    vi.setSystemTime(15_000);
+    snapshot.mockResolvedValue({ status: 'running', receivedBytes: 70, totalBytes: 100 });
+    await update.refreshAndroidUpdateDownloadState();
+    expect(listener).toHaveBeenLastCalledWith({
+      status: 'downloading', version: stored.version,
+      progress: { receivedBytes: 70, totalBytes: 100, bytesPerSecond: 6, phase: 'downloading' },
+    });
+    snapshot.mockResolvedValue({ status: 'successful', receivedBytes: 100, totalBytes: 100 });
+    native.exists.mockResolvedValue(true);
+    expect(await update.refreshAndroidUpdateDownloadState()).toEqual({
+      status: 'downloaded', version: stored.version, path: stored.path,
+    });
+    expect(verify).toHaveBeenCalledOnce();
+    expect(snapshot).toHaveBeenCalledWith(stored.path);
+    expect(native.status).not.toHaveBeenCalled();
+    expect(native.fetch).not.toHaveBeenCalled();
+    expect(native.deleteItem).not.toHaveBeenCalled();
+    unsubscribe();
+  });
+
+  it.each(['pending', 'running', 'paused'])('retains progress for a restored %s download', async status => {
+    native.status.mockResolvedValue(status);
+    const snapshot = vi.fn().mockResolvedValue({ status, receivedBytes: 40, totalBytes: 0 });
+    native.modules.AppUpdate = { getDownloadSnapshot: snapshot };
+    const update = await import('./appUpdate');
+    expect(await update.refreshAndroidUpdateDownloadState()).toEqual({
+      status: 'downloading', version: stored.version,
+      progress: { receivedBytes: 40, totalBytes: stored.expectedSize, bytesPerSecond: 0, phase: 'downloading' },
+    });
+    expect(native.fetch).not.toHaveBeenCalled();
+    expect(native.deleteItem).not.toHaveBeenCalled();
+  });
+
   it.each(['success', 'transfer-failed', 'verify-failed'])(
     'settles one report only after the official fallback and verification: %s', async outcome => {
       const transfer = deferred<string>();

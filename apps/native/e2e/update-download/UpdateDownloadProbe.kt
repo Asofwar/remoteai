@@ -7,10 +7,13 @@ import java.security.MessageDigest
 
 object UpdateDownloadProbe {
   @JvmStatic fun main(args: Array<String>) {
+    UpdateSnapshotChecks.run()
     UpdateOriginChecks.run()
     UpdatePipelineChecks.run()
     UpdateStorageChecks.run()
     if (args.isNotEmpty()) downloadRelease(args)
+    // Some phones retain a network helper thread after all synchronous checks and cleanup have finished.
+    kotlin.system.exitProcess(0)
   }
 
   private fun downloadRelease(args: Array<String>) = UpdateTestStorage().use { storage ->

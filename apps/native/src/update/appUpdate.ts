@@ -3,7 +3,7 @@ import * as Application from 'expo-application';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import appConfig from '../../app.json';
-import { getAndroidDownloadStatus } from './androidDownloadStatus';
+import { getAndroidDownloadSnapshot } from './androidDownloadStatus';
 import { downloadSharedAndroidUpdate, downloadOfficialAndroidUpdate,
   nativeUpdatePath, verifyAndroidPackage } from './androidSharedDownload';
 import { compareAppVersions, versionFromReleaseMetadata } from '../../../../shared/app-update/version';
@@ -216,9 +216,9 @@ async function restoreAndroidUpdateDownloadState(): Promise<AndroidUpdateDownloa
     return { status: 'idle' };
   }
   try {
-    const status = await getAndroidDownloadStatus(stored.path);
+    const { status, progress } = await getAndroidDownloadSnapshot(stored.path, stored.expectedSize);
     if (status === 'pending' || status === 'running' || status === 'paused') {
-      return { status: 'downloading', version: stored.version };
+      return { status: 'downloading', version: stored.version, ...(progress ? { progress } : {}) };
     }
     if (status !== 'failed' && await storedUpdateIsComplete(stored, status === 'successful')) {
       return { status: 'downloaded', version: stored.version, path: stored.path };

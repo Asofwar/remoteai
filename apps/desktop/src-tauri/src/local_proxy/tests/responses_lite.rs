@@ -6,11 +6,13 @@ fn lite_test_headers() -> Vec<(String, String)> {
 }
 
 fn lite_upstream() -> (String, thread::JoinHandle<(Value, bool)>) {
+    // The large-request regression prepares and parses 137 MB before connecting on shared CI runners.
+    const REQUEST_WAIT_TIMEOUT: Duration = Duration::from_secs(30);
     let server = Server::http("127.0.0.1:0").unwrap();
     let url = format!("http://{}", server.server_addr().to_ip().unwrap());
     let worker = thread::spawn(move || {
         let mut request = server
-            .recv_timeout(Duration::from_secs(5))
+            .recv_timeout(REQUEST_WAIT_TIMEOUT)
             .unwrap()
             .unwrap();
         let lite = request.headers().iter().any(|header| {

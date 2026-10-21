@@ -39,7 +39,7 @@ fn parse_official_model_catalog_payload(
         .map(|(_, value)| value.clone());
     let body = read_official_model_catalog_body(&mut payload.body)?;
     let catalog = serde_json::from_slice(&body)
-        .map_err(|error| format!("Official model catalog is invalid: {error}"))?;
+        .map_err(|error| request_error::RequestError::json(request_error::Stage::Catalog, &error).wire())?;
     Ok(OfficialModelCatalogFetch { catalog, etag })
 }
 
@@ -50,7 +50,7 @@ fn read_official_model_catalog_body(body: &mut UpstreamBody) -> Result<Vec<u8>, 
         UpstreamBody::Streaming(reader) => {
             reader
                 .read_to_end(&mut bytes)
-                .map_err(|error| format!("Failed to read the official model catalog: {error}"))?;
+                .map_err(|error| request_error::RequestError::io(request_error::Stage::Catalog, &error).wire())?;
         }
     };
     Ok(bytes)
@@ -151,7 +151,7 @@ fn override_official_model_context_windows(
         }
     }
     let mut catalog = serde_json::from_slice::<Value>(&body)
-        .map_err(|error| format!("Upstream model catalog is not valid JSON: {error}"))?;
+        .map_err(|error| request_error::RequestError::json(request_error::Stage::Catalog, &error).wire())?;
     let completed = complete_models(&mut catalog);
     let updated =
         apply_official_context_windows(&mut catalog, global_context_window, model_context_windows);
@@ -230,7 +230,7 @@ fn override_model_image_input(
         }
     }
     let mut catalog = serde_json::from_slice::<Value>(&body)
-        .map_err(|error| format!("Upstream model catalog is not valid JSON: {error}"))?;
+        .map_err(|error| request_error::RequestError::json(request_error::Stage::Catalog, &error).wire())?;
     let Some(models) = catalog.get_mut("models").and_then(Value::as_array_mut) else {
         payload.body = UpstreamBody::Buffered(body);
         return Ok(payload);

@@ -1,17 +1,29 @@
 use serde_json::{json, Value};
 
 use super::{continuation, request::ConversionError};
+use super::{Problem, RequestError, Stage};
 
 pub(super) fn to_chat(
     value: &Value,
     scope: &continuation::Scope,
 ) -> Result<Value, ConversionError> {
+    if value.get("error").is_some() {
+        return Err(ConversionError::Detailed(
+            crate::local_proxy::request_error::upstream(Stage::Anthropic, value),
+        ));
+    }
     let content = value["content"]
         .as_array()
-        .ok_or(ConversionError::InvalidResponse)?;
+        .ok_or(ConversionError::Detailed(RequestError::new(
+            Stage::Anthropic,
+            Problem::MissingContent,
+        )))?;
     let stop = value["stop_reason"]
         .as_str()
-        .ok_or(ConversionError::InvalidResponse)?;
+        .ok_or(ConversionError::Detailed(RequestError::new(
+            Stage::Anthropic,
+            Problem::MissingStopReason,
+        )))?;
     let mut text = String::new();
     let mut reasoning = String::new();
     let mut calls = Vec::new();
@@ -21,7 +33,12 @@ pub(super) fn to_chat(
             Some("thinking") => reasoning.push_str(block["thinking"].as_str().unwrap_or_default()),
             Some("redacted_thinking") => {}
             Some("tool_use") => calls.push(tool_call(block)?),
-            _ => return Err(ConversionError::UnsupportedContent),
+            _ => {
+                return Err(ConversionError::Detailed(RequestError::new(
+                    Stage::Anthropic,
+                    Problem::UnsupportedResponseContent,
+                )))
+            }
         }
     }
     if matches!(stop, "end_turn" | "stop_sequence" | "tool_use") {
@@ -40,7 +57,10 @@ pub(super) fn tool_call(block: &Value) -> Result<Value, ConversionError> {
         || block["id"].as_str().is_none()
         || block["name"].as_str().is_none()
     {
-        return Err(ConversionError::InvalidResponse);
+        return Err(ConversionError::Detailed(RequestError::new(
+            Stage::Anthropic,
+            Problem::InvalidTool,
+        )));
     }
     Ok(json!({ "id": block["id"], "type": "function", "function": {
         "name": block["name"], "arguments": block["input"].to_string()

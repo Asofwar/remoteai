@@ -291,10 +291,7 @@ fn responses_read_timeout_sends_a_codex_failure_and_keeps_connection_usable() {
     assert_eq!(failure["type"], "response.failed");
     assert_eq!(failure["response"]["status"], "failed");
     assert_eq!(failure["response"]["error"]["code"], "server_error");
-    assert_eq!(
-        failure["response"]["error"]["message"],
-        "The response timed out. Please try again."
-    );
+    assert!(failure["response"]["error"]["message"].as_str().unwrap().contains("等待后续数据超时"));
     assert!(!body.contains("response.completed"));
     client.send("GET /next HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
     assert!(client.headers().starts_with("HTTP/1.1 204"));

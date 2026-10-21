@@ -35,12 +35,33 @@ fn transport_messages_distinguish_failure_stages_and_causes() {
         ),
         ("error sending request", TransportFailure::Connection),
     ] {
-        for context in ["Official Codex", "Provider"] {
-            let error = format!("{context} proxy request failed: {detail}");
+        for context in [
+            "Official Codex proxy",
+            "Provider proxy",
+            "Messages",
+            "Content generation",
+            "Chat bridge",
+        ] {
+            let error = format!("{context} request failed: {detail}");
             assert_eq!(transport(&error), Some(expected.message()), "{error}");
             assert_eq!(gui(&error), expected.message(), "{error}");
         }
     }
+}
+
+#[test]
+fn retry_attempts_and_redirect_errors_are_not_reported_as_unknown_connections() {
+    let message = gui("Messages request failed: operation timed out (attempts: 7)");
+    assert!(message.contains("连接上游服务超时"));
+    assert!(message.contains("已尝试 7 次"));
+    assert!(
+        gui("Provider proxy request failed: upstream redirect limit exceeded (10)")
+            .contains("重定向次数")
+    );
+    assert!(
+        gui("Content generation request failed: unsupported redirect scheme").contains("地址协议")
+    );
+    assert!(gui("Chat bridge request failed: builder error").contains("自定义请求头"));
 }
 
 #[test]
@@ -65,6 +86,6 @@ fn account_errors_remain_actionable_without_guessing_the_cause() {
     let exhausted = "暂无符合条件的账号，请调整自动切号设置或选择其他账户。";
     assert_eq!(gui(missing), missing);
     assert_eq!(gui(exhausted), exhausted);
-    assert!(gui("unexpected internal failure").contains("暂时无法确认原因"));
+    assert!(gui("unexpected internal failure").contains("错误编号"));
     assert!(transport("Official Codex proxy request returned HTTP 401").is_none());
 }

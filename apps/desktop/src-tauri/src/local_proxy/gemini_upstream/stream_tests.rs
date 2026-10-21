@@ -17,6 +17,40 @@ fn convert(input: &str) -> String {
 }
 
 #[test]
+fn native_error_status_and_malformed_json_remain_specific_after_conversion() {
+    for (input, expected) in [
+        ("data: {\"error\":{\"code\":403,\"status\":\"PERMISSION_DENIED\",\"message\":\"private\"}}\n\n",
+            "无权访问"),
+        ("data: {\"error\":{\"code\":429,\"message\":\"private\"}}\n\n", "HTTP 429"),
+        ("data: {bad}\n\n", "JSON 语法无效"),
+        ("data: {\"candidates\":[]}\n\n", "结束原因"),
+    ] {
+        let output = convert(input);
+        assert!(output.contains("response.failed"), "{output}");
+        assert!(output.contains(expected), "{output}");
+        assert!(!output.contains("response.completed"));
+        assert!(!output.contains("private"));
+        assert!(!output.contains("proxy_request_error:"));
+    }
+}
+
+#[test]
+fn failed_tool_generation_preserves_reported_usage_without_completing_the_response() {
+    let input = json!({"candidates":[{"finishReason":"MALFORMED_FUNCTION_CALL"}],
+        "usageMetadata":{"promptTokenCount":11,"candidatesTokenCount":7}});
+    let output = convert(&format!("data: {input}\n\n"));
+    let response = terminal(&output);
+    assert_eq!(response["status"], "failed");
+    assert_eq!(response["usage"]["input_tokens"], 11);
+    assert_eq!(response["usage"]["output_tokens"], 7);
+    assert_eq!(response["usage"]["usage_incomplete"], true);
+    assert!(response["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("工具调用参数"));
+}
+
+#[test]
 fn native_stream_accepts_events_content_and_metadata_above_previous_limits() {
     let text = "x".repeat(8 * 1024 * 1024 + 1);
     let first = json!({"candidates":[{"content":{"parts":[{"text":text}]}}]});

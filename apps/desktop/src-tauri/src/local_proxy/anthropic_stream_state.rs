@@ -1,3 +1,4 @@
+use super::Problem;
 use super::{blocks::ContentBlocks, ConversionError};
 use serde_json::{json, Value};
 
@@ -50,9 +51,11 @@ impl MessageState {
         let kind = value
             .get("type")
             .and_then(Value::as_str)
-            .ok_or(ConversionError::InvalidEvent)?;
+            .ok_or(ConversionError::invalid(Problem::MissingEventType))?;
         if matches!(kind, "response.failed" | "error") {
-            return Err(ConversionError::UpstreamFailed);
+            return Err(ConversionError::Detailed(
+                super::super::request_error::upstream(super::Stage::Responses, value),
+            ));
         }
         let mut events = Vec::new();
         self.start(&mut events);
@@ -109,7 +112,7 @@ impl MessageState {
         let response = value
             .get("response")
             .filter(|response| response.is_object())
-            .ok_or(ConversionError::InvalidEvent)?;
+            .ok_or(ConversionError::invalid(Problem::MissingResponse))?;
         let incomplete = value["type"] == "response.incomplete";
         let expected = if incomplete {
             "incomplete"
@@ -121,7 +124,7 @@ impl MessageState {
             .and_then(Value::as_str)
             .is_some_and(|status| status != expected)
         {
-            return Err(ConversionError::InvalidEvent);
+            return Err(ConversionError::invalid(Problem::ResponseStatus));
         }
         if incomplete
             && response
@@ -129,7 +132,20 @@ impl MessageState {
                 .and_then(Value::as_str)
                 != Some("max_output_tokens")
         {
-            return Err(ConversionError::Incomplete);
+            return Err(
+                if response
+                    .pointer("/incomplete_details/reason")
+                    .and_then(Value::as_str)
+                    == Some("content_filter")
+                {
+                    ConversionError::Detailed(super::RequestError::new(
+                        super::Stage::Responses,
+                        super::Problem::ContentFilter,
+                    ))
+                } else {
+                    ConversionError::Incomplete
+                },
+            );
         }
         self.blocks.complete(response, events)?;
         self.stop_reason = Some(if incomplete {

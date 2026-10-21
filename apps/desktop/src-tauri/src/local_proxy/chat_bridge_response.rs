@@ -1,5 +1,6 @@
 //! Normalize response framing independently of a gateway's Content-Type header.
 
+use super::request_error::{Problem, RequestError, Stage};
 use super::*;
 
 const MAX_SNIFF_BYTES: usize = 4096;
@@ -31,7 +32,7 @@ pub(super) fn convert(
     } else {
         let bytes = read_response(reader)?;
         let chat: Value = serde_json::from_slice(&bytes)
-            .map_err(|_| "The service returned an unreadable response")?;
+            .map_err(|error| RequestError::json(Stage::Chat, &error).wire())?;
         convert_json(chat, context)?
     };
     payload.status = status;
@@ -77,12 +78,12 @@ pub(super) fn completed_response(reader: impl Read) -> Result<Value, String> {
         })
         .filter_map(|event| event.get("response").cloned())
         .next_back()
-        .ok_or_else(|| "The service response ended before it was complete".to_string())
+        .ok_or_else(|| RequestError::new(Stage::Chat, Problem::MissingTerminal).wire())
 }
 
 fn convert_json(chat: Value, context: Context) -> Result<UpstreamPayload, String> {
     if chat.pointer("/choices/0/message").is_none() && chat.get("error").is_none() {
-        return Err("The service returned an unreadable response".into());
+        return Err(RequestError::new(Stage::Chat, Problem::MissingChoices).wire());
     }
     if !context.stream {
         return Ok(json_payload(
@@ -122,7 +123,7 @@ pub(super) fn read_response(mut reader: impl Read) -> Result<Vec<u8>, String> {
     let mut bytes = Vec::new();
     reader
         .read_to_end(&mut bytes)
-        .map_err(|_| "The service response could not be read")?;
+        .map_err(|error| RequestError::io(Stage::Read, &error).wire())?;
     Ok(bytes)
 }
 
@@ -135,7 +136,7 @@ pub(super) fn sniff<R: Read>(reader: R) -> Result<(bool, PrefixedReader<R>), Str
         let mut byte = [0];
         if reader
             .read(&mut byte)
-            .map_err(|_| "The service response could not be read")?
+            .map_err(|error| RequestError::io(Stage::Read, &error).wire())?
             == 0
         {
             break;
@@ -154,7 +155,7 @@ pub(super) fn sniff<R: Read>(reader: R) -> Result<(bool, PrefixedReader<R>), Str
             return Ok((is_sse, std::io::Cursor::new(prefix).chain(reader)));
         }
     }
-    Err("The service returned an unreadable response".into())
+    Err(RequestError::new(Stage::Read, Problem::Framing).wire())
 }
 
 #[cfg(test)]

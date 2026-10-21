@@ -28,6 +28,49 @@ fn convert_stream(input: &str) -> String {
     result
 }
 
+#[test]
+fn native_errors_keep_their_cause_after_messages_chat_responses_conversion() {
+    for (input, expected) in [
+        ("data: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"private\"}}\n\n",
+            "频率或并发数"),
+        ("data: {\n\n", "JSON 数据不完整"),
+        ("data: {\"type\":\"content_block_start\"}\n\n", "index"),
+        ("", "没有发送完整的响应结束事件"),
+    ] {
+        let output = convert_stream(input);
+        assert!(output.contains("response.failed"), "{output}");
+        assert!(output.contains(expected), "{output}");
+        assert!(!output.contains("private"));
+        assert!(!output.contains("proxy_request_error:"));
+        assert!(!output.contains("response.completed"));
+    }
+}
+
+#[test]
+fn native_read_timeout_remains_a_timeout_after_conversion() {
+    struct Timeout;
+    impl Read for Timeout {
+        fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "private"))
+        }
+    }
+    let native = MessagesReader::new(
+        BufReader::new(Timeout),
+        continuation::Scope::fixture("timeout"),
+    );
+    let mut reader = super::super::ChatSseReader::new(
+        BufReader::new(native),
+        "claude".into(),
+        Default::default(),
+        None,
+    );
+    let mut output = String::new();
+    reader.read_to_string(&mut output).unwrap();
+    assert!(output.contains("等待后续数据超时"), "{output}");
+    assert!(output.contains("Anthropic"));
+    assert!(!output.contains("private"));
+}
+
 fn start() -> Value {
     json!({ "type": "message_start", "message": { "id": "msg", "model": "claude",
         "usage": { "input_tokens": 11, "output_tokens": 1, "cache_read_input_tokens": 4,

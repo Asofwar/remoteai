@@ -58,9 +58,10 @@ pub(super) fn handle<R: Runtime>(
     handle_selected(request).map_err(|error| {
         diagnostic_event(json!({
             "event": "gui_request_failed",
+            "errorId": super::error_messages::error_id(&error),
             "error": crate::error_logs::sanitize_diagnostic_message(&error)
         }));
-        super::error_messages::gui(&error).to_string()
+        super::error_messages::gui(&error)
     })
 }
 

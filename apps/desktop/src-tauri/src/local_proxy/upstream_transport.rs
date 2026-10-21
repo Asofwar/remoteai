@@ -58,8 +58,10 @@ pub(super) enum Error {
     Timeout { phase: Phase, sent_bytes: usize },
     #[error("upstream request requires a buffered body")]
     UnbufferedBody,
-    #[error("upstream redirect could not be followed")]
-    Redirect,
+    #[error("upstream redirect limit exceeded ({0})")]
+    RedirectLimit(u32),
+    #[error("unsupported redirect scheme")]
+    RedirectScheme,
     #[error(transparent)]
     Proxy(#[from] crate::system_proxy::ProxyResolutionError),
     #[error("{0}")]
@@ -72,7 +74,10 @@ impl Error {
             Self::Timeout { .. } => true,
             Self::Http { source, .. } => source.is_timeout(),
             Self::AfterRedirect(source) => source.is_timeout(),
-            Self::UnbufferedBody | Self::Redirect | Self::Proxy(_) => false,
+            Self::UnbufferedBody
+            | Self::RedirectLimit(_)
+            | Self::RedirectScheme
+            | Self::Proxy(_) => false,
         }
     }
 

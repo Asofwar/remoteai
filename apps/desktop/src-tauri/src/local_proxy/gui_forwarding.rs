@@ -103,7 +103,9 @@ fn help_target<R: Runtime>(
     body: &[u8],
 ) -> Result<ActiveTarget, String> {
     let mut target = selected_target(app, selection)?;
-    let body: Value = serde_json::from_slice(body).map_err(|_| "Invalid help request")?;
+    let body: Value = serde_json::from_slice(body).map_err(|error| {
+        request_error::RequestError::json(request_error::Stage::Request, &error).wire()
+    })?;
     let model = requested_model(&body).ok_or("Missing help model")?;
     if let ActiveTarget::Provider(provider) = &mut target {
         if !providers::supports_explicit_model(provider, model) {

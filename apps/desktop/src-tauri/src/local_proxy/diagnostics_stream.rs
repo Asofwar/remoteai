@@ -115,7 +115,7 @@ impl Read for DiagnosticStreamReader {
                 Ok(count)
             }
             Err(error) => {
-                let errors = self.capture.finish();
+                let errors = self.capture.finish_with_error(&error);
                 self.record_errors(errors);
                 self.context.emit(json!({
                     "event": "response_stream_error", "kind": format!("{:?}", error.kind()),

@@ -159,9 +159,32 @@ fn borrows_uncompressed_bytes_and_still_rejects_corrupt_compression() {
         assert!(matches!(decode(b"{}", encoding).unwrap(), Cow::Borrowed(_)));
     }
     for encoding in ["gzip", "zstd"] {
-        assert!(matches!(
-            decode(b"not compressed data", encoding),
-            Err(RequestError::InvalidEncoding)
-        ));
+        let error = decode(b"not compressed data", encoding).unwrap_err();
+        assert!(error.to_string().contains(encoding));
+        assert!(error.to_string().contains("解压失败"));
     }
+}
+
+#[test]
+fn malformed_lite_requests_explain_the_actual_problem() {
+    for (body, expected) in [
+        ("{", "JSON 数据不完整"),
+        ("[]", "JSON 对象"),
+        (r#"{"reasoning":"private"}"#, "reasoning 必须"),
+    ] {
+        let headers = vec![(LITE_HEADER.into(), "true".into())];
+        let error = prepare(
+            &Method::Post,
+            "/v1/responses",
+            &headers,
+            body.as_bytes().to_vec(),
+        )
+        .unwrap_err();
+        let message = super::super::error_messages::gui(&error.wire());
+        assert!(message.contains(expected), "{message}");
+        assert!(!message.contains("private"));
+        assert!(!message.contains("重新连接"));
+    }
+    let error = decode(b"private", "br").unwrap_err().to_string();
+    assert!(error.contains("不支持此请求压缩格式"));
 }

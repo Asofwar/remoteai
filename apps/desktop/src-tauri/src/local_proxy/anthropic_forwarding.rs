@@ -64,7 +64,7 @@ fn forward_anthropic_official<R: tauri::Runtime>(
         },
     )?;
     let request: Value = serde_json::from_slice(&body)
-        .map_err(|error| format!("Anthropic request body is not valid JSON: {error}"))?;
+        .map_err(|error| request_error::RequestError::json(request_error::Stage::Request, &error).wire())?;
     validate_anthropic_official_search(&request).map_err(|error| error.to_string())?;
     bridge_media::validate_anthropic(&request)?;
     let stream = request
@@ -92,7 +92,8 @@ fn forward_anthropic_official<R: tauri::Runtime>(
         requested_model(&responses_body).unwrap_or_default(),
     );
     let encoded = serde_json::to_vec(&responses_body)
-        .map_err(|error| format!("Failed to encode Anthropic request: {error}"))?;
+        .map_err(|_| request_error::RequestError::new(
+            request_error::Stage::Request, request_error::Problem::Encode).wire())?;
     let mut payload = send_official_request(
         &client,
         &Method::Post,
@@ -139,7 +140,7 @@ fn forward_anthropic_provider_with_context(
     context: AnthropicProviderContext<'_>,
 ) -> Result<UpstreamPayload, String> {
     let mut request: Value = serde_json::from_slice(&body)
-        .map_err(|error| format!("Anthropic request body is not valid JSON: {error}"))?;
+        .map_err(|error| request_error::RequestError::json(request_error::Stage::Request, &error).wire())?;
     if !request.is_object() {
         return Err("The request body must be a JSON object".to_string());
     }
@@ -193,7 +194,8 @@ fn forward_anthropic_provider_bridge(
     responses_body["model"] =
         Value::String(anthropic_provider_model(&request, provider, subagent_model));
     let encoded = serde_json::to_vec(&responses_body)
-        .map_err(|error| format!("Failed to encode Anthropic request: {error}"))?;
+        .map_err(|_| request_error::RequestError::new(
+            request_error::Stage::Request, request_error::Problem::Encode).wire())?;
     // Only pass our conversation identity, never the incoming Anthropic authentication headers.
     let mut headers = vec![(ANTHROPIC_BRIDGE_HEADER.to_string(), "true".to_string())];
     if let Some(id) = session_id {
@@ -238,7 +240,7 @@ fn convert_responses_payload(
             UpstreamBody::Buffered(body) => serde_json::from_slice::<Value>(body),
             UpstreamBody::Streaming(reader) => serde_json::from_reader::<_, Value>(reader),
         }
-        .map_err(|_| "The service returned an invalid response. Please try again.".to_string())?;
+        .map_err(|error| request_error::RequestError::json(request_error::Stage::Responses, &error).wire())?;
         return convert_anthropic_json_payload(payload, &response, stream, model);
     }
     let upstream_body = std::mem::replace(&mut payload.body, UpstreamBody::Buffered(Vec::new()));
@@ -259,7 +261,7 @@ fn convert_responses_payload(
         return Ok(payload);
     }
     let message =
-        anthropic_stream::collect_message(reader, model).map_err(|error| error.to_string())?;
+        anthropic_stream::collect_message(reader, model).map_err(|error| error.detail().wire())?;
     payload.content_type = Some("application/json; charset=utf-8".to_string());
     payload.body = UpstreamBody::Buffered(message.to_string().into_bytes());
     Ok(payload)
@@ -272,7 +274,7 @@ fn convert_anthropic_json_payload(
     model: &str,
 ) -> Result<UpstreamPayload, String> {
     let message =
-        anthropic_stream::convert_response(response, model).map_err(|error| error.to_string())?;
+        anthropic_stream::convert_response(response, model).map_err(|error| error.detail().wire())?;
     let (content_type, body) = if stream {
         (
             "text/event-stream",

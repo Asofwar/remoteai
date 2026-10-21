@@ -225,7 +225,7 @@ fn stream_response(response: ReqwestResponse) -> Result<UpstreamPayload, String>
     if !status_ok(status) {
         let body = response
             .bytes()
-            .map_err(|error| format!("Failed to read upstream error response: {error}"))?;
+            .map_err(|error| request_error::RequestError::io(request_error::Stage::Read, &error).wire())?;
         return Ok(UpstreamPayload {
             status,
             content_type,

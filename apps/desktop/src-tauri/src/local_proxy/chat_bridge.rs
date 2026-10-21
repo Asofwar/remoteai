@@ -9,7 +9,11 @@ fn forward_chat_bridge(
         return Err("Chat bridge only supports POST requests".to_string());
     }
     let mut responses_body: Value = serde_json::from_slice(&body)
-        .map_err(|error| format!("Responses request body is not valid JSON: {error}"))?;
+        .map_err(|error| request_error::RequestError::json(request_error::Stage::Request, &error).wire())?;
+    if !responses_body.is_object() {
+        return Err(request_error::RequestError::new(
+            request_error::Stage::Request, request_error::Problem::ObjectRequired).wire());
+    }
     bridge_media::validate_responses(&responses_body, true)?;
     validate_anthropic_chat_tools(&responses_body, headers).map_err(|error| error.to_string())?;
     omit_unsupported_provider_service_tier(&mut responses_body, provider);

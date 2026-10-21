@@ -48,6 +48,7 @@ mod provider_tool_schema;
 pub(crate) use official_model_cache::admin_model_catalog;
 mod quota_detection;
 mod quota_sse;
+mod request_error;
 pub(crate) mod response_header_timeout;
 mod responses_lite;
 pub(crate) mod session_metrics;

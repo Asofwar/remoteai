@@ -2,19 +2,12 @@
 use std::borrow::Cow;
 use std::io::Read;
 
+use super::request_error::{Problem, RequestError, Stage};
 use serde_json::{json, Value};
 use tiny_http::Method;
 
 const LITE_HEADER: &str = "x-openai-internal-codex-responses-lite";
 const ALL_TURNS: &str = "all_turns";
-
-#[derive(Debug, thiserror::Error)]
-pub(super) enum RequestError {
-    #[error("请求格式不兼容，请重新连接 Codex 后重试。")]
-    InvalidBody,
-    #[error("请求压缩格式不兼容，请重新连接 Codex 后重试。")]
-    InvalidEncoding,
-}
 
 pub(super) fn enabled(headers: &[(String, String)]) -> bool {
     headers.iter().any(|(name, value)| {
@@ -34,19 +27,24 @@ pub(super) fn prepare(
     }
     let encoding = super::header_value(headers, "content-encoding").unwrap_or("identity");
     let decoded = decode(&body, encoding)?;
-    let mut request: Value =
-        serde_json::from_slice(&decoded).map_err(|_| RequestError::InvalidBody)?;
-    let object = request.as_object_mut().ok_or(RequestError::InvalidBody)?;
+    let mut request: Value = serde_json::from_slice(&decoded)
+        .map_err(|error| RequestError::json(Stage::Lite, &error))?;
+    let object = request
+        .as_object_mut()
+        .ok_or(RequestError::new(Stage::Lite, Problem::ObjectRequired))?;
     let reasoning = object.entry("reasoning").or_insert_with(|| json!({}));
     if reasoning.is_null() {
         *reasoning = json!({});
     }
-    let reasoning = reasoning.as_object_mut().ok_or(RequestError::InvalidBody)?;
+    let reasoning = reasoning
+        .as_object_mut()
+        .ok_or(RequestError::new(Stage::Lite, Problem::ReasoningObject))?;
     if reasoning.get("context").and_then(Value::as_str) == Some(ALL_TURNS) {
         return Ok(body);
     }
     reasoning.insert("context".into(), json!(ALL_TURNS));
-    let encoded = serde_json::to_vec(&request).map_err(|_| RequestError::InvalidBody)?;
+    let encoded = serde_json::to_vec(&request)
+        .map_err(|_| RequestError::new(Stage::Lite, Problem::Encode))?;
     let encoded = encode(&encoded, encoding)?;
     super::diagnostic_event(json!({ "event": "responses_lite_context_repaired" }));
     Ok(encoded)
@@ -65,31 +63,40 @@ fn decode<'a>(body: &'a [u8], encoding: &str) -> Result<Cow<'a, [u8]>, RequestEr
     let mut reader: Box<dyn Read + '_> = match encoding.trim().to_ascii_lowercase().as_str() {
         "" | "identity" => return Ok(Cow::Borrowed(body)),
         "zstd" => Box::new(
-            zstd::stream::read::Decoder::new(body).map_err(|_| RequestError::InvalidEncoding)?,
+            zstd::stream::read::Decoder::new(body)
+                .map_err(|_| RequestError::new(Stage::Lite, Problem::ZstdDecode))?,
         ),
         "gzip" => Box::new(flate2::read::GzDecoder::new(body)),
-        _ => return Err(RequestError::InvalidEncoding),
+        _ => return Err(RequestError::new(Stage::Lite, Problem::UnsupportedEncoding)),
     };
     let mut decoded = Vec::new();
-    reader
-        .read_to_end(&mut decoded)
-        .map_err(|_| RequestError::InvalidEncoding)?;
+    reader.read_to_end(&mut decoded).map_err(|_| {
+        RequestError::new(
+            Stage::Lite,
+            if encoding.trim().eq_ignore_ascii_case("gzip") {
+                Problem::GzipDecode
+            } else {
+                Problem::ZstdDecode
+            },
+        )
+    })?;
     Ok(Cow::Owned(decoded))
 }
 
 fn encode(body: &[u8], encoding: &str) -> Result<Vec<u8>, RequestError> {
     match encoding.trim().to_ascii_lowercase().as_str() {
         "" | "identity" => Ok(body.to_vec()),
-        "zstd" => zstd::stream::encode_all(body, 0).map_err(|_| RequestError::InvalidEncoding),
+        "zstd" => zstd::stream::encode_all(body, 0)
+            .map_err(|_| RequestError::new(Stage::Lite, Problem::Encode)),
         "gzip" => {
             let mut encoder = flate2::read::GzEncoder::new(body, flate2::Compression::default());
             let mut encoded = Vec::new();
             encoder
                 .read_to_end(&mut encoded)
-                .map_err(|_| RequestError::InvalidEncoding)?;
+                .map_err(|_| RequestError::new(Stage::Lite, Problem::Encode))?;
             Ok(encoded)
         }
-        _ => Err(RequestError::InvalidEncoding),
+        _ => Err(RequestError::new(Stage::Lite, Problem::UnsupportedEncoding)),
     }
 }
 
@@ -103,14 +110,14 @@ pub(super) fn provider_catalog(
     }
     let bytes = super::read_official_model_catalog_body(&mut payload.body)?;
     let mut catalog: Value = serde_json::from_slice(&bytes)
-        .map_err(|_| "暂时无法读取 Provider 模型列表，请重试。".to_string())?;
+        .map_err(|error| RequestError::json(Stage::Catalog, &error).wire())?;
     if let Some(models) = catalog.get_mut("models").and_then(Value::as_array_mut) {
         for model in models.iter_mut().filter(|model| model.is_object()) {
             model["use_responses_lite"] = json!(false);
         }
     }
     let bytes = serde_json::to_vec(&catalog)
-        .map_err(|_| "暂时无法读取 Provider 模型列表，请重试。".to_string())?;
+        .map_err(|_| RequestError::new(Stage::Catalog, Problem::Encode).wire())?;
     super::replace_model_catalog_etags(&mut payload.response_headers, &bytes);
     payload.body = super::UpstreamBody::Buffered(bytes);
     Ok(payload)

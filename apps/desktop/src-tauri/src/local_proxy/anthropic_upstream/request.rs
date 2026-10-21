@@ -11,14 +11,23 @@ pub(super) enum ConversionError {
     InvalidImage,
     #[error("The request contains unsupported message content")]
     UnsupportedContent,
-    #[error("The service returned an incomplete or unreadable response")]
-    InvalidResponse,
+    #[error(transparent)]
+    Detailed(super::RequestError),
     #[error("The output limit is too small for the selected thinking budget")]
     InvalidThinkingBudget,
     #[error("The output limit must be a positive integer")]
     InvalidOutputLimit,
     #[error("Forced tool use cannot be combined with thinking")]
     IncompatibleToolChoice,
+}
+
+impl ConversionError {
+    pub(super) fn wire(self) -> String {
+        match self {
+            Self::Detailed(error) => error.wire(),
+            _ => self.to_string(),
+        }
+    }
 }
 
 pub(super) fn convert(

@@ -68,7 +68,10 @@ fn official_http_502_reaches_admin_and_records_success() {
         .iter()
         .find(|entry| entry["event"] == "model_catalog_admin_fallback_started")
         .unwrap();
-    assert_eq!(started["officialError"], "Model catalog returned HTTP 502");
+    assert!(started["officialError"]
+        .as_str()
+        .unwrap()
+        .contains("HTTP 502"));
     let completed = entries.last().unwrap();
     assert_eq!(completed["event"], "model_catalog_admin_fallback_succeeded");
     assert_eq!(completed["status"], 200);
@@ -120,8 +123,10 @@ fn failed_admin_request_keeps_both_causes_in_diagnostics_and_a_safe_gui_message(
     .err()
     .unwrap();
     admin.join().unwrap();
-    assert_eq!(error, UNAVAILABLE_MESSAGE);
-    assert_eq!(error_messages::gui(&error), UNAVAILABLE_MESSAGE);
+    let message = error_messages::gui(&error);
+    assert!(message.contains("无法解析上游服务的地址"), "{message}");
+    assert!(message.contains("HTTP 503"), "{message}");
+    assert!(message.contains("备用模型列表"), "{message}");
     let entries = events(&log);
     assert!(entries[0]["officialError"]
         .as_str()

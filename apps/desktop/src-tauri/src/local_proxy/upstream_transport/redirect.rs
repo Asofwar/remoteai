@@ -37,8 +37,11 @@ impl Target {
         let Some(next) = next else {
             return Ok(false);
         };
-        if !matches!(next.scheme(), "http" | "https") || self.followed >= self.max_redirects {
-            return Err(Error::Redirect);
+        if !matches!(next.scheme(), "http" | "https") {
+            return Err(Error::RedirectScheme);
+        }
+        if self.followed >= self.max_redirects {
+            return Err(Error::RedirectLimit(self.max_redirects));
         }
         if next.origin() != self.url.origin() {
             strip_credentials(&mut self.headers);

@@ -1,29 +1,27 @@
 /// An upstream termination reason is separate from closing the SSE transport.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum ChatCompletionStatus {
     Completed,
     Incomplete(&'static str),
-    Failed(&'static str),
+    Failed(String),
 }
 
 impl ChatCompletionStatus {
     fn from_chat(value: &Value) -> Option<Self> {
         if chat_completion_failed(value) {
-            return Some(Self::Failed(
-                "The upstream service could not complete the response.",
-            ));
+            return Some(Self::Failed(request_error::upstream(request_error::Stage::Chat, value).to_string()));
         }
         match value.pointer("/choices/0/finish_reason")?.as_str()? {
             "stop" | "tool_calls" | "function_call" => Some(Self::Completed),
             "length" => Some(Self::Incomplete("max_output_tokens")),
             "content_filter" => Some(Self::Incomplete("content_filter")),
             _ => Some(Self::Failed(
-                "The upstream response could not be completed.",
+                "Chat 响应包含不支持的 finish_reason，生成未正常完成。".into(),
             )),
         }
     }
 
-    fn event_type(self) -> &'static str {
+    fn event_type(&self) -> &'static str {
         match self {
             Self::Completed => "response.completed",
             Self::Incomplete(_) => "response.incomplete",
@@ -31,7 +29,7 @@ impl ChatCompletionStatus {
         }
     }
 
-    fn apply(self, response: &mut Value) {
+    fn apply(&self, response: &mut Value) {
         let status = match self {
             Self::Completed => "completed",
             Self::Incomplete(reason) => {
@@ -44,7 +42,7 @@ impl ChatCompletionStatus {
             }
         };
         response["status"] = json!(status);
-        if self == Self::Completed {
+        if *self == Self::Completed {
             return;
         }
         if let Some(items) = response.get_mut("output").and_then(Value::as_array_mut) {
@@ -78,7 +76,7 @@ impl<R: BufRead> ChatSseReader<R> {
         };
         // Usage-only chunks can follow finish_reason. Keep reading them, but never
         // let a later success marker turn truncation or failure into success.
-        let should_update = match self.termination {
+        let should_update = match &self.termination {
             None | Some(ChatCompletionStatus::Completed) => true,
             Some(ChatCompletionStatus::Incomplete(_)) => {
                 matches!(status, ChatCompletionStatus::Failed(_))

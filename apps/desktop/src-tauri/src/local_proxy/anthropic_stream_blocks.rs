@@ -1,4 +1,4 @@
-use super::ConversionError;
+use super::{ConversionError, Problem};
 use serde_json::{json, Value};
 
 #[derive(Default)]
@@ -60,7 +60,9 @@ impl ContentBlocks {
         event: &Value,
         events: &mut Vec<Value>,
     ) -> Result<(), ConversionError> {
-        let item = event.get("item").ok_or(ConversionError::InvalidEvent)?;
+        let item = event
+            .get("item")
+            .ok_or(ConversionError::invalid(Problem::MissingItem))?;
         match item.get("type").and_then(Value::as_str) {
             Some("function_call") => self.tool_item(event, item, events),
             Some("message") => self.message_item(event, item, events),
@@ -138,7 +140,7 @@ impl ContentBlocks {
             let content = part
                 .get("text")
                 .and_then(Value::as_str)
-                .ok_or(ConversionError::InvalidEvent)?;
+                .ok_or(ConversionError::invalid(Problem::DeltaText))?;
             self.append(index, content, true, events)?;
             if event.get("type").and_then(Value::as_str) == Some("response.output_item.done") {
                 self.close(index, events)?;
@@ -156,7 +158,7 @@ impl ContentBlocks {
         let content = event
             .get(if done { "text" } else { "delta" })
             .and_then(Value::as_str)
-            .ok_or(ConversionError::InvalidEvent)?;
+            .ok_or(ConversionError::invalid(Problem::DeltaText))?;
         let index = match self.find(event, BlockType::Text)? {
             Some(index) => index,
             None => self.push(event, BlockKind::Text, events),
@@ -259,13 +261,13 @@ impl ContentBlocks {
             return Ok(());
         }
         if block.closed {
-            return Err(ConversionError::InvalidEvent);
+            return Err(ConversionError::invalid(Problem::BlockOrder));
         }
         let delta_value = match &block.kind {
             BlockKind::Text => json!({ "type": "text_delta", "text": delta }),
             BlockKind::Tool { .. } => json!({ "type": "input_json_delta", "partial_json": delta }),
             BlockKind::Thinking(_) => json!({ "type": "thinking_delta", "thinking": delta }),
-            BlockKind::Server(_) => return Err(ConversionError::InvalidEvent),
+            BlockKind::Server(_) => return Err(ConversionError::invalid(Problem::BlockDelta)),
         };
         block.content.push_str(delta);
         events.push(json!({ "type": "content_block_delta", "index": index, "delta": delta_value }));
@@ -342,6 +344,6 @@ impl ContentBlock {
                 return Ok("");
             }
         }
-        Err(ConversionError::InvalidEvent)
+        Err(ConversionError::invalid(Problem::ContentMismatch))
     }
 }

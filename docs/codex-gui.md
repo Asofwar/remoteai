@@ -435,6 +435,25 @@ maximum, the request asks the user to configure `max_tokens` in the Provider's
 custom request parameters. Custom full URLs ending in `/messages` use the sibling
 model endpoint; other full URL shapes require explicit configuration.
 
+## Proxy request errors
+
+GUI and external proxy clients receive specific failure reasons for request decoding,
+JSON parsing, network setup, upload stalls, response reads and protocol conversion.
+JSON errors include their line and column without copying request content. Transport
+errors distinguish DNS, TLS, certificate validation, connection refusal, each timeout
+phase and redirect failures; exhausted retries report the number of attempts.
+
+Chat, Anthropic and Gemini conversion preserve recognized upstream error categories
+through streaming and buffered responses. Missing completion events, malformed events,
+invalid tool arguments and read timeouts remain failures. Metadata lookup failures
+include the HTTP status or parse/read cause and the option to configure `max_tokens`.
+When both official and backup model discovery fail, the response describes both failures.
+
+Credentials, private addresses, local paths and arbitrary upstream error text are not
+copied into generated client errors. Unexpected internal failures include an error ID
+matching `errorId` in diagnostics. Error history preserves read failures instead of
+replacing them with a generic incomplete-response message.
+
 ## Verification
 
 New conversations can search and switch local Git branches, create a branch, or create a local worktree

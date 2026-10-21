@@ -76,11 +76,8 @@ fn write_chunks(
 }
 
 fn interruption_event(responses: bool, error: &io::Error) -> String {
-    let message = if error.kind() == io::ErrorKind::TimedOut {
-        "The response timed out. Please try again."
-    } else {
-        "The connection was interrupted. Please try again."
-    };
+    let message = super::request_error::RequestError::io(super::request_error::Stage::Read, error)
+        .to_string();
     let (event, data) = if responses {
         // Codex consumes response.failed; a generic api_error is ignored by its SSE parser.
         (

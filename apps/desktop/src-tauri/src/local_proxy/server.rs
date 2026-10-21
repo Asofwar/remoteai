@@ -347,7 +347,7 @@ fn serve_request<R: Runtime>(app: tauri::AppHandle<R>, mut request: Request, ori
         respond_error(
             request,
             400,
-            format!("Failed to read request body: {error}"),
+            request_error::RequestError::io(request_error::Stage::Request, &error).to_string(),
         );
         return;
     }
@@ -397,9 +397,13 @@ fn serve_request<R: Runtime>(app: tauri::AppHandle<R>, mut request: Request, ori
         Err(error) => {
             diagnostic_event(json!({
                 "event": "request_failed",
+                "errorId": error_messages::error_id(&error),
                 "error": crate::error_logs::sanitize_diagnostic_message(&error)
             }));
-            let message = upstream_error_message(&error);
+            let message = match origin {
+                RequestOrigin::Gui => error,
+                RequestOrigin::External => upstream_error_message(&error),
+            };
             json_payload(502, json!({ "error": { "message": message } }))
         }
     };
@@ -423,8 +427,8 @@ fn request_origin_allowed(
     }
 }
 
-fn upstream_error_message(error: &str) -> &str {
-    error_messages::transport(error).unwrap_or(error)
+fn upstream_error_message(error: &str) -> String {
+    error_messages::gui(error)
 }
 
 fn request_has_valid_api_key(headers: &[(String, String)], expected: &str) -> bool {

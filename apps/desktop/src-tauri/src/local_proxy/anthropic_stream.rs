@@ -1,5 +1,6 @@
 //! Incremental Responses-to-Messages conversion, shared by both downstream response modes.
 
+use super::request_error::{Problem, RequestError, Stage};
 use serde_json::{json, Value};
 use std::io::{self, BufRead, BufReader, Read};
 
@@ -12,29 +13,34 @@ use state::MessageState;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum ConversionError {
     UnexpectedEnd,
-    UpstreamFailed,
     Incomplete,
-    InvalidEvent,
     InvalidTool,
-    ReadFailed,
+    Detailed(RequestError),
 }
 
 impl std::fmt::Display for ConversionError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(match self {
-            Self::UnexpectedEnd => "The response ended before it was complete. Please try again.",
-            Self::UpstreamFailed => {
-                "The service could not complete the response. Please try again."
-            }
-            Self::Incomplete => "The service returned an incomplete response. Please try again.",
-            Self::InvalidEvent => "The service returned an invalid response. Please try again.",
-            Self::InvalidTool => "The service returned an incomplete tool call. Please try again.",
-            Self::ReadFailed => "The connection was interrupted. Please try again.",
-        })
+        self.detail().fmt(formatter)
     }
 }
 
 impl std::error::Error for ConversionError {}
+
+impl ConversionError {
+    pub(super) fn detail(self) -> RequestError {
+        let problem = match self {
+            Self::UnexpectedEnd => Problem::MissingTerminal,
+            Self::Incomplete => Problem::Incomplete,
+            Self::InvalidTool => Problem::InvalidTool,
+            Self::Detailed(error) => return error,
+        };
+        RequestError::new(Stage::Responses, problem)
+    }
+
+    fn invalid(problem: Problem) -> Self {
+        Self::Detailed(RequestError::new(Stage::Responses, problem))
+    }
+}
 
 /// Dispatches only complete SSE frames; EOF is never an implicit successful terminal event.
 struct EventReader<R> {
@@ -47,11 +53,9 @@ impl<R: BufRead> EventReader<R> {
         let mut event = None;
         loop {
             let mut line = String::new();
-            if self
-                .upstream
-                .read_line(&mut line)
-                .map_err(|_| ConversionError::ReadFailed)?
-                == 0
+            if self.upstream.read_line(&mut line).map_err(|error| {
+                ConversionError::Detailed(RequestError::io(Stage::Responses, &error))
+            })? == 0
             {
                 return if data.is_empty() {
                     Ok(None)
@@ -78,19 +82,31 @@ fn decode_event(data: &str, event: Option<&str>) -> Result<Value, ConversionErro
     if data.trim() == "[DONE]" {
         return Err(ConversionError::UnexpectedEnd);
     }
-    let mut value: Value = serde_json::from_str(data).map_err(|_| ConversionError::InvalidEvent)?;
+    let mut value: Value = serde_json::from_str(data)
+        .map_err(|error| ConversionError::Detailed(RequestError::json(Stage::Responses, &error)))?;
     let payload_type = value.get("type").and_then(Value::as_str);
     if event
         .zip(payload_type)
         .is_some_and(|(event, kind)| event != kind)
     {
-        return Err(ConversionError::InvalidEvent);
+        return Err(ConversionError::Detailed(RequestError::new(
+            Stage::Responses,
+            Problem::EventTypeMismatch,
+        )));
     }
     if payload_type.is_none() {
-        let object = value.as_object_mut().ok_or(ConversionError::InvalidEvent)?;
+        let object = value
+            .as_object_mut()
+            .ok_or(ConversionError::Detailed(RequestError::new(
+                Stage::Responses,
+                Problem::ObjectRequired,
+            )))?;
         object.insert(
             "type".to_string(),
-            json!(event.ok_or(ConversionError::InvalidEvent)?),
+            json!(event.ok_or(ConversionError::Detailed(RequestError::new(
+                Stage::Responses,
+                Problem::MissingEventType
+            )))?),
         );
     }
     Ok(value)

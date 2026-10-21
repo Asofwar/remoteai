@@ -1,4 +1,5 @@
 use super::{continuation, response};
+use crate::local_proxy::request_error::{RequestError, Stage};
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Read};
 
@@ -38,9 +39,12 @@ impl<R: BufRead> GenerateContentReader<R> {
         if self.data.is_empty() {
             return Ok(());
         }
-        let value: Value =
-            serde_json::from_str(&std::mem::take(&mut self.data)).map_err(|_| invalid_event())?;
-        let delta = self.state.observe(&value).map_err(|_| invalid_event())?;
+        let value: Value = serde_json::from_str(&std::mem::take(&mut self.data))
+            .map_err(|error| io::Error::other(RequestError::json(Stage::Gemini, &error)))?;
+        let delta = self
+            .state
+            .observe(&value)
+            .map_err(|error| io::Error::other(error.detail()))?;
         self.emit(json!({ "choices": [{ "index": 0, "delta": delta }], "usage": response::usage(&self.state.usage) }));
         Ok(())
     }
@@ -59,13 +63,16 @@ impl<R: BufRead> GenerateContentReader<R> {
                     "usage": response::usage(&self.state.usage) }),
                 );
             }
-            Err(_) => self.fail(),
+            Err(error) => self.fail(error.detail()),
         }
         self.completed = true;
     }
 
-    fn fail(&mut self) {
-        self.emit(json!({ "error": { "type": "api_error", "message": "The service response was interrupted." } }));
+    fn fail(&mut self, error: RequestError) {
+        self.emit(
+            json!({ "error": { "type": "api_error", "message": error.wire() },
+            "usage": response::usage(&self.state.usage) }),
+        );
         self.completed = true;
     }
 
@@ -107,15 +114,8 @@ impl<R: BufRead> Read for GenerateContentReader<R> {
             match self.read_line() {
                 Ok(true) => {}
                 Ok(false) => self.finish(),
-                Err(_) => self.fail(),
+                Err(error) => self.fail(RequestError::io(Stage::Gemini, &error)),
             }
         }
     }
-}
-
-fn invalid_event() -> io::Error {
-    io::Error::new(
-        io::ErrorKind::InvalidData,
-        "The service returned an invalid event",
-    )
 }

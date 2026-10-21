@@ -1,4 +1,5 @@
 use super::{continuation, BridgeError, Context, GENERATED_CALL_PREFIX};
+use crate::local_proxy::request_error::{self, Problem, RequestError, Stage};
 use serde_json::{json, Value};
 
 #[derive(Default)]
@@ -13,7 +14,10 @@ pub(super) struct State {
 impl State {
     pub(super) fn observe(&mut self, value: &Value) -> Result<Value, BridgeError> {
         if value.get("error").is_some() {
-            return Err(BridgeError::InvalidResponse);
+            return Err(BridgeError::Detailed(request_error::upstream(
+                Stage::Gemini,
+                value,
+            )));
         }
         if let Some(usage) = value.get("usageMetadata").and_then(Value::as_object) {
             if !self.usage.is_object() {
@@ -84,7 +88,13 @@ impl State {
     }
 
     pub(super) fn finish_reason(&self) -> Result<&'static str, BridgeError> {
-        match self.reason.as_deref().ok_or(BridgeError::InvalidResponse)? {
+        match self
+            .reason
+            .as_deref()
+            .ok_or(BridgeError::Detailed(RequestError::new(
+                Stage::Gemini,
+                Problem::MissingStopReason,
+            )))? {
             "STOP" => Ok(if self.calls.is_empty() {
                 "stop"
             } else {
@@ -94,7 +104,10 @@ impl State {
             "SAFETY" | "RECITATION" | "BLOCKLIST" | "PROHIBITED_CONTENT" | "SPII" => {
                 Ok("content_filter")
             }
-            _ => Ok("error"),
+            reason => Err(BridgeError::Detailed(request_error::upstream(
+                Stage::Gemini,
+                &json!({"code":reason}),
+            ))),
         }
     }
 

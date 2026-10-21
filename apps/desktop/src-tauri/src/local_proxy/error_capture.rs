@@ -6,7 +6,7 @@ use super::stream_completion::{CompletionEvent, StreamCompletion};
 const MAX_CAPTURE_BYTES: usize = 64 * 1024;
 const MAX_ERROR_MESSAGE_CHARS: usize = 1000;
 const GENERIC_UPSTREAM_ERROR: &str = "The upstream service returned an error.";
-const INTERRUPTED_STREAM_ERROR: &str = "The upstream response ended before it was complete.";
+const INTERRUPTED_STREAM_ERROR: &str = "上游已结束传输，但没有发送完整的响应结束事件。";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum CapturePurpose {
@@ -141,6 +141,28 @@ impl ErrorCapture {
         }
         self.buffer.clear();
         self.buffer_bytes = 0;
+        errors
+    }
+
+    /// Preserve the actual read failure instead of treating every network error as ordinary EOF.
+    pub(super) fn finish_with_error(&mut self, error: &std::io::Error) -> Vec<ProxyCapturedError> {
+        if self.finished || self.reported {
+            return Vec::new();
+        }
+        let mut errors = Vec::new();
+        self.finished = true;
+        if self.event_stream {
+            self.finish_event(&mut errors);
+            if self.reported {
+                return errors;
+            }
+        }
+        self.report(
+            super::request_error::RequestError::io(super::request_error::Stage::Read, error)
+                .to_string(),
+            None,
+            &mut errors,
+        );
         errors
     }
 

@@ -231,7 +231,9 @@ fn append_proxy_diagnostic_result<R: Runtime>(
             entry["result"] = json!({
                 "ok": false,
                 "error": crate::error_logs::sanitize_diagnostic_message(error),
-                "errorHash": short_hash_str(error)
+                "errorHash": short_hash_str(error),
+                "errorId": error_messages::error_id(error),
+                "clientMessage": error_messages::gui(error)
             });
         }
     }

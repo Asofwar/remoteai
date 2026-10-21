@@ -97,8 +97,8 @@ fn thinking_stream_recovers_signature_only_reasoning_and_keeps_failures_as_failu
     let mut events = reasoning_events()[..2].to_vec();
     events.push(json!({ "type": "response.failed", "response": { "status": "failed" } }));
     let source = frames(&events);
-    assert_eq!(
-        collect_message(source.as_bytes(), "claude"),
-        Err(ConversionError::UpstreamFailed)
-    );
+    let error = collect_message(source.as_bytes(), "claude")
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("上游发送了错误事件"));
 }

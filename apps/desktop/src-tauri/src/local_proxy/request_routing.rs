@@ -7,7 +7,17 @@ fn handle_proxy_request<R: Runtime>(
     session_id: Option<&str>,
     session_request_id: Option<u64>,
 ) -> Result<UpstreamPayload, String> {
-    let settings = read_app_settings(app)?;
+    let settings = read_app_settings(app).map_err(|error| {
+        diagnostic_event(json!({
+            "event": "request_settings_failed", "errorId": error_messages::error_id(&error),
+            "error": crate::error_logs::sanitize_diagnostic_message(&error)
+        }));
+        if gui_routing::upstream_path(url).is_some() {
+            error_messages::gui(&error)
+        } else {
+            error
+        }
+    })?;
     let _transport_scope = transport_settings::RequestScope::enter(settings.proxy_transport);
     let _timeout_scope = sse_idle_timeout::RequestScope::enter(settings.sse_idle_timeout);
     let _header_timeout_scope =

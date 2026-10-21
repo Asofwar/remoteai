@@ -20,19 +20,11 @@ use std::io::BufReader;
 use serde_json::Value;
 use tiny_http::Method;
 
+use super::request_error::{Problem, RequestError, Stage};
 use super::{CodexToolContext, UpstreamBody, UpstreamPayload};
 use crate::models::ProviderProfile;
 
 const ANTHROPIC_VERSION: &str = "2023-06-01";
-
-pub(super) fn is_configuration_error(error: &str) -> bool {
-    [
-        output_limit::OutputLimitError::Invalid,
-        output_limit::OutputLimitError::Unavailable,
-    ]
-    .iter()
-    .any(|known| known.to_string() == error)
-}
 
 struct RequestContext {
     model: String,
@@ -51,7 +43,7 @@ pub(super) fn forward(
         return Err("Messages requests must use POST".to_string());
     }
     let mut input: Value = serde_json::from_slice(&body)
-        .map_err(|_| "The request body is not valid JSON".to_string())?;
+        .map_err(|error| RequestError::json(Stage::Request, &error).wire())?;
     if !input.is_object() {
         return Err("The request body must be a JSON object".to_string());
     }
@@ -66,7 +58,7 @@ pub(super) fn forward(
     let mut request = request::convert(&input, &context.tools, &context.scope)
         .map_err(|error| error.to_string())?;
     super::provider_request_options::body(&mut request, provider);
-    output_limit::ensure(&mut request, headers, provider).map_err(|error| error.to_string())?;
+    output_limit::ensure(&mut request, headers, provider).map_err(|error| error.wire())?;
     request_options::validate_after_overrides(&mut request).map_err(|error| error.to_string())?;
     let response = send(&request, headers, provider)?;
     receive(response, context)
@@ -80,7 +72,7 @@ pub(super) fn forward_messages(
 ) -> Result<UpstreamPayload, String> {
     let mut body = system_prompt::prepare(body);
     super::provider_request_options::body(&mut body, provider);
-    output_limit::ensure(&mut body, headers, provider).map_err(|error| error.to_string())?;
+    output_limit::ensure(&mut body, headers, provider).map_err(|error| error.wire())?;
     let response = send(&body, headers, provider)?;
     let status = response.status().as_u16();
     let content_type = response
@@ -95,7 +87,7 @@ pub(super) fn forward_messages(
         UpstreamBody::Buffered(
             response
                 .bytes()
-                .map_err(|_| "The service response could not be read".to_string())?
+                .map_err(|error| RequestError::io(Stage::Anthropic, &error).wire())?
                 .to_vec(),
         )
     };
@@ -167,7 +159,7 @@ fn receive(
     } else {
         let bytes = response
             .bytes()
-            .map_err(|_| "The service response could not be read".to_string())?;
+            .map_err(|error| RequestError::io(Stage::Anthropic, &error).wire())?;
         if !super::status_ok(status) {
             return Ok(UpstreamPayload {
                 status,
@@ -199,8 +191,8 @@ fn receive(
 
 fn buffered_body(bytes: &[u8], context: &RequestContext) -> Result<UpstreamBody, String> {
     let value: Value = serde_json::from_slice(bytes)
-        .map_err(|_| "The service returned an unreadable response".to_string())?;
-    let chat = response::to_chat(&value, &context.scope).map_err(|error| error.to_string())?;
+        .map_err(|error| RequestError::json(Stage::Anthropic, &error).wire())?;
+    let chat = response::to_chat(&value, &context.scope).map_err(|error| error.wire())?;
     if context.streaming {
         let chunk = response::single_chunk(&chat);
         let reader =
@@ -212,5 +204,5 @@ fn buffered_body(bytes: &[u8], context: &RequestContext) -> Result<UpstreamBody,
     let converted = super::chat_to_responses_json(&chat, &context.tools, None);
     serde_json::to_vec(&converted)
         .map(UpstreamBody::Buffered)
-        .map_err(|_| "The service response could not be converted".to_string())
+        .map_err(|_| RequestError::new(Stage::Anthropic, Problem::Encode).wire())
 }

@@ -9,18 +9,29 @@ pub(super) fn model_catalog(
         return Ok(payload);
     }
     let bytes = read_official_model_catalog_body(&mut payload.body)?;
-    let mut catalog: Value = serde_json::from_slice(&bytes)
-        .map_err(|_| "暂时无法读取 Codex GUI 模型列表，请重试。".to_string())?;
+    let mut catalog: Value = serde_json::from_slice(&bytes).map_err(|error| {
+        request_error::RequestError::json(request_error::Stage::Catalog, &error).wire()
+    })?;
     // A successful empty response would replace the CLI's last usable on-disk catalog.
     if catalog["models"]
         .as_array()
         .is_none_or(|models| models.is_empty())
     {
-        return Err("暂时无法读取 Codex GUI 模型列表，请重试。".to_string());
+        return Err(request_error::RequestError::new(
+            request_error::Stage::Catalog,
+            request_error::Problem::CatalogInvalid,
+        )
+        .wire());
     }
     customize(&mut catalog)?;
     allow_conversation_capacity(&mut catalog);
-    let bytes = serde_json::to_vec(&catalog).map_err(|error| error.to_string())?;
+    let bytes = serde_json::to_vec(&catalog).map_err(|_| {
+        request_error::RequestError::new(
+            request_error::Stage::Catalog,
+            request_error::Problem::Encode,
+        )
+        .wire()
+    })?;
     replace_model_catalog_etags(&mut payload.response_headers, &bytes);
     payload.body = UpstreamBody::Buffered(bytes);
     Ok(payload)
@@ -119,7 +130,9 @@ mod tests {
             let error = model_catalog(catalog_payload(catalog), |_| Ok(()))
                 .err()
                 .unwrap();
-            assert_eq!(error, "暂时无法读取 Codex GUI 模型列表，请重试。");
+            let message = error_messages::gui(&error);
+            assert!(message.contains("models 数组"), "{message}");
+            assert!(message.contains("读取模型列表失败"), "{message}");
         }
     }
 

@@ -66,7 +66,11 @@ fn classify(error: &Error) -> Option<NetworkFailure> {
         Error::AfterRedirect(source) => {
             return classify(source).map(|_| NetworkFailure { replay_safe: false })
         }
-        Error::Http { .. } | Error::UnbufferedBody | Error::Redirect | Error::Proxy(_) => {
+        Error::Http { .. }
+        | Error::UnbufferedBody
+        | Error::RedirectLimit(_)
+        | Error::RedirectScheme
+        | Error::Proxy(_) => {
             return None;
         }
     };

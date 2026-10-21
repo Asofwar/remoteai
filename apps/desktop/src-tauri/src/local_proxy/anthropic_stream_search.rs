@@ -16,7 +16,7 @@ impl ContentBlocks {
         let id = item
             .get("id")
             .and_then(Value::as_str)
-            .ok_or(ConversionError::InvalidEvent)?;
+            .ok_or(ConversionError::invalid(Problem::MissingItemId))?;
         let tool_id = format!("srvtoolu_{id}");
         let input = search_input(item);
         let index = self.push(

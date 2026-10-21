@@ -6,6 +6,7 @@ use std::{
 use serde_json::{json, Value};
 
 use super::{continuation, response};
+use crate::local_proxy::request_error::{self, Problem, RequestError, Stage};
 
 struct Block {
     value: Value,
@@ -44,9 +45,9 @@ impl<R: BufRead> MessagesReader<R> {
         self.pending = io::Cursor::new(format!("data: {value}\n\n").into_bytes());
     }
 
-    fn fail(&mut self) {
+    fn fail(&mut self, error: RequestError) {
         self.emit(json!({ "error": { "type": "api_error",
-            "message": "The service response ended before it was complete." } }));
+            "message": error.wire() }, "usage": response::chat_usage(&self.usage) }));
         self.finished = true;
     }
 
@@ -54,8 +55,8 @@ impl<R: BufRead> MessagesReader<R> {
         if self.data.is_empty() {
             return Ok(());
         }
-        let value: Value =
-            serde_json::from_str(&std::mem::take(&mut self.data)).map_err(|_| invalid_event())?;
+        let value: Value = serde_json::from_str(&std::mem::take(&mut self.data))
+            .map_err(|error| io::Error::other(RequestError::json(Stage::Anthropic, &error)))?;
         match value["type"].as_str() {
             Some("message_start") => self.start(&value),
             Some("content_block_start") => self.start_block(&value)?,
@@ -68,7 +69,8 @@ impl<R: BufRead> MessagesReader<R> {
                 self.merge_usage(&value["usage"]);
             }
             Some("message_stop") => self.finish()?,
-            Some("error") => self.fail(),
+            Some("error") => self.fail(request_error::upstream(Stage::Anthropic, &value)),
+            None => return Err(invalid_event(Problem::MissingEventType)),
             _ => {}
         }
         Ok(())
@@ -94,7 +96,7 @@ impl<R: BufRead> MessagesReader<R> {
     fn start_block(&mut self, event: &Value) -> io::Result<()> {
         let index = block_index(event)?;
         if !self.started || self.blocks.contains_key(&index) {
-            return Err(invalid_event());
+            return Err(invalid_event(Problem::BlockOrder));
         }
         let value = event["content_block"].clone();
         let delta = match value["type"].as_str() {
@@ -102,12 +104,13 @@ impl<R: BufRead> MessagesReader<R> {
             Some("thinking") => json!({ "reasoning_content": value["thinking"] }),
             Some("redacted_thinking") => json!({}),
             Some("tool_use") => {
-                let mut call = response::tool_call(&value).map_err(|_| invalid_event())?;
+                let mut call =
+                    response::tool_call(&value).map_err(|_| invalid_event(Problem::InvalidTool))?;
                 call["index"] = json!(index);
                 call["function"]["arguments"] = json!("");
                 json!({ "tool_calls": [call] })
             }
-            _ => return Err(invalid_event()),
+            _ => return Err(invalid_event(Problem::UnknownBlock)),
         };
         self.blocks.insert(
             index,
@@ -127,7 +130,7 @@ impl<R: BufRead> MessagesReader<R> {
             .blocks
             .get_mut(&index)
             .filter(|block| !block.stopped)
-            .ok_or_else(invalid_event)?;
+            .ok_or_else(|| invalid_event(Problem::BlockOrder))?;
         let delta = &event["delta"];
         let (field, text, output) = match (block.value["type"].as_str(), delta["type"].as_str()) {
             (Some("text"), Some("text_delta")) => ("text", &delta["text"], "content"),
@@ -138,9 +141,11 @@ impl<R: BufRead> MessagesReader<R> {
             (Some("tool_use"), Some("input_json_delta")) => {
                 ("input", &delta["partial_json"], "tool_calls")
             }
-            _ => return Ok(()),
+            _ => return Err(invalid_event(Problem::BlockDelta)),
         };
-        let text = text.as_str().ok_or_else(invalid_event)?;
+        let text = text
+            .as_str()
+            .ok_or_else(|| invalid_event(Problem::DeltaText))?;
         if field == "input" {
             block.arguments.push_str(text);
         } else {
@@ -165,14 +170,15 @@ impl<R: BufRead> MessagesReader<R> {
             .blocks
             .get_mut(&index)
             .filter(|block| !block.stopped)
-            .ok_or_else(invalid_event)?;
+            .ok_or_else(|| invalid_event(Problem::BlockOrder))?;
         if block.value["type"] == "tool_use" {
             if !block.arguments.is_empty() {
-                block.value["input"] =
-                    serde_json::from_str(&block.arguments).map_err(|_| invalid_event())?;
+                block.value["input"] = serde_json::from_str(&block.arguments).map_err(|error| {
+                    io::Error::other(RequestError::json(Stage::Anthropic, &error))
+                })?;
             }
             if !block.value["input"].is_object() {
-                return Err(invalid_event());
+                return Err(invalid_event(Problem::ToolArguments));
             }
             if block.arguments.is_empty() {
                 let arguments = block.value["input"].to_string();
@@ -197,9 +203,9 @@ impl<R: BufRead> MessagesReader<R> {
             .stop_reason
             .as_deref()
             .filter(|_| self.started)
-            .ok_or_else(invalid_event)?;
+            .ok_or_else(|| invalid_event(Problem::MissingStopReason))?;
         if self.blocks.values().any(|block| !block.stopped) {
-            return Err(invalid_event());
+            return Err(invalid_event(Problem::UnclosedBlock));
         }
         if matches!(reason, "end_turn" | "stop_sequence" | "tool_use") {
             let content = self
@@ -248,7 +254,11 @@ impl<R: BufRead> Read for MessagesReader<R> {
             }
             match self.read_event_line() {
                 Ok(true) => {}
-                Ok(false) | Err(_) => self.fail(),
+                Ok(false) => self.fail(RequestError::new(
+                    Stage::Anthropic,
+                    Problem::MissingTerminal,
+                )),
+                Err(error) => self.fail(RequestError::io(Stage::Anthropic, &error)),
             }
         }
     }
@@ -258,12 +268,12 @@ fn block_index(event: &Value) -> io::Result<usize> {
     event["index"]
         .as_u64()
         .and_then(|index| usize::try_from(index).ok())
-        .ok_or_else(invalid_event)
+        .ok_or_else(|| invalid_event(Problem::MissingBlockIndex))
 }
 
-fn invalid_event() -> io::Error {
+fn invalid_event(problem: Problem) -> io::Error {
     io::Error::new(
         io::ErrorKind::InvalidData,
-        "The service returned an invalid message event",
+        RequestError::new(Stage::Anthropic, problem),
     )
 }

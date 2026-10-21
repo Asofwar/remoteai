@@ -2,12 +2,12 @@
 use super::{UpstreamBody, UpstreamPayload};
 use std::{collections::HashSet, io::Read, time::Duration};
 
+use super::request_error::{self, Problem, RequestError, Stage};
 use reqwest::{blocking::Client, Url};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Runtime};
 
 const CACHE_TIMEOUT: Duration = Duration::from_secs(60);
-pub(super) const UNAVAILABLE_MESSAGE: &str = "模型列表暂时无法获取，请稍后重试。";
 
 #[derive(Debug, thiserror::Error)]
 enum CatalogError {
@@ -23,6 +23,28 @@ enum CatalogError {
     Status(u16),
     #[error("Model catalog cache is invalid or empty")]
     Invalid,
+    #[error(transparent)]
+    Detailed(RequestError),
+}
+
+impl CatalogError {
+    fn detail(&self) -> RequestError {
+        match self {
+            Self::Settings => RequestError::new(Stage::Catalog, Problem::CatalogSettings),
+            Self::Address => RequestError::new(Stage::Catalog, Problem::CatalogAddress),
+            Self::Invalid => RequestError::new(Stage::Catalog, Problem::CatalogInvalid),
+            Self::Status(status) => RequestError::http(Stage::Catalog, *status),
+            Self::Read(error) => RequestError::io(Stage::Catalog, error),
+            Self::Detailed(error) => *error,
+            Self::Request(error) => match error.status() {
+                Some(status) => RequestError::http(Stage::Catalog, status.as_u16()),
+                None => RequestError::transport(
+                    Stage::Catalog,
+                    &super::diagnostic_error_causes(error).join(": "),
+                ),
+            },
+        }
+    }
 }
 
 pub(super) fn with_fallback<R: Runtime>(
@@ -50,7 +72,7 @@ fn prefer_official(
     let official = {
         let _deadline = super::model_catalog_deadline::Scope::enter();
         official().and_then(|payload| {
-            validate_official_payload(payload).map_err(|error| error.to_string())
+            validate_official_payload(payload).map_err(|error| error.detail().wire())
         })
     };
     match official {
@@ -63,7 +85,9 @@ fn fallback_to_admin(
     official_error: &str,
     admin: impl FnOnce() -> Result<UpstreamPayload, CatalogError>,
 ) -> Result<UpstreamPayload, String> {
-    let error = crate::error_logs::sanitize_diagnostic_message(official_error);
+    let error = RequestError::decode(official_error)
+        .map(|error| error.to_string())
+        .unwrap_or_else(|| crate::error_logs::sanitize_diagnostic_message(official_error));
     super::diagnostic_event(
         json!({ "event": "model_catalog_admin_fallback_started", "officialError": error }),
     );
@@ -83,7 +107,9 @@ fn fallback_to_admin(
             }));
             eprintln!("Admin model catalog fallback failed: {error}");
             // Both sources failed. Returning only the official error hides the failed fallback.
-            Err(UNAVAILABLE_MESSAGE.to_owned())
+            let official = RequestError::decode(official_error)
+                .unwrap_or_else(|| RequestError::transport(Stage::Catalog, official_error));
+            Err(request_error::catalog_failure(official, error.detail()))
         }
     }
 }
@@ -175,7 +201,8 @@ fn read_catalog(mut reader: impl Read) -> Result<Vec<u8>, CatalogError> {
 }
 
 fn validate_catalog(bytes: &[u8]) -> Result<(), CatalogError> {
-    let value: Value = serde_json::from_slice(bytes).map_err(|_| CatalogError::Invalid)?;
+    let value: Value = serde_json::from_slice(bytes)
+        .map_err(|error| CatalogError::Detailed(RequestError::json(Stage::Catalog, &error)))?;
     let models = value
         .get("models")
         .and_then(Value::as_array)

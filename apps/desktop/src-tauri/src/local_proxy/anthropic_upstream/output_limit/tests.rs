@@ -83,10 +83,10 @@ fn explicit_lengths_skip_discovery_and_invalid_lengths_are_not_replaced() {
         json!("unlimited"),
     ] {
         let mut body = json!({"max_tokens": invalid});
-        assert!(matches!(
+        assert_eq!(
             ensure(&mut body, &[], &provider),
-            Err(OutputLimitError::Invalid)
-        ));
+            Err(problem(Problem::InvalidMaximum))
+        );
     }
 }
 
@@ -106,12 +106,15 @@ fn missing_or_invalid_metadata_requires_configuration_without_a_fixed_fallback()
         });
         let mut body = json!({"model": "claude-test"});
         let error = ensure(&mut body, &[], &provider).unwrap_err();
-        assert!(matches!(error, OutputLimitError::Unavailable));
+        assert_eq!(error, problem(Problem::MissingMaximum));
         assert!(error.to_string().contains("max_tokens"));
         let message = error.to_string();
-        assert_eq!(crate::local_proxy::error_messages::gui(&message), message);
         assert_eq!(
-            crate::local_proxy::upstream_error_message(&message),
+            crate::local_proxy::error_messages::gui(&error.wire()),
+            message
+        );
+        assert_eq!(
+            crate::local_proxy::upstream_error_message(&error.wire()),
             message
         );
         assert!(body.get("max_tokens").is_none());
@@ -129,4 +132,27 @@ fn full_messages_url_preserves_gateway_prefix_query_and_encodes_model() {
     );
     provider.base_url = "https://example.test/gateway/invoke".into();
     assert!(model_url(&provider, "test").is_err());
+}
+
+#[test]
+fn metadata_http_and_json_failures_report_the_reason_and_configuration_alternative() {
+    for status in [200, 401, 403, 404, 429, 503] {
+        let server = Server::http("127.0.0.1:0").unwrap();
+        let provider = provider(format!("http://{}", server.server_addr()));
+        let worker = thread::spawn(move || {
+            receive(&server)
+                .respond(Response::from_string("private response").with_status_code(status))
+                .unwrap();
+        });
+        let error = ensure(&mut json!({"model":"test"}), &[], &provider).unwrap_err();
+        let message = crate::local_proxy::upstream_error_message(&error.wire());
+        if status == 200 {
+            assert!(message.contains("JSON 语法无效"), "{message}");
+        } else {
+            assert!(message.contains(&format!("HTTP {status}")), "{message}");
+        }
+        assert!(message.contains("max_tokens"));
+        assert!(!message.contains("private"));
+        worker.join().unwrap();
+    }
 }

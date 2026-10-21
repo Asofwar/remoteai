@@ -142,13 +142,16 @@ impl<R: BufRead> ChatSseReader<R> {
             self.finish();
             return;
         }
-        let Ok(value) = serde_json::from_str::<Value>(&data) else {
-            self.fail("The upstream response contained an unreadable event.");
-            return;
+        let value = match serde_json::from_str::<Value>(&data) {
+            Ok(value) => value,
+            Err(error) => {
+                self.fail(&request_error::RequestError::json(request_error::Stage::Chat, &error).to_string());
+                return;
+            }
         };
         self.metadata.observe(&value);
         if event_type == "error" || chat_completion_failed(&value) {
-            self.fail("The upstream service could not complete the response.");
+            self.fail(&request_error::upstream(request_error::Stage::Chat, &value).to_string());
             return;
         }
         self.observe_termination(&value);
@@ -175,15 +178,16 @@ impl<R: BufRead> ChatSseReader<R> {
             return;
         }
         self.flush_inline_reasoning();
-        let termination = self.termination.unwrap_or(ChatCompletionStatus::Failed(
-            "The upstream response ended before it was complete.",
+        let termination = self.termination.take().unwrap_or_else(|| ChatCompletionStatus::Failed(
+            request_error::RequestError::new(request_error::Stage::Chat,
+                request_error::Problem::MissingTerminal).to_string(),
         ));
         if termination != ChatCompletionStatus::Completed {
             self.finish_unsuccessfully(termination);
             return;
         }
         if !self.tools.values().all(streaming_tool_arguments_complete) {
-            self.fail("The upstream response ended with an incomplete tool call.");
+            self.fail("Chat 响应中的工具调用缺少名称，或参数 JSON 不完整。");
             return;
         }
         let (tool_events, tool_items) = self.finalize_tools();
@@ -247,8 +251,8 @@ impl<R: BufRead> ChatSseReader<R> {
         );
     }
 
-    fn fail(&mut self, message: &'static str) {
-        self.finish_unsuccessfully(ChatCompletionStatus::Failed(message));
+    fn fail(&mut self, message: &str) {
+        self.finish_unsuccessfully(ChatCompletionStatus::Failed(message.to_string()));
     }
 
     fn allocate_output_index(&mut self) -> usize {
@@ -349,7 +353,8 @@ impl<R: BufRead> Read for ChatSseReader<R> {
                     self.finish();
                 }
                 Ok(_) => self.process_line(&line),
-                Err(_) => self.fail("The connection closed before the response was complete."),
+                Err(error) => self.fail(
+                    &request_error::RequestError::io(request_error::Stage::Chat, &error).to_string()),
             }
         }
         Ok(self.drain_pending(target))

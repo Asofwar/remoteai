@@ -9,19 +9,16 @@ use reqwest::{blocking::RequestBuilder, Url};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
+use super::{Problem, RequestError, Stage};
 use crate::models::ProviderProfile;
 
 const CACHE_TTL: Duration = Duration::from_secs(30 * 60);
 const CACHE_ENTRIES: usize = 128;
 
-#[derive(Debug, thiserror::Error)]
-pub(super) enum OutputLimitError {
-    #[error("输出长度必须为正整数，请检查请求或 Provider 中的 max_tokens 设置。")]
-    Invalid,
-    #[error(
-        "无法获取此模型的最大输出长度。请在 Provider 的自定义请求参数中设置 max_tokens 后重试。"
-    )]
-    Unavailable,
+type OutputLimitError = RequestError;
+
+fn problem(problem: Problem) -> OutputLimitError {
+    RequestError::new(Stage::OutputLimit, problem)
 }
 
 struct Entry {
@@ -43,12 +40,12 @@ pub(super) fn ensure(
     if let Some(explicit) = body.get("max_tokens") {
         return positive_limit(explicit)
             .map(|_| ())
-            .ok_or(OutputLimitError::Invalid);
+            .ok_or(problem(Problem::InvalidMaximum));
     }
     let model = body["model"]
         .as_str()
         .filter(|value| !value.is_empty())
-        .ok_or(OutputLimitError::Unavailable)?;
+        .ok_or(problem(Problem::InvalidModel))?;
     body["max_tokens"] = json!(discover(model, headers, provider)?);
     Ok(())
 }
@@ -59,7 +56,8 @@ fn discover(
     provider: &ProviderProfile,
 ) -> Result<u64, OutputLimitError> {
     let _deadline = super::super::model_catalog_deadline::Scope::enter();
-    let client = super::super::http_client().map_err(|_| OutputLimitError::Unavailable)?;
+    let client = super::super::http_client()
+        .map_err(|error| RequestError::transport(Stage::OutputLimit, &error))?;
     let metadata_headers = headers
         .iter()
         .filter(|(name, _)| {
@@ -82,14 +80,25 @@ fn discover(
         return Ok(maximum);
     }
     let request = super::super::upstream_transport::Request::prepare(request)
-        .map_err(|_| OutputLimitError::Unavailable)?;
-    let response = request.send().map_err(|_| OutputLimitError::Unavailable)?;
+        .map_err(|_| problem(Problem::Prepare))?;
+    let response = request.send().map_err(|error| {
+        RequestError::transport(
+            Stage::OutputLimit,
+            &super::super::transport_error_detail(&error, "Model metadata request failed", 1),
+        )
+    })?;
     if !response.status().is_success() {
-        return Err(OutputLimitError::Unavailable);
+        return Err(RequestError::http(
+            Stage::OutputLimit,
+            response.status().as_u16(),
+        ));
     }
-    let value: Value =
-        serde_json::from_reader(response).map_err(|_| OutputLimitError::Unavailable)?;
-    let maximum = positive_limit(&value["max_tokens"]).ok_or(OutputLimitError::Unavailable)?;
+    let bytes = response
+        .bytes()
+        .map_err(|error| RequestError::io(Stage::OutputLimit, &error))?;
+    let value: Value = serde_json::from_slice(&bytes)
+        .map_err(|error| RequestError::json(Stage::OutputLimit, &error))?;
+    let maximum = positive_limit(&value["max_tokens"]).ok_or(problem(Problem::MissingMaximum))?;
     remember(key, maximum);
     Ok(maximum)
 }
@@ -100,15 +109,15 @@ fn positive_limit(value: &Value) -> Option<u64> {
 
 fn model_url(provider: &ProviderProfile, model: &str) -> Result<Url, OutputLimitError> {
     let messages = super::super::provider_request_options::url(provider, "/messages");
-    let mut url = Url::parse(&messages).map_err(|_| OutputLimitError::Unavailable)?;
+    let mut url = Url::parse(&messages).map_err(|_| problem(Problem::ModelEndpoint))?;
     // A custom invocation path has no unambiguous sibling model API.
     if !matches!(url.scheme(), "http" | "https")
         || !url.path().trim_end_matches('/').ends_with("/messages")
     {
-        return Err(OutputLimitError::Unavailable);
+        return Err(problem(Problem::ModelEndpoint));
     }
     url.path_segments_mut()
-        .map_err(|_| OutputLimitError::Unavailable)?
+        .map_err(|_| problem(Problem::ModelEndpoint))?
         .pop_if_empty()
         .pop()
         .push("models")
@@ -123,9 +132,9 @@ fn cache_key(
 ) -> Result<[u8; 32], OutputLimitError> {
     let request = request
         .try_clone()
-        .ok_or(OutputLimitError::Unavailable)?
+        .ok_or(problem(Problem::Prepare))?
         .build()
-        .map_err(|_| OutputLimitError::Unavailable)?;
+        .map_err(|_| problem(Problem::Prepare))?;
     let mut hash = Sha256::new();
     for bytes in [provider.id.as_bytes(), request.url().as_str().as_bytes()] {
         hash.update(bytes.len().to_le_bytes());

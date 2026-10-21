@@ -73,7 +73,7 @@ fn invalid_requests_and_proxy_configuration_errors_do_not_mark_network_health() 
             sent_bytes: 0,
         },
         Error::UnbufferedBody,
-        Error::Redirect,
+        Error::RedirectLimit(10),
         Error::Proxy(crate::system_proxy::ProxyResolutionError::Timeout),
     ] {
         assert_eq!(classify(&error), None);

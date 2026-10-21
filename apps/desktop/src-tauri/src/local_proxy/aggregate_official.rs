@@ -47,10 +47,11 @@ fn account_member_body(
         return Ok(body);
     }
     let mut body: Value = serde_json::from_slice(&body)
-        .map_err(|_| "The request body is not valid JSON".to_string())?;
+        .map_err(|error| request_error::RequestError::json(request_error::Stage::Request, &error).wire())?;
     let object = body
         .as_object_mut()
         .ok_or("The request body must be an object")?;
     object.insert("model".into(), Value::String(model.into()));
-    serde_json::to_vec(&body).map_err(|_| "Unable to prepare the request".to_string())
+    serde_json::to_vec(&body).map_err(|_| request_error::RequestError::new(
+        request_error::Stage::Request, request_error::Problem::Encode).wire())
 }

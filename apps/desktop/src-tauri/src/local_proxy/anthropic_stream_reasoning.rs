@@ -34,19 +34,19 @@ impl ContentBlocks {
         let text = event
             .get(if complete { "text" } else { "delta" })
             .and_then(Value::as_str)
-            .ok_or(ConversionError::InvalidEvent)?;
+            .ok_or(ConversionError::invalid(Problem::DeltaText))?;
         let index = self.thinking_block(event, events)?;
         let part_index = event
             .get("summary_index")
             .and_then(Value::as_u64)
             .unwrap_or(0);
         let BlockKind::Thinking(thinking) = &mut self.blocks[index].kind else {
-            return Err(ConversionError::InvalidEvent);
+            return Err(ConversionError::invalid(Problem::BlockDelta));
         };
         let part = thinking.parts.entry(part_index).or_default();
         let delta = if complete {
             text.strip_prefix(part.as_str())
-                .ok_or(ConversionError::InvalidEvent)?
+                .ok_or(ConversionError::invalid(Problem::ContentMismatch))?
         } else {
             text
         };

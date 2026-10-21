@@ -86,7 +86,7 @@ fn send_official_request(
     authentication: &OfficialRequestAuthentication,
 ) -> Result<UpstreamPayload, String> {
     let body = responses_lite::prepare(method, upstream_url, headers, body.to_vec())
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| error.wire())?;
     diagnostic_event(json!({
         "event": "official_request_prepared", "request": diagnostic_request_options(&body),
         "responsesLite": responses_lite::enabled(headers)
@@ -238,7 +238,7 @@ fn forward_provider_request(
     }
     // Validate before automatic API fallback so malformed Lite requests are never replayed as Chat.
     let body = responses_lite::prepare(method, url, headers, body)
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| error.wire())?;
     if provider.kind == ProviderKind::Custom
         && *method == Method::Post
         && is_response_create_endpoint(request_path(url))
@@ -302,7 +302,9 @@ fn apply_provider_body_options(
     if *method != Method::Post || provider.request_options.as_ref().is_none_or(|options| options.body.is_empty()) {
         return Ok(body.to_vec());
     }
-    let mut value = serde_json::from_slice(body).map_err(|_| "Request parameters are invalid")?;
+    let mut value = serde_json::from_slice(body).map_err(|error|
+        request_error::RequestError::json(request_error::Stage::Request, &error).wire())?;
     provider_request_options::body(&mut value, provider);
-    serde_json::to_vec(&value).map_err(|_| "Could not prepare request parameters".to_string())
+    serde_json::to_vec(&value).map_err(|_| request_error::RequestError::new(
+        request_error::Stage::Request, request_error::Problem::Encode).wire())
 }

@@ -1,4 +1,5 @@
 use super::*;
+use crate::local_proxy::error_messages;
 use std::{cell::Cell, io::Cursor, thread};
 
 #[path = "deadline_tests.rs"]
@@ -197,7 +198,16 @@ fn failed_or_invalid_admin_fallback_reports_model_discovery_failure() {
             || Err("official unavailable".into()),
             || request_catalog(&client, url),
         );
-        assert_eq!(result.err().as_deref(), Some(UNAVAILABLE_MESSAGE));
+        let message = error_messages::gui(&result.err().unwrap());
+        assert!(message.contains("备用模型列表"), "{message}");
+        if status >= 400 {
+            assert!(message.contains(&format!("HTTP {status}")), "{message}");
+        } else {
+            assert!(
+                message.contains("JSON") || message.contains("models"),
+                "{message}"
+            );
+        }
         task.join().unwrap();
     }
 }
@@ -229,5 +239,6 @@ fn admin_transport_failure_reports_model_discovery_failure() {
         || Err("official unavailable".into()),
         || request_catalog(&client, url),
     );
-    assert_eq!(result.err().as_deref(), Some(UNAVAILABLE_MESSAGE));
+    let message = error_messages::gui(&result.err().unwrap());
+    assert!(message.contains("连接被上游服务或代理拒绝"), "{message}");
 }

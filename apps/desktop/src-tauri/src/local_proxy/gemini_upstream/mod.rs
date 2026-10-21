@@ -24,6 +24,7 @@ use serde_json::Value;
 use std::io::Cursor;
 use tiny_http::Method;
 
+use super::request_error::{Problem, RequestError, Stage};
 use super::{CodexToolContext, UpstreamBody, UpstreamPayload};
 use crate::models::ProviderProfile;
 
@@ -39,8 +40,8 @@ enum BridgeError {
     InvalidMedia,
     #[error("The model name or service address is invalid")]
     InvalidEndpoint,
-    #[error("The service returned an incomplete or unreadable response")]
-    InvalidResponse,
+    #[error(transparent)]
+    Detailed(RequestError),
     #[error("The selected service cannot apply the requested search restrictions")]
     UnsupportedSearchOptions,
     #[error("Generation settings must request exactly one response candidate")]
@@ -49,6 +50,19 @@ enum BridgeError {
     MissingHistory,
     #[error("The selected service cannot enforce this tool choice, call limit, or serial tool execution")]
     UnsupportedToolOptions,
+}
+
+impl BridgeError {
+    fn detail(self) -> RequestError {
+        match self {
+            Self::Detailed(error) => error,
+            Self::InvalidToolCall => RequestError::new(Stage::Gemini, Problem::InvalidTool),
+            Self::UnsupportedContent => {
+                RequestError::new(Stage::Gemini, Problem::UnsupportedResponseContent)
+            }
+            _ => RequestError::new(Stage::Gemini, Problem::InvalidEvent),
+        }
+    }
 }
 
 struct Context {
@@ -68,8 +82,8 @@ pub(super) fn forward(
     if *method != Method::Post {
         return Err("Content generation requests must use POST".into());
     }
-    let input: Value =
-        serde_json::from_slice(&body).map_err(|_| "The request body is not valid JSON")?;
+    let input: Value = serde_json::from_slice(&body)
+        .map_err(|error| RequestError::json(Stage::Request, &error).wire())?;
     if !input.is_object() {
         return Err("The request body must be a JSON object".into());
     }
@@ -137,9 +151,9 @@ fn buffered(
     context: &Context,
     pending: Option<history::Pending>,
 ) -> Result<UpstreamBody, String> {
-    let value: Value =
-        serde_json::from_slice(bytes).map_err(|_| "The service returned unreadable JSON")?;
-    let chat = response::to_chat(&value, context).map_err(|error| error.to_string())?;
+    let value: Value = serde_json::from_slice(bytes)
+        .map_err(|error| RequestError::json(Stage::Gemini, &error).wire())?;
+    let chat = response::to_chat(&value, context).map_err(|error| error.detail().wire())?;
     if context.streaming {
         let mut chunk = chat.clone();
         chunk["choices"][0]["delta"] = chunk["choices"][0]["message"].take();
@@ -158,7 +172,7 @@ fn buffered(
     );
     serde_json::to_vec(&response)
         .map(UpstreamBody::Buffered)
-        .map_err(|_| "The response could not be converted".into())
+        .map_err(|_| RequestError::new(Stage::Gemini, Problem::Encode).wire())
 }
 
 fn capture_buffered(pending: Option<history::Pending>, id: &str, native: &Value, chat: &Value) {

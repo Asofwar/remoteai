@@ -74,7 +74,7 @@ fn from_events(
     }
     serde_json::to_vec(&completed_response(reader)?)
         .map(UpstreamBody::Buffered)
-        .map_err(|_| "The response could not be converted".into())
+        .map_err(|_| super::RequestError::new(super::Stage::Gemini, super::Problem::Encode).wire())
 }
 
 #[cfg(test)]

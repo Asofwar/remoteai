@@ -231,22 +231,3 @@ Remote AI is licensed under the [Apache License 2.0](LICENSE), the same license 
 ## Disclaimer
 
 Remote AI is independently developed third-party software and is not affiliated with, associated with, authorized by, endorsed by, or officially partnered with OpenAI or its Codex products.
-
-## Star History
-
-<a href="https://www.star-history.com/#piperhex/remoteai&Date">
-  <picture>
-    <source
-      media="(prefers-color-scheme: dark)"
-      srcset="assets/star-history/star-history-dark.svg"
-    />
-    <source
-      media="(prefers-color-scheme: light)"
-      srcset="assets/star-history/star-history-light.svg"
-    />
-    <img
-      alt="Remote AI Star History"
-      src="assets/star-history/star-history-light.svg"
-    />
-  </picture>
-</a>

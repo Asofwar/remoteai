@@ -10,12 +10,25 @@ vi.mock('./hostSession', () => ({ HostSession: vi.fn(class {
     displayId: this.settings.displayId ?? 'first', capabilities: { displaySessions: true } }));
   signal = vi.fn(async () => ({ candidates: [] }));
   update = vi.fn();
+  inputFocus = vi.fn(async () => ({ top: 0.7, bottom: 0.72, lineHeight: 0.02 }));
   privacy = vi.fn(async (enabled: boolean) => ({ privacyScreen: enabled, displayId: 'private' }));
   resolution = vi.fn(async () => ({ displayId: 'selected' }));
   close = vi.fn(() => { this.closed = true; });
 }) }));
 beforeEach(() => vi.clearAllMocks());
 const opening = { action: 'open', id: 'desktop-1', settings: DEFAULT_SETTINGS };
+
+it('exposes input geometry only to the owner of the active desktop session', async () => {
+  const host = new RemoteDesktopHost(); host.register('alice', []); host.register('bob', []);
+  await host.request(opening, 'alice');
+  const request = { action: 'inputFocus', id: 'desktop-1' };
+  await expect(host.request(request, 'bob')).rejects.toThrow('连接已结束');
+  const session = vi.mocked(DesktopHostSession).mock.results[0].value;
+  expect(session.inputFocus).not.toHaveBeenCalled();
+  await expect(host.request(request, 'alice')).resolves.toEqual({ top: 0.7, bottom: 0.72, lineHeight: 0.02 });
+  host.release();
+  await expect(host.request(request, 'alice')).rejects.toThrow();
+});
 
 it('validates resolution dimensions and binds changes to the authenticated owner', async () => {
   const host = new RemoteDesktopHost(); host.register('alice', []); host.register('bob', []);

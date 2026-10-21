@@ -1,5 +1,6 @@
 import { object, type IceServer } from '../../../../shared/remote-chat/protocol';
-import { validateResolution, validateSettings, type DesktopDisplays, type DesktopOffer, type DesktopResolution,
+import { validateResolution, validateSettings, type DesktopDisplays, type DesktopInputFocus,
+  type DesktopOffer, type DesktopResolution,
   type DesktopSettings, type DesktopSignal, type DesktopSignalReply }
   from '../../../../shared/remote-desktop/protocol';
 import { HostSession } from './hostSession';
@@ -10,6 +11,7 @@ import { desktopPermissionStatus } from './permissions';
 import type { DesktopCaptureSettings } from './displays';
 
 export interface DesktopHostSession {
+  inputFocus?(): Promise<DesktopInputFocus | null>;
   readonly closed: boolean;
   open(): Promise<DesktopOffer>;
   close(): unknown;
@@ -68,6 +70,7 @@ export class RemoteDesktopHost {
       throw new Error('桌面连接已结束，请重新连接。');
     }
     switch (body.action) {
+      case 'inputFocus': return await active.session.inputFocus?.() ?? null;
       case 'resolution':
         if (!active.session.resolution) throw new Error('这台电脑暂不支持切换分辨率。');
         return active.session.resolution(validateResolution(body.resolution));

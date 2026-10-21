@@ -1,4 +1,4 @@
-import type { DesktopDisplay, DesktopInput, DesktopResolution, DesktopSettings, DesktopSystemPermission }
+import type { DesktopDisplay, DesktopInput, DesktopInputFocus, DesktopResolution, DesktopSettings, DesktopSystemPermission }
   from '../../../shared/remote-desktop/protocol';
 import { RemoteDesktopHost } from '../../desktop/src/remoteDesktop/host';
 import { HostSession } from '../../desktop/src/remoteDesktop/hostSession';
@@ -42,6 +42,7 @@ if (new URLSearchParams(location.search).has('three-displays')) {
 let selected = displays[0];
 const multiDisplay = new URLSearchParams(location.search).has('displays');
 export const desktopTest = { inputs: [] as DesktopInput[], settings: [] as DesktopSettings[],
+  inputFocus: null as DesktopInputFocus | null, inputFocusReads: 0,
   privacyChanges: [] as boolean[],
   resolutionChanges: [] as DesktopResolution[],
   privacyInstallationRequired: new URLSearchParams(location.search).has('privacy-install'),
@@ -114,6 +115,10 @@ Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {
       desktopTest.localClipboard.content = structuredClone(args.content!); return;
     }
     if (command === 'remote_desktop_clipboard') return desktopClipboard(args.message!);
+    if (command === 'remote_desktop_input_focus') {
+      desktopTest.inputFocusReads += 1;
+      return structuredClone(desktopTest.inputFocus);
+    }
     if (command === 'remote_desktop_permissions') return { enabled: true, control: true };
     if (command === 'remote_desktop_system_permissions') {
       desktopTest.permissionChecks += 1;

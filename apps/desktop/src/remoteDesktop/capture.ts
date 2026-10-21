@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { DesktopDisplays } from '../../../../shared/remote-desktop/protocol';
+import type { DesktopDisplays, DesktopInputFocus } from '../../../../shared/remote-desktop/protocol';
 import type { ClipboardReply } from '../../../../shared/remote-desktop/clipboard';
 import { openDesktopCapture } from './displays';
 
@@ -43,6 +43,10 @@ export class DesktopCapture {
   }
   async input(input: unknown) {
     if (!this.stopped && this.id) await invoke('remote_desktop_input', { id: this.id, input });
+  }
+  async inputFocus() {
+    if (!this.id || this.stopped) return null;
+    return invoke<DesktopInputFocus | null>('remote_desktop_input_focus', { id: this.id });
   }
   async renew(expiresAt: number) {
     if (this.id && !this.stopped) await invoke('remote_desktop_renew', { id: this.id, expiresAt });

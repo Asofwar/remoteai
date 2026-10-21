@@ -270,6 +270,7 @@ pub(super) async fn desktop_call(call: Call) -> Result<Value> {
         call.command.as_str(),
         "remote_desktop_open"
             | "remote_desktop_renew"
+            | "remote_desktop_input_focus"
             | "remote_desktop_stream_available"
             | "remote_desktop_stream_open"
             | "remote_desktop_stream_signal"

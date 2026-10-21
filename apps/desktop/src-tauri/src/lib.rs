@@ -330,6 +330,7 @@ pub fn run() {
             remote_desktop::system_permissions::remote_desktop_repair_system_permission,
             remote_desktop::remote_desktop_frame,
             remote_desktop::remote_desktop_input,
+            remote_desktop::input_focus::remote_desktop_input_focus,
             remote_desktop::clipboard::remote_desktop_clipboard,
             remote_desktop::local_clipboard::remote_desktop_read_local_clipboard,
             remote_desktop::local_clipboard::remote_desktop_write_local_clipboard,

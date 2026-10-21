@@ -39,6 +39,7 @@ export class NativeMediaHostSession implements DesktopHostSession {
     return this.session.signal(signal);
   }
   async update(settings: DesktopSettings) { await this.session?.update(settings); }
+  async inputFocus() { return !this.stopped ? await this.session?.inputFocus?.() ?? null : null; }
   async privacy(enabled: boolean) {
     if (!this.session?.privacy || this.stopped) throw new Error('这台电脑暂不支持隐私屏。');
     return this.session.privacy(enabled);

@@ -32,6 +32,12 @@ export class DesktopDisplaySession {
     return this.selected.receiver.clipboard;
   }
   input(input: Parameters<DesktopReceiver['input']>[0]) { this.selected?.receiver.input(input); }
+  async inputFocus() {
+    const selected = this.selected;
+    if (this.stopped || this.switching || !selected) return null;
+    const focus = await selected.receiver.inputFocus();
+    return !this.stopped && !this.switching && this.selected === selected ? focus : null;
+  }
   frameRendered(stream: MediaStream | undefined) { this.selected?.receiver.frameRendered(stream); }
   mute(value: boolean) { this.muted = value; this.selected?.receiver.mute(value); }
 

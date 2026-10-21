@@ -1,4 +1,5 @@
 import { useThemeColor } from '../../theme/store';
+import { useState } from 'react';
 import { t, useLanguage } from '../../i18n';
 import { Keyboard, Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +19,7 @@ export function DesktopKeyboard({ input, close, compact, supported, platform }: 
   const color = useThemeColor();
   useLanguage();
   const keyboard = useSoftKeyboard(input);
+  const [focusRequest, setFocusRequest] = useState(0);
   const dismiss = () => { Keyboard.dismiss(); close(); };
   return <View style={s.root}>
     <View style={s.tabs} accessibilityRole="tablist">
@@ -25,12 +27,13 @@ export function DesktopKeyboard({ input, close, compact, supported, platform }: 
         accessibilityState={{ selected: keyboard.tab === tab.id }}
         style={[s.tab, keyboard.tab === tab.id && s.activeTab]} onPress={() => {
           if (tab.id !== 'ime') Keyboard.dismiss();
+          else setFocusRequest(value => value + 1);
           keyboard.selectTab(tab.id);
         }}><Text style={[s.tabLabel, keyboard.tab === tab.id && s.activeText]}>{t(tab.label)}</Text></Pressable>)}
       <Pressable accessibilityRole="button" accessibilityLabel={t("收起键盘")} style={s.close} onPress={dismiss}>
         <Ionicons name="close-circle" size={24} color={color("#ddd", 'faint')} /></Pressable>
     </View>
-    {keyboard.tab === 'ime' ? <DesktopIme input={input} />
+    {keyboard.tab === 'ime' ? <DesktopIme input={input} focusRequest={focusRequest} />
       : <ScrollView style={{ maxHeight: compact ? 238 : 320 }}
         contentContainerStyle={s.content} keyboardShouldPersistTaps="always">
         {!supported && <Text accessibilityRole="alert" style={s.notice}>{t("更新远程电脑上的应用后，即可使用这些按键。")}</Text>}

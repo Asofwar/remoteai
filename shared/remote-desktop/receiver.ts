@@ -321,6 +321,10 @@ export class DesktopReceiver {
     return snapshot;
   }
 
+  async inputFocus() {
+    if (this.stopped || this.capabilities.control === false || !this.capabilities.inputFocus) return null;
+    return await this.options.client.inputFocus?.(this.id) ?? null;
+  }
   input(input: DesktopInput) {
     if (this.capabilities.control === false) return;
     if (input.kind === 'wheel' && input.horizontal && !this.capabilities.horizontalScroll) return;

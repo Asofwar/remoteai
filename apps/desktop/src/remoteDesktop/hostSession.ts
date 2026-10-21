@@ -42,10 +42,12 @@ export class HostSession {
       resolution: this.session instanceof NativeDesktopSession && policy?.control !== false
         && !!offer.resolutions?.length,
       keyboard: policy?.control ?? true, control: policy?.control ?? true,
+      inputFocus: policy?.control ?? true,
       clipboardNative: true,
       clipboard: !policy || policy.clipboardRead || policy.clipboardWrite, horizontalScroll: policy?.control ?? true } };
   }
   signal(signal: DesktopSignal) { return this.session.signal(signal); }
+  inputFocus() { return this.session.inputFocus(); }
   async privacy(enabled: boolean) {
     if (!(this.session instanceof NativeDesktopSession)) throw new Error('这台电脑暂不支持隐私屏。');
     return this.session.privacy(enabled);

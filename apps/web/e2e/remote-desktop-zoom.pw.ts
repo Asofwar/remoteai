@@ -160,9 +160,13 @@ test('keeps text input and its actions inside a short landscape viewport', async
   await page.getByRole('button', { name: '键盘', exact: true }).click();
   await page.setViewportSize({ width: 844, height: 140 });
   const input = page.getByRole('textbox', { name: '发送到电脑的文字' });
-  await expect(input).toBeVisible(); await expect(page.locator('.rd-stats')).toHaveCount(0);
+  await expect(input).toBeFocused();
+  await expect(input).toHaveCSS('opacity', '0');
+  await expect(page.locator('.rd-stats')).toHaveCount(0);
   const stage = (await page.locator('.rd-stage').boundingBox())!;
   const keyboard = (await page.getByRole('region', { name: '远程输入' }).boundingBox())!;
+  const tabs = (await page.locator('.rd-input-tabs').boundingBox())!;
+  expect(keyboard.height).toBe(tabs.height);
   expect(keyboard.y).toBeGreaterThanOrEqual(stage.y + stage.height);
   const viewportHeight = await page.evaluate(() => window.innerHeight);
   for (const control of [input, page.getByRole('tablist', { name: '输入方式' }),

@@ -1,4 +1,5 @@
 //! Keep the Lite header and reasoning context consistent at the final transport boundary.
+use std::borrow::Cow;
 use std::io::Read;
 
 use serde_json::{json, Value};
@@ -6,7 +7,6 @@ use tiny_http::Method;
 
 const LITE_HEADER: &str = "x-openai-internal-codex-responses-lite";
 const ALL_TURNS: &str = "all_turns";
-const MAX_DECODED_BYTES: u64 = 128 * 1024 * 1024;
 
 #[derive(Debug, thiserror::Error)]
 pub(super) enum RequestError {
@@ -59,9 +59,11 @@ fn is_responses_url(value: &str) -> bool {
     super::is_responses_endpoint(super::request_path(path))
 }
 
-fn decode(body: &[u8], encoding: &str) -> Result<Vec<u8>, RequestError> {
-    let reader: Box<dyn Read + '_> = match encoding.trim().to_ascii_lowercase().as_str() {
-        "" | "identity" => Box::new(body),
+fn decode<'a>(body: &'a [u8], encoding: &str) -> Result<Cow<'a, [u8]>, RequestError> {
+    // Lite compatibility must not impose a body-size limit on otherwise valid conversations.
+    // Uncompressed requests are already buffered by the request worker; avoid copying them again.
+    let mut reader: Box<dyn Read + '_> = match encoding.trim().to_ascii_lowercase().as_str() {
+        "" | "identity" => return Ok(Cow::Borrowed(body)),
         "zstd" => Box::new(
             zstd::stream::read::Decoder::new(body).map_err(|_| RequestError::InvalidEncoding)?,
         ),
@@ -70,13 +72,9 @@ fn decode(body: &[u8], encoding: &str) -> Result<Vec<u8>, RequestError> {
     };
     let mut decoded = Vec::new();
     reader
-        .take(MAX_DECODED_BYTES + 1)
         .read_to_end(&mut decoded)
         .map_err(|_| RequestError::InvalidEncoding)?;
-    if decoded.len() as u64 > MAX_DECODED_BYTES {
-        return Err(RequestError::InvalidBody);
-    }
-    Ok(decoded)
+    Ok(Cow::Owned(decoded))
 }
 
 fn encode(body: &[u8], encoding: &str) -> Result<Vec<u8>, RequestError> {

@@ -117,3 +117,51 @@ fn repairs_compressed_requests_without_changing_encoding() {
         );
     }
 }
+
+#[test]
+fn accepts_large_lite_requests_and_repairs_context_for_each_encoding() {
+    // Match the reported failure size, above the former 128 MiB decoded-body limit.
+    const REPORTED_REQUEST_BYTES: usize = 136_965_209;
+    for encoding in ["identity", "gzip", "zstd"] {
+        for context in [None, Some(ALL_TURNS)] {
+            let mut request = json!({"input": [], "reasoning": {"effort": "max"}});
+            if let Some(context) = context {
+                request["reasoning"]["context"] = json!(context);
+            }
+            let mut original = serde_json::to_vec(&request).unwrap();
+            // Valid trailing whitespace exercises the size boundary without duplicating large strings.
+            original.resize(REPORTED_REQUEST_BYTES, b' ');
+            let body = encode(&original, encoding).unwrap();
+            drop(original);
+            let original_pointer = body.as_ptr();
+            let mut headers = headers();
+            headers.push(("Content-Encoding".into(), encoding.into()));
+            let prepared = prepare(&Method::Post, "/v1/responses", &headers, body).unwrap();
+            if context.is_some() {
+                assert_eq!(prepared.as_ptr(), original_pointer);
+                assert_eq!(
+                    decode(&prepared, encoding).unwrap().len(),
+                    REPORTED_REQUEST_BYTES
+                );
+            } else {
+                request["reasoning"]["context"] = json!(ALL_TURNS);
+                let actual: Value =
+                    serde_json::from_slice(&decode(&prepared, encoding).unwrap()).unwrap();
+                assert_eq!(actual, request);
+            }
+        }
+    }
+}
+
+#[test]
+fn borrows_uncompressed_bytes_and_still_rejects_corrupt_compression() {
+    for encoding in ["", "identity", " IDENTITY "] {
+        assert!(matches!(decode(b"{}", encoding).unwrap(), Cow::Borrowed(_)));
+    }
+    for encoding in ["gzip", "zstd"] {
+        assert!(matches!(
+            decode(b"not compressed data", encoding),
+            Err(RequestError::InvalidEncoding)
+        ));
+    }
+}

@@ -90,6 +90,48 @@ fn responses_lite_official_transport_also_repairs_context() {
 }
 
 #[test]
+fn responses_lite_large_requests_reach_official_and_provider_upstreams() {
+    const REPORTED_REQUEST_BYTES: usize = 136_965_209;
+    let authentication = OfficialRequestAuthentication::OAuth {
+        access_token: "fixture".into(),
+        chatgpt_account_id: None,
+    };
+    let expected = json!({
+        "model": "gpt-5.6-sol", "input": [],
+        "reasoning": {"context": "all_turns", "effort": "max"}
+    });
+    for official in [true, false] {
+        let (url, worker) = lite_upstream();
+        let mut body = serde_json::to_vec(&expected).unwrap();
+        body.resize(REPORTED_REQUEST_BYTES, b' ');
+        let response = if official {
+            send_official_request(
+                &Client::new(),
+                &Method::Post,
+                &format!("{url}/backend-api/codex/responses"),
+                &lite_test_headers(),
+                &body,
+                &authentication,
+            )
+        } else {
+            forward_provider_request(
+                &Method::Post,
+                "/v1/responses",
+                &lite_test_headers(),
+                body,
+                &openai_provider(url),
+            )
+        }
+        .unwrap();
+        assert_eq!(response.status, 200);
+        read_upstream_payload(response);
+        let (sent, lite) = worker.join().unwrap();
+        assert!(lite);
+        assert_eq!(sent, expected);
+    }
+}
+
+#[test]
 fn responses_lite_invalid_body_never_reaches_provider_or_api_fallback() {
     let server = Server::http("127.0.0.1:0").unwrap();
     let mut provider = openai_provider(format!("http://{}", server.server_addr().to_ip().unwrap()));

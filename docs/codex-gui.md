@@ -371,6 +371,12 @@ header is retained because Lite also changes the input and tool structure. Diagn
 flag, reasoning context and repair events without logging conversation text. If a gateway subsequently
 drops the context field, its request forwarding must also be corrected.
 
+Lite compatibility does not impose a request-body size limit, including for gzip and zstd requests.
+The former 128 MiB decoded-body limit incorrectly rejected valid long conversations before transport,
+even when their reasoning context was already correct. Uncompressed bodies are borrowed during decoding
+to avoid an extra full-body allocation. JSON and compression validation still apply; upstream limits
+remain unchanged.
+
 Run `node scripts/codex-gui-responses-lite-smoke.mjs <installed-package>/bin/codex.exe` to check new turns,
 automatic compaction, restart/resume and extra app-server `-c` settings against a local fixture.
 

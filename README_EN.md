@@ -15,6 +15,9 @@ and mobile companion to manage accounts across devices.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE) [![Release](https://img.shields.io/github/v/release/piperhex/remoteai)](https://github.com/piperhex/remoteai/releases)
 
+Product website: [Remote AI](https://piperhex.github.io/remoteai/en/) — explore features, downloads, and getting started.
+Website source and maintenance instructions: [apps/website](apps/website/README.md).
+
 ## RemoteAI Web
 
 Open [RemoteAI Web](https://codex.onepiper.cloud/web/) to connect to your computer and use Codex in your browser.

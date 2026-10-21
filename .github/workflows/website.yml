@@ -1,0 +1,90 @@
+name: Website / GitHub Pages
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'apps/website/**'
+      - 'docs/assets/codex-switch-*.png'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/website.yml'
+  pull_request:
+    paths:
+      - 'apps/website/**'
+      - 'docs/assets/codex-switch-*.png'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/website.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  WEBSITE_URL: ${{ vars.WEBSITE_URL || 'https://piperhex.github.io/remoteai/' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install website dependencies
+        run: npm ci --workspace @codex-switch/website --include-workspace-root=false --ignore-scripts
+      - name: Build static pages and verify links and metadata
+        run: npm run check:website
+      - name: Install test browser
+        run: npm exec --workspace @codex-switch/website -- playwright install --with-deps chromium
+      - name: Verify navigation, mobile layouts and HTML without JavaScript
+        run: npm run test:website:e2e
+      - name: Upload browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-browser-diagnostics
+          path: apps/website/test-results/
+          retention-days: 7
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: apps/website/dist
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    steps:
+      - name: Read Pages configuration
+        id: pages
+        uses: actions/configure-pages@v5
+      - name: Check canonical URL matches the hosting domain
+        env:
+          PAGES_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          node --input-type=module -e '
+            const normalize = (url) => new URL(url).href.replace(/\/+$/, "");
+            if (normalize(process.env.PAGES_URL) !== normalize(process.env.WEBSITE_URL)) {
+              throw new Error("Set the WEBSITE_URL repository variable to the configured Pages URL before publishing.");
+            }
+          '
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4

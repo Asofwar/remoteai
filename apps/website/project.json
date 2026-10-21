@@ -1,0 +1,25 @@
+{
+  "name": "@codex-switch/website",
+  "targets": {
+    "build": {
+      "inputs": [
+        "default",
+        "^default",
+        "{workspaceRoot}/docs/assets/codex-switch-*.png",
+        "{workspaceRoot}/package-lock.json",
+        { "env": "WEBSITE_URL" }
+      ],
+      "outputs": ["{projectRoot}/dist", "{projectRoot}/.prerender", "{projectRoot}/public/media"]
+    },
+    "check": {
+      "inputs": [
+        "default",
+        "^default",
+        "{workspaceRoot}/docs/assets/codex-switch-*.png",
+        "{workspaceRoot}/package-lock.json",
+        { "env": "WEBSITE_URL" }
+      ],
+      "outputs": ["{projectRoot}/dist", "{projectRoot}/.prerender", "{projectRoot}/public/media"]
+    }
+  }
+}

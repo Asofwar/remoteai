@@ -1,0 +1,106 @@
+# Remote AI 官网
+
+React 18 + Ant Design 5 + Vite 的静态多页官网。源码位于 `apps/website`，
+与桌面端、远程 Web 应用和 admin-go 分开构建。
+
+## 页面与内容
+
+- 中文和英文各 15 页，共 30 个可直接访问的页面。
+- 首页、功能总览、下载页、快速上手指南。
+- 11 个独立功能页：Codex GUI、跨设备工作区、会话管理、多账号管理、
+  Provider 与本地代理、Token 分析、Skills 与插件、电脑助手、
+  Dream Skin、2FA、悬浮用量球。
+- 每个功能页包含配图、适用场景、三组详细说明、操作步骤、使用条件、
+  常见问题、相关功能和仓库资料链接。
+- 功能文案位于 `src/content/features-*.ts`，通用文案位于 `src/content/copy.ts`。
+  修改功能时同步维护中文和英文，核对该条目 `source` 指向的项目文档。
+
+配图复用 `docs/assets/codex-switch-*.png` 中的产品截图。构建时由 Sharp 生成
+WebP 和窄屏版本；小尺寸图片不会放大。跨设备和电脑助手使用代码绘制的流程示意，
+并在页面中标明“功能流程示意”。不包含真实用户的新录屏、凭据或虚构使用量。
+
+## 本地开发与检查
+
+在仓库根目录运行：
+
+```sh
+npm ci --workspace @codex-switch/website --include-workspace-root=false --ignore-scripts
+npm run dev:website
+npm run check:website
+npm run test:website:e2e
+```
+
+开发地址默认是 `http://127.0.0.1:4175/remoteai/`。
+
+`check:website` 执行 TypeScript 检查、图片优化、客户端构建、React 静态渲染和
+导出验证。`test:website:e2e` 使用生产产物检查全部页面的 hydration、图片、
+导航、语言切换、手机布局与禁用 JavaScript 的访问，并保留视觉检查截图。
+Windows 默认使用已安装的 Edge；CI 使用 Playwright Chromium。
+可设置 `WEBSITE_TEST_BROWSER` 覆盖浏览器 channel。
+
+```sh
+npm run build:website
+npm run preview --workspace @codex-switch/website
+```
+
+构建产物在 `apps/website/dist/`，不提交 Git。`.prerender/` 是仅供构建使用的
+服务端渲染模块，不上传到 Pages，也不需要在服务器运行 Node.js。
+
+## GitHub Pages 自动发布
+
+工作流位于 `.github/workflows/website.yml`。
+
+1. 在仓库 **Settings → Pages → Build and deployment** 中将 Source 设为
+   **GitHub Actions**。首次启用需要仓库管理权限。
+2. 推送官网、配图或相关依赖变更到 `master`，或手动运行工作流。
+3. CI 仅安装官网依赖，完成构建、静态内容检查和浏览器测试。
+4. 将 `dist/` 上传为 `github-pages` Artifact，部署到 Pages。
+
+PR 只验证，不发布。工作流只声明发布所需的 `pages: write` 和 `id-token: write`
+权限；不构建桌面端、原生移动端或后端，不维护 `gh-pages` 分支。
+
+默认正式地址为 `https://piperhex.github.io/remoteai/`。启用独立域名后，
+在仓库 **Settings → Secrets and variables → Actions → Variables** 设置
+`WEBSITE_URL` 为完整官网地址，例如 `https://www.example.com/`，
+再触发工作流。Pages 的域名与 DNS 必须相应配置。
+部署前会对比 Pages 实际地址与 `WEBSITE_URL`，避免发布错误的 canonical。
+
+本地验证独立域名可以设置相同环境变量后构建：
+
+```powershell
+$env:WEBSITE_URL = 'https://www.example.com/'
+npm run check:website
+Remove-Item Env:WEBSITE_URL
+```
+
+环境变量控制 Vite 资源前缀、站内链接、语言链接、canonical、结构化数据、
+分享图片和 sitemap，不能只修改 HTML 中的域名。它是公开地址，不是密钥。
+
+## SEO 与生成式搜索
+
+- 每个地址都有完整静态 HTML，正文、步骤、FAQ 和导航不依赖客户端执行。
+- 服务端提取 Ant Design 样式，避免页面等待 JavaScript 才获得基本外观。
+- 使用语义标题、图片说明、内部链接、独立 title / description。
+- 输出 canonical、`zh-CN` / `en` / `x-default` hreflang、Open Graph 和 Twitter 元信息。
+- 结构化数据包含 WebSite、WebPage、SoftwareApplication、BreadcrumbList，
+  以及与页面可见问答一致的 FAQPage。没有虚构评分、评论或价格。
+- 生成 `sitemap.xml`、`robots.txt`、每页 `index.md` 和聚合索引 `llms.txt`。
+- `404.html` 使用 `noindex`。不存在的地址不会伪装成首页内容。
+
+**robots.txt 的生效范围**：爬虫只读取域名根目录 `/robots.txt`。
+默认项目站点的 `/remoteai/robots.txt` 不具有站点级控制效力；应在对应用户站点
+根目录维护规则，或在绑定独立域名后使用本项目生成的根目录文件。
+无根目录限制时，页面可正常抓取。可在 Search Console 提交
+`https://piperhex.github.io/remoteai/sitemap.xml`。
+
+`llms.txt` 和 Markdown 只是便于读取的补充资料，不代表搜索平台会使用它们。
+GEO 的主要工作是提供可抓取的完整内容、清晰的产品实体、具体功能说明、
+可信来源和真实使用条件。结构化数据不保证富结果、排名、收录或 AI 引用。
+部署后仍需在相应站长平台验证域名、提交 sitemap，并观察实际收录。
+
+参考：
+
+- [GitHub Pages 自定义工作流](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
+- [Ant Design 服务端样式提取](https://ant.design/docs/react/server-side-rendering/)
+- [Google：AI 搜索功能与网站](https://developers.google.com/search/docs/appearance/ai-features)
+- [Google：robots.txt 简介](https://developers.google.com/search/docs/crawling-indexing/robots/intro)

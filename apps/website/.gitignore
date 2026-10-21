@@ -1,0 +1,4 @@
+.prerender/
+public/media/
+test-results/
+playwright-report/

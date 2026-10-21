@@ -15,6 +15,9 @@ Remote AI 是一款面向 Codex 的图形化 AI 编程工作台，以直观易�
 
 QQ 技术交流群：`972062132`
 
+产品官网：[Remote AI](https://piperhex.github.io/remoteai/)，查看功能介绍、下载入口与使用指南。
+官网源码和维护说明见 [apps/website](apps/website/README.md)。
+
 ## RemoteAI Web
 
 访问 [RemoteAI Web](https://codex.onepiper.cloud/web/)，在浏览器中连接电脑使用 Codex。

@@ -116,4 +116,8 @@ export const downloadManager = {
     const uri = task.uri.startsWith('file://') ? decodeURI(task.uri.slice(7)) : task.uri;
     await ReactNativeBlobUtil.android.actionViewIntent(uri, task.mimeType || 'application/octet-stream');
   },
+  async share(task: DownloadTask) {
+    if (!task.uri || task.status !== 'completed') return;
+    await requireNative().share(task.id);
+  },
 };

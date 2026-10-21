@@ -63,6 +63,7 @@ export interface DownloadNative {
   previewUri: (id: string) => Promise<string>;
   discardPreview: (id: string) => Promise<void>;
   exportImage: (id: string) => Promise<void>;
+  share: (id: string) => Promise<void>;
   pause: (id: string) => Promise<void>;
   resume: (id: string) => Promise<void>;
   delete: (id: string) => Promise<void>;

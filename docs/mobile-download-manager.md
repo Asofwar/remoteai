@@ -54,7 +54,15 @@ relay 每连接、账号、实例的 bulk 队列分别限制为 256 KiB、2 MiB�
 设置中的“下载管理”统一管理聊天文件与视频的下载，也可以从当前聊天项目或“此电脑”的本地硬盘中选择文件。
 下载管理使用独立页面，左上角返回按钮回到设置；浏览文件时，左上角按钮和 Android 返回键逐级返回文件夹及下载列表。
 页面隐藏底部导航，以卡片展示文件入口、空状态和下载任务，区分下载中、暂停、失败与完成状态。
-下载列表显示状态、大小、速度，提供暂停、继续、打开文件和删除操作。删除只影响手机上的下载文件与记录。
+下载列表显示状态、大小、速度，提供暂停、继续、打开文件、分享和删除操作。删除只影响手机上的下载文件与记录。
+顶部“当前项目”和“此电脑”使用横向紧凑卡片；电脑名称和连接状态位于“添加下载”行的右侧。
+常规后台下载和自动重试说明不再占据列表空间。
+
+Android 已完成的文件可通过系统分享面板发送，离线也可使用。分享按任务 ID 查找已保存的文件，
+在工作线程检查文件可读性，只授予接收应用临时读取权限；旧版文件通过现有 FileProvider 分享。
+Web 在浏览器支持对应文件分享时显示“分享”，发送前读取并校验本地缓存。
+若准备耗时导致点击授权过期，会请用户再次点击“分享”；不支持时仍可保存到设备后分享。
+取消分享不改变下载状态，也不显示错误。iOS 继续使用原有下载方式，不接入 Android 下载管理。
 
 下载由 `apps/native/plugins/downloads` 中的 Android 工作线程调度。它负责分块校验、解码、写入、保存进度和发布文件；
 React 只订阅状态，传输桥接沿用已有的加密聊天连接，最多同时下载两个文件。
@@ -107,12 +115,15 @@ cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 adb -s emulator-5580 install -r app/build/outputs/apk/debug/app-debug.apk
 adb -s emulator-5580 install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb -s emulator-5580 shell am instrument -w `
-  -e class com.codexswitch.downloads.DownloadEngineTest,com.codexswitch.downloads.BulkDownloadTest `
+  -e class com.codexswitch.downloads.DownloadEngineTest,com.codexswitch.downloads.BulkDownloadTest,com.codexswitch.downloads.DownloadSharingTest `
   com.codexswitch.mobile.downloadtest.test/com.codexswitch.downloads.DownloadTestRunner
 ```
 
 测试必须指定 `-e class`，避免平台测试运行器扫描整个 React Native 应用导致启动超时。
-Web 下载回归使用 `apps/web/playwright.chat.config.ts` 下的 `downloads.pw.ts`，覆盖手机和桌面布局。
+Web 下载回归使用 `apps/web/playwright.chat.config.ts` 下的 `downloads.pw.ts`、`download-actions.pw.ts`
+和 `download-sharing.pw.ts`，覆盖手机和桌面布局、离线分享、取消、失效缓存及点击授权恢复。
+原生页面可使用 `e2e/download-manager.init.gradle` 构建独立包 `com.codexswitch.mobile.downloaduitest`，
+直接查看紧凑布局，并点击已完成文件的“分享”验证系统面板。
 Admin 配置持久化和实时推送使用 Go 的 `scripts/chat-policy-smoke.mjs` 验证。
 
 ### 持续传输与连接切换回归

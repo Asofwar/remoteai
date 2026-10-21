@@ -1,9 +1,11 @@
 package com.codexswitch.downloads
 
+import android.content.Intent
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
+import com.facebook.react.bridge.UiThreadUtil
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import org.json.JSONObject
 
@@ -37,6 +39,21 @@ class DownloadModule(private val context: ReactApplicationContext) : ReactContex
   @ReactMethod fun pause(id: String, promise: Promise) = run(promise) { engine.pause(id); null }
   @ReactMethod fun resume(id: String, promise: Promise) = run(promise) { engine.resume(id); null }
   @ReactMethod fun delete(id: String, promise: Promise) = run(promise) { engine.delete(id); null }
+  @ReactMethod fun share(id: String, promise: Promise) {
+    val failure = { _: Exception ->
+      promise.reject("SHARE_FAILED", "无法分享，请确认文件仍在手机上后重试。")
+    }
+    engine.submit({ Intent.createChooser(engine.shareIntent(id), null) }, { intent ->
+      UiThreadUtil.runOnUiThread {
+        try {
+          val activity = checkNotNull(context.currentActivity)
+          check(!activity.isFinishing && !activity.isDestroyed)
+          activity.startActivity(intent as Intent)
+          promise.resolve(null)
+        } catch (error: Exception) { failure(error) }
+      }
+    }, failure)
+  }
   @ReactMethod fun connection(owner: String, deviceId: String, window: Int, promise: Promise) =
     run(promise) { engine.connection(owner, deviceId, window); null }
   @ReactMethod fun accept(requestId: String, result: String?, failed: Boolean, promise: Promise) =

@@ -1,7 +1,8 @@
-import { Download, ExternalLink, Pause, Play, Trash2 } from 'lucide-react';
+import { Download, ExternalLink, Pause, Play, Share2, Trash2 } from 'lucide-react';
 import { t } from '../i18n';
 import type { DownloadTask } from './types';
 import { archivePercent, archiveStatus } from '../../../../shared/remote-chat/archiveDownload';
+import { canShareDownload } from './shareDownload';
 
 export function formatBytes(value: number) {
   if (value < 1024) return `${value} B`;
@@ -11,9 +12,9 @@ export function formatBytes(value: number) {
 const STATUS = { queued: '等待下载', preparing: '准备并校验文件', downloading: '下载中', verifying: '正在校验',
   ready: '文件已就绪', saving: '正在保存', paused: '已暂停', completed: '已完成', failed: '下载失败' };
 
-export function DownloadCard({ task, busy, connected, action, open, remove, text = t }: {
+export function DownloadCard({ task, busy, connected, action, open, share, remove, text = t }: {
   task: DownloadTask; busy: boolean; connected: boolean; action: () => void; remove: () => void;
-  open: () => void; text?: typeof t;
+  open: () => void; share?: () => void; text?: typeof t;
 }) {
   const running = ['downloading', 'queued', 'preparing', 'verifying'].includes(task.status);
   const completed = ['completed', 'ready', 'saving'].includes(task.status);
@@ -41,6 +42,8 @@ export function DownloadCard({ task, busy, connected, action, open, remove, text
     <div className="download-actions">
       {completed && <button type="button" className="download-button" onClick={open}
         disabled={busy || task.status === 'saving'}><ExternalLink size={17} />{text('打开')}</button>}
+      {completed && share && canShareDownload(task) && <button type="button" className="download-button"
+        onClick={share} disabled={busy || task.status === 'saving'}><Share2 size={17} />{text('分享')}</button>}
       <button type="button" className="download-button" onClick={action}
         disabled={busy || task.status === 'saving' || (!running && !completed && !connected)}>
         <Icon size={17} />{text(label)}</button>

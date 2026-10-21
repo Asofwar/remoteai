@@ -1,4 +1,9 @@
 export const downloads: Readonly<Record<string, string>> = {
+  '分享': 'Share', '分享文件': 'Share file',
+  '无法分享，请确认文件仍在手机上后重试。': 'Could not share the file. Check that it is still on your phone and try again.',
+  '此浏览器无法分享此文件，请先保存到设备后分享。':
+    'This browser cannot share this file. Save it to your device to share it.',
+  '分享未完成，请重试或保存到设备后分享。': 'Could not share the file. Try again, or save it to your device to share it.',
   '正在统计文件…': 'Counting files…',
   '正在压缩': 'Compressing',
   '正在准备下载…': 'Preparing download…',

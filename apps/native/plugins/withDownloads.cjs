@@ -1,4 +1,4 @@
-const { withDangerousMod, withMainApplication } = require('expo/config-plugins');
+const { withAndroidManifest, withDangerousMod, withMainApplication } = require('expo/config-plugins');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
@@ -6,6 +6,17 @@ const PACKAGE_LINE = 'packages.add(com.codexswitch.downloads.DownloadPackage())'
 
 module.exports = function withDownloads(config) {
   require('../scripts/patch-webrtc-bulk.cjs').applyBulkPatch();
+  config = withAndroidManifest(config, result => {
+    const application = result.modResults.manifest.application[0];
+    const name = 'com.codexswitch.downloads.DownloadShareProvider';
+    application.provider ??= [];
+    if (!application.provider.some(provider => provider.$['android:name'] === name)) {
+      application.provider.push({ $: { 'android:name': name,
+        'android:authorities': '${applicationId}.download-share',
+        'android:exported': 'false', 'android:grantUriPermissions': 'true' } });
+    }
+    return result;
+  });
   config = withMainApplication(config, (result) => {
     const source = result.modResults.contents;
     if (!source.includes(PACKAGE_LINE)) {

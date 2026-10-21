@@ -4,6 +4,7 @@ import { t } from '../i18n';
 import { downloadManager } from './manager';
 import type { DownloadTask } from './types';
 import { DownloadOpenError, type DownloadOpener } from './openDownload';
+import { DownloadShareError } from './shareDownload';
 
 export function useDownloadTasks(owner: string, options: {
   confirmRemove?: () => Promise<boolean>; openDownload?: DownloadOpener; additionalOwner?: string;
@@ -16,11 +17,12 @@ export function useDownloadTasks(owner: string, options: {
   const [error, setError] = useState('');
   const pending = useRef(false);
   useEffect(() => { void downloadManager.initialize(); }, []);
-  const run = async (task: DownloadTask, operation: 'action' | 'remove' | 'open' = 'action') => {
+  const run = async (task: DownloadTask, operation: 'action' | 'remove' | 'open' | 'share' = 'action') => {
     if (pending.current) return;
     pending.current = true; setBusy(task.id); setError('');
     try {
       if (operation === 'open') await downloadManager.open(task.id, options.openDownload);
+      else if (operation === 'share') await downloadManager.share(task.id);
       else if (operation === 'remove') {
         const confirmed = await (options.confirmRemove?.() ?? Dialog.confirm({ title: t('删除下载？'),
           content: t('将删除此网页保存的文件和下载记录。已保存到设备的文件和电脑上的原文件会保留。'),
@@ -30,7 +32,8 @@ export function useDownloadTasks(owner: string, options: {
       else if (['queued', 'preparing', 'downloading', 'verifying'].includes(task.status)) await downloadManager.pause(task.id);
       else await downloadManager.resume(task.id);
     } catch (cause) {
-      setError(cause instanceof DownloadOpenError ? cause.message : operation === 'open'
+      const knownError = cause instanceof DownloadOpenError || cause instanceof DownloadShareError;
+      setError(knownError ? cause.message : operation === 'open'
         ? '打开未完成，请重试或保存到设备后打开。' : '操作未完成，请检查浏览器存储空间后重试。');
     }
     finally { pending.current = false; setBusy(''); }

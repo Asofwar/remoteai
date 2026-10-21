@@ -31,6 +31,7 @@ internal class DownloadStorage(private val context: Context) {
   }
 
   fun exportImage(task: DownloadTask) = DownloadImages(context).publish(part(task), task)
+  fun shareIntent(task: DownloadTask) = DownloadSharing(context).intent(task)
 
   fun load(): LinkedHashMap<String, DownloadTask> {
     val result = linkedMapOf<String, DownloadTask>()

@@ -15,6 +15,7 @@ export default defineConfig({
     '**/chat-terminal.pw.ts', '**/chat-terminal-display.pw.ts', '**/chat-activities.pw.ts', '**/downloads.pw.ts',
     '**/thread-actions.pw.ts', '**/chat-markdown.pw.ts', '**/chat-git.pw.ts', '**/task-review.pw.ts',
     '**/connection-health.pw.ts', '**/connection-info.pw.ts', '**/text-selection.pw.ts', '**/download-actions.pw.ts',
+    '**/download-sharing.pw.ts',
     '**/preview-downloads.pw.ts', '**/chat-steering.pw.ts', '**/tablet-layout.pw.ts', '**/chat-accounts.pw.ts',
     '**/tool-details.pw.ts'],
   workers: 1, timeout: 150_000,

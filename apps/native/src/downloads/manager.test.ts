@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import type { DownloadConnection, DownloadRequest } from './types';
+import type { DownloadConnection, DownloadRequest, DownloadTask } from './types';
 import { BulkTransport } from '../../../../shared/remote-chat/bulkTransport';
 import { downloadBulkClient } from '../../../../shared/remote-chat/client/bulkClient';
 import { NativeBulkChannel } from '../../../../shared/remote-chat/nativeBulkChannel';
@@ -7,7 +7,7 @@ import type { ChatLink } from '../../../../shared/remote-chat/link';
 
 const mocks = vi.hoisted(() => ({
   events: new Map<string, (value: string) => void>(),
-  bridge: { list: vi.fn(), enqueue: vi.fn(), pause: vi.fn(), resume: vi.fn(), delete: vi.fn(),
+  bridge: { list: vi.fn(), enqueue: vi.fn(), pause: vi.fn(), resume: vi.fn(), delete: vi.fn(), share: vi.fn(),
     connection: vi.fn(), accept: vi.fn(), invalidateBulk: vi.fn() },
 }));
 vi.mock('react-native', () => ({ NativeModules: { FileDownloads: mocks.bridge },
@@ -30,6 +30,19 @@ beforeEach(() => {
   mocks.bridge.connection.mockResolvedValue(undefined);
   mocks.bridge.accept.mockResolvedValue(true);
   mocks.bridge.invalidateBulk.mockResolvedValue(undefined);
+});
+
+it('shares a completed local file offline by task ID and ignores unfinished files', async () => {
+  const { downloadManager } = await import('./manager');
+  const task: DownloadTask = { id: 'saved-file', name: 'app.apk', status: 'completed',
+    source: { owner: 'owner', deviceId: 'pc', deviceName: 'PC', scope: 'computer', path: 'app.apk' },
+    uri: 'content://media/external/downloads/1', size: 10, received: 10, createdAt: 1, message: '' };
+  await downloadManager.share(task);
+  expect(mocks.bridge.share).toHaveBeenCalledExactlyOnceWith(task.id);
+  await downloadManager.share({ ...task, status: 'downloading' });
+  await downloadManager.share({ ...task, uri: undefined });
+  expect(mocks.bridge.share).toHaveBeenCalledOnce();
+  expect(mocks.bridge.connection).not.toHaveBeenCalled();
 });
 
 it('continues forwarding native task requests after the last download view unsubscribes', async () => {

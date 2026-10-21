@@ -18,14 +18,14 @@ function SourceCard({ scope, disabled, onPress }: {
     accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
     style={({ pressed }) => [styles.sourceCard, disabled && styles.disabled, pressed && styles.pressed]}>
     <View style={[styles.sourceIcon, !project && styles.computerIcon]}>
-      <Ionicons name={project ? 'folder-outline' : 'desktop-outline'} size={23}
+      <Ionicons name={project ? 'folder-outline' : 'desktop-outline'} size={20}
         color={project ? resolveThemeColor(colors.green, 'accent') : resolveThemeColor(colors.blue, 'info')} />
     </View>
     <View style={styles.sourceCopy}>
       <Text style={styles.sourceTitle}>{project ? t("当前项目") : t("此电脑")}</Text>
       <Text style={styles.caption}>{project ? t("浏览项目文件") : t("浏览电脑文件")}</Text>
     </View>
-    <Ionicons name="chevron-forward" size={16} color={color(colors.muted, 'muted')} style={styles.sourceChevron} />
+    <Ionicons name="chevron-forward" size={12} color={color(colors.muted, 'muted')} />
   </Pressable>;
 }
 
@@ -37,23 +37,25 @@ export function DownloadSources({ connection, browse }: {
   useLanguage();
   const ready = !!connection?.ready;
   const canBrowseProject = ready && !!(connection.cwd || connection.threadId);
-  let hint = t("离开此页面后，下载仍会继续。");
+  let hint = '';
   if (!ready) hint = t("先在聊天中连接电脑，即可添加下载。");
   else if (!canBrowseProject) hint = t("在聊天中选择项目，或从此电脑添加下载。");
   return <View style={styles.sources}>
-    <View style={styles.connection}>
-      <View style={[styles.connectionDot, !ready && styles.offlineDot]} />
-      <Text style={styles.connectionName} numberOfLines={1}>{connection?.deviceName || t("尚未连接电脑")}</Text>
-      <Text style={styles.caption}>{t(downloadConnectionLabel(connection?.mode))}</Text>
+    <View style={styles.sourceHeading}>
+      <Text style={styles.sectionLabel}>{t("添加下载")}</Text>
+      <View style={styles.connection}>
+        <View style={[styles.connectionDot, !ready && styles.offlineDot]} />
+        <Text style={styles.connectionName} numberOfLines={1}>{connection?.deviceName || t("尚未连接电脑")}</Text>
+        {!!connection && <Text style={styles.caption}>{t(downloadConnectionLabel(connection.mode))}</Text>}
+      </View>
     </View>
-    <Text style={styles.sectionLabel}>{t("添加下载")}</Text>
     <View style={styles.sourceRow}>
       <SourceCard scope="project" disabled={!canBrowseProject} onPress={() => browse('project')} />
       <SourceCard scope="computer" disabled={!ready} onPress={() => browse('computer')} />
     </View>
-    <View style={styles.hint}>
+    {!!hint && <View style={styles.hint}>
       <Ionicons name="information-circle-outline" size={15} color={color(colors.muted, 'muted')} />
       <Text style={styles.hintText}>{hint}</Text>
-    </View>
+    </View>}
   </View>;
 }

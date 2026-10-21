@@ -6,9 +6,9 @@ import type { DownloadTask } from './types';
 import { downloadDetail, downloadPercent, downloadStatusLabel, formatBytes } from './presentation';
 import { colors, useStyles } from './styles';
 
-export function DownloadCard({ task, connected, busy, action, remove }: {
+export function DownloadCard({ task, connected, busy, action, share, remove }: {
   task: DownloadTask; connected: boolean; busy: boolean;
-  action: () => void; remove: () => void;
+  action: () => void; share: () => void; remove: () => void;
 }) {
   const styles = useStyles();
   const color = useThemeColor();
@@ -56,6 +56,12 @@ export function DownloadCard({ task, connected, busy, action, remove }: {
         <Ionicons name="trash-outline" size={16} color={color(colors.muted, 'muted')} />
         <Text style={styles.deleteText}>{t("删除")}</Text>
       </Pressable>
+      {complete && <Pressable accessibilityRole="button" accessibilityLabel={t("分享")}
+        accessibilityState={{ disabled: busy }} disabled={busy} onPress={share}
+        style={({ pressed }) => [styles.shareButton, busy && styles.disabled, pressed && styles.pressed]}>
+        <Ionicons name="share-social-outline" size={16} color={color(colors.green, 'accent')} />
+        <Text style={styles.buttonText}>{t("分享")}</Text>
+      </Pressable>}
       <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled, busy }}
         disabled={disabled} onPress={action}
         style={({ pressed }) => [styles.button, disabled && styles.disabled, pressed && styles.pressed]}>

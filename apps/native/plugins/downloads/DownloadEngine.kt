@@ -56,6 +56,7 @@ internal class DownloadEngine(
   }
 
   fun snapshot(): String = JSONArray().apply { jobs().values.forEach { put(it.data) } }.toString()
+  fun shareIntent(id: String) = storage.shareIntent(requireNotNull(jobs()[id]))
 
   fun previewText(id: String): String {
     val task = requireNotNull(jobs()[id])

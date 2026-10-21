@@ -5,6 +5,7 @@ import { normalizeFileError } from '../../../../shared/remote-chat/fileErrors';
 import { canRetryDownload, DownloadRetry } from '../../../../shared/remote-chat/downloadRetry';
 import { saveDownload } from './saveDownload';
 import { openBrowserDownload, type DownloadOpener } from './openDownload';
+import { shareBrowserDownload } from './shareDownload';
 import type { AuthSession } from '../types';
 import { deleteDownload, listDownloads, storeDownload } from './storage';
 import { transferDownload } from './transfer';
@@ -159,6 +160,7 @@ export class WebDownloadManager {
       throw error;
     }
   }
+  share(id: string) { return this.open(id, shareBrowserDownload); }
   private async persist(task: DownloadTask) {
     await storeDownload(task);
     this.update(task);

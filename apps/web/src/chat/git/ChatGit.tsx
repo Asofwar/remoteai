@@ -45,7 +45,7 @@ function GitContent(props: Props & { panel: RemoteGit }) {
         {t('请先在电脑上解决冲突或完成正在进行的合并。')}</p>}
       {panel.notice && <p role="status" className="git-notice">{panel.notice.startsWith('已提交 ')
         ? t('已提交 {hash}', { hash: panel.notice.slice(4) }) : t(panel.notice)}</p>}
-      {panel.busy && <div className="git-loading"><Spin size="small" />{t('正在处理…')}</div>}
+      {panel.busy && !panel.loading && <div className="git-loading"><Spin size="small" />{t('正在处理…')}</div>}
       {panel.detail?.kind === 'diff' && <GitDiff
         key={JSON.stringify([props.cwd, panel.detail.path, panel.detail.commit?.hash])}
         client={props.client} cwd={props.cwd} detail={panel.detail} enabled={props.active && props.connected}
@@ -60,13 +60,17 @@ function GitContent(props: Props & { panel: RemoteGit }) {
         <div className="git-tabs" role="tablist" aria-label={t('Git 视图')}>
           <button type="button" role="tab" aria-selected={panel.tab === 'changes'}
             onClick={() => { panel.setDetail(null); panel.setTab('changes'); }}>
-            {t('改动')} {panel.changes?.files.length ?? 0}</button>
+            {t('改动')}{panel.changes ? ` ${panel.changes.files.length}` : ''}</button>
           <button type="button" role="tab" aria-selected={panel.tab === 'history'}
             onClick={() => { panel.setDetail(null); panel.setTab('history'); }}>
             {t('提交记录')}</button></div>
-        {panel.tab === 'changes' ? <GitChanges panel={panel} connected={props.connected} />
-          : <GitHistory panel={panel} connected={props.connected}
-            onPatch={commit => enqueueGitPatch(props.client, props.cwd, commit.hash)} />}
+        {panel.loading && <div className="git-initial-loading" role="status" aria-live="polite">
+          <Spin />
+          <span>{t(panel.tab === 'changes' ? '正在加载改动…' : '正在加载提交记录…')}</span>
+        </div>}
+        {!panel.loading && panel.tab === 'changes' && <GitChanges panel={panel} connected={props.connected} />}
+        {!panel.loading && panel.tab === 'history' && <GitHistory panel={panel} connected={props.connected}
+          onPatch={commit => enqueueGitPatch(props.client, props.cwd, commit.hash)} />}
       </>}
     </div>
     </ChatDetailsWorkspace>;

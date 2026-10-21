@@ -73,6 +73,7 @@ export const gitMessages: Record<string, string> = {
     'Cannot switch branches. Check local changes and whether another worktree uses the branch.',
   '打开工具': 'Open tools', '终端': 'Terminal', '关闭 Git': 'Close Git', '刷新 Git': 'Refresh Git',
   'Git 仓库': 'Git repository', 'Git 视图': 'Git view', '改动': 'Changes', '提交记录': 'History',
+  '正在加载改动…': 'Loading changes…', '正在加载提交记录…': 'Loading commit history…',
   '请先选择一个项目。': 'Choose a project first.',
   '电脑连接后即可使用 Git。': 'Connect to your computer to use Git.',
   '已提交 {hash}': 'Committed {hash}',

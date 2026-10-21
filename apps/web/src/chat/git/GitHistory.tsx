@@ -17,7 +17,8 @@ export function GitHistory({ panel, connected, onPatch }: {
   const graph = useMemo(() => gitGraph(panel.commits), [panel.commits]);
   const pagination = useGitHistoryScroll(panel, connected);
   return <div className="git-history" style={HISTORY_STYLE} ref={pagination.list} onScroll={pagination.onScroll}>
-    {!panel.busy && !panel.commits.length && <p className="git-notice">{t('还没有提交记录。')}</p>}
+    {panel.changes && !panel.busy && !panel.commits.length &&
+      <p className="git-notice">{t('还没有提交记录。')}</p>}
     {graph.rows.map(row => <GitCommitMenu key={row.commit.hash} commit={row.commit} panel={panel}
       connected={connected} onPatch={onPatch}><button type="button" className="git-history-row"
       style={{ minWidth: `calc(${row.width}px + var(--git-history-content-width, 560px))` }}

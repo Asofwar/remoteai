@@ -41,7 +41,8 @@ export function GitHistory({ panel, connected, onMenu }: {
   return <ScrollView style={styles.fill} {...scrollProps} onLayout={event => {
     setWidth(event.nativeEvent.layout.width); onLayout(event);
   }}>
-    {!panel.busy && !panel.commits.length && <Text style={styles.notice}>{t("还没有提交记录。")}</Text>}
+    {panel.changes && !panel.busy && !panel.commits.length &&
+      <Text style={styles.notice}>{t("还没有提交记录。")}</Text>}
     <ScrollView horizontal>
       <View>{graph.rows.map(row => <Pressable key={row.commit.hash} accessibilityRole="button"
         accessibilityLabel={`${row.commit.hash.slice(0, 8)} ${row.commit.subject}`}

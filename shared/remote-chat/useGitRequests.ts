@@ -44,6 +44,6 @@ export function useGitRequests({ scope, enabled, load, refreshInterval }: {
     const timer = setInterval(poll, refreshInterval);
     return () => clearInterval(timer);
   }, [enabled, poll, refreshInterval]);
-  const refresh = useCallback(() => run(async () => { await load(); setLoadError(''); }), [run, load]);
+  const refresh = useCallback(() => run(async () => { setLoadError(''); await load(); }), [run, load]);
   return { busy, error: error || loadError, notice, setNotice, run, refresh };
 }

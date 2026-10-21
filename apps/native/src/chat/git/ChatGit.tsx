@@ -50,7 +50,8 @@ export function ChatGit(props: Props) {
       {panel.changes?.files.some(file => file.conflict) && <Text style={styles.error}>
         {t("请先在电脑上解决冲突或完成正在进行的合并。")}</Text>}
       {!!panel.notice && <Text accessibilityRole="alert" style={styles.notice}>{panel.notice}</Text>}
-      {panel.busy && <ActivityIndicator style={styles.loading} color={color(palette.green, 'accent')} />}
+      {panel.busy && !panel.loading &&
+        <ActivityIndicator style={styles.loading} color={color(palette.green, 'accent')} />}
       {detail?.kind === 'files' && <GitCommitFiles commit={detail.commit} state={commitFiles}
         connected={props.connected} onSelect={file => panel.setDetail({ kind: 'diff', path: file.path,
           commit: detail.commit, title: `${file.path} · ${detail.commit.hash.slice(0, 8)}` })} />}
@@ -71,15 +72,21 @@ export function ChatGit(props: Props) {
           <Pressable accessibilityRole="tab" accessibilityState={{ selected: panel.tab === 'changes' }}
             style={[styles.tab, panel.tab === 'changes' && styles.selectedTab]} onPress={() => panel.setTab('changes')}>
             <Text style={[styles.tabText, panel.tab === 'changes' && styles.selectedTabText]}>
-              {t("改动")}{' '}{panel.changes?.files.length ?? 0}</Text></Pressable>
+              {t("改动")}{panel.changes ? ` ${panel.changes.files.length}` : ''}</Text></Pressable>
           <Pressable accessibilityRole="tab" accessibilityState={{ selected: panel.tab === 'history' }}
             style={[styles.tab, panel.tab === 'history' && styles.selectedTab]} onPress={() => panel.setTab('history')}>
             <Text style={[styles.tabText, panel.tab === 'history' && styles.selectedTabText]}>{t("提交记录")}</Text></Pressable>
         </View>
-        {panel.tab === 'changes' ? <GitChanges panel={panel} connected={props.connected}
-          onMenu={row => setMenu({ kind: 'file', row })} />
-          : <GitHistory panel={panel} connected={props.connected}
-            onMenu={commit => setMenu({ kind: 'commit', commit })} />}
+        {panel.loading && <View style={styles.initialLoading} accessibilityLiveRegion="polite"
+          accessibilityState={{ busy: true }}>
+          <ActivityIndicator color={color(palette.green, 'accent')} />
+          <Text style={styles.loadingText}>
+            {t(panel.tab === 'changes' ? '正在加载改动…' : '正在加载提交记录…')}</Text>
+        </View>}
+        {!panel.loading && panel.tab === 'changes' && <GitChanges panel={panel} connected={props.connected}
+          onMenu={row => setMenu({ kind: 'file', row })} />}
+        {!panel.loading && panel.tab === 'history' && <GitHistory panel={panel} connected={props.connected}
+          onMenu={commit => setMenu({ kind: 'commit', commit })} />}
       </>}
       {menu && !panel.fileAction && !panel.revisionAction && <GitMenu target={menu} panel={panel}
         connected={props.connected} close={() => setMenu(null)} patchNotice={gitPatchNotice}

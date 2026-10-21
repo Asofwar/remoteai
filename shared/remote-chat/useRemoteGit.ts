@@ -108,7 +108,8 @@ export function useRemoteGit({ client, cwd, active, connected, refreshInterval }
       ...page.commits.filter(commit => !previous.commits.some(row => row.hash === commit.hash))],
     hasMore: page.hasMore }));
   });
-  return { ...revisions, ...submission, busy, error: error || submission.settingsError,
+  const loading = active && connected && !!cwd && !changes && !error;
+  return { ...revisions, ...submission, busy, loading, error: error || submission.settingsError,
     notice, changes, commits, hasMore, selected, tab, setTab,
     detail, setDetail, backDetail: () => setDetail(parentGitDetail), refresh, toggle, selectAll, selectFiles, more,
     repository, action, strategy, setStrategy, fileList, fileAction, requestFileAction, confirmFileAction,

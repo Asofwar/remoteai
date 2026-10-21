@@ -66,10 +66,13 @@ it('ignores old project reads and allows the new project to load immediately', a
   vi.mocked(test.client.changes).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
   try {
     await test.render('/old');
+    expect(test.panel().loading).toBe(true);
     await test.render('/new');
     expect(test.panel().changes?.root).toBe('/new');
+    expect(test.panel().loading).toBe(false);
     await act(async () => finish({ root: '/old', branch: 'old', head: null, files: [] }));
     expect(test.panel().changes?.root).toBe('/new');
+    expect(test.panel().loading).toBe(false);
   } finally { await test.dispose(); }
 });
 

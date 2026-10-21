@@ -23,6 +23,40 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); vi.restoreAllMocks(); vi.useRealTimers(); });
 
+it('shows initial loading until all reads finish and clears it on failure, retry or disconnect', async () => {
+  const history = await client.history('/project', 0);
+  let finish!: () => void;
+  vi.spyOn(client, 'history').mockImplementationOnce(() => new Promise(resolve => {
+    finish = () => resolve(history);
+  }));
+  vi.mocked(client.changes).mockRejectedValueOnce(new Error('unavailable'));
+  await act(async () => root.render(<Fixture />));
+  expect(panel.loading).toBe(true);
+  expect(panel.busy).toBe(false);
+  await act(async () => panel.setTab('history'));
+  expect(panel.loading).toBe(true);
+  await act(async () => root.render(<Fixture connected={false} />));
+  expect(panel.loading).toBe(false);
+  await act(async () => root.render(<Fixture />));
+  expect(panel.loading).toBe(true);
+  await act(async () => finish());
+  expect(panel.loading).toBe(false);
+  expect(panel.error).toBe('unavailable');
+  expect(panel.changes).toBeNull();
+  vi.mocked(client.changes).mockImplementationOnce(() => new Promise(resolve => {
+    finish = () => resolve({ root: '/project', branch: 'main', head: null, files: [] });
+  }));
+  vi.mocked(client.history).mockResolvedValueOnce({ commits: [], hasMore: false });
+  let refresh!: Promise<void>;
+  await act(async () => { refresh = panel.refresh(); });
+  expect(panel.loading).toBe(true);
+  await act(async () => { finish(); await refresh; });
+  expect(panel.loading).toBe(false);
+  expect(panel.error).toBe('');
+  expect(panel.changes?.files).toEqual([]);
+  expect(panel.commits).toEqual([]);
+});
+
 it('loads immediately and polls silently while preserving drafts, selection, notices and older history', async () => {
   await act(async () => root.render(<Fixture />));
   expect(client.changes).toHaveBeenCalledTimes(1);
@@ -56,6 +90,7 @@ it('keeps slow reads single-flight and runs a clicked action after the backgroun
   await tick(5000);
   expect(client.changes).toHaveBeenCalledTimes(2);
   expect(panel.busy).toBe(false);
+  expect(panel.loading).toBe(false);
   let action!: Promise<void>;
   await act(async () => { action = panel.action('fetch'); });
   expect(panel.busy).toBe(true);

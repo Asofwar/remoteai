@@ -14,7 +14,9 @@ pub(super) fn show(app: &tauri::AppHandle, thread_id: &str, title: &str) {
             .notification()
             .builder()
             .title(title)
-            .body("本轮回复已完成，可以查看结果了。")
+            .body(crate::storage::native_text(
+                "本轮回复已完成，可以查看结果了。",
+            ))
             .show()
             .is_err()
         {

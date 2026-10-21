@@ -98,7 +98,7 @@ fn notification_title(thread: &Value) -> String {
         .into_iter()
         .filter_map(|key| thread[key].as_str())
         .find(|text| !text.trim().is_empty())
-        .unwrap_or("新对话");
+        .unwrap_or_else(|| crate::storage::native_text("新对话"));
     let title = title.split_whitespace().collect::<Vec<_>>().join(" ");
     let mut chars = title.chars().filter(|character| !character.is_control());
     let mut title: String = chars.by_ref().take(MAX_TITLE_CHARS).collect();
@@ -231,5 +231,18 @@ mod tests {
             notification_title(&json!({"name": "中".repeat(MAX_TITLE_CHARS + 1)})),
             format!("{}…", "中".repeat(MAX_TITLE_CHARS))
         );
+    }
+
+    #[test]
+    fn default_title_follows_the_saved_interface_language() {
+        use crate::storage::{with_interface_language, InterfaceLanguage};
+
+        with_interface_language(InterfaceLanguage::Ru, || {
+            assert_eq!(notification_title(&Value::Null), "Новый чат");
+            assert_eq!(notification_title(&json!({"name": "修复通知"})), "修复通知");
+        });
+        with_interface_language(InterfaceLanguage::En, || {
+            assert_eq!(notification_title(&Value::Null), "新对话");
+        });
     }
 }

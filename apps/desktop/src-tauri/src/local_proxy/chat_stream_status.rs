@@ -16,7 +16,10 @@ impl ChatCompletionStatus {
             "length" => Some(Self::Incomplete("max_output_tokens")),
             "content_filter" => Some(Self::Incomplete("content_filter")),
             _ => Some(Self::Failed(
-                "Chat 响应包含不支持的 finish_reason，生成未正常完成。".into(),
+                error_messages::localized(
+                    "Chat 响应包含不支持的 finish_reason，生成未正常完成。",
+                )
+                .into(),
             )),
         }
     }

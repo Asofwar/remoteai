@@ -52,7 +52,7 @@ export function ChatPhotoPicker({ photos, disabled, active, upload, reconnecting
       </View>)}
     </ScrollView>}
     {photos.busy && <Text style={styles.status}>{t("正在读取照片…")}</Text>}
-    {!!photos.error && <Text accessibilityRole="alert" style={styles.error}>{photos.error}</Text>}
+    {!!photos.error && <Text accessibilityRole="alert" style={styles.error}>{t(photos.error)}</Text>}
     {photos.settingsRequired && <Pressable accessibilityRole="button" onPress={photos.openSettings}>
       <Text style={styles.buttonText}>{t("打开设置")}</Text>
     </Pressable>}

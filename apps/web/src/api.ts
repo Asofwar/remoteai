@@ -1,4 +1,5 @@
 import { remoteProviderCommand, type RemoteModelTarget } from '../../../shared/remote-chat/modelTarget';
+import { t } from './i18n';
 import type {
   AccountSummary,
   AuthResponse,
@@ -70,7 +71,7 @@ export function subscribeSession(listener: (session: AuthSession | null) => void
 async function responseError(response: Response) {
   const payload = await response.json().catch(() => null) as { message?: string | string[] } | null;
   if (Array.isArray(payload?.message)) return payload.message.join("；");
-  return payload?.message || `请求失败（HTTP ${response.status}）`;
+  return payload?.message || t('请求失败（HTTP {value1}）', { value1: response.status });
 }
 
 export async function refreshSession() {

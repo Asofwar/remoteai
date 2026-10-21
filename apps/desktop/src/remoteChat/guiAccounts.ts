@@ -4,21 +4,23 @@ import { object } from '../../../../shared/remote-chat/protocol';
 import type { GuiAccountSelection, GuiAccountsSnapshot } from '../../../../shared/remote-chat/guiAccounts';
 import { guiAccountBalances } from './guiAccountBalances';
 import { switchGuiAccount } from '../pages/codexGui/session';
+import { guiText } from '../i18n/guiText';
 
 function remainingPercent(value: number | undefined) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
   return `${Math.round(Math.max(0, Math.min(100, value)))}%`;
 }
 
+// Remote clients render these fields verbatim, so the host formats them in its interface language.
 function accountPlan(account: Account) {
-  return account.plan?.trim() || account.usage?.plan?.trim() || '套餐未知';
+  return account.plan?.trim() || account.usage?.plan?.trim() || guiText('套餐未知');
 }
 
 function accountDetail(account: Account) {
   const plan = accountPlan(account);
   const primary = remainingPercent(account.usage?.primary?.remainingPercent);
   const secondary = remainingPercent(account.usage?.secondary?.remainingPercent);
-  return `${plan} · 主剩余 ${primary} · 次剩余 ${secondary}`;
+  return guiText('{plan} · 主剩余 {primary} · 次剩余 {secondary}', { plan, primary, secondary });
 }
 
 export async function readGuiAccounts(): Promise<GuiAccountsSnapshot> {

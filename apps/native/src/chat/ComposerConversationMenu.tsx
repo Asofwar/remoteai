@@ -44,7 +44,7 @@ export function ComposerConversationMenu({ query, threadId, ready, load, choose,
       ListFooterComponent={<>
         {!ready && <Text style={menuStyles.message}>{t("连接后即可引用对话")}</Text>}
         {ready && result.loading && !threads.length && <Text style={menuStyles.message}>{t("正在加载对话…")}</Text>}
-        {ready && !!result.error && <Text accessibilityRole="alert" style={menuStyles.message}>{result.error}</Text>}
+        {ready && !!result.error && <Text accessibilityRole="alert" style={menuStyles.message}>{t(result.error)}</Text>}
         {ready && !result.loading && !result.error && !threads.length
           && <Text style={menuStyles.message}>{t("没有找到可引用的对话")}</Text>}
       </>} />

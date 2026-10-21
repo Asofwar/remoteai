@@ -118,7 +118,8 @@ export function TomlEditorModal(props: TomlEditorProps) {
     {editor.issue && <div id="codex-toml-error" className={styles.error} role="alert">
       <AlertCircle size={16} />
       <div><strong>{editor.issue.line ? (zh
-        ? guiText("第 {value1} 行{value2}", { value1: editor.issue.line, value2: editor.issue.column ? `，第 ${editor.issue.column} 列` : "" })
+        ? guiText("第 {value1} 行{value2}", { value1: editor.issue.line,
+          value2: editor.issue.column ? guiText("，第 {value1} 列", { value1: editor.issue.column }) : "" })
         : `Line ${editor.issue.line}${editor.issue.column ? `, column ${editor.issue.column}` : ""}`)
         : (zh ? guiText("请检查配置") : "Check the configuration")}</strong>
       <p>{editor.issue.message}</p></div>

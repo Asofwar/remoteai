@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useFilePaste } from "./useFilePaste";
+import { guiText } from "../../i18n/guiText";
 import type { GuiController } from "./controller";
 import type { ComposerText } from "./types";
 import { attachmentKey, MAX_ATTACHMENTS, type AttachmentReference } from "./attachmentTypes";
@@ -34,7 +35,7 @@ export function useComposerDraft(key: string, controller: GuiController) {
         mentions: [...previous.mentions, ...mentions],
         attachments: [...(previous.attachments ?? []), ...(recovered.attachments ?? [])],
         images: [...previous.images, ...recovered.images.map((url) =>
-          ({ id: crypto.randomUUID(), name: "图片", url }))] } };
+          ({ id: crypto.randomUUID(), name: guiText("图片"), url }))] } };
     });
   }, [controller, key, recovered]);
   const draft = drafts[key] ?? EMPTY_DRAFT;
@@ -57,7 +58,8 @@ export function useComposerDraft(key: string, controller: GuiController) {
     const message = controller.queue.take(key, id);
     if (!message) return false;
     const restored: Draft = { ...queuedMessageText(message), attachments: message.attachments,
-      images: message.images.map((url, index) => ({ id: crypto.randomUUID(), name: `图片 ${index + 1}`, url })) };
+      images: message.images.map((url, index) => ({ id: crypto.randomUUID(),
+        name: guiText("图片 {value1}", { value1: index + 1 }), url })) };
     update(() => restored);
     return true;
   };

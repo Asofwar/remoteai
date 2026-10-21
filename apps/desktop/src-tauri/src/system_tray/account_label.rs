@@ -30,6 +30,18 @@ pub(super) fn account_label(email: &str, usage: &UsageSummary, chinese: bool) ->
     )
 }
 
+/// Replaces the English usage markers of a built account label for the Russian menu.
+/// Only the last two separators are used, so an unusual account name cannot be rewritten.
+pub(super) fn russian_account_label(text: &str) -> Option<String> {
+    let (prefix, secondary) = text.rsplit_once(SEPARATOR)?;
+    let (email, primary) = prefix.rsplit_once(SEPARATOR)?;
+    let primary = primary.strip_prefix("Primary ")?;
+    let secondary = secondary.strip_prefix("Secondary ")?;
+    Some(format!(
+        "{email}{SEPARATOR}Основной {primary}{SEPARATOR}Второй {secondary}"
+    ))
+}
+
 fn truncate_email(text: &str) -> String {
     let mut chars = text.chars();
     let truncated = chars.by_ref().take(MENU_EMAIL_CHARS).collect::<String>();
@@ -68,7 +80,7 @@ impl AccountMenuLabel {
         let (secondary_marker, secondary_value) = secondary.split_once(' ')?;
         if !matches!(
             (primary_marker, secondary_marker),
-            ("主", "次") | ("Primary", "Secondary")
+            ("主", "次") | ("Primary", "Secondary") | ("Основной", "Второй")
         ) {
             return None;
         }

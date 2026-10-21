@@ -1,0 +1,85 @@
+// @vitest-environment jsdom
+import { act, forwardRef, useImperativeHandle } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { english } from "../../../../shared/i18n/en";
+import { russian } from "../../../../shared/i18n/ru";
+import { translateBackendMessage } from "../../../../shared/i18n/backend/translateBackendMessage";
+import { setGuiLanguage } from "../i18n/guiText";
+import { useToast } from "./useToast";
+
+const api = vi.hoisted(() => ({
+  recordToastLog: vi.fn(() => Promise.resolve()),
+  syncCodexNotification: vi.fn(() => Promise.resolve(true)),
+}));
+vi.mock("../api/errorLogs", () => ({ recordToastLog: api.recordToastLog }));
+vi.mock("../api/backend", () => ({ syncCodexNotification: api.syncCodexNotification }));
+
+const BACKEND_MESSAGE = "无法读取配置";
+const chinese = /[一-鿿]/;
+
+const ToastProbe = forwardRef<(message: string) => void>(function ToastProbe(_props, ref) {
+  const { message, notify } = useToast();
+  useImperativeHandle(ref, () => notify, [notify]);
+  return <output>{message ?? ""}</output>;
+});
+
+let container: HTMLDivElement;
+let root: Root;
+let notify: ((message: string) => void) | null = null;
+
+beforeEach(async () => {
+  vi.clearAllMocks();
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root.render(<ToastProbe ref={(value) => { notify = value; }} />));
+});
+
+afterEach(async () => {
+  await act(async () => root.unmount());
+  container.remove();
+  setGuiLanguage("zh");
+});
+
+const show = async (message: string) => act(async () => notify?.(message));
+
+describe("useToast", () => {
+  it("shows backend messages in the interface language and logs the original text", async () => {
+    await act(async () => setGuiLanguage("ru"));
+    await show(BACKEND_MESSAGE);
+
+    expect(russian[BACKEND_MESSAGE]).toBeTruthy();
+    expect(container.textContent).toBe(russian[BACKEND_MESSAGE]);
+    expect(api.recordToastLog).toHaveBeenCalledWith(BACKEND_MESSAGE);
+    expect(api.syncCodexNotification).toHaveBeenCalledWith(russian[BACKEND_MESSAGE]);
+  });
+
+  it("follows a language change while the toast is visible", async () => {
+    await act(async () => setGuiLanguage("ru"));
+    await show(BACKEND_MESSAGE);
+    await act(async () => setGuiLanguage("en"));
+
+    expect(container.textContent).toBe(english[BACKEND_MESSAGE]);
+  });
+
+  it("leaves Chinese and already translated toasts unchanged", async () => {
+    await show(BACKEND_MESSAGE);
+    expect(container.textContent).toBe(BACKEND_MESSAGE);
+
+    await act(async () => setGuiLanguage("ru"));
+    await show(russian[BACKEND_MESSAGE]);
+    expect(container.textContent).toBe(russian[BACKEND_MESSAGE]);
+    expect(api.recordToastLog).toHaveBeenLastCalledWith(russian[BACKEND_MESSAGE]);
+  });
+
+  it("does not change translated dictionary text when it is translated again", () => {
+    for (const [language, dictionary] of [["en", english], ["ru", russian]] as const) {
+      const changed = Object.values(dictionary)
+        .map(String)
+        .filter((value) => !chinese.test(value) && translateBackendMessage(language, value) !== value);
+      expect(changed, language).toEqual([]);
+    }
+  });
+});

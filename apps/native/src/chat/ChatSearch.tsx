@@ -47,7 +47,7 @@ export function ChatSearch({ state, controller, onClose, select }: Props) {
             ? <Text style={searchStyles.empty}>{emptyMessage}</Text> : null}
           ListFooterComponent={<View style={searchStyles.status}>
             {search.loading && <ActivityIndicator accessibilityLabel={t("正在搜索")} color={color(palette.green, 'accent')} />}
-            {!!search.error && <><Text accessibilityRole="alert" style={styles.error}>{search.error}</Text>
+            {!!search.error && <><Text accessibilityRole="alert" style={styles.error}>{t(search.error)}</Text>
               <Pressable accessibilityRole="button" style={styles.button} onPress={search.reload}>
                 <Text style={styles.buttonText}>{t("重试")}</Text></Pressable></>}
             {!!search.cursor && !search.loading && !search.error && <Pressable accessibilityRole="button"

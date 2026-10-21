@@ -1,4 +1,5 @@
 import { getLocale } from "../../i18n";
+import { translateBackendMessage } from "../../../../../shared/i18n/backend/translateBackendMessage";
 import { Alert, Button, Popconfirm, Segmented, Table, Tag, type TableColumnsType } from "antd";
 import { RefreshCw, Trash2 } from "lucide-react";
 import type { ErrorLogEntry } from "../../api/errorLogs";
@@ -32,7 +33,7 @@ function logColumns({ language, t }: ErrorLogsPageProps): TableColumnsType<Error
     },
     {
       title: t("errorLogs.message"), dataIndex: "message",
-      render: (message: string) => <div className={styles.message}>{message}</div>,
+      render: (message: string) => <div className={styles.message}>{translateBackendMessage(language, message)}</div>,
     },
     {
       title: t("errorLogs.status"), dataIndex: "statusCode", width: 96,

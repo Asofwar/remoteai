@@ -46,10 +46,11 @@ export function ChatGit(props: Props) {
       <Text numberOfLines={1} style={styles.project}>{panel.changes?.root ?? props.cwd}</Text>
       {!props.cwd && <Text style={styles.notice}>{t("请先选择一个项目。")}</Text>}
       {!props.connected && <Text style={styles.notice}>{t("电脑连接后即可使用 Git。")}</Text>}
-      {!!panel.error && <Text accessibilityRole="alert" style={styles.error}>{panel.error}</Text>}
+      {!!panel.error && <Text accessibilityRole="alert" style={styles.error}>{t(panel.error)}</Text>}
       {panel.changes?.files.some(file => file.conflict) && <Text style={styles.error}>
         {t("请先在电脑上解决冲突或完成正在进行的合并。")}</Text>}
-      {!!panel.notice && <Text accessibilityRole="alert" style={styles.notice}>{panel.notice}</Text>}
+      {!!panel.notice && <Text accessibilityRole="alert" style={styles.notice}>{panel.notice.startsWith('已提交 ')
+        ? t('已提交 {hash}', { hash: panel.notice.slice(4) }) : t(panel.notice)}</Text>}
       {panel.busy && !panel.loading &&
         <ActivityIndicator style={styles.loading} color={color(palette.green, 'accent')} />}
       {detail?.kind === 'files' && <GitCommitFiles commit={detail.commit} state={commitFiles}
@@ -57,7 +58,7 @@ export function ChatGit(props: Props) {
           commit: detail.commit, title: `${file.path} · ${detail.commit.hash.slice(0, 8)}` })} />}
       {detail?.kind === 'diff' && <>
         <Text numberOfLines={2} style={styles.detailTitle}>{detail.title}</Text>
-        {!!diff.error && <Text accessibilityRole="alert" style={styles.error}>{diff.error}</Text>}
+        {!!diff.error && <Text accessibilityRole="alert" style={styles.error}>{t(diff.error)}</Text>}
         {!diff.value && !diff.error && props.connected && <ActivityIndicator color={color(palette.green, 'accent')} />}
         {diff.value && <ScrollView style={styles.fill}>
           {diff.value.truncated && <Text style={styles.notice}>{t("差异较大，仅显示部分内容。")}</Text>}

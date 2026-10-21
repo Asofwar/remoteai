@@ -2,6 +2,7 @@ import { ImageAiContext } from '../../../../shared/chat/ImageAiContext';
 import { prepareImageEdit } from '../../../web/src/chat/prepareImageEdit';
 import { guiText } from "../i18n/guiText";
 import { useGuiLanguage } from '../i18n/useGuiLanguage';
+import { translateBackendMessage } from '../../../../shared/i18n/backend/translateBackendMessage';
 import { DiffTextContext } from "../../../../shared/chat/diffText";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useVisibleGuiState } from './codexGui/useVisibleGuiState';
@@ -149,7 +150,7 @@ function Workspace({ active, accountPicker, windowControls, plugins, hostPicker,
         </div>
         {focused && windowControls && <div className={styles.focusWindowControls}>{windowControls}</div>}
       </header>
-      {state.error && <Alert className={styles.error} message={state.error}
+      {state.error && <Alert className={styles.error} message={translateBackendMessage(language, state.error)}
         type="error" closable onClose={controller.clearError} />}
       <GuiSetupAlerts computerUseSetup={state.computerUseSetup} unattendedSetup={state.unattendedSetup} />
       {navigationApproval && <button className={styles.pendingBanner} onClick={() => {

@@ -54,7 +54,7 @@ export function ImageViewer({ thumbnail, description, load, close, download, con
         setSaving(true);
         setDownloadError('');
         try { await download(await image.loadOriginal()); }
-        catch (error) { setDownloadError(error instanceof Error ? error.message : translate('下载失败，请重试。')); }
+        catch (error) { setDownloadError(error instanceof Error ? error.message : '下载失败，请重试。'); }
         finally { setSaving(false); }
       }}>{saving ? <LoaderCircle size={24} className="cs-image-download-spinner" aria-hidden="true" />
         : <Download size={24} aria-hidden="true" />}
@@ -75,7 +75,7 @@ export function ImageViewer({ thumbnail, description, load, close, download, con
         <span>{translate(image.error ? '重新加载原图' : '查看原图')}</span></button>} />
     {image.loading && <div className="cs-image-status cs-image-transfer">
       <PreviewTransferProgress progress={image.progress} label={translate('正在加载原图…')} /></div>}
-    {downloadError && <div className="cs-image-status" role="status">{downloadError}</div>}
+    {downloadError && <div className="cs-image-status" role="status">{translate(downloadError)}</div>}
     {feedback && <div className="cs-image-status" role="status">{feedback}</div>}
     {image.error && <div className="cs-image-status" role="status">{translate('原图加载失败')}</div>}
   </dialog>;

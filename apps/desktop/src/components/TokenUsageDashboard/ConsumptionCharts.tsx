@@ -1,3 +1,4 @@
+import { getLocale } from "../../i18n";
 import { guiText } from "../../i18n/guiText";
 import { useMemo } from "react";
 import type { EChartsCoreOption } from "echarts/core";
@@ -77,27 +78,31 @@ function ConsumptionPanel({ props, title, hint, definitions }: {
 }
 
 export function ConsumptionCharts(props: ConsumptionProps) {
-  const zh = props.language === "zh";
-  const unknown = zh ? "未识别" : "Unknown";
-  const threshold = new Intl.NumberFormat(zh ? "zh-CN" : "en-US").format(props.thresholdTokens);
+  const { language } = props;
+  const zh = language === "zh";
+  const ru = language === "ru";
+  const unknown = ru ? guiText("未识别", {}, language) : zh ? "未识别" : "Unknown";
+  const threshold = new Intl.NumberFormat(getLocale(language)).format(props.thresholdTokens);
   const contextDefinitions: SeriesDefinition[] = [
-    { name: zh ? "短上下文" : "Short context", field: "shortContextTokens" },
-    { name: zh ? "长上下文" : "Long context", field: "longContextTokens" },
+    { name: ru ? guiText("短上下文", {}, language) : zh ? "短上下文" : "Short context", field: "shortContextTokens" },
+    { name: ru ? guiText("长上下文", {}, language) : zh ? "长上下文" : "Long context", field: "longContextTokens" },
     { name: unknown, field: "unknownContextTokens" },
   ];
   const modeDefinitions: SeriesDefinition[] = [
-    { name: zh ? "普通模式" : "Standard mode", field: "standardModeTokens" },
-    { name: zh ? "快速模式" : "Fast mode", field: "fastModeTokens" },
+    { name: ru ? guiText("普通模式", {}, language) : zh ? "普通模式" : "Standard mode", field: "standardModeTokens" },
+    { name: ru ? guiText("快速模式", {}, language) : zh ? "快速模式" : "Fast mode", field: "fastModeTokens" },
     { name: unknown, field: "unknownModeTokens" },
   ];
   return <div className={`${styles.tokenDashboardGrid} ${styles.consumptionGrid}`}>
     <ConsumptionPanel props={props} definitions={contextDefinitions}
-      title={zh ? "短 / 长上下文消耗" : "Short / Long Context Usage"}
-      hint={zh ? `单次输入超过 ${threshold} Tokens（含缓存）计为长上下文，累计整次请求的消耗。`
+      title={ru ? guiText("短 / 长上下文消耗", {}, language) : zh ? "短 / 长上下文消耗" : "Short / Long Context Usage"}
+      hint={ru ? guiText("单次输入超过 {value1} Tokens（含缓存）计为长上下文，累计整次请求的消耗。", { value1: threshold }, language)
+        : zh ? `单次输入超过 ${threshold} Tokens（含缓存）计为长上下文，累计整次请求的消耗。`
         : `Inputs above ${threshold} tokens (including cache) are long context. Totals include the whole request.`} />
     <ConsumptionPanel props={props} definitions={modeDefinitions}
-      title={zh ? "普通 / 快速模式消耗" : "Standard / Fast Mode Usage"}
-      hint={zh ? "按每日实际 Token 数统计；缺少模式记录的消耗归入“未识别”。"
+      title={ru ? guiText("普通 / 快速模式消耗", {}, language) : zh ? "普通 / 快速模式消耗" : "Standard / Fast Mode Usage"}
+      hint={ru ? guiText("按每日实际 Token 数统计；缺少模式记录的消耗归入“未识别”。", {}, language)
+        : zh ? "按每日实际 Token 数统计；缺少模式记录的消耗归入“未识别”。"
         : "Actual tokens per day; usage without a known mode is shown as unknown."} />
   </div>;
 }

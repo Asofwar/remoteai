@@ -1,4 +1,5 @@
 import { runtimeCollector, browserCollector } from './console-runtime.js';
+import { t } from './i18n.js';
 
 export function listenTarget(target, listener) {
   const handler = (source, method, params) => {
@@ -28,7 +29,7 @@ export async function readWorkerLogs(connection, options) {
     if (options.source !== 'worker') await chrome.debugger.sendCommand(target, 'Log.enable');
     await runtime.flush();
     await guard();
-    if (runtime.contextChanged()) throw new Error('这个 Worker 已变化，请重新读取日志。');
+    if (runtime.contextChanged()) throw new Error(t('workerChanged', '这个 Worker 已变化，请重新读取日志。'));
   } finally {
     dispose();
     // Retained connections need a fresh replay on the next read. A cleanup failure propagates

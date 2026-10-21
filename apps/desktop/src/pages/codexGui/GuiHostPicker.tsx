@@ -1,4 +1,5 @@
 import { guiText } from "../../i18n/guiText";
+import { backendText } from "../../../../../shared/i18n/backend/translateBackendMessage";
 import { useEffect, useRef, useState } from 'react';
 import { Input, Popover, Spin, type InputRef } from 'antd';
 import { Check, ChevronDown, Laptop, Monitor, RefreshCw, Search } from 'lucide-react';
@@ -61,7 +62,7 @@ export function GuiHostPicker({ navigation, active }: { navigation: GuiComputerN
         <span>{navigation.loading ? guiText("正在查找主机…") : guiText("刷新主机列表")}</span>
       </button>
     </>}
-    {navigation.error && <p className={`${projectStyles.empty} ${styles.error}`} role="alert">{navigation.error}</p>}
+    {navigation.error && <p className={`${projectStyles.empty} ${styles.error}`} role="alert">{backendText(navigation.error)}</p>}
   </div>;
   return <Popover trigger="click" placement="topRight" arrow={false} open={open && active} content={panel}
     onOpenChange={next => { setOpen(next); if (next) { setQuery(''); navigation.refresh(); } }}

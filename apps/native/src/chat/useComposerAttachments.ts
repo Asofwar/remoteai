@@ -4,7 +4,12 @@ import * as DocumentPicker from 'expo-document-picker';
 import { readAsStringAsync, EncodingType } from 'expo-file-system';
 import type { AttachmentReference, ComposerPlugin } from '../../../desktop/src/pages/codexGui/attachmentTypes';
 import { remoteAttachments } from '../../../../shared/remote-chat/composerAttachments';
-import { checkFileUploadSize } from '../../../../shared/remote-chat/policy';
+import { checkFileUploadSize, UploadPolicyError } from '../../../../shared/remote-chat/policy';
+
+/** Validators may localize their copy when thrown, so trust it by type rather than by wording. */
+export function attachmentErrorMessage(cause: unknown) {
+  return cause instanceof UploadPolicyError ? cause.message : t("文件添加失败，请重新选择。");
+}
 
 export function useComposerAttachments({ threadId, sending }: { threadId: string | null; sending: boolean }) {
   const [items, setItems] = useState<AttachmentReference[]>([]);
@@ -40,8 +45,7 @@ export function useComposerAttachments({ threadId, sending }: { threadId: string
       }
       if (current === generation.current) setItems((existing) => [...existing, ...additions]);
     } catch (cause) {
-      if (current === generation.current) setError(cause instanceof Error
-        && /文件|附件/.test(cause.message) ? cause.message : t("文件添加失败，请重新选择。"));
+      if (current === generation.current) setError(attachmentErrorMessage(cause));
     } finally { picking.current = false; if (mounted.current) setBusy(false); }
   };
   const add = (item: AttachmentReference) => {

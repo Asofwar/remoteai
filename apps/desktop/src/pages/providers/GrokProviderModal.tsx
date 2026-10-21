@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { backendText } from "../../../../../shared/i18n/backend/translateBackendMessage";
 import { Button, Input, Select } from "antd";
 import { RefreshCw, Save, Sparkles, X } from "lucide-react";
 import { fetchGrokModels } from "../../api/backend";
@@ -57,7 +58,7 @@ export function GrokProviderModal({ provider, saving, onClose, onSave, t }: Prov
     } catch (error) {
       if (requestId !== modelRequestId.current) return;
       setModelsError(t("providers.grok.modelsFetchFailed", {
-        error: String(error).replace(/^Error:\s*/, ""),
+        error: backendText(String(error).replace(/^Error:\s*/, "")),
       }));
     } finally {
       if (requestId === modelRequestId.current) setModelsLoading(false);

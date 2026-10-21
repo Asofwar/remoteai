@@ -1,4 +1,5 @@
 import { guiText } from "../../i18n/guiText";
+import { backendText } from "../../../../../shared/i18n/backend/translateBackendMessage";
 import { useContext, useEffect, useRef, useState } from "react";
 import { Popconfirm } from "antd";
 import { Undo2 } from "lucide-react";
@@ -45,6 +46,6 @@ export function TurnDiff({ files, title, threadId, turnId, disabled }: {
   </Popconfirm>;
   return <>
     <DiffView files={files} title={title} status={undone ? guiText("已撤销") : undefined} undo={action} />
-    {error && <p role="alert" className={styles.error}>{error}</p>}
+    {error && <p role="alert" className={styles.error}>{backendText(error)}</p>}
   </>;
 }

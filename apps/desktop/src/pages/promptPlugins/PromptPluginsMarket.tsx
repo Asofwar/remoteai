@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, Edit3, LoaderCircle, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { backendText } from "../../../../../shared/i18n/backend/translateBackendMessage";
 import {
   fetchPromptPlugins,
   installPromptPlugin,
@@ -102,7 +103,7 @@ function PublishModal({ editing, onClose, onPublished, t }: PublishModalProps) {
             onChange={(event) => setText(event.target.value)}
           />
         </label>
-        {error && <p className="feedback-error">{error}</p>}
+        {error && <p className="feedback-error">{backendText(error)}</p>}
         <div className="feedback-actions">
           <button type="button" className="note-cancel-button" disabled={busy} onClick={onClose}>
             {t("skills.cancel")}
@@ -199,7 +200,7 @@ export function PromptPluginsMarket({
         t={t}
       />
       {embedded && <p className={styles.scopeNote}>{t("skills.prompt.scope")}</p>}
-      {error && <div className="skills-market-error" role="alert">{error}</div>}
+      {error && <div className="skills-market-error" role="alert">{backendText(error)}</div>}
       {loading && !items.length ? (
         <div className="skills-market-state"><LoaderCircle className="spin" size={22} />{t("skills.prompt.loading")}</div>
       ) : !filtered.length ? (

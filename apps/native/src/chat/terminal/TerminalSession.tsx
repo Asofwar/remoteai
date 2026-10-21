@@ -53,6 +53,10 @@ export function TerminalSession({ client, session, visible, deviceName, hide, cl
     return () => { cancelled = true; };
   }, []);
   useEffect(() => { if (visible) updateDisplay(); }, [wrap, visible, orientation.landscape]);
+  const labels = `(() => { const screen = document.getElementById('viewport'); const keys = document.querySelector('nav');
+    if (screen) screen.setAttribute('aria-label', ${JSON.stringify(t('终端'))});
+    if (keys) keys.setAttribute('aria-label', ${JSON.stringify(t('终端快捷键'))}); })(); true;`;
+  useEffect(() => { webview.current?.injectJavaScript(labels); }, [labels]);
   const message = notice || status || orientation.error;
   // A translucent navigation bar disables Android's modal resize when the keyboard opens.
   // Let Android resize the WebView; iOS needs explicit keyboard avoidance.
@@ -93,6 +97,7 @@ export function TerminalSession({ client, session, visible, deviceName, hide, cl
           sharedCookiesEnabled={false} thirdPartyCookiesEnabled={false} setSupportMultipleWindows={false}
           javaScriptCanOpenWindowsAutomatically={false} keyboardDisplayRequiresUserAction={false}
           onShouldStartLoadWithRequest={({ url }) => url === 'about:blank'}
+          onLoadEnd={() => { webview.current?.injectJavaScript(labels); }}
           onMessage={({ nativeEvent }) => {
             if (!visible) return;
             if (parseTerminalMessage(nativeEvent.data)?.type === 'ready') updateDisplay();
@@ -100,7 +105,7 @@ export function TerminalSession({ client, session, visible, deviceName, hide, cl
           }}
           onError={() => setStatus(t("终端显示遇到问题，请收起后重新打开。"))} />
           : <ActivityIndicator style={styles.loading} color={color("#14806f", 'accent')} />}
-        {!!message && <Text accessibilityRole="alert" style={styles.status}>{message}</Text>}
+        {!!message && <Text accessibilityRole="alert" style={styles.status}>{t(message)}</Text>}
       </View>
     </SafeAreaView></KeyboardAvoidingView></SafeAreaProvider>
   </Modal>;

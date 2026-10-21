@@ -97,16 +97,22 @@ fn exchange_code(client: &Client, port: u16, code: &str, verifier: &str) -> Resu
 }
 
 fn html_response(request: Request, status: u16, title: &str, message: &str) {
-    let safe_title = title.replace('<', "&lt;").replace('>', "&gt;");
-    let safe_message = message.replace('<', "&lt;").replace('>', "&gt;");
-    let body = format!(
-        r#"<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>{safe_title}</title><style>body{{margin:0;min-height:100vh;display:grid;place-items:center;background:#f2f6f1;color:#183024;font-family:system-ui,sans-serif}}main{{width:min(420px,calc(100% - 40px));padding:38px;text-align:center;border:1px solid #d8e4da;border-radius:18px;background:white;box-shadow:0 24px 70px #1738241a}}i{{display:grid;place-items:center;width:54px;height:54px;margin:auto;border-radius:16px;background:#e2f1e5;color:#28734d;font-style:normal;font-size:26px}}h1{{font-size:22px;margin:18px 0 8px}}p{{color:#6c7c72;line-height:1.6;font-size:14px}}</style></head><body><main><i>✓</i><h1>{safe_title}</h1><p>{safe_message}</p></main></body></html>"#
-    );
+    let body = callback_page_html(title, message);
     let mut response = HttpResponse::from_string(body).with_status_code(StatusCode(status));
     if let Ok(header) = Header::from_bytes("Content-Type", "text/html; charset=utf-8") {
         response = response.with_header(header);
     }
     let _ = request.respond(response);
+}
+
+fn callback_page_html(title: &str, message: &str) -> String {
+    let page = crate::storage::callback_page_copy(title, message);
+    let lang = page.lang;
+    let safe_title = page.title.replace('<', "&lt;").replace('>', "&gt;");
+    let safe_message = page.message.replace('<', "&lt;").replace('>', "&gt;");
+    format!(
+        r#"<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>{safe_title}</title><style>body{{margin:0;min-height:100vh;display:grid;place-items:center;background:#f2f6f1;color:#183024;font-family:system-ui,sans-serif}}main{{width:min(420px,calc(100% - 40px));padding:38px;text-align:center;border:1px solid #d8e4da;border-radius:18px;background:white;box-shadow:0 24px 70px #1738241a}}i{{display:grid;place-items:center;width:54px;height:54px;margin:auto;border-radius:16px;background:#e2f1e5;color:#28734d;font-style:normal;font-size:26px}}h1{{font-size:22px;margin:18px 0 8px}}p{{color:#6c7c72;line-height:1.6;font-size:14px}}</style></head><body><main><i>✓</i><h1>{safe_title}</h1><p>{safe_message}</p></main></body></html>"#
+    )
 }
 
 pub(crate) fn emit_login<R: Runtime>(
@@ -182,7 +188,7 @@ fn open_embedded_login_window<R: Runtime + 'static>(
                 "codex-login",
                 WebviewUrl::App("login.html".into()),
             )
-            .title("登录 ChatGPT - Remote AI")
+            .title(crate::storage::native_text("登录 ChatGPT - Remote AI"))
             .inner_size(520.0, 720.0)
             .min_inner_size(420.0, 620.0)
             .center()
@@ -423,4 +429,33 @@ pub(crate) fn start_login<R: Runtime + 'static>(
         return Err(error);
     }
     Ok(LoginStart { url, embedded })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::callback_page_html;
+    use crate::storage::{with_interface_language, InterfaceLanguage};
+
+    #[test]
+    fn callback_page_keeps_chinese_and_escapes_markup() {
+        let page = callback_page_html("登录失败", "<script>x</script>");
+        assert!(page.contains(r#"<html lang="zh-CN">"#));
+        assert!(page.contains("<title>登录失败</title>"));
+        assert!(page.contains("<p>&lt;script&gt;x&lt;/script&gt;</p>"));
+    }
+
+    #[test]
+    fn callback_page_uses_russian_when_it_was_saved() {
+        let page = with_interface_language(InterfaceLanguage::Ru, || {
+            callback_page_html(
+                "登录成功",
+                "账户已保存。请回到 Remote AI 手动切换到此账户。",
+            )
+        });
+        assert!(page.contains(r#"<html lang="ru">"#));
+        assert!(page.contains("<h1>Вход выполнен</h1>"));
+        assert!(page.contains(
+            "<p>Аккаунт сохранён. Вернитесь в Remote AI и переключитесь на него вручную.</p>"
+        ));
+    }
 }

@@ -1,4 +1,5 @@
 import { guiText } from "../../i18n/guiText";
+import { backendText } from "../../../../../shared/i18n/backend/translateBackendMessage";
 import { useRef, useState } from "react";
 import { Input, Modal, Popover, type InputRef } from "antd";
 import { Check, GitBranch, GitFork, Laptop, Plus, Search } from "lucide-react";
@@ -38,7 +39,7 @@ export function WorkspacePicker({ cwd, disabled, onChange, onBusyChange, request
     setMenu(open ? kind : null);
     if (open) { setQuery(""); void git.refresh(); }
   };
-  const notice = git.error && <p role="alert" className={styles.notice}>{git.error}</p>;
+  const notice = git.error && <p role="alert" className={styles.notice}>{backendText(git.error)}</p>;
   const branchPanel = <div className={styles.panel} onKeyDown={(event) => {
     if (event.key === "Escape") { event.stopPropagation(); setMenu(null); }
   }}>

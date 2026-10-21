@@ -1,18 +1,26 @@
 import { queryProviderBalance } from '../api/backend';
 import type { Provider, ProviderBalance } from '../types';
 import { formatCurrencyAmount } from '../utils/currencyDisplay';
+import { guiText } from '../i18n/guiText';
 
 const BALANCE_CACHE_MS = 60_000;
-type BalanceEntry = { detail: string; balance?: ProviderBalance; updatedAt: number; pending: boolean };
+// Keep the query state instead of formatted text so every read uses the current interface language.
+type BalanceEntry = { balance?: ProviderBalance; failed: boolean; updatedAt: number; pending: boolean };
 
 function balanceDetail(provider: Provider, balance: ProviderBalance) {
   const quota = provider.balancePlatform === 'codexSwitch';
-  const label = quota ? '剩余额度' : '钱包余额';
-  if (quota && balance.apiUnlimited) return `${label} 不限额`;
+  if (quota && balance.apiUnlimited) return guiText('剩余额度 不限额');
   const amount = quota ? balance.apiAmount : balance.walletAmount;
   const unit = quota ? balance.apiUnit : balance.walletUnit;
-  if (typeof amount !== 'number' || !Number.isFinite(amount)) return `${label} 暂无余额`;
-  return `${label} ${formatCurrencyAmount(amount, unit)}`;
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) {
+    return guiText(quota ? '剩余额度 暂无余额' : '钱包余额 暂无余额');
+  }
+  return guiText(quota ? '剩余额度 {amount}' : '钱包余额 {amount}', { amount: formatCurrencyAmount(amount, unit) });
+}
+
+function entryDetail(provider: Provider, entry: BalanceEntry) {
+  if (entry.balance) return balanceDetail(provider, entry.balance);
+  return guiText(entry.failed ? '余额暂不可用' : '正在查询余额…');
 }
 
 /** Balance requests run separately so a slow provider cannot delay the account picker. */
@@ -26,26 +34,30 @@ export class GuiAccountBalances {
   }
 
   detail(provider: Provider): string {
-    if (!provider.balancePlatform) return '钱包余额 暂无余额';
+    if (!provider.balancePlatform) return guiText('钱包余额 暂无余额');
     const existing = this.entries.get(provider.id);
     if (existing && (existing.pending || Date.now() - existing.updatedAt < BALANCE_CACHE_MS)) {
-      return existing.balance ? balanceDetail(provider, existing.balance) : existing.detail;
+      return entryDetail(provider, existing);
     }
+    // A refresh keeps showing the previous result until the new query settles.
     const entry: BalanceEntry = {
-      detail: existing?.detail ?? '正在查询余额…', updatedAt: 0, pending: true,
+      balance: existing?.balance, failed: existing?.failed ?? false, updatedAt: 0, pending: true,
     };
     this.entries.set(provider.id, entry);
     void queryProviderBalance(provider.id).then((balance) => {
+      // Format once so malformed data is reported as unavailable instead of failing later reads.
+      balanceDetail(provider, balance);
       entry.balance = balance;
-      entry.detail = balanceDetail(provider, balance);
+      entry.failed = false;
     }).catch(() => {
-      entry.detail = '余额暂不可用';
+      entry.balance = undefined;
+      entry.failed = true;
     }).finally(() => {
       entry.pending = false;
       entry.updatedAt = Date.now();
       for (const listener of this.listeners) listener();
     });
-    return entry.detail;
+    return entryDetail(provider, entry);
   }
 }
 

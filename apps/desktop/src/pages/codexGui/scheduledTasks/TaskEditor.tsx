@@ -1,4 +1,5 @@
 import { guiText } from "../../../i18n/guiText";
+import { backendText } from "../../../../../../shared/i18n/backend/translateBackendMessage";
 import { useState } from "react";
 import { Alert, Button, Input, InputNumber, Modal, Select } from "antd";
 import type { Schedule, TaskInput } from "./types";
@@ -73,6 +74,6 @@ export function TaskEditor({ initial, editing, busy, error, onClose, onSave }: {
       placeholder={guiText("不填写也可以创建任务")}
       onChange={(event) => setInput({ ...input, cwd: event.target.value })} /></label>
     <p className={styles.hint}>{guiText("任务会在 Remote AI 运行时执行，时间以运行应用的电脑为准。 如需你的确认，请打开任务对话。")}</p>
-    {error && <Alert type="error" message={error} />}
+    {error && <Alert type="error" message={backendText(error)} />}
   </Modal>;
 }

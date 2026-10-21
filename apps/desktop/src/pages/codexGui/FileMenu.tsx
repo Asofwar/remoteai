@@ -71,7 +71,7 @@ export function FileMenu({ path, line, column, children, className, onReview, pr
       expandIcon: <ChevronRight size={14} aria-hidden="true" />,
       onClick: () => menu.setOpen(false) }} disabled={menu.busy}>
     <button type="button" className={className ?? styles.link}
-      aria-label={onReview ? guiText("查看 {value1} 的差异", { value1: path }) : guiText("{value1}：{value2}", { value1: previewsFile ? "预览文件" : "文件操作", value2: path })}
+      aria-label={onReview ? guiText("查看 {value1} 的差异", { value1: path }) : guiText("{value1}：{value2}", { value1: guiText(previewsFile ? "预览文件" : "文件操作"), value2: path })}
       onClick={() => {
         if (onReview) { menu.setOpen(false); onReview(); }
         else if (previewsFile) void menu.preview();

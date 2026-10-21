@@ -1,7 +1,7 @@
 import { t } from '../../i18n';
 import TcpSocket from 'react-native-tcp-socket';
 type Socket = InstanceType<typeof TcpSocket.Socket>;
-import type { RangeSource } from './videoRangeStream';
+import { VideoPlaybackError, type RangeSource } from './videoRangeStream';
 import { serveVideoSocket } from './videoSocket';
 
 const LOOPBACK = '127.0.0.1';
@@ -32,13 +32,13 @@ export function createVideoServer(source: RangeSource, onError: (error: unknown)
       close();
       if (started) onError(error); else reject(error);
     };
-    const timeout = setTimeout(() => fail(new Error(t("视频播放器启动超时，请重试。"))), START_TIMEOUT_MS);
+    const timeout = setTimeout(() => fail(new VideoPlaybackError(t("视频播放器启动超时，请重试。"))), START_TIMEOUT_MS);
     server.on('error', fail);
     server.listen({ host: LOOPBACK, port: 0 }, () => {
       if (closed) { server.close(); return; }
       clearTimeout(timeout);
       const address = server.address();
-      if (!address) { fail(new Error(t("视频播放器启动失败，请重试。"))); return; }
+      if (!address) { fail(new VideoPlaybackError(t("视频播放器启动失败，请重试。"))); return; }
       started = true;
       resolve({ url: `http://${LOOPBACK}:${address.port}/${source.info.id}`, close });
     });

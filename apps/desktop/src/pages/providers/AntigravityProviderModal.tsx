@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { backendText } from "../../../../../shared/i18n/backend/translateBackendMessage";
 import { Button, Input, Select } from "antd";
 import { Orbit, RefreshCw, Save, X } from "lucide-react";
 import { fetchAntigravityModels } from "../../api/backend";
@@ -80,7 +81,7 @@ export function AntigravityProviderModal({ provider, saving, onClose, onSave, t 
     } catch (error) {
       if (requestId !== modelRequestId.current) return;
       setModelsError(t("providers.antigravity.modelsFetchFailed", {
-        error: String(error).replace(/^Error:\s*/, ""),
+        error: backendText(String(error).replace(/^Error:\s*/, "")),
       }));
     } finally {
       if (requestId === modelRequestId.current) setModelsLoading(false);

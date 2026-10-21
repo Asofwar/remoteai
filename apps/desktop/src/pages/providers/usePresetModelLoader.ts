@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { backendText } from "../../../../../shared/i18n/backend/translateBackendMessage";
 
 import { fetchPresetModels } from "../../api/backend";
 import type { ProviderRequestOptions } from "../../types";
@@ -68,7 +69,7 @@ export function usePresetModelLoader(options: PresetModelLoaderOptions) {
     } catch (loadError) {
       if (currentRequestId !== requestId.current) return;
       setError(options.t("providers.catalog.modelsFetchFailed", {
-        error: String(loadError).replace(/^Error:\s*/, ""),
+        error: backendText(String(loadError).replace(/^Error:\s*/, "")),
       }));
     } finally {
       pending.current = false;

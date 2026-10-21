@@ -26,7 +26,7 @@ export function HostIdentityVerification({ confirm, close }: {
       <TextInput accessibilityLabel={t("设备指纹")} value={fingerprint} onChangeText={setFingerprint}
         autoCapitalize="none" autoCorrect={false} maxLength={100}
         style={{ borderWidth: 1, borderColor: color('#cbd5e1', 'border'), borderRadius: 8, padding: 12 }} />
-      {!!error && <Text accessibilityRole="alert">{error}</Text>}
+      {!!error && <Text accessibilityRole="alert">{t(error)}</Text>}
     </View>
   </BottomSheet>;
 }

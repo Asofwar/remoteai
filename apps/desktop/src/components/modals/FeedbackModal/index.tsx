@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { ImagePlus, LoaderCircle, MessageSquareText, Send, Trash2, X } from "lucide-react";
+import { backendText } from "../../../../../../shared/i18n/backend/translateBackendMessage";
 import type { Translate } from "../../../i18n";
 import {
   FEEDBACK_IMAGE_TYPES,
@@ -154,7 +155,7 @@ export function FeedbackModal({ signedInEmail, onClose, onSubmit, t }: FeedbackM
             ))}
           </div>
         )}
-        {error && <div className="feedback-error" role="alert">{error}</div>}
+        {error && <div className="feedback-error" role="alert">{backendText(error)}</div>}
 
         <div className="feedback-actions">
           <button type="button" className="note-cancel-button" disabled={submitting || preparing}

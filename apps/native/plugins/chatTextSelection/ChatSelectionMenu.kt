@@ -14,9 +14,26 @@ import android.graphics.Rect
 private const val QUOTE_ACTION = 0x435351
 private const val TOOLBAR_ANCHOR_OFFSET_DP = 4
 
+/** Toolbar titles supplied by JavaScript in the interface language; Chinese remains the fallback. */
+internal data class ChatSelectionLabels(
+  val copy: String = "复制",
+  val selectAll: String = "全选",
+  val quote: String = "引用",
+) {
+  companion object {
+    fun from(values: Map<String, Any?>): ChatSelectionLabels {
+      val defaults = ChatSelectionLabels()
+      fun label(key: String, fallback: String) = (values[key] as? String)?.takeIf { it.isNotBlank() } ?: fallback
+      return ChatSelectionLabels(label("copy", defaults.copy), label("selectAll", defaults.selectAll),
+        label("quote", defaults.quote))
+    }
+  }
+}
+
 internal data class ChatSelectionActions(
   val quoteEnabled: Boolean,
   val trailingControls: Int,
+  val labels: () -> ChatSelectionLabels,
   val quote: (String) -> Unit,
 )
 
@@ -33,9 +50,10 @@ internal class ChatSelectionMenu(
 
   private fun populate(menu: Menu): Boolean {
     menu.clear()
-    menu.add(Menu.NONE, android.R.id.copy, 0, "复制").setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
-    menu.add(Menu.NONE, android.R.id.selectAll, 1, "全选").setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
-    if (actions.quoteEnabled) menu.add(Menu.NONE, QUOTE_ACTION, 2, "引用")
+    val labels = actions.labels()
+    menu.add(Menu.NONE, android.R.id.copy, 0, labels.copy).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+    menu.add(Menu.NONE, android.R.id.selectAll, 1, labels.selectAll).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+    if (actions.quoteEnabled) menu.add(Menu.NONE, QUOTE_ACTION, 2, labels.quote)
       .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
     return true
   }

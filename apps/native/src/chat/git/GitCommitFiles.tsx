@@ -25,7 +25,7 @@ export function GitCommitFiles({ commit, state, connected, onSelect }: Props) {
       {commit.parents.length > 1 && <Text style={styles.meta}>{t("显示相对第一个父提交的变更")}</Text>}
     </View>
     {state.error && <View>
-      <Text accessibilityRole="alert" style={styles.error}>{state.error}</Text>
+      <Text accessibilityRole="alert" style={styles.error}>{t(state.error)}</Text>
       <Pressable accessibilityRole="button" disabled={!connected} style={styles.button} onPress={state.retry}>
         <Text style={styles.buttonText}>{t("重试")}</Text></Pressable>
     </View>}

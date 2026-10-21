@@ -5,6 +5,7 @@
 > [piperhex/remoteai](https://github.com/piperhex/remoteai)，欢迎更新收藏，继续关注后续版本。
 
 > For English documentation, please see [README_EN.md](README_EN.md).
+> 俄语（Русский）文档请参阅 [README_RU.md](README_RU.md)。
 
 Remote AI 是一款面向 Codex 的图形化 AI 编程工作台，以直观易用的界面整合对话编程、项目管理与多账号管理。
 你可以直接在应用中与 Codex 对话，理解代码、实现功能、排查问题，并随时查看执行进度和文件改动。

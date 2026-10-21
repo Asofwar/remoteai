@@ -5,6 +5,21 @@ import { remoteAttachments } from '../../../../shared/remote-chat/composerAttach
 import { checkFileUploadSize } from '../../../../shared/remote-chat/policy';
 import { readFileBase64 } from '../../../../shared/chat/fileData';
 
+/** Validation copy may already be localized when thrown, so trust it by origin rather than by wording. */
+export class AttachmentRejection extends Error {}
+
+function rejection(cause: unknown) {
+  return cause instanceof Error ? new AttachmentRejection(cause.message) : cause;
+}
+
+function validated<T>(step: () => T): T {
+  try { return step(); } catch (cause) { throw rejection(cause); }
+}
+
+export function attachmentErrorMessage(cause: unknown) {
+  return cause instanceof AttachmentRejection ? t(cause.message) : t("文件添加失败，请重新选择。");
+}
+
 export function useComposerAttachments({ threadId, sending }: { threadId: string | null; sending: boolean }) {
   const [items, setItems] = useState<AttachmentReference[]>([]);
   const [busy, setBusy] = useState(false);
@@ -29,14 +44,14 @@ export function useComposerAttachments({ threadId, sending }: { threadId: string
       const additions: AttachmentReference[] = [];
       for (const file of files) {
         if (current !== generation.current) return;
-        checkFileUploadSize(file.size);
-        additions.push({ kind: 'file', name: file.name, path: '', data: await readFileBase64(file) });
-        remoteAttachments([...items, ...additions]);
+        validated(() => checkFileUploadSize(file.size));
+        const data = await readFileBase64(file).catch((cause: unknown) => { throw rejection(cause); });
+        additions.push({ kind: 'file', name: file.name, path: '', data });
+        validated(() => remoteAttachments([...items, ...additions]));
       }
       if (current === generation.current) setItems(existing => [...existing, ...additions]);
     } catch (cause) {
-      if (current === generation.current) setError(cause instanceof Error && /文件|附件/.test(cause.message)
-        ? t(cause.message) : t("文件添加失败，请重新选择。"));
+      if (current === generation.current) setError(attachmentErrorMessage(cause));
     } finally { picking.current = false; if (mounted.current) setBusy(false); }
   };
   const add = (item: AttachmentReference) => {

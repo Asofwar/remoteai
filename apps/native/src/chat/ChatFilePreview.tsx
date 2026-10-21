@@ -71,7 +71,7 @@ function FilePreview({ file, threadId, ready, load, files, close }: PreviewProps
       {download.busy && !!download.detail && <Text style={[styles.subtitle, { maxWidth: 400 }]}>
         {download.detail}</Text>}
       {!!download.message && <Text accessibilityLiveRegion="polite" style={[styles.subtitle,
-        { maxWidth: 400 }]}>{download.message}</Text>}
+        { maxWidth: 400 }]}>{t(download.message)}</Text>}
       {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
       {result && !html && !markdown && <>
         <Text style={styles.subtitle}>{t("当前文件内容")}{file.line ? t(" · 引用第 {value1} 行", { value1: file.line }) : ''}</Text>

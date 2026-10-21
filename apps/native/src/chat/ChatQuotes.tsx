@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Toast } from '../components/AppToast';
+import { t } from '../i18n';
 import { appendQuote, clearSubmittedQuotes, quoteKey, type ChatQuote } from './replyQuotes';
 
 interface QuotesContext {
@@ -30,7 +31,7 @@ export function ChatQuotesProvider({ children, active, enabled, scope }: {
   const add = useCallback((quote: ChatQuote) => {
     if (!enabled) return false;
     const result = appendQuote(current.current, quote);
-    if (result.error) { Toast.fail(result.error); return false; }
+    if (result.error) { Toast.fail(t(result.error)); return false; }
     current.current = result.quotes;
     setState({ scope, quotes: result.quotes });
     return true;

@@ -93,7 +93,7 @@ const pageMeta: Record<AdminPage, { title: string; subtitle: string }> = {
 };
 
 function messageOf(error: unknown) {
-  return error instanceof Error ? error.message : t("操作失败，请稍后重试");
+  return error instanceof Error ? t(error.message) : t("操作失败，请稍后重试");
 }
 
 function formatDate(value?: string | null) {
@@ -852,12 +852,12 @@ function InvitationsPage({ session, profile, onBack }: AdminAreaProps & { onBack
   }
 
   const status = (item: AdminInvitation) => item.revokedAt
-    ? t("已撤销")
+    ? { active: false, label: t("已撤销") }
     : item.usedCount >= item.maxUses
-      ? t("已用完")
+      ? { active: false, label: t("已用完") }
       : item.expiresAt && new Date(item.expiresAt) <= new Date()
-        ? t("已过期")
-        : '有效';
+        ? { active: false, label: t("已过期") }
+        : { active: true, label: t("有效") };
 
   return <PageShell page="invitations" onBack={onBack}>
     <Toolbar total={data.total} loading={loading} onRefresh={() => void load()}>
@@ -866,14 +866,13 @@ function InvitationsPage({ session, profile, onBack }: AdminAreaProps & { onBack
     <ScrollView contentContainerStyle={styles.listScroll}>
       <LoadingOrEmpty loading={loading} empty={!data.items.length}>
         {data.items.map((item) => {
-          const currentStatus = status(item);
-          const active = currentStatus === '有效';
+          const { active, label: currentStatus } = status(item);
           return <Surface key={item.id}>
             <View style={styles.cardHeader}>
               <View style={[styles.avatar, { backgroundColor: COLORS.amberSoft }]}><Text style={[styles.avatarText, { color: COLORS.amber }]}>{t("邀")}</Text></View>
               <View style={styles.cardHeading}>
                 <Text style={styles.cardTitle} numberOfLines={1}>{item.email || t("任意邮箱")}</Text>
-                <Text style={styles.cardSubtitle}>{t("由")}{' '}{item.createdByEmail}{' '}{t("创建")}</Text>
+                <Text style={styles.cardSubtitle}>{t("由 {email} 创建", { email: item.createdByEmail })}</Text>
               </View>
               <Pill tone={active ? 'green' : 'gray'}>{currentStatus}</Pill>
             </View>

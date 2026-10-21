@@ -6,6 +6,11 @@ import type { Language } from "../../i18n";
 import type { DailyTokenUsage } from "../../types";
 import { COMPACT_TOOLTIP_STYLE, dateFromKey, formatTokens, type ChartPalette } from "./chartUtils";
 
+// ECharts registers only the EN and ZH locales by default, so Russian heatmap month labels are listed explicitly.
+const RUSSIAN_MONTH_LABELS = [
+  "Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек",
+] as const;
+
 interface OverviewOptions {
   dailyUsage: DailyTokenUsage[];
   dateKeys: string[];
@@ -70,7 +75,7 @@ function useHeatmapOption(context: OverviewContext) {
       itemStyle: { color: palette.heat[0], borderColor: palette.panel, borderWidth: 2 },
       yearLabel: { show: false },
       monthLabel: { color: palette.muted, fontSize: 10,
-        nameMap: language === "zh" ? "ZH" : "EN" },
+        nameMap: language === "ru" ? [...RUSSIAN_MONTH_LABELS] : language === "zh" ? "ZH" : "EN" },
       dayLabel: { firstDay: 0, color: palette.muted, fontSize: 10,
         nameMap: (language === "ru" ? [guiText("日", {}, language), guiText("一", {}, language), guiText("二", {}, language), guiText("三", {}, language), guiText("四", {}, language), guiText("五", {}, language), guiText("六", {}, language)] : language === "zh" ? ["日", "一", "二", "三", "四", "五", "六"] : "EN") },
     },

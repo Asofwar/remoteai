@@ -34,7 +34,7 @@ export function DownloadManagerPage({ session, onBack }: { session: AuthSession;
       contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}
       ListHeaderComponent={<>
         <DownloadSources connection={connection} browse={setView} />
-        {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+        {!!error && <Text accessibilityRole="alert" style={styles.error}>{t(error)}</Text>}
         <View style={styles.sectionHeading}>
           <Text style={styles.sectionTitle}>{t("下载任务")}</Text>
           <Text style={styles.count}>{tasks.length}{' '}{t("项")}</Text>
@@ -52,7 +52,7 @@ export function DownloadManagerPage({ session, onBack }: { session: AuthSession;
           onPress: () => { if (deleting) void run(deleting, 'delete'); } },
       ]}>
       <Text style={styles.text}>{t("将删除手机上的文件和下载记录，电脑上的原文件会保留。")}</Text>
-      {!!error && <Text style={styles.error}>{error}</Text>}
+      {!!error && <Text style={styles.error}>{t(error)}</Text>}
     </BottomSheet>
   </View>;
 }

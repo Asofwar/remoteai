@@ -194,7 +194,7 @@ fn save_as(app: &AppHandle, path: &std::path::Path) -> Result<bool> {
     let Some(destination) = app
         .dialog()
         .file()
-        .set_title("文件另存为")
+        .set_title(crate::storage::native_text("文件另存为"))
         .set_file_name(name)
         .blocking_save_file()
     else {

@@ -1,4 +1,5 @@
 import { guiText } from "../i18n/guiText";
+import { backendText } from "../../../../shared/i18n/backend/translateBackendMessage";
 import { CodexHomeScope, CodexHomeSelect, useSelectedCodexHome } from "../components/CodexHomeScope";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -59,9 +60,9 @@ function CodexConfigContent({ active }: { active: boolean }) {
         ]} />
       </div>
       {config.error && <Alert type="error" showIcon message={document ? guiText("配置尚未保存") : guiText("无法读取配置")}
-        description={config.error} className={styles.notice} />}
+        description={backendText(config.error)} className={styles.notice} />}
       {document?.error && <Alert type="warning" showIcon message={guiText("请先在编辑器中检查配置")}
-        description={document.error.message} className={styles.notice} />}
+        description={backendText(document.error.message)} className={styles.notice} />}
       {models.error && <Alert type="warning" showIcon message={models.error} className={styles.notice} />}
       {!config.loaded && <div className={styles.loading}><Spin tip={guiText("正在读取配置")}><div /></Spin></div>}
       <ConfigModelsContext.Provider value={models}>

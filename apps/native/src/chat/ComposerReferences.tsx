@@ -30,7 +30,8 @@ export function ComposerReferences({ items, disabled, remove, upload, reconnecti
       {!!item.data && <ComposerUploadProgress inline progress={itemUploadProgress(upload, 'attachment', index)}
         reconnecting={reconnecting} />}
       <Pressable accessibilityRole="button"
-        accessibilityLabel={t("移除{value1} {value2}", { value1: item.kind === 'conversation' ? '对话引用' : '附件', value2: item.name })}
+        accessibilityLabel={item.kind === 'conversation' ? t("移除对话引用 {value1}", { value1: item.name })
+          : t("移除附件 {value1}", { value1: item.name })}
         disabled={disabled} onPress={() => remove(item)} hitSlop={8} style={referenceStyles.remove}>
         <Feather name="x" size={16} color={color("#666", 'ink')} />
       </Pressable>

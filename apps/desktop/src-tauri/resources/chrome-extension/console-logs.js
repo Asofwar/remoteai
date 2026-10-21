@@ -7,6 +7,7 @@ import { rendererScope, verifyRendererScope } from './console-scope.js';
 import { readWorkerLogs } from './console-target.js';
 import { authorize } from './permissions.js';
 import { workerWebsite } from './worker-driver.js';
+import { t } from './i18n.js';
 
 export async function consoleLogs(driver, args) {
   const frame = await documentFrame(driver, args.frameId);
@@ -20,7 +21,7 @@ export async function consoleLogs(driver, args) {
     await runtime.flush();
     const current = await documentFrame(driver, frame.id);
     if (current.loaderId !== frame.loaderId || runtime.contextChanged()) {
-      throw new Error('页面已变化，请重新读取日志。');
+      throw new Error(t('pageChangedReadLogs', '页面已变化，请重新读取日志。'));
     }
     const result = buffer.result();
     return { tabId: driver.tab.id, frameId: frame.id, ...result, ...extra,

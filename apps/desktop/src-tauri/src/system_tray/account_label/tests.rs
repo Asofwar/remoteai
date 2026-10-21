@@ -115,6 +115,44 @@ fn email_truncation_preserves_unicode_characters_and_exact_length_names() {
 }
 
 #[test]
+fn russian_labels_rewrite_only_the_usage_markers_and_keep_their_colors() {
+    let usage = UsageSummary {
+        primary: Some(usage_window(10.0)),
+        secondary: Some(usage_window(60.0)),
+        ..UsageSummary::default()
+    };
+    let english = account_label("a · Primary 1", &usage, false);
+    let russian = russian_account_label(&english).unwrap();
+    assert_eq!(russian, "a · Primary 1 · Основной 10% · Второй 60%");
+
+    let label = AccountMenuLabel::from_text(&russian, GOOD_COLOR).unwrap();
+    assert_eq!(label.segments[0].text, "a · Primary 1 · Основной ");
+    assert_eq!(label.segments[1].color, Some([0xb9, 0x4b, 0x42]));
+    assert_eq!(label.segments[2].text, " · Второй ");
+    assert_eq!(label.segments[3].color, Some(GOOD_COLOR));
+    assert_eq!(
+        label
+            .segments
+            .iter()
+            .map(|segment| segment.text.as_str())
+            .collect::<String>(),
+        russian
+    );
+
+    for text in [
+        "test · 主 10% · 次 --",
+        "No accounts",
+        "Provider · model",
+        "test · Основной 10% · Второй --",
+    ] {
+        assert_eq!(russian_account_label(text), None);
+    }
+    assert!(
+        AccountMenuLabel::from_text("test · Основной 10% · Secondary --", GOOD_COLOR).is_none()
+    );
+}
+
+#[test]
 fn custom_theme_color_applies_only_to_sufficient_remaining_usage() {
     let custom_color = [0x12, 0x34, 0x56];
     let label = AccountMenuLabel::from_text("test · 主 90% · 次 10%", custom_color).unwrap();

@@ -1,4 +1,5 @@
 import { guiText } from "../../i18n/guiText";
+import { backendText } from "../../../../../shared/i18n/backend/translateBackendMessage";
 import { Button, Dropdown } from "antd";
 import { ArrowDown, ArrowUp, CornerDownRight, MoreHorizontal, Trash2 } from "lucide-react";
 import type { QueuedMessage } from "./types";
@@ -44,7 +45,7 @@ function QueueItem({ item, context, canMoveUp, canMoveDown }: QueueItemProps) {
           disabled={item.busy || editDisabled} />
       </Dropdown>
     </div>
-    {item.error && <div role="status" style={{ maxWidth: 400, whiteSpace: 'normal' }}>{item.error}</div>}
+    {item.error && <div role="status" style={{ maxWidth: 400, whiteSpace: 'normal' }}>{backendText(item.error)}</div>}
   </li>;
 }
 

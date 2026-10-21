@@ -1,5 +1,7 @@
 import { MAX_QUOTE_CHARACTERS, MAX_REPLY_QUOTES, quoteKey, quotedReply,
   type ReplyQuote } from '../../apps/desktop/src/pages/codexGui/replyQuotes';
+import { getInterfaceLanguage } from '../i18n/interfaceLanguage';
+import { translateText } from '../i18n/translate';
 
 export { quoteKey };
 export interface ChatQuote extends ReplyQuote { role: 'assistant' | 'user' | 'tool' }
@@ -10,7 +12,10 @@ export function appendQuote(quotes: ChatQuote[], quote: ChatQuote): { quotes: Ch
   if (text.length > MAX_QUOTE_CHARACTERS) return { quotes, error: '这段内容太长，请缩小引用范围。' };
   const entry = { ...quote, text };
   if (quotes.some((item) => quoteKey(item) === quoteKey(entry))) return { quotes };
-  if (quotes.length >= MAX_REPLY_QUOTES) return { quotes, error: `一次最多添加 ${MAX_REPLY_QUOTES} 条引用。` };
+  if (quotes.length >= MAX_REPLY_QUOTES) {
+    return { quotes, error: translateText(getInterfaceLanguage(), '一次最多添加 {value1} 条引用。',
+      { value1: MAX_REPLY_QUOTES }) };
+  }
   return { quotes: [...quotes, entry] };
 }
 

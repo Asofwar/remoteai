@@ -23,6 +23,7 @@ import { assistanceRussian } from '../remoteAssistance';
 import { guiSettingsRussian } from '../guiSettings';
 import { cozeRussian } from '../coze';
 import { portForwardingRussian } from '../portForwarding';
+import { featureCopyRussian } from '../featureCopy';
 
 export const russian = {
   ...projectBrowserRussian,
@@ -59,4 +60,5 @@ export const russian = {
   ...messages6,
   ...messages7,
   ...messages8,
+  ...featureCopyRussian,
 } as const;

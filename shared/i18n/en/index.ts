@@ -19,6 +19,7 @@ import { assistanceEnglish } from '../remoteAssistance';
 import { guiSettingsEnglish } from '../guiSettings';
 import { cozeEnglish } from '../coze';
 import { portForwardingEnglish } from '../portForwarding';
+import { featureCopyEnglish } from '../featureCopy';
 
 export const english: Readonly<Record<string, string>> = {
   ...dictationEnglish,
@@ -38,4 +39,5 @@ export const english: Readonly<Record<string, string>> = {
   ...imageAiEnglish,
   ...fileReferencesEnglish,
   ...portForwardingEnglish,
+  ...featureCopyEnglish,
 };

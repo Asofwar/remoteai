@@ -94,28 +94,38 @@ fn build_initial_menu<R: Runtime>(
     app: &AppHandle<R>,
 ) -> Result<Menu<R>, Box<dyn std::error::Error>> {
     let menu = Menu::new(app)?;
+    let settings = read_app_settings(app).ok();
+    let (dashboard, loading, quit) = initial_menu_labels(
+        settings
+            .as_ref()
+            .and_then(|value| value.language.as_deref()),
+    );
     menu.append(&MenuItem::with_id(
         app,
         DASHBOARD_ID,
-        "Dashboard",
+        dashboard,
         true,
         None::<&str>,
     )?)?;
     menu.append(&MenuItem::with_id(
         app,
         "tray:loading",
-        "正在加载…",
+        loading,
         false,
         None::<&str>,
     )?)?;
-    menu.append(&MenuItem::with_id(
-        app,
-        QUIT_ID,
-        "Quit",
-        true,
-        None::<&str>,
-    )?)?;
+    menu.append(&MenuItem::with_id(app, QUIT_ID, quit, true, None::<&str>)?)?;
     Ok(menu)
+}
+
+/// Labels shown until the first full menu is built; they follow the tray language policy.
+#[cfg(any(not(windows), test))]
+fn initial_menu_labels(language: Option<&str>) -> (&'static str, &'static str, &'static str) {
+    match language {
+        Some("zh") => ("Dashboard", "正在加载…", "Quit"),
+        Some("ru") => ("Обзор", "Загрузка…", "Выйти"),
+        _ => ("Dashboard", "Loading…", "Quit"),
+    }
 }
 
 pub(crate) fn show_dashboard<R: Runtime>(app: &AppHandle<R>) {
@@ -330,6 +340,17 @@ pub(crate) fn build_menu<R: Runtime>(
                 "Не удалось загрузить аккаунты"
             })?;
         }
+        // Only the text changes; Windows owner-draw reads it again when the menu is drawn.
+        for item in menu.items()? {
+            if !item.id().as_ref().starts_with(ACCOUNT_PREFIX) {
+                continue;
+            }
+            if let Some(item) = item.as_check_menuitem() {
+                if let Some(label) = account_label::russian_account_label(&item.text()?) {
+                    item.set_text(label)?;
+                }
+            }
+        }
     }
     Ok(menu)
 }
@@ -500,7 +521,25 @@ fn escape_menu_text(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_provider_model_menu_id, provider_model_menu_id};
+    use super::{initial_menu_labels, parse_provider_model_menu_id, provider_model_menu_id};
+
+    #[test]
+    fn initial_menu_follows_the_tray_language() {
+        assert_eq!(
+            initial_menu_labels(Some("zh")),
+            ("Dashboard", "正在加载…", "Quit")
+        );
+        assert_eq!(
+            initial_menu_labels(Some("ru")),
+            ("Обзор", "Загрузка…", "Выйти")
+        );
+        for language in [None, Some("en"), Some("unknown")] {
+            assert_eq!(
+                initial_menu_labels(language),
+                ("Dashboard", "Loading…", "Quit")
+            );
+        }
+    }
 
     #[test]
     fn provider_model_menu_id_round_trips_special_characters() {

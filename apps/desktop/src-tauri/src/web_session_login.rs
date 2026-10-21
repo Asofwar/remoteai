@@ -295,7 +295,7 @@ pub(crate) async fn start_web_session_login<R: Runtime + 'static>(
     let navigation_completed = completed.clone();
     let navigation_app = app.clone();
     let window = crate::webview_windows::builder(&app, WINDOW_LABEL, WebviewUrl::External(url))
-        .title("ChatGPT 网页登录 - Remote AI")
+        .title(crate::storage::native_text("ChatGPT 网页登录 - Remote AI"))
         .inner_size(560.0, 760.0)
         .min_inner_size(420.0, 620.0)
         .center()

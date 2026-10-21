@@ -48,7 +48,7 @@ function activitySummary(item: Item, text: string) {
   if (item.type === "commandExecution") {
     const action = item.commandActions?.find((entry) => entry.type !== "unknown");
     const labels: Record<string, string> = { read: guiText("读取文件"), listFiles: guiText("浏览文件"), search: guiText("搜索代码") };
-    const preview = action ? guiText("{value1} · {value2}", { value1: labels[action.type] || "执行命令", value2: action.name || action.query || action.path || "" })
+    const preview = action ? guiText("{value1} · {value2}", { value1: labels[action.type] || guiText("执行命令"), value2: action.name || action.query || action.path || "" })
       : `${commandLabel(item.status)} ${commandPreview(item.command ?? "")}`;
     return { icon: SquareTerminal, preview };
   }

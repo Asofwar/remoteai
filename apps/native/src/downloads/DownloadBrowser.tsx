@@ -73,11 +73,11 @@ export function DownloadBrowser({ connection, scope, back }: {
         {!ready && <Text style={styles.error}>{t("请连接这台电脑后浏览文件。")}</Text>}
         {!!notice && <Text accessibilityLiveRegion="polite" style={styles.message}>{notice}</Text>}
         {!!error && <Pressable accessibilityRole="button" accessibilityLabel={t("重试读取文件夹")}
-          onPress={() => setRevision(value => value + 1)}><Text style={styles.error}>{error}</Text></Pressable>}
+          onPress={() => setRevision(value => value + 1)}><Text style={styles.error}>{t(error)}</Text></Pressable>}
         {loading && <ActivityIndicator accessibilityLabel={t("正在读取文件夹")} color={color(colors.green, 'accent')} />}
       </View>}
       renderItem={({ item }) => <Pressable accessibilityRole="button" disabled={adding || !ready}
-        accessibilityLabel={`${item.directory ? t("打开文件夹") : t("下载")}：${item.name}`}
+        accessibilityLabel={item.directory ? t("打开文件夹：{name}", { name: item.name }) : t("下载：{name}", { name: item.name })}
         onPress={() => { void choose(item); }}
         style={({ pressed }) => [styles.row, (adding || !ready) && styles.disabled, pressed && styles.pressed]}>
         <View style={styles.sourceIcon}>

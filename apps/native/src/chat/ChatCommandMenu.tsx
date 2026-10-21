@@ -54,7 +54,7 @@ export function ChatCommandMenu({ catalog, query, skillsOnly, compactReason, cho
       </Pressable>}
       ListFooterComponent={<>
         {!catalog.loaded && catalog.loading && <Text style={menuStyles.message}>{t("正在加载技能…")}</Text>}
-        {!!catalog.error && <Text style={menuStyles.message}>{catalog.error}</Text>}
+        {!!catalog.error && <Text style={menuStyles.message}>{t(catalog.error)}</Text>}
         {catalog.loaded && !skills.length && !showCompact && !showGoal
           && <Text style={menuStyles.message}>{t("没有找到匹配的命令或技能")}</Text>}
       </>} />

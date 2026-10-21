@@ -1,4 +1,5 @@
 import { guiText } from "../../../i18n/guiText";
+import { backendText } from "../../../../../../shared/i18n/backend/translateBackendMessage";
 import { Button, Dropdown } from "antd";
 import { CheckCircle2, CirclePlay, LoaderCircle, MoreHorizontal, PauseCircle } from "lucide-react";
 import { scheduleLabel, type ScheduledTask } from "./types";
@@ -27,7 +28,7 @@ export function TaskRow({ task, busy, onAction }: {
       onClick={() => onAction(running && task.lastThreadId ? "open" : "edit", task)}>
       <span className={styles.taskTitle}>{task.title}</span>
       <span className={styles.taskSchedule}>{scheduleLabel(task.schedule)}{status && ` · ${status}`}</span>
-      {task.error && <span className={styles.taskError}>{task.error}</span>}
+      {task.error && <span className={styles.taskError}>{backendText(task.error)}</span>}
     </button>
     <Dropdown trigger={["click"]} menu={{ items, onClick: ({ key }) => onAction(key as TaskAction, task) }}
       overlayStyle={{ maxWidth: 400 }}>

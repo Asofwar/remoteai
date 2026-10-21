@@ -4,9 +4,13 @@ include!("account_metadata.rs");
 include!("settings_and_import.rs");
 include!("tests.rs");
 
+mod interface_copy;
 mod language_settings;
 mod model_context_settings;
-pub(crate) use language_settings::save_app_language;
+pub(crate) use interface_copy::{callback_page_copy, native_text};
+#[cfg(test)]
+pub(crate) use language_settings::with_interface_language;
+pub(crate) use language_settings::{interface_language, save_app_language, InterfaceLanguage};
 pub(crate) use model_context_settings::{update_model_context_window, ModelContextWindowUpdate};
 
 #[cfg(test)]

@@ -35,6 +35,21 @@ fn language_changes_do_not_overwrite_business_settings_or_lose_to_stale_snapshot
 }
 
 #[test]
+fn saved_russian_does_not_switch_rust_copy_for_other_tests() {
+    let app = test_app();
+    let path = app_settings_path(app.handle()).unwrap();
+    write_app_settings(app.handle(), &AppSettings::default()).unwrap();
+    save_app_language(app.handle(), "ru").unwrap();
+    assert_eq!(
+        read_app_settings(app.handle()).unwrap().language.as_deref(),
+        Some("ru")
+    );
+    // Proxy and notification tests run concurrently and assert the canonical Chinese copy.
+    assert_eq!(interface_language(), InterfaceLanguage::Zh);
+    fs::remove_dir_all(path.parent().unwrap()).unwrap();
+}
+
+#[test]
 fn language_preference_preserves_legacy_fallback_and_rejects_invalid_values() {
     let app = test_app();
     let path = app_settings_path(app.handle()).unwrap();

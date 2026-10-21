@@ -202,10 +202,10 @@ export function ChatComposer({ projectPicker, suggestions, models, selection, se
     {queue && <ChatQueue {...queue} {...queueEditor} />}
     {projectPicker}
     <View style={[styles.composer, compactField && styles.composerCompact]}>
-    {!!draft.error && <Text accessibilityRole="alert" style={styles.error}>{draft.error}</Text>}
+    {!!draft.error && <Text accessibilityRole="alert" style={styles.error}>{t(draft.error)}</Text>}
     {compacting && <Text style={styles.subtitle}>{t("正在压缩上下文…")}</Text>}
     {!!(attachmentError || attachments.error) && <Text accessibilityRole="alert" style={styles.error}>
-      {attachmentError || attachments.error}</Text>}
+      {t(attachmentError || attachments.error)}</Text>}
     {attachments.busy && <Text style={styles.status}>{t("正在读取文件…")}</Text>}
     {(adding || menu.open) && <ComposerPopover anchor={anchor} anchorHeight={anchorHeight} wide={!adding}
       close={() => { setAdding(false); menu.close(); }}>

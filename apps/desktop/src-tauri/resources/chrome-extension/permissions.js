@@ -1,5 +1,6 @@
 import { website } from './validation.js';
 import { allSitesAllowed, assertWebsitePermission, siteAccessMode } from './site-access.js';
+import { t } from './i18n.js';
 
 const pending = new Map();
 const REQUEST_TIMEOUT_MS = 120000;
@@ -18,8 +19,8 @@ export async function initializePermissions() {
 }
 
 export function assertRunning(signal) {
-  if (paused) throw new Error('浏览器控制已暂停，请在浏览器助手中继续。');
-  if (signal?.aborted) throw new Error('浏览器操作已取消。');
+  if (paused) throw new Error(t('controlPaused', '浏览器控制已暂停，请在浏览器助手中继续。'));
+  if (signal?.aborted) throw new Error(t('browserActionCancelled', '浏览器操作已取消。'));
 }
 
 export async function setPaused(value) {
@@ -55,7 +56,7 @@ export async function authorize(value, clientId, signal, { prompt = true } = {})
   const { siteGrants = [] } = await chrome.storage.local.get('siteGrants');
   const { sessionGrants = [] } = await chrome.storage.session.get('sessionGrants');
   if (![...siteGrants, ...sessionGrants].some((grant) => grant.clientId === clientId && grant.origin === origin)) {
-    if (!prompt) throw new Error('未获得网站访问许可。');
+    if (!prompt) throw new Error(t('siteAccessNotGranted', '未获得网站访问许可。'));
     await requestAccess({ origin, clientId, signal });
   }
   assertRunning(signal);
@@ -77,7 +78,7 @@ function requestAccess({ origin, clientId, signal }) {
       if (windowId !== undefined) void chrome.windows.remove(windowId).catch(() => {});
       void refreshBadge();
       if (allowed) resolve();
-      else reject(new Error('未获得网站访问许可。请在 Chrome 中确认后重试。'));
+      else reject(new Error(t('siteAccessNotGrantedInChrome', '未获得网站访问许可。请在 Chrome 中确认后重试。')));
     };
     signal?.addEventListener('abort', abort, { once: true });
   });
@@ -109,7 +110,7 @@ export function decideAccess(id, decision) {
 
 async function saveDecision(id, decision) {
   const item = pending.get(id);
-  if (!item) throw new Error('这次请求已结束，请重新操作。');
+  if (!item) throw new Error(t('accessRequestEnded', '这次请求已结束，请重新操作。'));
   if (decision === 'always') {
     const { siteGrants = [] } = await chrome.storage.local.get('siteGrants');
     await chrome.storage.local.set({ siteGrants: addGrant(siteGrants, item) });

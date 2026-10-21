@@ -1,4 +1,5 @@
 import { guiText } from "../../i18n/guiText";
+import { backendText } from "../../../../../shared/i18n/backend/translateBackendMessage";
 import { useState } from "react";
 import { Alert, Button, Input, Segmented } from "antd";
 import { useLanguage } from "../../hooks/useLanguage";
@@ -48,7 +49,7 @@ export function GuiSkinSettings() {
           if (themeTab === "market") catalog.refreshThemeMarket();
         }}>{guiText("刷新")}</Button>
       </div>
-      {library.error && <Alert type="error" showIcon closable message={library.error}
+      {library.error && <Alert type="error" showIcon closable message={backendText(library.error)}
         onClose={() => library.setError(null)} />}
       {resourceUnavailable && themeTab === "builtIn" && <Alert showIcon
         type={library.resources?.phase === "error" ? "error" : "info"}

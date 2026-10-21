@@ -1,4 +1,5 @@
 import { guiText } from "../../i18n/guiText";
+import { backendText } from "../../../../../shared/i18n/backend/translateBackendMessage";
 import type { ReactNode } from "react";
 import { Spin } from "antd";
 import { ArrowDown, Terminal } from "lucide-react";
@@ -81,7 +82,7 @@ export function Messages({ value, selected, active = true, footer, pendingReques
             <button type="button" onClick={history.loadNewer} disabled={history.loading}>
               {guiText("加载更新的消息")}</button>
           </div>}
-          {value?.error && <p className={styles.turnError} role="status">{value.error}</p>}
+          {value?.error && <p className={styles.turnError} role="status">{backendText(value.error)}</p>}
           {value?.activeTurn && <WorkingStatus key={`${selected}:${value.activeTurn}`} active={active}
             turn={activeTurn} processing={processing} />}
           {sending && <WorkingStatus key={`sending:${selected}`} active={active} pendingRequest={pendingRequest} />}

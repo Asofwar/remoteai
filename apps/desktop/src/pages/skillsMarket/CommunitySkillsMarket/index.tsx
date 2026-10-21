@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { LoaderCircle, PackageOpen } from "lucide-react";
+import { backendText } from "../../../../../../shared/i18n/backend/translateBackendMessage";
 import { hasLocalBackend, isDesktopApp, skillPreviewUrl } from "../../../api/backend";
 import { CodexHomeScope, CodexHomeSelect, useSelectedCodexHome } from "../../../components/CodexHomeScope";
 import { useCommunitySkills } from "./useCommunitySkills";
@@ -103,7 +104,7 @@ function CommunitySkillsContent({
         </button>
       )}
 
-      {error && <div className="skills-market-error" role="alert">{error}</div>}
+      {error && <div className="skills-market-error" role="alert">{backendText(error)}</div>}
       {(browserCard || computerCard || remoteCommandCard || filtered.length > 0) && (
         <SkillMarketGrid
           leadingCard={<>{browserCard}{computerCard}{remoteCommandCard}</>}

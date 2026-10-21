@@ -126,6 +126,7 @@ import codexConfigStyles from "../../pages/codexConfig/pageStyles.module.less";
 import { SystemPromptPage } from "../../pages/SystemPromptPage";
 import { NetworkProxySettingsModal } from "../../pages/settings/NetworkProxySettings";
 import type { Translate } from "../../i18n";
+import { guiText } from "../../i18n/guiText";
 import { AccountDisplayTabs } from "./AccountDisplayTabs";
 import { AccountManagementToolbar } from "./AccountManagementToolbar";
 import { AccountToolbox } from "./AccountToolbox";
@@ -1369,7 +1370,7 @@ export function DashboardApp() {
                   {page === "skills" && <div id="skills-market-tabs" className="skills-market-tabs-slot" />}
                   {page === "settings" && <SettingsGroupsNav t={t} />}
                   {page === "codexConfig" && <p className={codexConfigStyles.subtitle}>
-                    管理 Codex 的 config.toml 配置项
+                    {guiText("管理 Codex 的 config.toml 配置项", {}, language)}
                   </p>}
                 </div>
               </div>

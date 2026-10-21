@@ -8,9 +8,11 @@ export interface RangeSource {
   info: VideoInfo;
   read: (offset: number, length: number) => Promise<VideoChunk>;
 }
+/** Local playback failure whose message is already localized; callers show it by type, not by wording. */
+export class VideoPlaybackError extends Error {}
 export function checkVideoSize(size: number) {
   const limit = getChatPolicy().videoPreviewMaxMb;
-  if (size > limit * MIB) throw new Error(t("视频超过 {value1} MB，无法播放。", { value1: limit }));
+  if (size > limit * MIB) throw new VideoPlaybackError(t("视频超过 {value1} MB，无法播放。", { value1: limit }));
 }
 
 /** Pull one bounded chunk at a time; the socket write completes before the next remote read. */
@@ -24,10 +26,10 @@ export async function* videoRangeStream(source: RangeSource, range: VideoRange, 
     checkVideoSize(source.info.size);
     if (chunk.offset !== offset || typeof chunk.data !== 'string'
       || chunk.data.length !== Math.ceil(length / 3) * 4 || !/^[a-z\d+/]*={0,2}$/i.test(chunk.data)) {
-      throw new Error(t("视频加载中断，请重试。"));
+      throw new VideoPlaybackError(t("视频加载中断，请重试。"));
     }
     const bytes = Buffer.from(chunk.data, 'base64');
-    if (bytes.length !== length) throw new Error(t("视频加载中断，请重试。"));
+    if (bytes.length !== length) throw new VideoPlaybackError(t("视频加载中断，请重试。"));
     yield bytes;
     offset += length;
   }

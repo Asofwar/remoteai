@@ -1,9 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { translateBackendMessage } from "../../../../shared/i18n/backend/translateBackendMessage";
 import { syncCodexNotification } from "../api/backend";
 import { recordToastLog } from "../api/errorLogs";
+import { guiLanguage } from "../i18n/guiText";
+import { useGuiLanguage } from "../i18n/useGuiLanguage";
 
+/**
+ * Toasts receive app copy that is already translated as well as raw backend messages. The error
+ * log keeps the raw text; what the user sees goes through the backend dictionary, which leaves
+ * translated text unchanged.
+ */
 export function useToast() {
-  const [message, setMessage] = useState<string | null>(null);
+  const language = useGuiLanguage();
+  const [rawMessage, setRawMessage] = useState<string | null>(null);
   const timer = useRef<number>();
 
   const notify = useCallback((nextMessage: string) => {
@@ -11,13 +20,17 @@ export function useToast() {
       console.debug("The notification could not be added to the error log.");
     });
     window.clearTimeout(timer.current);
-    setMessage(nextMessage);
-    timer.current = window.setTimeout(() => setMessage(null), 3400);
-    void syncCodexNotification(nextMessage).catch(() => {
+    setRawMessage(nextMessage);
+    timer.current = window.setTimeout(() => setRawMessage(null), 3400);
+    void syncCodexNotification(translateBackendMessage(guiLanguage(), nextMessage)).catch(() => {
       console.debug("Codex notification mirror is unavailable.");
     });
   }, []);
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
+  const message = useMemo(
+    () => (rawMessage === null ? null : translateBackendMessage(language, rawMessage)),
+    [language, rawMessage],
+  );
   return { message, notify };
 }

@@ -68,14 +68,16 @@ export const SkillInput = forwardRef<SkillInputHandle, {
   const cozeOptions: ComposerOption[] = coze.items
     .filter((item) => `${item.name} ${item.description}`.toLocaleLowerCase().includes(query))
     .map((item) => ({ kind: "coze", key: item.id, label: item.name,
-      description: item.description || "已发布的 Coze 内容", enabled: true,
+      description: item.description || guiText("已发布的 Coze 内容"), enabled: true,
       command: { enabled: true, run: () => onCoze?.({ kind: "coze", name: item.name, path: `coze://${item.id}` }) } }));
   let options: ComposerOption[] = composerOptions(catalog.skills, query, compact, goal);
   if (isConversation) options = conversationCandidates({ remote: candidates.threads,
     known: conversations?.threads ?? [], conversations: conversations?.conversations ?? {},
     currentId: conversations?.selected ?? null, query }).map((thread) => ({ kind: "conversation", key: thread.id,
       label: conversationReference(thread).name, enabled: true,
-      description: guiText("{value1} · {value2}", { value1: thread.status?.type === "active" ? "运行中" : "空闲", value2: thread.cwd || "未选择项目" }),
+      description: guiText("{value1} · {value2}", {
+        value1: thread.status?.type === "active" ? guiText("运行中") : guiText("空闲"),
+        value2: thread.cwd || guiText("未选择项目") }),
       command: { enabled: true, run: () => onConversation?.(conversationReference(thread)) },
     }));
   if (isCoze) options = cozeOptions;

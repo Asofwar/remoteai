@@ -1,4 +1,5 @@
 import { guiText } from "../../i18n/guiText";
+import { backendText } from "../../../../../shared/i18n/backend/translateBackendMessage";
 import { useContext, useEffect, useRef, useState } from "react";
 import { Button, Popconfirm } from "antd";
 import type { Content, SkillReference } from "./types";
@@ -42,7 +43,7 @@ export function UserMessageEditor({ text, images, skills, disabled, onSubmit, on
       connected={!disabled} disabled={saving || disabled} editing={{ onCancel, className: styles.editorInput }}
       placeholder={guiText("输入消息，或输入 / 选择技能…")} onChange={draft.setDraft} onPaste={draft.paste}
       onSend={() => void submit()} />
-    {draft.error && <p className={styles.editorError} role="status">{draft.error}</p>}
+    {draft.error && <p className={styles.editorError} role="status">{backendText(draft.error)}</p>}
     <div className={styles.editorActions}>
       {onDelete && <Popconfirm title={guiText("删除这条消息？")}
         description={guiText("这条消息及之后的所有消息都会删除，无法撤销。")}

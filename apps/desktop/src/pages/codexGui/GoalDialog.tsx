@@ -1,4 +1,5 @@
 import { guiText } from "../../i18n/guiText";
+import { backendText } from "../../../../../shared/i18n/backend/translateBackendMessage";
 import { useEffect, useState } from "react";
 import { Alert, Button, Input, Modal } from "antd";
 import { GOAL_STATUS } from "./goalTypes";
@@ -45,7 +46,7 @@ export function GoalDialog({ state, controller, onClose }: {
       value={objective} maxLength={4000} autoSize={{ minRows: 4, maxRows: 8 }} disabled={unavailable || running}
       onChange={(event) => { setObjective(event.target.value); setEdited(true); }} />
     {blocked && <p className={styles.copy}>{guiText("请先等待当前任务结束，并处理待发送消息或确认请求，再开始或修改目标。")}</p>}
-    {error && <Alert type="warning" className={styles.goalError} message={error}
+    {error && <Alert type="warning" className={styles.goalError} message={backendText(error)}
       action={<Button size="small" onClick={() => { if (id) void controller.goals.load(id); }}>{guiText("重试")}</Button>} />}
   </Modal>;
 }

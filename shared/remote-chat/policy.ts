@@ -2,6 +2,8 @@ export { CHAT_POLICY_FIELDS, DEFAULT_CHAT_POLICY, parseChatPolicy, type ChatPoli
   from '../chat/chatPolicy';
 import { DEFAULT_CHAT_POLICY, parseChatPolicy } from '../chat/chatPolicy';
 import type { ConnectionMode } from './protocol';
+import { getInterfaceLanguage } from '../i18n/interfaceLanguage';
+import { translateText } from '../i18n/translate';
 
 export const CHAT_POLICY_MESSAGE = 'chat-policy';
 export const KIB = 1024;
@@ -51,9 +53,12 @@ export function fileUploadByteLimit(mode?: ConnectionMode) {
 export function fileUploadTotalByteLimit(mode?: ConnectionMode) {
   return Math.min(Number.MAX_SAFE_INTEGER, getChatPolicy(mode).fileUploadTotalMaxMb * MIB);
 }
+/** Upload limit or invalid attachment; lets callers show the message by type rather than by its text. */
+export class UploadPolicyError extends Error {}
 export function checkFileUploadSize(bytes: number, mode?: ConnectionMode) {
   if (bytes > fileUploadByteLimit(mode)) {
-    throw new Error(`单个文件不能超过 ${current.fileUploadMaxMb} MB，请选择较小的文件。`);
+    throw new UploadPolicyError(translateText(getInterfaceLanguage(), '单个文件不能超过 {value1} MB，请选择较小的文件。',
+      { value1: current.fileUploadMaxMb }));
   }
 }
 export class DownloadPolicyError extends Error {}
@@ -62,6 +67,7 @@ export function fileDownloadByteLimit(mode?: ConnectionMode) {
 }
 export function checkDownloadSize(bytes: number, mode?: ConnectionMode) {
   if (bytes > fileDownloadByteLimit(mode)) {
-    throw new DownloadPolicyError(`文件超过 ${current.fileDownloadMaxMb} MB，无法下载。`);
+    throw new DownloadPolicyError(translateText(getInterfaceLanguage(), '文件超过 {value1} MB，无法下载。',
+      { value1: current.fileDownloadMaxMb }));
   }
 }

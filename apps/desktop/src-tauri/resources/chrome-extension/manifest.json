@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Remote AI 浏览器助手",
+  "name": "__MSG_extensionName__",
   "version": "1.7.0",
-  "description": "让 Remote AI 帮你浏览网页、查找信息和操作网站。你可以随时暂停。",
+  "description": "__MSG_extensionDescription__",
+  "default_locale": "zh_CN",
   "minimum_chrome_version": "125",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv8ljU5o5M2fErYFE69cj75ydJ91ilH6DWffO4ud7g/c0aKDDbJScenPeLC4FSvcGUa4OeqeTN+Nxidyk9HZISKxv8+hoC9NdeoLQiDYynKk8bYmr6+rTnhcNyXdRwuGz4O1H7G034x+15wL8lZMKti5br2pIaf6Az7Yy6gH0NNV0wFOGBVMX4PItYuWcFV6mzcDGLZ3GtPlRgOwSktvSH0NAIGmoS0OhQZUSJkmvISsbhamHRwj9HB2tHhkOKLmilWIMLNdZ2XPT7VqgPC39bYeXyDBVumLYiNXvhlUymk3aVd044JNayxxJTPsqiYPU33wKfM5MorJnkd8SyYeYjQIDAQAB",
   "permissions": [
@@ -25,7 +26,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Remote AI 浏览器助手"
+    "default_title": "__MSG_extensionName__"
   },
   "side_panel": {
     "default_path": "sidepanel.html"

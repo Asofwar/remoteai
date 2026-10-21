@@ -1,4 +1,5 @@
 import { Archive, Check, FolderOpen, ImagePlus, LoaderCircle, PackageOpen, Upload, X } from "lucide-react";
+import { backendText } from "../../../../../shared/i18n/backend/translateBackendMessage";
 import type { Translate } from "../../i18n";
 import type { SkillPackageSelection } from "../../types";
 import { FEEDBACK_IMAGE_TYPES } from "../../utils/feedbackImages";
@@ -144,7 +145,7 @@ export function SkillPublishModal(props: PublishModalProps) {
           )}
         </div>
 
-        {error && <div className="feedback-error" role="alert">{error}</div>}
+        {error && <div className="feedback-error" role="alert">{backendText(error)}</div>}
         <div className="feedback-actions">
           <button type="button" className="note-cancel-button" disabled={busy} onClick={onClose}>
             {t("skills.cancel")}

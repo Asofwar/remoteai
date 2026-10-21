@@ -1,3 +1,5 @@
+import { t } from './i18n.js';
+
 export const ALL_WEBSITES = { origins: ['http://*/*', 'https://*/*'] };
 
 export async function siteAccessMode() {
@@ -11,6 +13,6 @@ export async function allSitesAllowed() {
 
 export async function assertWebsitePermission(origin) {
   if (!await chrome.permissions.contains({ origins: [`${origin}/*`] })) {
-    throw new Error('请在 Chrome 的扩展设置中允许浏览器助手访问这个网站。');
+    throw new Error(t('allowSiteInChrome', '请在 Chrome 的扩展设置中允许浏览器助手访问这个网站。'));
   }
 }

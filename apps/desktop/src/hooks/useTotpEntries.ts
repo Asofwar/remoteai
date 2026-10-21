@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { backendText } from "../../../../shared/i18n/backend/translateBackendMessage";
 import {
   publishTotpChange,
   pullCloudTotp,
@@ -114,7 +115,7 @@ export function useTotpEntries({ cloudAuthenticated, notify, t }: TotpEntriesOpt
         const response = await syncCloudTotp(snapshot);
         applyRemoteVault(response);
       })
-      .catch((error) => notify(`${t("totp.cloudSyncFailed")}: ${String(error)}`))
+      .catch((error) => notify(`${t("totp.cloudSyncFailed")}: ${backendText(String(error))}`))
       .finally(() => {
         activeSyncCountRef.current -= 1;
         if (activeSyncCountRef.current === 0) setSyncing(false);
@@ -134,7 +135,7 @@ export function useTotpEntries({ cloudAuthenticated, notify, t }: TotpEntriesOpt
         return true;
       })
       .catch((error) => {
-        notify(`${t("totp.cloudSyncFailed")}: ${String(error)}`);
+        notify(`${t("totp.cloudSyncFailed")}: ${backendText(String(error))}`);
         return false;
       })
       .finally(() => {

@@ -110,6 +110,10 @@ impl TransportFailure {
 }
 
 pub(super) fn transport(error: &str) -> Option<&'static str> {
+    transport_failure(error).map(TransportFailure::message)
+}
+
+fn transport_failure(error: &str) -> Option<TransportFailure> {
     let detail = error
         .strip_prefix("Official Codex proxy request failed: ")
         .or_else(|| error.strip_prefix("Provider proxy request failed: "))
@@ -117,7 +121,16 @@ pub(super) fn transport(error: &str) -> Option<&'static str> {
         .or_else(|| error.strip_prefix("Content generation request failed: "))
         .or_else(|| error.strip_prefix("Chat bridge request failed: "))
         .or_else(|| error.strip_prefix("Failed to create proxy HTTP client: "))?;
-    Some(TransportFailure::classify(&detail.to_ascii_lowercase()).message())
+    Some(TransportFailure::classify(&detail.to_ascii_lowercase()))
+}
+
+/// Retry count appended by the transport layer, reported only when it retried.
+fn transport_attempts(error: &str) -> Option<u64> {
+    error
+        .rsplit_once("(attempts: ")
+        .and_then(|(_, count)| count.strip_suffix(')'))
+        .and_then(|count| count.parse::<u64>().ok())
+        .filter(|count| *count > 1)
 }
 
 pub(super) fn gui(error: &str) -> String {
@@ -127,12 +140,11 @@ pub(super) fn gui(error: &str) -> String {
     if let Some(message) = super::request_error::catalog_message(error) {
         return message;
     }
+    if crate::storage::interface_language() == crate::storage::InterfaceLanguage::Ru {
+        return russian::gui(error);
+    }
     if let Some(message) = transport(error) {
-        let attempts = error
-            .rsplit_once("(attempts: ")
-            .and_then(|(_, count)| count.strip_suffix(')'))
-            .and_then(|count| count.parse::<u64>().ok());
-        return match attempts.filter(|count| *count > 1) {
+        return match transport_attempts(error) {
             Some(count) => format!("{message}已尝试 {count} 次。"),
             None => message.to_string(),
         };
@@ -170,7 +182,17 @@ pub(super) fn error_id(error: &str) -> String {
         .collect()
 }
 
+/// Fixed client-visible proxy texts produced outside `gui`, in the saved interface language.
+/// The Chinese source stays the canonical value that tests and diagnostics compare.
+pub(super) fn localized(source: &'static str) -> &'static str {
+    if crate::storage::interface_language() == crate::storage::InterfaceLanguage::Ru {
+        return russian::fixed(source).unwrap_or(source);
+    }
+    source
+}
+
 mod known;
+mod russian;
 
 #[cfg(test)]
 #[path = "error_messages_tests.rs"]

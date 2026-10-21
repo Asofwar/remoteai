@@ -56,6 +56,7 @@ import type {
 import { accountExpirationDate } from "../../../utils/expiration";
 import { maskAccountEmail } from "../../../utils/accountPrivacy";
 import { shouldShowUsageError } from "../../../utils/usageErrors";
+import { translateBackendMessage } from "../../../../../../shared/i18n/backend/translateBackendMessage";
 import {
   formatEstimatedCost,
   invalidateCustomTokenCostRulesCache,
@@ -675,7 +676,7 @@ export function AccountTable({
                   })}</span>
                 )}
                 {shouldShowUsageError(account.usage.error, showUsageNetworkErrors)
-                  && <Tooltip title={account.usage.error}>
+                  && <Tooltip title={translateBackendMessage(language, account.usage.error)}>
                     <Tag color="error" className="account-error-tag" icon={<CircleHelp size={12} aria-hidden="true" />}>
                       {t("table.error")}
                     </Tag>
@@ -1300,7 +1301,7 @@ export function AccountTable({
                     })}</span>
                   )}
                   {shouldShowUsageError(account.usage.error, showUsageNetworkErrors)
-                    && <Tooltip title={account.usage.error}>
+                    && <Tooltip title={translateBackendMessage(language, account.usage.error)}>
                       <Tag color="error" className="account-error-tag" icon={<CircleHelp size={12} aria-hidden="true" />}>
                         {t("table.error")}
                       </Tag>

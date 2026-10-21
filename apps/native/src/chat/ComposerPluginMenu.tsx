@@ -61,7 +61,7 @@ export function ComposerPluginMenu({ catalog, query, load, chooseSkill, choosePl
         {loading && !entries.length && <Text style={pluginStyles.message}>{t("正在加载插件…")}</Text>}
         {!loading && !entries.length && !error && <Text style={pluginStyles.message}>
           {query ? t("没有找到匹配的插件") : t("暂无可用插件或技能")}</Text>}
-        {!!error && <Text style={pluginStyles.message}>{error}</Text>}
+        {!!error && <Text style={pluginStyles.message}>{t(error)}</Text>}
       </>} />
   </View>;
 }

@@ -39,7 +39,7 @@ function resetLabel(account: AccountSummary, now: number) {
   const days = Math.floor(totalMinutes / (60 * 24));
   const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
   const minutes = totalMinutes % 60;
-  return t("主额度约 {value1}{value2} 小时 {value3} 分后重置", { value1: days ? `${days} 天 ` : '', value2: hours, value3: minutes });
+  return t("主额度约 {value1}{value2} 小时 {value3} 分后重置", { value1: days ? t("{days} 天 ", { days }) : '', value2: hours, value3: minutes });
 }
 
 export function QuotaConsumptionSheet({

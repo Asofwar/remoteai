@@ -1,4 +1,5 @@
 import { guiText } from "../../i18n/guiText";
+import { backendText } from "../../../../../shared/i18n/backend/translateBackendMessage";
 import { useRef, useState } from 'react';
 import { Popover, Spin } from 'antd';
 import { Check, ChevronDown, Monitor, RefreshCw } from 'lucide-react';
@@ -46,14 +47,14 @@ export function GuiDevicePicker({ navigation, busy, onSelect }: {
           disabled={navigation.loading} onClick={navigation.refresh}>
           {navigation.loading ? <Spin size="small" /> : <RefreshCw size={14} />}{guiText("刷新设备列表")}</button>
       </>}
-      {navigation.error && <p className={styles.error} role="alert">{navigation.error}</p>}
+      {navigation.error && <p className={styles.error} role="alert">{backendText(navigation.error)}</p>}
     </div>
   </div>;
   return <Popover trigger="click" placement="bottomRight" arrow={false} open={open} content={content}
     classNames={{ root: styles.devicePopup }} getPopupContainer={(element) => element.parentElement ?? document.body}
     onOpenChange={(next) => { setOpen(next); if (next) navigation.refresh(); }}>
     <button ref={trigger} type="button" className={styles.deviceTrigger} aria-label={guiText("切换设备")}
-      aria-expanded={open} title={guiText("当前设备：{value1}", { value1: navigation.current?.name ?? '本机' })} onKeyDown={(event) => {
+      aria-expanded={open} title={guiText("当前设备：{value1}", { value1: navigation.current?.name ?? guiText('本机') })} onKeyDown={(event) => {
         if (open && event.key === 'Escape') { event.stopPropagation(); close(); }
       }}>
       <Monitor size={16} /><span>{guiText("切换设备")}</span><ChevronDown size={12} />

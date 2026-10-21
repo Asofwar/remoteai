@@ -1,5 +1,6 @@
 import { Button } from "antd";
 import { CalendarClock, RefreshCw } from "lucide-react";
+import { translateBackendMessage } from "../../../../../shared/i18n/backend/translateBackendMessage";
 import type { Language, Translate } from "../../i18n";
 import type { ResetCreditsLoadState } from "../../types";
 import { formatSystemTime } from "../../utils/format";
@@ -20,7 +21,7 @@ export function ResetCreditsPanel({ state, onRetry, language, t, missingState = 
   if (state.status === "error") {
     return (
       <div className="reset-credits-status reset-credits-error">
-        <span>{state.error}</span>
+        <span>{translateBackendMessage(language, state.error)}</span>
         <Button size="small" icon={<RefreshCw size={13} />} onClick={onRetry}>{t("reset.retry")}</Button>
       </div>
     );

@@ -58,7 +58,7 @@ function tooltipFormatter(options: QuotaOptionProps) {
   const labels = quotaChartLabels(options.language);
   const unit = options.view === "drop" ? labels.points : "%";
   const timestamp = timestampFormatter(options.language, options.interval);
-  const number = new Intl.NumberFormat(options.language === "zh" ? "zh-CN" : "en-US", {
+  const number = new Intl.NumberFormat(getLocale(options.language), {
     maximumFractionDigits: 2,
   });
   return (params: unknown) => {

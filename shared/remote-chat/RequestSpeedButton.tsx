@@ -12,7 +12,8 @@ export function RequestSpeedButton({ speed, disabled, busy, onChange, translate 
   const label = !available && current === 'normal' ? translate('当前账户暂不支持加速模式')
     : requestSpeedLabel(current, translate, available);
   const bolts = speedBoltCount(current);
-  return <Tooltip title={error || label} trigger={['hover', 'focus']} styles={{ root: { maxWidth: 400 } }}>
+  return <Tooltip title={error ? translate(error) : label} trigger={['hover', 'focus']}
+    styles={{ root: { maxWidth: 400 } }}>
     <button type="button" className="request-speed-button" data-speed={current}
       disabled={disabled || busy || speed === undefined || (!available && current === 'normal')}
       aria-busy={busy} aria-label={label} onClick={() => onChange(nextRequestSpeed(current, available))}>

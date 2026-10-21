@@ -9,7 +9,7 @@ const messages: Record<string, [string, string]> = {
   ],
   "查看本轮改动，验证后再决定是否交付。": [
     "Review the changes and verify them before delivery.",
-    "Проверьте изменения перед передачей результата.",
+    "Просмотрите изменения этого хода и проверьте их перед передачей результата.",
   ],
   "{value1} 个改动文件": [
     "{value1} changed files",
@@ -65,11 +65,11 @@ const messages: Record<string, [string, string]> = {
   ],
   "查看验证记录": [
     "View check record",
-    "Открыть запись проверки",
+    "Показать журнал проверки",
   ],
   "收起验证记录": [
     "Hide check record",
-    "Скрыть запись проверки",
+    "Скрыть журнал проверки",
   ],
   "等待验证完成。": [
     "Waiting for the check to finish.",
@@ -81,7 +81,7 @@ const messages: Record<string, [string, string]> = {
   ],
   "将在电脑上运行项目命令，可能修改文件或下载依赖。": [
     "This runs a project command on your computer and may change files or download dependencies.",
-    "Команда запустится на компьютере и может изменить файлы или загрузить зависимости.",
+    "Команда запустится на компьютере и может изменить файлы или скачать зависимости.",
   ],
   "PR 与 CI": [
     "PR and CI",
@@ -97,7 +97,7 @@ const messages: Record<string, [string, string]> = {
   ],
   "CI 对应其他代码版本，请提交并推送当前改动后再确认。": [
     "CI refers to a different code version. Commit and push your current changes before confirming.",
-    "CI относится к другой версии кода. Сначала закоммитьте и отправьте текущие изменения.",
+    "CI относится к другой версии кода. Создайте коммит, отправьте текущие изменения и подтвердите снова.",
   ],
   "暂无 CI 结果。": [
     "No CI results yet.",
@@ -117,7 +117,7 @@ const messages: Record<string, [string, string]> = {
   ],
   "请先通过 Git 入口提交并推送当前改动，再创建 PR。": [
     "Commit and push your changes from Git before creating a PR.",
-    "Сначала закоммитьте и отправьте изменения через Git, затем создайте PR.",
+    "Сначала создайте коммит и отправьте изменения в разделе Git, затем создайте PR.",
   ],
   "PR 标题": [
     "PR title",
@@ -129,7 +129,7 @@ const messages: Record<string, [string, string]> = {
   ],
   "目标分支（留空使用默认分支）": [
     "Base branch (leave blank for default)",
-    "Целевая ветка (по умолчанию, если не указана)",
+    "Целевая ветка (оставьте пустым для ветки по умолчанию)",
   ],
   "恢复本轮修改": [
     "Restore this turn’s changes",
@@ -165,7 +165,7 @@ const messages: Record<string, [string, string]> = {
   ],
   "刷新验收结果": [
     "Refresh review",
-    "Обновить результаты",
+    "Обновить результаты проверки",
   ],
   "本轮改动": [
     "This turn’s changes",
@@ -193,7 +193,7 @@ const messages: Record<string, [string, string]> = {
   ],
   "对第 {value1} 行留言": [
     "Comment on line {value1}",
-    "Комментарий к строке {value1}",
+    "Прокомментировать строку {value1}",
   ],
   "留言": [
     "Comment",
@@ -205,7 +205,7 @@ const messages: Record<string, [string, string]> = {
   ],
   "无法打开链接，请稍后重试。": [
     "Could not open the link. Try again.",
-    "Не удалось открыть ссылку. Повторите попытку.",
+    "Не удалось открыть ссылку. Повторите попытку позже.",
   ],
   "无法读取 GitHub 状态，请在电脑上安装并登录 GitHub CLI，再检查网络和仓库权限。": [
     "Could not read GitHub status. Install and sign in to GitHub CLI on the computer, then check the network " +
@@ -219,11 +219,11 @@ const messages: Record<string, [string, string]> = {
   ],
   "请先预览恢复影响，再确认恢复。": [
     "Preview the restore before confirming it.",
-    "Сначала откройте предпросмотр отмены.",
+    "Сначала откройте предпросмотр отмены, затем подтвердите её.",
   ],
   "无法保存验证记录，请检查电脑可用空间后重试。": [
     "Could not save the check. Check free space on the computer and try again.",
-    "Не удалось сохранить проверку. Проверьте свободное место на компьютере и повторите попытку.",
+    "Не удалось сохранить журнал проверки. Проверьте свободное место на компьютере и повторите попытку.",
   ],
   "项目已有验证在运行，请等待完成。": [
     "A project check is already running. Wait for it to finish.",
@@ -236,7 +236,8 @@ const messages: Record<string, [string, string]> = {
   "未跟踪文件过大或包含链接，暂时无法核实代码版本。请先在电脑上整理文件。": [
     "Untracked files are too large or include links. Organize them on the computer before verifying the code " +
     "version.",
-    "Неотслеживаемые файлы слишком велики или содержат ссылки. Сначала разберите их на компьютере.",
+    "Неотслеживаемые файлы слишком велики или содержат ссылки, поэтому версию кода сейчас не удаётся " +
+    "проверить. Сначала разберите эти файлы на компьютере.",
   ],
   "项目包含子模块，暂时无法完整核实验证版本，请在电脑上验证。": [
     "This project contains submodules. Verify it on the computer because its full code version cannot be " +
@@ -246,7 +247,8 @@ const messages: Record<string, [string, string]> = {
   "项目有跳过检查的文件，暂时无法核实代码版本。请先在电脑上恢复这些文件的正常跟踪。": [
     "Some project files skip change detection. Restore normal tracking on the computer before verifying the " +
     "code version.",
-    "Некоторые файлы исключены из проверки изменений. Восстановите их обычное отслеживание на компьютере.",
+    "Некоторые файлы проекта исключены из отслеживания изменений, поэтому версию кода сейчас не удаётся " +
+    "проверить. Восстановите их обычное отслеживание на компьютере.",
   ],
   "请填写 PR 标题，并缩短过长的说明。": [
     "Enter a PR title and shorten any overly long description.",

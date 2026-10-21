@@ -8,6 +8,8 @@ import { draftSkills, editSkillDraft, emptySkillDraft, insertDraftSkill, type Te
 import { queuedMessageText } from '../../../apps/desktop/src/pages/codexGui/queuedMessageDraft';
 import { draftImage } from '../attachments';
 import type { QueueDraft } from '../queue';
+import { getInterfaceLanguage } from '../../i18n/interfaceLanguage';
+import { translateText } from '../../i18n/translate';
 
 interface Options {
   threadId: string | null;
@@ -69,7 +71,10 @@ export function useChatDraft({ threadId, sending, disabled, selection, send, rec
     const current = generation.current;
     busy.current = true; setPicking(true); setError('');
     try {
-      if (images.length >= MAX_CHAT_IMAGES) throw new ChatImageError(`一次最多添加 ${MAX_CHAT_IMAGES} 张图片。`);
+      if (images.length >= MAX_CHAT_IMAGES) {
+        throw new ChatImageError(translateText(getInterfaceLanguage(), '一次最多添加 {value1} 张图片。',
+          { value1: MAX_CHAT_IMAGES }));
+      }
       const selected = await pick(MAX_CHAT_IMAGES - images.length);
       if (current !== generation.current || !selected.length) return;
       validateChatImages([...images, ...selected].map((image) => image.url));

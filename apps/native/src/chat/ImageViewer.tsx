@@ -46,7 +46,7 @@ export function ImageViewer({ thumbnail, description, load, close, save }: Props
           <View pointerEvents="box-none" style={styles.footer}>
             <View pointerEvents="box-none" style={styles.notices}>
               {!!message && <Text pointerEvents="none" accessibilityLiveRegion="polite"
-                style={styles.status}>{message}</Text>}
+                style={styles.status}>{t(message)}</Text>}
               {image.loading && <PreviewTransferProgress progress={image.progress} dark label={t("正在加载原图…")} />}
               {image.error && <View style={styles.error}>
                 <Text style={styles.status}>{t("原图加载失败")}</Text>

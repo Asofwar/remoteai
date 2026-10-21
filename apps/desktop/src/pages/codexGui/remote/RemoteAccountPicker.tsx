@@ -1,4 +1,5 @@
 import { guiText } from "../../../i18n/guiText";
+import { backendText } from '../../../../../../shared/i18n/backend/translateBackendMessage';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { RefreshCw } from 'lucide-react';
 import type { GuiAccountsClient, SelectableGuiAccount } from '../../../../../../shared/remote-chat/guiAccounts';
@@ -42,7 +43,7 @@ export function RemoteAccountPicker({ active, ready, client, computers, privacyM
       {!ready && <p className={styles.hint}>{guiText("连接电脑后即可切换账户。")}</p>}
       {ready && accounts.snapshot && !accounts.snapshot.running
         && <p className={styles.hint}>{guiText("请先在这台电脑上开启本地代理。")}</p>}
-      {accounts.error && <p className={styles.error} role="alert">{accounts.error}</p>}
+      {accounts.error && <p className={styles.error} role="alert">{backendText(accounts.error)}</p>}
       <button type="button" className={styles.settings} aria-label={guiText("刷新账户列表")}
         disabled={!ready || accounts.loading || Boolean(accounts.saving)} onClick={accounts.refresh}>
         <RefreshCw size={17} />{guiText("刷新账户")}</button>

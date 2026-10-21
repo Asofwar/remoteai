@@ -3,6 +3,7 @@ import { website } from './validation.js';
 import { acquireConnection, assertConnected, finishConnection, releaseConnection, connectionOwner }
   from './debugger-connections.js';
 import { queueTarget } from './target-queue.js';
+import { t } from './i18n.js';
 
 const MAX_LIST_WORKERS = 100;
 const MAX_WORKER_URL = 2000;
@@ -11,7 +12,7 @@ const MAX_WORKER_TITLE = 200;
 export function workerWebsite(value) {
   let url;
   try { url = new URL(value); }
-  catch { throw new Error('无法确认这个 Worker 所属的网站，请重新查看可用的 Worker。'); }
+  catch { throw new Error(t('workerSiteUnknown', '无法确认这个 Worker 所属的网站，请重新查看可用的 Worker。')); }
   return website(url.protocol === 'blob:' ? url.origin : value).href;
 }
 
@@ -39,7 +40,7 @@ export function withWorker(context, args, operation) {
 async function findWorker(context, workerId) {
   assertRunning(context.signal);
   const worker = (await chrome.debugger.getTargets()).find(target => target.id === workerId && isWebsiteWorker(target));
-  if (!worker) throw new Error('这个 Worker 已停止，请重新查看可用的 Worker。');
+  if (!worker) throw new Error(t('workerStopped', '这个 Worker 已停止，请重新查看可用的 Worker。'));
   await authorize(workerWebsite(worker.url), context.clientId, context.signal);
   return worker;
 }
@@ -51,12 +52,12 @@ async function run(context, workerId, operation) {
   const owner = connectionOwner(context);
   const connection = await acquireConnection(target, context.signal, owner).catch(() => {
     assertRunning(context.signal);
-    throw new Error('无法连接这个 Worker，请关闭其开发者工具后重试。');
+    throw new Error(t('workerConnectFailed', '无法连接这个 Worker，请关闭其开发者工具后重试。'));
   });
   const guard = async () => {
     const current = await findWorker(context, workerId);
     assertConnected(connection);
-    if (current.url !== workerUrl) throw new Error('这个 Worker 已变化，请重新读取日志。');
+    if (current.url !== workerUrl) throw new Error(t('workerChanged', '这个 Worker 已变化，请重新读取日志。'));
   };
   // Cancellation must release a debugger command awaiting a worker that is shutting down.
   const abort = () => { void finishConnection(target, owner); };

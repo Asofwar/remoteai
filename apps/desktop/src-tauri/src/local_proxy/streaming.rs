@@ -187,7 +187,9 @@ impl<R: BufRead> ChatSseReader<R> {
             return;
         }
         if !self.tools.values().all(streaming_tool_arguments_complete) {
-            self.fail("Chat 响应中的工具调用缺少名称，或参数 JSON 不完整。");
+            self.fail(error_messages::localized(
+                "Chat 响应中的工具调用缺少名称，或参数 JSON 不完整。",
+            ));
             return;
         }
         let (tool_events, tool_items) = self.finalize_tools();

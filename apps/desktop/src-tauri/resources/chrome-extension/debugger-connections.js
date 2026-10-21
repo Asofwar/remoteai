@@ -1,6 +1,7 @@
 import { assertRunning } from './permissions.js';
 import { clearControlledTabs } from './tab-indicator.js';
 import { clearTabPointer } from './pointer.js';
+import { t } from './i18n.js';
 
 const connections = new Map();
 const keyOf = target => target.tabId === undefined ? `worker:${target.targetId}` : `tab:${target.tabId}`;
@@ -35,7 +36,7 @@ export async function acquireConnection(target, signal, clientId) {
 }
 
 export function assertConnected(connection) {
-  if (connection.closed) throw new Error('浏览器连接已结束，请重新操作。');
+  if (connection.closed) throw new Error(t('browserConnectionEnded', '浏览器连接已结束，请重新操作。'));
 }
 
 export function releaseConnection(connection, keepAlive, clientId) {

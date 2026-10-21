@@ -1,20 +1,20 @@
 const messages: Record<string, [string, string]> = {
   '暂时无法同步 Git 设置，请稍后重试。': [
     'Could not sync Git settings. Please try again shortly.',
-    'Не удалось синхронизировать настройки Git. Повторите попытку позже.',
+    'Сейчас не удаётся синхронизировать настройки Git. Повторите попытку позже.',
   ],
   '自动生成提交说明': ['Generate commit message automatically', 'Создавать сообщение коммита автоматически'],
   '填写提交说明，或按 Tab 用 AI 生成': [
     'Write a commit message, or press Tab to generate with AI',
-    'Введите сообщение или нажмите Tab для генерации с ИИ',
+    'Введите сообщение коммита или нажмите Tab, чтобы создать его с ИИ',
   ],
   '填写提交说明，或点 AI 生成': [
     'Write a commit message, or tap Generate with AI',
-    'Введите сообщение или нажмите «Создать с ИИ»',
+    'Введите сообщение коммита или нажмите «Создать с ИИ»',
   ],
   '提交时根据所选文件自动生成说明': [
     'Generate a message from selected files when committing',
-    'Создать сообщение по выбранным файлам при коммите',
+    'Сообщение будет создано по выбранным файлам при коммите',
   ],
   'AI 生成': ['Generate with AI', 'Создать с ИИ'],
   '正在生成提交说明…': ['Generating commit message…', 'Создание сообщения коммита…'],
@@ -28,7 +28,7 @@ const messages: Record<string, [string, string]> = {
   ],
   '所选文件过多，请减少选择后再生成提交说明。': [
     'Too many files selected. Select fewer files and generate again.',
-    'Выбрано слишком много файлов. Выберите меньше файлов и повторите генерацию.',
+    'Выбрано слишком много файлов. Выберите меньше файлов и создайте сообщение снова.',
   ],
   'Git 提交说明': ['Git commit message', 'Сообщение коммита Git'],
 };

@@ -1,4 +1,5 @@
 import { guiText } from "../../../i18n/guiText";
+import { backendText } from '../../../../../../shared/i18n/backend/translateBackendMessage';
 import { useState } from 'react';
 import { Alert, Button, Popover, Tooltip } from 'antd';
 import { PanelBottom, RefreshCw } from 'lucide-react';
@@ -36,7 +37,7 @@ export function RemoteGuiTools({ controller, state, active, terminal }: {
     </Tooltip>
     <Popover trigger="click" placement="bottomRight" styles={{ root: { maxWidth: 400 } }} content={<>
       <Installer installer={installer} compact remote running={running} disabled={!connected} />
-      {installer.error && <Alert type="error" message={installer.error} />}
+      {installer.error && <Alert type="error" message={backendText(installer.error)} />}
     </>}>
       <Button type="text" className="gui-remote-secondary-tool"
         icon={<CliUpdateIcon version={installer.version} release={installer.release} />}
@@ -47,8 +48,8 @@ export function RemoteGuiTools({ controller, state, active, terminal }: {
         aria-expanded={terminal.open} disabled={terminal.busy || (!connected && !terminal.open)}
         onClick={terminal.toggle} />
     </Tooltip>
-    {terminal.error && !terminal.open && <span role="alert" style={{ maxWidth: 400 }}>{terminal.error}</span>}
-    {error && <Popover open content={<Alert type="error" message={error} closable onClose={() => setError('')} />}
+    {terminal.error && !terminal.open && <span role="alert" style={{ maxWidth: 400 }}>{backendText(terminal.error)}</span>}
+    {error && <Popover open content={<Alert type="error" message={backendText(error)} closable onClose={() => setError('')} />}
       placement="bottomRight" styles={{ root: { maxWidth: 400 } }}><span /></Popover>}
   </div>;
 }

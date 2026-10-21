@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::{fmt, io};
 
+pub(super) mod russian;
 mod upstream;
 pub(super) use upstream::upstream;
 
@@ -285,6 +286,9 @@ impl RequestError {
 
 impl fmt::Display for RequestError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if crate::storage::interface_language() == crate::storage::InterfaceLanguage::Ru {
+            return russian::fmt(self, f);
+        }
         write!(f, "{}失败：", self.stage.label())?;
         match self.cause {
             Cause::Problem(problem) => f.write_str(problem.message())?,
@@ -336,6 +340,9 @@ pub(super) fn catalog_failure(official: RequestError, admin: RequestError) -> St
 pub(super) fn catalog_message(value: &str) -> Option<String> {
     let (official, admin): (RequestError, RequestError) =
         serde_json::from_str(value.strip_prefix("proxy_catalog_error:")?).ok()?;
+    if crate::storage::interface_language() == crate::storage::InterfaceLanguage::Ru {
+        return Some(russian::catalog(&official, &admin));
+    }
     Some(format!("官方模型列表：{official} 备用模型列表：{admin}"))
 }
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Switch, Table, Tooltip } from "antd";
 import { RefreshCw } from "lucide-react";
+import { backendText } from "../../../../../shared/i18n/backend/translateBackendMessage";
 import { loadProxySessions, loadProxySessionUnlimitedConversation,
   setProxySessionUnlimitedConversation } from "../../api/backend";
 import type { Translate } from "../../i18n";
@@ -33,7 +34,7 @@ function useProxySessions(t: Translate) {
       setSessions(await loadProxySessions());
       setError("");
     } catch (cause) {
-      const detail = cause instanceof Error ? cause.message : String(cause);
+      const detail = backendText(cause instanceof Error ? cause.message : String(cause));
       setError(`${t("providers.proxy.sessionsLoadError")}: ${detail}`);
     } finally {
       refreshingRef.current = false;
@@ -58,7 +59,7 @@ function useProxySessions(t: Translate) {
     try {
       setUnlimitedConversation(await setProxySessionUnlimitedConversation(enabled));
     } catch (cause) {
-      const detail = cause instanceof Error ? cause.message : String(cause);
+      const detail = backendText(cause instanceof Error ? cause.message : String(cause));
       setError(`${t("providers.proxy.sessionsRetentionSettingError")}: ${detail}`);
     } finally {
       setUnlimitedConversationLoading(false);

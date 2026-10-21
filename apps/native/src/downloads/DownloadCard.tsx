@@ -48,7 +48,7 @@ export function DownloadCard({ task, connected, busy, action, share, remove }: {
         <Text style={styles.caption}>{downloadDetail(task)}</Text>
       </>}
     </View>
-    {!!task.message && <Text style={failed ? styles.error : styles.text}>{task.message}</Text>}
+    {!!task.message && <Text style={failed ? styles.error : styles.text}>{t(task.message)}</Text>}
     {!connected && !complete && !task.readyToSave && <Text style={styles.text}>{t("连接这台电脑后即可继续。")}</Text>}
     <View style={[styles.toolbar, styles.cardActions]}>
       <Pressable accessibilityRole="button" accessibilityLabel={t("删除")} disabled={busy} onPress={remove}

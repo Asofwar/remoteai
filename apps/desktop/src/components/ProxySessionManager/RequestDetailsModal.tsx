@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Modal, Table } from "antd";
 import { RefreshCw } from "lucide-react";
+import { backendText } from "../../../../../shared/i18n/backend/translateBackendMessage";
 import { loadProxySessionRequests } from "../../api/backend";
 import type { Translate } from "../../i18n";
 import type { ProxySession, ProxySessionRequest } from "../../types";
@@ -27,7 +28,7 @@ function useRequestDetails(sessionId: string, t: Translate) {
       setRequestDetails(await loadProxySessionRequests(sessionId));
       setDetailsError("");
     } catch (cause) {
-      const detail = cause instanceof Error ? cause.message : String(cause);
+      const detail = backendText(cause instanceof Error ? cause.message : String(cause));
       setDetailsError(`${t("providers.proxy.sessionsRequestDetailsLoadError")}: ${detail}`);
     } finally {
       refreshingRef.current = false;

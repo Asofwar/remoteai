@@ -99,8 +99,9 @@ async function screenshot(target, name) {
 
 async function verifySettings(panel, worker) {
   await panel.evaluate(`document.querySelector('#settings-toggle').click()`);
+  // The test browser may use any UI language; compare with the message Chrome selected for it.
   await until(() => panel.evaluate(`document.querySelector('#settings').contentDocument?.querySelector('#pause')
-    ?.textContent === '暂停控制'`));
+    ?.textContent === chrome.i18n.getMessage('pauseControl')`));
   await screenshot(panel, 'settings');
   await panel.evaluate(`document.querySelector('#settings').contentDocument.querySelector('#pause').click()`);
   await until(() => worker.evaluate(async () => (await chrome.storage.local.get('paused')).paused));

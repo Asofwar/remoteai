@@ -1,4 +1,5 @@
 import type { Language } from "../i18n";
+import { HTTP_STATUS_RU } from "./httpStatusRussian";
 
 interface HttpStatusDefinition {
   code: number;
@@ -82,7 +83,9 @@ export interface HttpStatusOption {
 
 export function httpStatusOptions(language: Language): HttpStatusOption[] {
   return HTTP_STATUS_DEFINITIONS.map((status) => {
-    const description = language === "zh" ? status.descriptionZh : status.descriptionEn;
+    const description = language === "zh"
+      ? status.descriptionZh
+      : language === "ru" ? (HTTP_STATUS_RU[status.code] ?? status.descriptionEn) : status.descriptionEn;
     const label = `${status.code} ${status.name}`;
     return {
       value: status.code,

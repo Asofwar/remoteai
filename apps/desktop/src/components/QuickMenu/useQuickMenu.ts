@@ -6,6 +6,7 @@ import type { MenuEntry, MenuSnapshot } from "./types";
 
 export function useQuickMenu() {
   const [snapshot, setSnapshot] = useState<MenuSnapshot | null>(null);
+  // Errors stay Chinese source strings; MenuPanel translates them with the tray language.
   const [error, setError] = useState("");
   const inFlight = useRef(false);
   const panel = useRef<HTMLDivElement>(null);

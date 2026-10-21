@@ -26,7 +26,7 @@ export function ChatProjectPicker(props: ProjectPickerProps) {
             onPress={() => browse(result.parent ?? '')}><Text style={pickerStyles.link}>{t("返回上一级")}</Text></Pressable>}
         </View>
         {loading && <ActivityIndicator accessibilityLabel={t("正在读取文件夹")} style={pickerStyles.message} />}
-        {!!error && <View><Text accessibilityRole="alert" style={pickerStyles.message}>{error}</Text>
+        {!!error && <View><Text accessibilityRole="alert" style={pickerStyles.message}>{t(error)}</Text>
           <Pressable accessibilityRole="button" onPress={retry}><Text style={pickerStyles.link}>{t("重试")}</Text></Pressable>
         </View>}
       </SheetInset>

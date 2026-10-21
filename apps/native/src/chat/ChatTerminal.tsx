@@ -36,7 +36,7 @@ export function ChatTerminal({ client, cwd, active, connected, deviceName, launc
       onClose={hide} maxWidth={400} actions={[{ label: panel.error ? t("重试") : t("新建终端"),
         onPress: panel.retry, disabled: !connected, loading: panel.busy }]}>
       {panel.busy ? <ActivityIndicator color={color(palette.green, 'accent')} />
-        : !!panel.error && <Text accessibilityRole="alert" style={styles.status}>{panel.error}</Text>}
+        : !!panel.error && <Text accessibilityRole="alert" style={styles.status}>{t(panel.error)}</Text>}
     </BottomSheet>}
     {selected && <TerminalSession key={selected.id} client={client} session={selected.session} deviceName={deviceName}
       visible={active && panel.open} hide={hide} close={() => panel.remove(selected.id)} notice={panel.error}

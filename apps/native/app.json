@@ -10,6 +10,12 @@
       "resizeMode": "contain",
       "backgroundColor": "#f7faf7"
     },
+    "locales": {
+      "en": "./locales/en.json",
+      "ru": "./locales/ru.json",
+      "zh-Hans": "./locales/zh.json",
+      "zh-Hant": "./locales/zh.json"
+    },
     "ios": {
       "icon": "./assets/icon.png",
       "supportsTablet": true,

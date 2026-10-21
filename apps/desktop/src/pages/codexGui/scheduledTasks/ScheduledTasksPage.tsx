@@ -1,4 +1,5 @@
 import { guiText } from "../../../i18n/guiText";
+import { backendText } from "../../../../../../shared/i18n/backend/translateBackendMessage";
 import { useMemo, useState } from "react";
 import { Alert, Button, Dropdown, Input, Modal, Spin } from "antd";
 import { Bell, ChevronDown, FileSearch, NotebookPen, Search } from "lucide-react";
@@ -54,7 +55,7 @@ export function ScheduledTasksPage({ active, cwd, onOpenThread }: {
           className={filter === item.value ? styles.selectedFilter : ""}
           onClick={() => setFilter(item.value)}>{guiText(item.label)}</button>)}
       </div>
-      {manager.error && !editor && <Alert type="error" className={styles.error} message={manager.error}
+      {manager.error && !editor && <Alert type="error" className={styles.error} message={backendText(manager.error)}
         action={<Button size="small" onClick={() => void manager.refresh()}>{guiText("重试")}</Button>} />}
       <div className={styles.taskList} aria-busy={manager.loading}>
         {manager.loading ? <div className={styles.empty}><Spin size="small" />  {guiText("正在加载任务…")}</div>

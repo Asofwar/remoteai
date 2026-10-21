@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { setInterfaceLanguage } from '../../../../shared/i18n/interfaceLanguage';
 import { isMarkdownPath } from '../../../../shared/remote-chat/textPreview';
 import { ChatMarkdownPreview } from './ChatMarkdownPreview';
 
@@ -33,7 +34,7 @@ function select(label: string) {
 }
 
 beforeEach(() => { vi.stubGlobal('React', React); state.mode = 'preview'; });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); setInterfaceLanguage('zh'); });
 
 it('recognizes Markdown extensions without rendering ordinary source files', () => {
   for (const path of ['./verification.md', 'C:\\docs\\README.MD', '/docs/说明.markdown']) {
@@ -67,4 +68,14 @@ it('keeps a labeled copy action outside the scroll area with all source text in 
 it('shows an empty-file notice and still allows copying its exact whitespace', () => {
   expect(render(' \n').some(node => node.props.children === '（空文件）')).toBe(true);
   expect(render(' \n').find(node => node.type === 'Copy')?.props.text).toBe(' \n');
+});
+
+it('names the referenced line with one complete message in every language', () => {
+  const subtitle = () => render().find(node => node.type === 'Text' && typeof node.props.children === 'string'
+    && node.props.children.includes('3'))?.props.children;
+  expect(subtitle()).toBe('引用位置：第 3 行');
+  setInterfaceLanguage('en');
+  expect(subtitle()).toBe('Referenced line: 3');
+  setInterfaceLanguage('ru');
+  expect(subtitle()).toBe('Ссылка на строку 3');
 });

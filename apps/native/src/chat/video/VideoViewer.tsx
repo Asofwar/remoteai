@@ -18,7 +18,7 @@ interface Props {
 }
 export function VideoViewer({ close, ...options }: Props) {
   const styles = useStyles();
-  useLanguage();
+  const language = useLanguage();
   const video = useVideoStream(options);
   const download = useManagedDownload({ ...options, client: options.files });
   const orientation = useImageOrientation();
@@ -26,7 +26,7 @@ export function VideoViewer({ close, ...options }: Props) {
   const error = video.error || (video.url && video.url === failedUrl
     ? t("暂时无法播放此视频，请换一个 MP4 视频试试。") : '');
   const source = useMemo(() => video.url
-    ? { html: videoPlayerHtml(video.url), baseUrl: video.url } : undefined, [video.url]);
+    ? { html: videoPlayerHtml(video.url, t("视频播放器")), baseUrl: video.url } : undefined, [video.url, language]);
   return <Modal visible animationType="fade" onRequestClose={close} statusBarTranslucent
     navigationBarTranslucent supportedOrientations={['portrait', 'portrait-upside-down',
       'landscape-left', 'landscape-right']}>
@@ -57,7 +57,7 @@ export function VideoViewer({ close, ...options }: Props) {
           onError={() => setFailedUrl(video.url)} />}
         {(!source || !!error) && <View style={styles.notice}>
           {!!error ? <>
-            <Text accessibilityRole="alert" style={styles.status}>{error}</Text>
+            <Text accessibilityRole="alert" style={styles.status}>{t(error)}</Text>
             <Pressable accessibilityRole="button" accessibilityLabel={t("重新加载视频")} onPress={video.retry}
               disabled={!options.ready} style={styles.retry}><Text style={styles.status}>{t("重试")}</Text></Pressable>
           </> : options.ready ? <ActivityIndicator color="#fff" accessibilityLabel={t("正在加载视频")} />
@@ -65,7 +65,7 @@ export function VideoViewer({ close, ...options }: Props) {
         </View>}
         {!!orientation.error && <Text style={styles.status}>{orientation.error}</Text>}
         {download.busy && !!download.detail && <Text style={styles.status}>{download.detail}</Text>}
-        {!!download.message && <Text accessibilityLiveRegion="polite" style={styles.status}>{download.message}</Text>}
+        {!!download.message && <Text accessibilityLiveRegion="polite" style={styles.status}>{t(download.message)}</Text>}
       </SafeAreaView>
     </SafeAreaProvider>
   </Modal>;

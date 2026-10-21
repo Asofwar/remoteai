@@ -45,7 +45,8 @@ export function ChatDiff({ files, copy, onComment }: {
       <View style={diffStyles.folder}>
         <Feather name="folder" size={15} color={color(palette.muted, 'muted')} />
         <View style={styles.fill}>
-          <Text accessibilityRole="header" style={diffStyles.folderName}>{group.name}</Text>
+          <Text accessibilityRole="header" style={diffStyles.folderName}>
+            {group.directory.split('/').pop() ? group.name : t("根目录")}</Text>
           <Text style={diffStyles.folderPath}>{group.directory || '.'}</Text>
         </View>
       </View>

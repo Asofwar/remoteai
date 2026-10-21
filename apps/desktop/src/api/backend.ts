@@ -17,6 +17,7 @@ import type { CodexConnectionStatus, CodexConnectResult } from "./codexConnectio
 import { DEMO_ACCOUNTS, DEMO_INFO } from "../demo";
 import { BUILT_IN_DREAM_SKIN_THEMES } from "../dreamSkinBuiltIns";
 import { LANGUAGE_STORAGE_KEY, isLanguage, type Language } from "../i18n";
+import { guiText } from "../i18n/guiText";
 import {
   ANTIGRAVITY_FALLBACK_MODELS,
   isAntigravityProvider,
@@ -1835,7 +1836,7 @@ export async function saveCodexThreadPackage(
   sessionIds: string[], homeId?: string,
 ): Promise<CodexThreadBundleResult | null> {
   const exportPath = await save({
-    title: "导出 Codex 会话",
+    title: guiText("导出 Codex 会话"),
     defaultPath: `codex-sessions-${new Date().toISOString().slice(0, 10)}.zip`,
     filters: [{ name: "Codex session package", extensions: ["zip"] }],
   });
@@ -1845,7 +1846,7 @@ export async function saveCodexThreadPackage(
 
 export async function chooseCodexThreadPackage(): Promise<string | null> {
   const selected = await open({
-    title: "导入 Codex 会话",
+    title: guiText("导入 Codex 会话"),
     multiple: false,
     directory: false,
     filters: [{ name: "Codex session package", extensions: ["zip"] }],
@@ -1881,7 +1882,7 @@ export function migrateCodexThreadsToHome(request: {
 }
 
 export async function migrateCodexThreads(sessionIds: string[], homeId?: string): Promise<CodexThreadMigrationReport> {
-  if (!hasLocalBackend) throw new Error("会话迁移需要桌面版 Remote AI");
+  if (!hasLocalBackend) throw new Error(guiText("会话迁移需要桌面版 Remote AI"));
   return invoke<CodexThreadMigrationReport>("migrate_codex_threads", { homeId, sessionIds });
 }
 

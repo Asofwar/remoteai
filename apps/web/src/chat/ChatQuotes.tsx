@@ -27,7 +27,7 @@ export function ChatQuotesProvider({ scope, children, sending, enabled }: {
   }, [scope, sending]);
   const add = (quote: ChatQuote) => {
     const result = appendQuote(quotes, quote);
-    if (result.error) Toast.show({ content: result.error });
+    if (result.error) Toast.show({ content: t(result.error) });
     else setQuotes(result.quotes);
   };
   return <Context.Provider value={enabled ? { quotes, add,

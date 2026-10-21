@@ -37,7 +37,7 @@ export function ChatGuiUpdateSheet({ deviceName, onClose, onBack, ...options }: 
       <Text accessibilityLiveRegion="polite" style={styles.subtitle}>{t(update.message)}</Text>
       {update.progress !== null && <Text accessibilityRole="progressbar"
         accessibilityValue={{ min: 0, max: 100, now: update.progress }} style={styles.title}>{update.progress}%</Text>}
-      {!!update.error && <Text accessibilityRole="alert" style={styles.error}>{update.error}</Text>}
+      {!!update.error && <Text accessibilityRole="alert" style={styles.error}>{t(update.error)}</Text>}
     </View></ScrollView>
   </BottomSheet>;
 }

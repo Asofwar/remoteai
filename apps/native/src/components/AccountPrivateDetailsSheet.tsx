@@ -14,7 +14,7 @@ import { useAccountTotp } from '../accounts/useAccountTotp';
 import { copyAccountValue as copyValue } from '../accounts/copyAccountValue';
 
 function messageOf(error: unknown) {
-  return error instanceof Error ? error.message : t("保存失败，请稍后重试");
+  return error instanceof Error ? t(error.message) : t("保存失败，请稍后重试");
 }
 
 function normalizeAccountTotp(value: string) {

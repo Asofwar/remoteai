@@ -1,3 +1,5 @@
+import { t } from './i18n.js';
+
 const WORK_GROUPS_KEY = 'browserWorkGroups';
 const WORK_TABS_KEY = 'browserWorkTabs';
 const WORK_GROUP_TITLE = 'Remote AI';
@@ -29,7 +31,7 @@ export async function withNewTabs(context, openerTabId, operation) {
     // Even failed/cancelled input can have opened a page. Save its ownership for explicit cleanup.
     if (created.size) {
       try { await serialize(() => registerCreatedTabs(context.clientId, created)); }
-      catch { throw new Error('新打开的页面未能完成整理，请检查后重试。'); }
+      catch { throw new Error(t('organizeNewTabsFailed', '新打开的页面未能完成整理，请检查后重试。')); }
     }
   }
 }

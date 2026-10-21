@@ -22,7 +22,7 @@ export function ChatUsage({ read, active, ready, tokenUsage, onContextSettings, 
   const language = useLanguage();
   const { usage, error } = useChatUsage(read, active && ready);
   const trailing = usageTrailing(usage, t);
-  const notice = ready ? error || t("正在读取今日用量…") : t("连接后查看今日用量");
+  const notice = ready ? (error ? t(error) : t("正在读取今日用量…")) : t("连接后查看今日用量");
   return <View style={styles.container}>
     <View style={styles.context}>
       <Text style={[styles.row, styles.contextText]}>{contextUsageLabel(tokenUsage, language)}</Text>

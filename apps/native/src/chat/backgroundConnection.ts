@@ -1,15 +1,28 @@
 import { t } from '../i18n';
 import { AppRegistry, DeviceEventEmitter, NativeModules, Platform } from 'react-native';
+import { subscribeInterfaceLanguage } from '../../../../shared/i18n/interfaceLanguage';
 
 export const CHAT_SERVICE_STOPPED = 'codexChatConnectionStopped';
+export interface ConnectionLabels {
+  channel: string; channelDescription: string;
+  chatTitle: string; chatText: string; mappingTitle: string; mappingText: string;
+}
 interface ChatBackgroundModule {
   start: () => Promise<boolean>; stop: () => Promise<void>;
   setPortMappingEnabled?: (enabled: boolean) => Promise<boolean>;
+  /** Missing in older native builds, which keep their built-in Chinese notification copy. */
+  setLabels?: (labels: ConnectionLabels) => void;
 }
 const native: ChatBackgroundModule | undefined = NativeModules.ChatBackground;
 let operation = Promise.resolve();
 let chatEnabled = false;
 const mappingLeases = new Set<symbol>();
+
+export const connectionLabels = (): ConnectionLabels => ({
+  channel: t('聊天连接'), channelDescription: t('在后台接收电脑上的聊天回复'),
+  chatTitle: t('Remote AI 聊天'), chatText: t('后台接收电脑回复，点击返回应用'),
+  mappingTitle: t('Remote AI 端口映射'), mappingText: t('端口映射正在运行，点击返回应用'),
+});
 
 if (Platform.OS === 'android') {
   AppRegistry.registerHeadlessTask('CodexChatConnection', () => () => new Promise<void>((resolve) => {
@@ -17,6 +30,12 @@ if (Platform.OS === 'android') {
       subscription.remove(); resolve();
     });
   }));
+  if (typeof native?.setLabels === 'function') {
+    // The notification and its system channel are native, so they follow each interface language change.
+    const updateLabels = () => native.setLabels?.(connectionLabels());
+    updateLabels();
+    subscribeInterfaceLanguage(updateLabels);
+  }
 }
 
 export function keepChatConnected(enabled: boolean): Promise<void> {

@@ -1,5 +1,7 @@
 import { ALL_WEBSITES } from './site-access.js';
+import { localizeDocument, t } from './i18n.js';
 
+localizeDocument();
 const error = document.querySelector('#error');
 const allowAll = document.querySelector('#allow-all');
 let paused = false;
@@ -14,7 +16,7 @@ async function send(message) {
 
 function rows(container, items, label, action, handler) {
   container.replaceChildren();
-  if (!items.length) { container.textContent = '暂无'; return; }
+  if (!items.length) { container.textContent = t('listEmpty', '暂无'); return; }
   for (const item of items) {
     const row = document.createElement('div'); row.className = 'row';
     const text = document.createElement('span'); text.textContent = label(item);
@@ -34,15 +36,17 @@ async function refresh() {
 function renderStatus(state) {
   paused = state.paused;
   document.querySelector('#status').textContent = state.connected
-    ? paused ? '已连接 · 控制已暂停' : '已连接 · 等待你的任务' : '尚未连接 Remote AI';
-  document.querySelector('#pause').textContent = paused ? '继续控制' : '暂停控制';
+    ? paused ? t('statusPaused', '已连接 · 控制已暂停') : t('statusWaiting', '已连接 · 等待你的任务')
+    : t('statusDisconnected', '尚未连接 Remote AI');
+  document.querySelector('#pause').textContent = paused
+    ? t('resumeControl', '继续控制') : t('pauseControl', '暂停控制');
   allowAll.checked = state.allSitesAllowed;
   document.querySelector('#site-details').hidden = state.allSitesAllowed;
   error.hidden = !state.connectionError;
   error.textContent = state.connectionError;
-  rows(document.querySelector('#requests'), state.pending, (item) => item.origin, '查看', (item) =>
+  rows(document.querySelector('#requests'), state.pending, (item) => item.origin, t('reviewRequest', '查看'), (item) =>
     chrome.windows.create({ url: chrome.runtime.getURL(`approval.html?id=${item.id}`), type: 'popup', width: 400, height: 520 }));
-  rows(document.querySelector('#origins'), state.allowedOrigins, (origin) => origin, '撤销', (origin) =>
+  rows(document.querySelector('#origins'), state.allowedOrigins, (origin) => origin, t('revokeAccess', '撤销'), (origin) =>
     send({ operation: 'revoke', origin }));
 }
 

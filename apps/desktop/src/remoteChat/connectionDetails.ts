@@ -1,5 +1,6 @@
 import type { ConnectionMode } from '../../../../shared/remote-chat/protocol';
 import type { RelayUsage } from '../../../../shared/remote-chat/relayUsage';
+import { guiText } from '../i18n/guiText';
 
 export interface ConnectedDevice {
   id: string;
@@ -27,7 +28,7 @@ export const connectionDetails = {
   },
   open(id: string, info: unknown) {
     const data = (info && typeof info === 'object' ? info : {}) as Record<string, unknown>;
-    const name = typeof data.name === 'string' && data.name.trim() ? data.name.slice(0, 80) : '其他设备';
+    const name = typeof data.name === 'string' && data.name.trim() ? data.name.slice(0, 80) : guiText('其他设备');
     const platform = typeof data.platform === 'string' ? data.platform.slice(0, 80) : '';
     publish({ ...snapshot, devices: [...snapshot.devices.filter((device) => device.id !== id),
       { id, name, platform, connectedAt: Date.now(), mode: 'connecting' }] });

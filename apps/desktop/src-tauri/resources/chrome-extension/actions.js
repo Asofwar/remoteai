@@ -1,6 +1,7 @@
 import { pageCall } from './driver.js';
 import { reference } from './snapshot.js';
 import { movePointer, showPointer } from './pointer.js';
+import { t } from './i18n.js';
 
 async function point(driver, ref) {
   await pageCall(driver, ref, `function() {
@@ -12,7 +13,7 @@ async function point(driver, ref) {
   }`);
   const { quads } = await driver.send('DOM.getContentQuads', { backendNodeId: ref.nodeId }, ref.frameId);
   const quad = quads.find((quad) => quad.length === 8);
-  if (!quad) throw new Error('这个元素当前不可见，请重新读取页面。');
+  if (!quad) throw new Error(t('elementNotVisible', '这个元素当前不可见，请重新读取页面。'));
   return { x: (quad[0] + quad[2] + quad[4] + quad[6]) / 4,
     y: (quad[1] + quad[3] + quad[5] + quad[7]) / 4, frameId: ref.frameId };
 }
@@ -68,10 +69,10 @@ const MODIFIERS = { Alt: 1, Control: 2, Meta: 4, Shift: 8 };
 export async function key(driver, args) {
   const parts = args.key.split('+');
   const value = parts.pop();
-  if (parts.some((part) => !MODIFIERS[part])) throw new Error('不支持这个快捷键。');
+  if (parts.some((part) => !MODIFIERS[part])) throw new Error(t('unsupportedShortcut', '不支持这个快捷键。'));
   const modifiers = parts.reduce((flags, part) => flags | MODIFIERS[part], 0);
   const known = KEY_CODES[value];
-  if (!known && !/^[a-zA-Z0-9]$/.test(value)) throw new Error('不支持这个按键。');
+  if (!known && !/^[a-zA-Z0-9]$/.test(value)) throw new Error(t('unsupportedKey', '不支持这个按键。'));
   const code = known?.[0] ?? (/\d/.test(value) ? `Digit${value}` : `Key${value.toUpperCase()}`);
   const virtualKey = known?.[1] ?? value.toUpperCase().charCodeAt(0);
   const event = { key: value === 'Space' ? ' ' : value, code, modifiers, windowsVirtualKeyCode: virtualKey };
@@ -118,7 +119,7 @@ export async function check(driver, args) {
 export async function drag(driver, args) {
   const from = await point(driver, await reference(driver, args.fromRef));
   const to = await point(driver, await reference(driver, args.toRef));
-  if (from.frameId !== to.frameId) throw new Error('请在同一页面框架内拖动。');
+  if (from.frameId !== to.frameId) throw new Error(t('dragAcrossFrames', '请在同一页面框架内拖动。'));
   await movePointer(driver, from);
   await showPointer(driver, from, { phase: 'press' });
   await driver.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1,

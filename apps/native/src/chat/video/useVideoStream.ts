@@ -2,11 +2,16 @@ import { t } from '../../i18n';
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { validateVideoInfo, type VideoClient } from '../../../../../shared/remote-chat/video';
-import { checkVideoSize } from './videoRangeStream';
+import { checkVideoSize, VideoPlaybackError } from './videoRangeStream';
 import { createVideoServer, type VideoServer } from './videoServer';
 
 interface Options { threadId: string | null; path: string; ready: boolean; client: VideoClient }
-function errorMessage(error: unknown) {
+/**
+ * Local playback errors are already localized, so they are shown by type. Host and metadata errors still
+ * arrive as Chinese source text and are translated where they are displayed.
+ */
+export function videoErrorMessage(error: unknown) {
+  if (error instanceof VideoPlaybackError) return error.message;
   return error instanceof Error && /视频/.test(error.message)
     ? error.message : t("视频暂时无法播放，请检查电脑连接后重试。");
 }
@@ -36,7 +41,7 @@ export function useVideoStream({ threadId, path, ready, client }: Options) {
     };
     const fail = (reason: unknown) => {
       if (disposed) return;
-      setError(errorMessage(reason));
+      setError(videoErrorMessage(reason));
       setUrl('');
       release();
     };

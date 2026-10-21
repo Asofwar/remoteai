@@ -3,6 +3,7 @@ package com.codexswitch.chat
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
@@ -13,17 +14,34 @@ import com.facebook.react.bridge.Arguments
 import com.facebook.react.jstasks.HeadlessJsTaskConfig
 import com.facebook.react.modules.core.DeviceEventManagerModule
 
+/** Notification copy supplied by JavaScript in the interface language; Chinese remains the fallback. */
+internal data class ChatConnectionLabels(
+  val channel: String = "聊天连接",
+  val channelDescription: String = "在后台接收电脑上的聊天回复",
+  val chatTitle: String = "Remote AI 聊天",
+  val chatText: String = "后台接收电脑回复，点击返回应用",
+  val mappingTitle: String = "Remote AI 端口映射",
+  val mappingText: String = "端口映射正在运行，点击返回应用",
+) {
+  companion object {
+    fun from(values: Map<String, Any?>): ChatConnectionLabels {
+      val defaults = ChatConnectionLabels()
+      fun label(key: String, fallback: String) = (values[key] as? String)?.takeIf { it.isNotBlank() } ?: fallback
+      return ChatConnectionLabels(
+        label("channel", defaults.channel), label("channelDescription", defaults.channelDescription),
+        label("chatTitle", defaults.chatTitle), label("chatText", defaults.chatText),
+        label("mappingTitle", defaults.mappingTitle), label("mappingText", defaults.mappingText),
+      )
+    }
+  }
+}
+
 class ChatConnectionService : HeadlessJsTaskService() {
   private var taskStarted = false
 
   override fun onCreate() {
     super.onCreate()
-    val manager = getSystemService(NotificationManager::class.java)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      manager.createNotificationChannel(NotificationChannel(
-        CHANNEL_ID, "聊天连接", NotificationManager.IMPORTANCE_LOW
-      ).apply { description = "在后台接收电脑上的聊天回复"; setShowBadge(false) })
-    }
+    createChannel(this)
     instance = this
     updateNotification()
     running = true
@@ -36,8 +54,8 @@ class ChatConnectionService : HeadlessJsTaskService() {
     }
     val notification = NotificationCompat.Builder(this, CHANNEL_ID)
       .setSmallIcon(android.R.drawable.stat_notify_chat)
-      .setContentTitle(if (mappingEnabled) "Remote AI 端口映射" else "Remote AI 聊天")
-      .setContentText(if (mappingEnabled) "端口映射正在运行，点击返回应用" else "后台接收电脑回复，点击返回应用")
+      .setContentTitle(if (mappingEnabled) labels.mappingTitle else labels.chatTitle)
+      .setContentText(if (mappingEnabled) labels.mappingText else labels.chatText)
       .setContentIntent(pending)
       .setCategory(NotificationCompat.CATEGORY_SERVICE)
       .setOngoing(true).setShowWhen(false).setOnlyAlertOnce(true)
@@ -85,10 +103,34 @@ class ChatConnectionService : HeadlessJsTaskService() {
     private const val NOTIFICATION_ID = 7301
     private var instance: ChatConnectionService? = null
     private var mappingEnabled = false
+    private var labels = ChatConnectionLabels()
     fun setPortMappingEnabled(enabled: Boolean) {
       mappingEnabled = enabled
       instance?.updateNotification()
     }
+
+    /** Call on the main thread, like setPortMappingEnabled; a language change also renames the system channel. */
+    internal fun setLabels(context: Context, next: ChatConnectionLabels) {
+      if (next == labels) return
+      labels = next
+      val service = instance
+      if (service != null) {
+        createChannel(service)
+        service.updateNotification()
+      } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+        context.getSystemService(NotificationManager::class.java).getNotificationChannel(CHANNEL_ID) != null) {
+        createChannel(context)
+      }
+    }
+
+    // Creating an existing channel again only updates its name and description.
+    private fun createChannel(context: Context) {
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+      context.getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel(
+        CHANNEL_ID, labels.channel, NotificationManager.IMPORTANCE_LOW
+      ).apply { description = labels.channelDescription; setShowBadge(false) })
+    }
+
     @Volatile var running = false
       private set
   }

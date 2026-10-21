@@ -4,6 +4,7 @@ import { Button, Checkbox, Dropdown, Popconfirm, Space, Table, Tag, Tooltip } fr
 import type { ColumnsType } from "antd/es/table";
 import { Activity, CircleOff, Columns3, ExternalLink, Pencil, RotateCcw, Server, Shuffle, Trash2 } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { backendText } from "../../../../../../shared/i18n/backend/translateBackendMessage";
 import { ImageModelRouteSelect } from "../../../components/ImageModelRouteSelect";
 import { TokenCostColumnTitle, useTokenCostDisplaySettings } from "../../../components/TokenCostUnitSettings";
 import type { Language, Translate } from "../../../i18n";
@@ -212,7 +213,7 @@ function ProviderIdentityCell({ provider, error, successLatencyMs, conversationC
       onClick={() => void openUrl(providerBaseUrl)}>
       <span className="provider-link-name">
         <strong>{provider.name}</strong>
-        {error && <Tooltip title={error} styles={{ root: { maxWidth: 400 } }}>
+        {error && <Tooltip title={backendText(error)} styles={{ root: { maxWidth: 400 } }}>
           <span className="provider-connectivity-error">{t("providers.connectivity.error")}</span>
         </Tooltip>}
         {successLatencyMs !== undefined && (

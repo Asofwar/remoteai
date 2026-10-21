@@ -8,8 +8,8 @@ import styles from "./SkillInput.module.less";
 function menuLabels(kind: "coze" | "conversation" | "skill" | "command" | "file") {
   if (kind === "file") return { heading: guiText("引用文件或文件夹"), label: guiText("项目文件"),
     loading: guiText("正在搜索文件…"), empty: guiText("没有找到匹配的文件或文件夹") };
-  if (kind === "coze") return { heading: "选择 Coze 内容", label: "Coze", loading: "正在加载 Coze 内容…",
-    empty: "没有匹配的已发布内容，请先在 Coze 中发布。" };
+  if (kind === "coze") return { heading: guiText("选择 Coze 内容"), label: "Coze",
+    loading: guiText("正在加载 Coze 内容…"), empty: guiText("没有匹配的已发布内容，请先在 Coze 中发布。") };
   if (kind === "conversation") return { heading: guiText("引用对话 · 发送时带上近期内容"), label: guiText("对话"),
     loading: guiText("正在加载对话…"), empty: guiText("没有找到其他对话，试试输入对话名称") };
   if (kind === "skill") return { heading: guiText("选择技能"), label: guiText("技能"),

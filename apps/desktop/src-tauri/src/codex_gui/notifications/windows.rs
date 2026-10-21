@@ -63,8 +63,12 @@ fn toast_document(thread_id: &str, title: &str) -> windows::core::Result<XmlDocu
     text.Item(0)?
         .AppendChild(&document.CreateTextNode(&HSTRING::from(title))?)?;
     text.Item(1)?
-        .AppendChild(&document.CreateTextNode(&HSTRING::from(COMPLETION_BODY))?)?;
+        .AppendChild(&document.CreateTextNode(&HSTRING::from(completion_body()))?)?;
     Ok(document)
+}
+
+fn completion_body() -> &'static str {
+    crate::storage::native_text(COMPLETION_BODY)
 }
 
 #[cfg(test)]
@@ -95,6 +99,19 @@ mod tests {
                 .InnerText()
                 .unwrap(),
             title
+        );
+    }
+
+    // No WinRT here: a second test that builds an XmlDocument and then uninitializes the runtime
+    // leaves the cached activation factory unusable for the next one (access violation).
+    #[test]
+    fn toast_body_follows_the_saved_interface_language() {
+        use crate::storage::{with_interface_language, InterfaceLanguage};
+
+        assert_eq!(completion_body(), COMPLETION_BODY);
+        assert_eq!(
+            with_interface_language(InterfaceLanguage::Ru, completion_body),
+            "Ответ готов. Нажмите, чтобы посмотреть."
         );
     }
 }

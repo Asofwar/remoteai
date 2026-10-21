@@ -7,6 +7,7 @@ import { debuggerDetached, hasDebuggerConnections, finishClientConnections, conn
 import { clearControlledTabs } from './tab-indicator.js';
 import { forgetWorkTab, renameWorkGroups } from './tab-groups.js';
 import { createBundleUpdater, UPDATE_ALARM } from './auto-update.js';
+import { t } from './i18n.js';
 
 const HOST = 'dev.codex_switch.chrome';
 const running = new Map();
@@ -30,7 +31,8 @@ async function connect() {
     const reason = chrome.runtime.lastError?.message;
     if (port !== next) return;
     port = undefined;
-    connectionError = reason ? '请先在 Remote AI 中启用浏览器助手，再点击重新连接。' : '连接已断开，请重新连接。';
+    connectionError = reason ? t('enableInRemoteAi', '请先在 Remote AI 中启用浏览器助手，再点击重新连接。')
+      : t('connectionLost', '连接已断开，请重新连接。');
     for (const controller of running.values()) controller.abort();
     void stopDebugging();
     chrome.alarms.create('reconnect', { delayInMinutes: 0.5 });
@@ -38,7 +40,7 @@ async function connect() {
   const { profileName = 'Chrome' } = await chrome.storage.local.get('profileName');
   if (port === next) {
     try { next.postMessage({ type: 'ready', name: profileName }); }
-    catch { connectionError = '连接已断开，请重新连接。'; }
+    catch { connectionError = t('connectionLost', '连接已断开，请重新连接。'); }
   }
 }
 
@@ -64,12 +66,12 @@ async function handleRequest(source, message) {
   let reply;
   try {
     await cleanup.get(owner);
-    if (updater.isReloading()) throw new Error('浏览器助手正在更新，请稍后重试。');
+    if (updater.isReloading()) throw new Error(t('assistantUpdating', '浏览器助手正在更新，请稍后重试。'));
     const result = await execute({ clientId: message.clientId, sessionId: message.sessionId,
       signal: controller.signal }, message.request);
     reply = { result, error: null };
   } catch (error) {
-    reply = { result: null, error: error instanceof Error ? error.message : '浏览器操作未完成，请重试。' };
+    reply = { result: null, error: error instanceof Error ? error.message : t('browserActionFailed', '浏览器操作未完成，请重试。') };
   } finally {
     running.delete(message.id);
     clients.delete(message.id);
@@ -77,7 +79,7 @@ async function handleRequest(source, message) {
   // A cancelled Chrome connection has no recipient; do not reconnect and replay a completed action.
   if (port === source) {
     try { source.postMessage({ type: 'reply', id: message.id, ...reply }); }
-    catch { connectionError = '连接已断开，请重新连接。'; }
+    catch { connectionError = t('connectionLost', '连接已断开，请重新连接。'); }
   }
 }
 
@@ -100,7 +102,7 @@ async function localMessage(message) {
       await stopDebugging();
       return {};
     case 'siteAccess':
-      if (typeof message.allowAll !== 'boolean') throw new Error('网站访问设置无效。');
+      if (typeof message.allowAll !== 'boolean') throw new Error(t('invalidSiteAccessSetting', '网站访问设置无效。'));
       for (const controller of running.values()) controller.abort();
       await permissions.setSiteAccessMode(message.allowAll);
       await stopDebugging();
@@ -108,11 +110,11 @@ async function localMessage(message) {
     case 'request': return permissions.accessRequest(message.id);
     case 'decide': await permissions.decideAccess(message.id, message.decision); return {};
     case 'profileName':
-      if (typeof message.name !== 'string' || message.name.length > 60) throw new Error('名称过长。');
+      if (typeof message.name !== 'string' || message.name.length > 60) throw new Error(t('nameTooLong', '名称过长。'));
       await chrome.storage.local.set({ profileName: message.name.trim() || 'Chrome' });
       port?.postMessage({ type: 'ready', name: message.name.trim() || 'Chrome' });
       return {};
-    default: throw new Error('请求无效。');
+    default: throw new Error(t('invalidRequest', '请求无效。'));
   }
 }
 
@@ -132,7 +134,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   invalidate(tabId);
   void debuggerDetached({ tabId });
   void clearControlledTabs(tabId);
-  void forgetWorkTab(tabId).catch(() => console.warn('未能清理已关闭标签页的记录。'));
+  void forgetWorkTab(tabId).catch(() => console.warn(t('closedTabCleanupFailed', '未能清理已关闭标签页的记录。')));
 });
 chrome.debugger.onDetach.addListener((target, reason) => {
   void debuggerDetached(target);
@@ -156,6 +158,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 updater.start();
 void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
-  .catch(() => console.warn('未能启用侧边栏，请重新加载浏览器助手。'));
-void renameWorkGroups().catch(() => console.warn('未能更新标签组名称。'));
+  .catch(() => console.warn(t('sidePanelEnableFailed', '未能启用侧边栏，请重新加载浏览器助手。')));
+void renameWorkGroups().catch(() => console.warn(t('tabGroupRenameFailed', '未能更新标签组名称。')));
 void connect();

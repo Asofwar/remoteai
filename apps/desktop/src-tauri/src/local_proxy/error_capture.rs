@@ -132,7 +132,7 @@ impl ErrorCapture {
                 let message = if self.http_status >= 400 {
                     http_error_message(self.http_status)
                 } else {
-                    INTERRUPTED_STREAM_ERROR.to_string()
+                    super::error_messages::localized(INTERRUPTED_STREAM_ERROR).to_string()
                 };
                 self.report(message, None, &mut errors);
             }

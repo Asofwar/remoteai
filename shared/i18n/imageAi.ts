@@ -75,7 +75,7 @@ export const imageAiRussian: Readonly<Record<string, string>> = {
   "正在提交…":
     "Отправка…",
   "交给 AI 编辑":
-    "Редактировать с ИИ",
+    "Изменить с ИИ",
   "图片编辑":
     "Редактирование изображения",
 };

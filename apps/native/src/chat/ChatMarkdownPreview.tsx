@@ -27,7 +27,7 @@ export function ChatMarkdownPreview({ text, line }: { text: string; line?: numbe
       <CopyTextButton text={text} label={t("复制原文")} variant="labeled" />
     </SheetInset>
     <SheetScrollView key={mode} contentContainerStyle={previewStyles.content}>
-      {!!line && <Text style={styles.subtitle}>{t("引用位置：第")}{' '}{line}{' '}{t("行")}</Text>}
+      {!!line && <Text style={styles.subtitle}>{t('引用位置：第 {line} 行', { line })}</Text>}
       {mode === 'source' && <ChatCodeBlock text={text} label={t("原文")} language="markdown"
         lineNumbers copyLabel={t("复制原文")} />}
       {mode === 'preview' && (text.trim()

@@ -5,6 +5,7 @@
 > [piperhex/remoteai](https://github.com/piperhex/remoteai). Update your bookmarks to follow future releases.
 
 > Chinese is the default documentation language. For the Chinese README, see [README.md](README.md).
+> For the Russian README (Русский), see [README_RU.md](README_RU.md).
 
 Remote AI is a graphical AI coding workspace for Codex, bringing chat-based coding, project organization,
 and multi-account management together in an intuitive desktop interface.

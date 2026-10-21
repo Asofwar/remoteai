@@ -109,7 +109,7 @@ export function ChatProfileMenu(props: Props) {
           {ready && accounts.snapshot && !accounts.snapshot.running &&
             <Text style={styles.subtitle}>{t("电脑上的聊天暂不可用，请在电脑上重新打开 Remote AI。")}</Text>}
           {!!accounts.error && <View style={styles.row}>
-            <Text accessibilityRole="alert" style={[styles.error, styles.fill]}>{accounts.error}</Text>
+            <Text accessibilityRole="alert" style={[styles.error, styles.fill]}>{t(accounts.error)}</Text>
             <Pressable accessibilityRole="button" accessibilityLabel={t("重试读取账户")}
               disabled={!ready || accounts.loading || Boolean(accounts.saving)} onPress={accounts.refresh}>
               <Text style={styles.buttonText}>{t("重试")}</Text>

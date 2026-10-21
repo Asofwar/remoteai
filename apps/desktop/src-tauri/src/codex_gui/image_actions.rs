@@ -113,12 +113,13 @@ fn extension(bytes: &[u8]) -> Result<&'static str> {
 
 fn save_as(app: &AppHandle, bytes: &[u8]) -> Result<bool> {
     let extension = extension(bytes)?;
+    let image = crate::storage::native_text("图片");
     let Some(destination) = app
         .dialog()
         .file()
-        .set_title("图片另存为")
-        .set_file_name(format!("图片.{extension}"))
-        .add_filter("图片", &[extension])
+        .set_title(crate::storage::native_text("图片另存为"))
+        .set_file_name(format!("{image}.{extension}"))
+        .add_filter(image, &[extension])
         .blocking_save_file()
     else {
         return Ok(false);

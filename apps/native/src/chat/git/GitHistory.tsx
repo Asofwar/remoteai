@@ -7,6 +7,8 @@ import type { RemoteGit } from '../../../../../shared/remote-chat/useRemoteGit';
 import { GIT_HISTORY_CONTENT_WIDTH, GIT_HISTORY_DATE_FORMAT } from '../../../../../shared/remote-chat/gitHistoryLayout';
 import { useGitStyles as useStyles } from './styles';
 import { useGitHistoryScroll } from './useGitHistoryScroll';
+import { GIT_LONG_PRESS_MS } from '../../../../../shared/remote-chat/gitMenu';
+import type { GitCommit } from '../../../../../shared/remote-chat/gitTypes';
 
 function Line({ line }: { line: GraphLine }) {
   useLanguage();
@@ -28,7 +30,9 @@ function Graph({ row }: { row: GraphRow }) {
   </View>;
 }
 
-export function GitHistory({ panel, connected }: { panel: RemoteGit; connected: boolean }) {
+export function GitHistory({ panel, connected, onMenu }: {
+  panel: RemoteGit; connected: boolean; onMenu: (commit: GitCommit) => void;
+}) {
   const styles = useStyles();
   useLanguage();
   const [width, setWidth] = useState(0);
@@ -42,6 +46,7 @@ export function GitHistory({ panel, connected }: { panel: RemoteGit; connected: 
       <View>{graph.rows.map(row => <Pressable key={row.commit.hash} accessibilityRole="button"
         accessibilityLabel={`${row.commit.hash.slice(0, 8)} ${row.commit.subject}`}
         style={[styles.historyRow, { width: Math.max(width, row.width + GIT_HISTORY_CONTENT_WIDTH) }]}
+        delayLongPress={GIT_LONG_PRESS_MS} onLongPress={() => onMenu(row.commit)}
         disabled={!connected || panel.busy} onPress={() => panel.setDetail({ kind: 'files', commit: row.commit })}>
         <Graph row={row} />
         <View style={styles.historyText}>

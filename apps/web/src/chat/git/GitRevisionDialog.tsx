@@ -4,14 +4,7 @@ import type { GitResetMode } from '../../../../../shared/remote-chat/gitTypes';
 import type { RemoteGit } from '../../../../../shared/remote-chat/useRemoteGit';
 import { t } from '../../i18n';
 import './gitRevision.css';
-
-const RESET_MODES: { value: GitResetMode; label: string; description: string }[] = [
-  { value: 'soft', label: '保留改动并暂存（Soft）', description: '保留文件和暂存区，撤回的提交可重新提交。' },
-  { value: 'mixed', label: '保留改动，取消暂存（Mixed）', description: '保留文件，将与目标提交的差异放回未暂存改动。' },
-  { value: 'hard', label: '放弃改动（Hard）',
-    description: '文件和暂存区将恢复到此提交，未提交的改动及阻挡恢复的未跟踪文件会丢失。' },
-  { value: 'keep', label: '保留未提交改动（Keep）', description: '保留未提交的改动；如与目标提交冲突，将停止重置。' },
-];
+import { GIT_RESET_MODES } from '../../../../../shared/remote-chat/gitMenu';
 
 export function GitRevisionDialog({ panel, connected }: { panel: RemoteGit; connected: boolean }) {
   const [mode, setMode] = useState<GitResetMode>('mixed');
@@ -31,7 +24,7 @@ export function GitRevisionDialog({ panel, connected }: { panel: RemoteGit; conn
       <p>{t('将分支 {branch} 移到所选提交。', { branch: prompt.branch ?? '' })}</p>
       <Radio.Group value={mode} disabled={panel.busy} onChange={event => setMode(event.target.value)}
         className="git-reset-modes" aria-label={t('重置方式')}>
-        {RESET_MODES.map(item => <Radio key={item.value} value={item.value}>
+        {GIT_RESET_MODES.map(item => <Radio key={item.value} value={item.value}>
           <strong>{t(item.label)}</strong><small>{t(item.description)}</small>
         </Radio>)}
       </Radio.Group>

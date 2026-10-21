@@ -7,6 +7,7 @@ export interface DownloadSource extends DownloadLocation {
   deviceId: string;
   deviceName: string;
   path: string;
+  gitCommit?: string;
   preview?: import('../../../../shared/remote-chat/downloads').PreviewKind;
 }
 export interface DownloadTask {

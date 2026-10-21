@@ -10,8 +10,11 @@ import { useGitStyles as useStyles } from './styles';
 import { palette } from '../styles';
 import { GitSelectionMark, GitTreeIcon } from './GitTreeIcon';
 import { GitCommitForm } from './GitCommitForm';
+import { GIT_LONG_PRESS_MS } from '../../../../../shared/remote-chat/gitMenu';
 
-export function GitChanges({ panel, connected }: { panel: RemoteGit; connected: boolean }) {
+export function GitChanges({ panel, connected, onMenu }: {
+  panel: RemoteGit; connected: boolean; onMenu: (row: GitFileRow) => void;
+}) {
   const styles = useStyles();
   useLanguage();
   const files = panel.changes?.files ?? [];
@@ -34,14 +37,15 @@ export function GitChanges({ panel, connected }: { panel: RemoteGit; connected: 
     <ScrollView style={styles.fill} keyboardShouldPersistTaps="handled">
       {panel.changes && !files.length && <Text style={styles.notice}>{t("工作区没有未提交的改动。")}</Text>}
       {list.rows.map(row => <GitRow key={row.id} row={row} panel={panel} connected={connected}
-        flat={list.mode === 'flat'} onToggle={() => list.toggleFolder(row.id)} />)}
+        flat={list.mode === 'flat'} onToggle={() => list.toggleFolder(row.id)} onMenu={onMenu} />)}
     </ScrollView>
     <GitCommitForm panel={panel} />
   </>;
 }
 
-function GitRow({ row, panel, connected, flat, onToggle }: {
+export function GitRow({ row, panel, connected, flat, onToggle, onMenu }: {
   row: GitFileRow; panel: RemoteGit; connected: boolean; flat: boolean; onToggle: () => void;
+  onMenu: (row: GitFileRow) => void;
 }) {
   const styles = useStyles();
   const themedColor = useThemeColor();
@@ -67,6 +71,7 @@ function GitRow({ row, panel, connected, flat, onToggle }: {
         accessibilityState={{ expanded: folder ? !row.collapsed : undefined }}
         disabled={panel.busy || (!folder && !connected)}
         style={[styles.fileButton, { marginLeft: Math.min(row.depth, 4) * 14 }]}
+        delayLongPress={GIT_LONG_PRESS_MS} onLongPress={() => onMenu(row)}
         onPress={() => folder ? onToggle() : panel.setDetail({ kind: 'diff', path: row.path, title: row.path })}>
         {!flat && <View style={styles.chevronSlot}>{folder && <Ionicons
           name={row.collapsed ? 'chevron-forward' : 'chevron-down'} size={12} color={themedColor(palette.muted, 'muted')} />}</View>}

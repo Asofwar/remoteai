@@ -16,6 +16,16 @@ function setup() {
   return { client, native };
 }
 
+it('preserves the commit when opening a patch from a native download task', async () => {
+  const { client, native } = setup();
+  vi.mocked(client.open).mockResolvedValue({ id: 'handle', name: 'commit.patch', size: 5, mimeType: 'text/plain' });
+  const patchSource = { ...source, scope: 'project' as const, cwd: '/repo',
+    path: 'commit.patch', gitCommit: 'a'.repeat(40) };
+  await forwardDownloadRequest({ request: { ...request, source: patchSource }, client, native });
+  expect(client.open).toHaveBeenCalledWith({ transferId: 'job', scope: 'project', cwd: '/repo',
+    path: 'commit.patch', gitCommit: 'a'.repeat(40) });
+});
+
 it('closes a late remote handle when pause or deletion won the race', async () => {
   const { client, native } = setup();
   vi.mocked(client.open).mockResolvedValue({ id: 'handle', name: 'app.apk', size: 5, mimeType: 'binary' });

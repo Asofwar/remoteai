@@ -1,4 +1,4 @@
-import { Dropdown } from 'antd';
+import { GitContextMenu } from './GitContextMenu';
 import { Copy, FileDown, GitCommitHorizontal, Undo2 } from 'lucide-react';
 import type { ReactElement } from 'react';
 import type { GitCommit } from '../../../../../shared/remote-chat/gitTypes';
@@ -13,7 +13,7 @@ export function GitCommitMenu({ commit, panel, connected, onPatch, children }: {
 }) {
   const disabled = !connected || panel.busy;
   const mutationDisabled = disabled || !panel.changes || panel.changes.files.some(file => file.conflict);
-  return <Dropdown trigger={['contextMenu']} overlayClassName="git-commit-context-menu"
+  return <GitContextMenu overlayClassName="git-commit-context-menu"
     menu={{ items: [
       { key: 'copy', label: t('复制提交哈希'), icon: <Copy size={16} /> },
       { key: 'patch', label: t('创建补丁…'), icon: <FileDown size={16} />, disabled: disabled || !onPatch },
@@ -28,5 +28,5 @@ export function GitCommitMenu({ commit, panel, connected, onPatch, children }: {
       else if (key === 'patch' && onPatch) {
         void panel.performHistoryAction(() => onPatch(commit), '已加入下载管理。');
       } else if (key === 'checkout' || key === 'reset') panel.requestRevisionAction(key, commit);
-    } }}>{children}</Dropdown>;
+    } }}>{children}</GitContextMenu>;
 }

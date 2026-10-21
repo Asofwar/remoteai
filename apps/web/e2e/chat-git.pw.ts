@@ -1,7 +1,78 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { connect, fixtureUrl, login, navigate, openChatList, screenshot, state } from './chat-helpers';
 import { checkInternalGitDrawer } from '../../desktop/e2e/git-drawer-checks';
 import { readFile } from 'node:fs/promises';
+
+async function holdRow(page: Page, row: Locator) {
+  await row.scrollIntoViewIfNeeded();
+  const box = (await row.boundingBox())!;
+  const session = await page.context().newCDPSession(page);
+  try {
+    await session.send('Input.dispatchTouchEvent', { type: 'touchStart',
+      touchPoints: [{ x: box.x + Math.min(box.width / 2, 120), y: box.y + box.height / 2 }] });
+    await expect(page.getByRole('menu')).toBeVisible();
+    await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } finally { await session.detach(); }
+  await expect(page.getByRole('menu')).toBeVisible();
+}
+
+test('mobile long presses open file, folder and commit actions without opening details', async ({
+  page, request, isMobile,
+}, info) => {
+  test.skip(!isMobile, 'Touch interaction');
+  await request.post(`${fixtureUrl}/test/reset`);
+  await login(page); await connect(page); await openChatList(page);
+  await page.getByRole('button', { name: '移动端聊天体验', exact: true }).click();
+  await page.getByRole('button', { name: '打开工具', exact: true }).click();
+  await page.getByRole('button', { name: 'Git', exact: true }).click();
+  const drawer = page.getByRole('dialog', { name: 'Git', exact: true });
+  const file = drawer.getByRole('button', { name: '查看 src/app.ts', exact: true });
+  await holdRow(page, file);
+  await expect(drawer.locator('.git-diff')).toHaveCount(0);
+  await expect(drawer.getByRole('checkbox', { name: '选择 src/app.ts', exact: true })).not.toBeChecked();
+  const menuBox = (await page.getByRole('menu').boundingBox())!;
+  expect(menuBox.width).toBeLessThanOrEqual(400);
+  expect(menuBox.x).toBeGreaterThanOrEqual(0);
+  expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await screenshot(page, info, 'git-file-long-press');
+  await page.getByRole('menuitem', { name: '回退单个文件', exact: true }).click();
+  const rollback = page.getByRole('dialog', { name: '回退文件', exact: true });
+  await expect(rollback).toContainText('src/app.ts');
+  await rollback.getByRole('button', { name: '取消', exact: true }).click();
+  expect((await state(request)).operations.filter(op => op.operation === 'guiGitFileAction')).toHaveLength(0);
+  await file.tap();
+  await expect(drawer.locator('.git-diff')).toBeVisible();
+  await drawer.getByRole('button', { name: 'src/app.ts', exact: true }).click();
+  await holdRow(page, drawer.getByRole('button', { name: '展开或收起 src/chat', exact: true }));
+  await page.getByRole('menuitem', { name: '提交文件夹内改动', exact: true }).click();
+  const commitDialog = page.getByRole('dialog', { name: '提交 2 个文件', exact: true });
+  await expect(commitDialog.locator('li')).toHaveText(['src/chat/tools.ts', 'src/chat/menu.ts']);
+  await commitDialog.getByRole('button', { name: '取消', exact: true }).click();
+  await drawer.getByRole('tab', { name: '提交记录', exact: true }).click();
+  const commitRow = drawer.locator('.git-history-row').nth(1);
+  await holdRow(page, commitRow);
+  await expect(page.getByRole('menuitem')).toHaveCount(4);
+  await expect(drawer.locator('.git-commit-file')).toHaveCount(0);
+  await screenshot(page, info, 'git-history-long-press');
+  await page.getByRole('menuitem', { name: '重置当前分支到此提交…', exact: true }).click();
+  const reset = page.getByRole('dialog', { name: '重置当前分支到此提交', exact: true });
+  await expect(reset.getByRole('radio', { name: /Mixed/ })).toBeChecked();
+  await reset.getByRole('button', { name: '取消', exact: true }).click();
+  expect((await state(request)).operations.filter(op => op.operation === 'guiGitRevision')).toHaveLength(0);
+
+  const box = (await commitRow.boundingBox())!;
+  const session = await page.context().newCDPSession(page);
+  try {
+    const point = { x: box.x + 120, y: box.y + box.height / 2 };
+    await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+    await session.send('Input.dispatchTouchEvent', { type: 'touchMove',
+      touchPoints: [{ x: point.x - 60, y: point.y }] });
+    await page.waitForTimeout(650);
+    await expect(page.getByRole('menu')).toBeHidden();
+    await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } finally { await session.detach(); }
+  await expect(drawer.locator('.git-commit-file')).toHaveCount(0);
+});
 
 test('AI commit settings sync across remote viewers and generate only selected files', async ({ page, browser, request }) => {
   await request.post(`${fixtureUrl}/test/reset`);

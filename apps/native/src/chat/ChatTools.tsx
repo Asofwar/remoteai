@@ -13,10 +13,12 @@ import { PortMappings } from './portMapping/PortMappings';
 import type { AuthSession } from '../types';
 import { palette, useStyles } from './styles';
 import { ProjectBrowser } from './ProjectBrowser';
+import type { DownloadClient } from '../../../../shared/remote-chat/downloads';
 
 interface Props {
   client: GuiToolsClient; cwd: string; active: boolean; connected: boolean; deviceName?: string;
   scope: string; session?: AuthSession;
+  downloads?: DownloadClient;
 }
 export function ChatTools(props: Props) {
   useLanguage();

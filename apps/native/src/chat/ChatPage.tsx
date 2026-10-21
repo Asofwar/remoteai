@@ -175,7 +175,8 @@ function ConnectedChat({ session, device, devices, selected, active: pageActive,
         onPress={() => { void controller.archive().then(openDrawer); }}>
         <Text style={styles.buttonText}>{t("恢复")}</Text></Pressable>}
       <View style={styles.headerTools}>
-        <ChatTools client={controller.guiTools} active={active && foreground} connected={ready}
+        <ChatTools client={controller.guiTools} downloads={controller.downloads}
+          active={active && foreground} connected={ready}
           scope={JSON.stringify([session.baseUrl, session.email, device?.deviceId ?? ''])}
           session={session}
           deviceName={device?.name} cwd={state.selected?.cwd ?? state.draftProject?.cwd ?? ''} />

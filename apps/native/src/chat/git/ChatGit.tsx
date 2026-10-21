@@ -1,6 +1,7 @@
 import { useThemeColor } from '../../theme/store';
 import { t, useLanguage } from '../../i18n';
 import { ActivityIndicator, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { useEffect, useState } from 'react';
 import type { GitClient } from '../../../../../shared/remote-chat/gitTypes';
 import { useGitDiff, useRemoteGit } from '../../../../../shared/remote-chat/useRemoteGit';
 import { useGitCommitFiles } from '../../../../../shared/remote-chat/useGitCommitFiles';
@@ -11,9 +12,14 @@ import { GitCommitFiles } from './GitCommitFiles';
 import { GitToolbar } from './GitToolbar';
 import { useGitStyles as useStyles } from './styles';
 import { palette } from '../styles';
+import type { DownloadClient } from '../../../../../shared/remote-chat/downloads';
+import { gitPatchNotice, saveGitPatch } from '../../downloads/gitPatch';
+import { GitMenu, type GitMenuTarget } from './GitMenu';
+import { GitFileActionConfirmation, GitRevisionConfirmation } from './GitActionConfirmations';
 
 interface Props {
   client: GitClient; cwd: string; active: boolean; connected: boolean; deviceName?: string; onClose: () => void;
+  downloads?: DownloadClient;
 }
 
 export function ChatGit(props: Props) {
@@ -21,11 +27,19 @@ export function ChatGit(props: Props) {
   const color = useThemeColor();
   useLanguage();
   const panel = useRemoteGit(props);
+  const [menu, setMenu] = useState<GitMenuTarget | null>(null);
+  useEffect(() => { setMenu(null); }, [props.active, props.cwd, props.client]);
+  const close = () => {
+    if (panel.fileAction) panel.cancelFileAction();
+    else if (panel.revisionAction) panel.cancelRevisionAction();
+    else if (menu) setMenu(null);
+    else props.onClose();
+  };
   const detail = panel.detail;
   const commitFiles = useGitCommitFiles(props.client, props.cwd, detail?.commit?.hash, props.active && props.connected);
   const diff = useGitDiff(props.client, props.cwd, panel.detail, props.active && props.connected);
   const { height } = useWindowDimensions();
-  return <BottomSheet visible={props.active} title="Git" subtitle={props.deviceName} onClose={props.onClose}
+  return <BottomSheet visible={props.active} title="Git" subtitle={props.deviceName} onClose={close}
     onBack={detail ? panel.backDetail : undefined} tall dragFromHeaderOnly fullWidthContent compactHeader>
     <View style={{ height: height * .80, flexShrink: 1 }}>
       <GitToolbar panel={panel} connected={props.connected} />
@@ -62,9 +76,16 @@ export function ChatGit(props: Props) {
             style={[styles.tab, panel.tab === 'history' && styles.selectedTab]} onPress={() => panel.setTab('history')}>
             <Text style={[styles.tabText, panel.tab === 'history' && styles.selectedTabText]}>{t("提交记录")}</Text></Pressable>
         </View>
-        {panel.tab === 'changes' ? <GitChanges panel={panel} connected={props.connected} />
-          : <GitHistory panel={panel} connected={props.connected} />}
+        {panel.tab === 'changes' ? <GitChanges panel={panel} connected={props.connected}
+          onMenu={row => setMenu({ kind: 'file', row })} />
+          : <GitHistory panel={panel} connected={props.connected}
+            onMenu={commit => setMenu({ kind: 'commit', commit })} />}
       </>}
+      {menu && !panel.fileAction && !panel.revisionAction && <GitMenu target={menu} panel={panel}
+        connected={props.connected} close={() => setMenu(null)} patchNotice={gitPatchNotice}
+        onPatch={props.downloads ? commit => saveGitPatch(props.downloads!, props.cwd, commit.hash) : undefined} />}
+      {panel.fileAction && <GitFileActionConfirmation panel={panel} connected={props.connected} />}
+      {panel.revisionAction && <GitRevisionConfirmation panel={panel} connected={props.connected} />}
     </View>
   </BottomSheet>;
 }

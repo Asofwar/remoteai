@@ -72,7 +72,7 @@ export function ProjectTabs({ tabs, activePath, choose, close, t, groupId, block
       onClick={event => { dismiss(); setOverflowAnchor(event.currentTarget); }}><Ellipsis size={18} /></button>}
   </div>
     {overflowAnchor && hiddenTabs.length > 0 && <TabOverflowMenu tabs={hiddenTabs} anchor={overflowAnchor}
-      choose={select} close={dismissOverflow} t={t} />}
+      choose={select} close={dismissOverflow} closeTab={close} blocked={blocked} t={t} />}
     {menu && <TabMenu target={menu} tabs={tabs} blocked={blocked} connected={connected}
       command={action => command(menu, action)} close={dismiss} t={t} />}
   </>;

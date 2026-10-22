@@ -31,7 +31,7 @@ test('long filenames stay clipped inside narrow panes and wrap inside the overfl
   await expectActiveVisible(strip);
   await more.click();
   const menu = page.getByRole('menu', { name: '隐藏的标签页' });
-  await expect(menu.getByRole('menuitem')).toHaveCount(1);
+  await expect(menu.locator('.pf-tab-overflow-select')).toHaveCount(1);
   expect(await menu.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
   await menu.getByRole('menuitem', { name: longNames[0], exact: true }).click();
   await expectActiveVisible(strip);
@@ -78,8 +78,9 @@ for (const mode of ['local', 'remote', 'web']) {
     expect(hidden).not.toContain('测试.py');
     await more.click();
     const menu = page.getByRole('menu', { name: '隐藏的标签页', exact: true });
-    await expect(menu.getByRole('menuitem')).toHaveCount(hidden.length);
-    expect(await menu.getByRole('menuitem').evaluateAll(items => items.map(item => item.getAttribute('aria-label'))))
+    await expect(menu.locator('.pf-tab-overflow-select')).toHaveCount(hidden.length);
+    expect(await menu.locator('.pf-tab-overflow-select')
+      .evaluateAll(items => items.map(item => item.getAttribute('aria-label'))))
       .toEqual(hidden);
     expect((await menu.boundingBox())!.width).toBeLessThanOrEqual(400);
     await page.screenshot({ path: `../../.codex-tmp/project-browser-overflow-${mode}.png` });
@@ -96,6 +97,8 @@ for (const mode of ['local', 'remote', 'web']) {
     await expect(menu.getByRole('menuitem', { name: 'notes.txt', exact: true })).toHaveCount(0);
     await page.keyboard.press('End');
     await expect(menu.getByRole('menuitem').last()).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await expect(menu.locator('.pf-tab-overflow-select').last()).toBeFocused();
     await page.keyboard.press('Enter');
     await expectActiveVisible(strip);
     await page.keyboard.press('Home');

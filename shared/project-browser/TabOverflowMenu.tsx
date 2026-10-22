@@ -1,14 +1,31 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { X } from 'lucide-react';
 import { isDirty, type DocumentTab } from './documents';
 import type { BrowserTranslate } from './ProjectTree';
 import { focusFirstMenuItem, MENU_MARGIN, moveMenuFocus } from './treeMenuNavigation';
 
 interface Props {
   tabs: DocumentTab[]; anchor: HTMLButtonElement; choose: (path: string) => void;
-  close: () => void; t: BrowserTranslate;
+  close: () => void; closeTab: (path: string) => void; blocked: boolean; t: BrowserTranslate;
 }
 
-export function TabOverflowMenu({ tabs, anchor, choose, close, t }: Props) {
+function OverflowItem({ tab, choose, closeTab, blocked, t }: {
+  tab: DocumentTab; choose: () => void; closeTab: () => void; blocked: boolean; t: BrowserTranslate;
+}) {
+  const name = tab.path.split(/[\\/]/).at(-1) ?? tab.path;
+  return <div className="pf-tab-overflow-item" role="none">
+    <button type="button" role="menuitem" className="pf-tab-overflow-select" aria-label={name} onClick={choose}>
+      <span className="pf-tab-overflow-label">{name}</span>
+      {isDirty(tab) && <span className="pf-dirty-dot" aria-label={t('未保存')} />}
+    </button>
+    <button type="button" role="menuitem" className="pf-tab-overflow-close"
+      aria-label={`${t('关闭文件')} ${name}`} disabled={tab.saving || blocked} onClick={closeTab}>
+      <X size={14} aria-hidden="true" />
+    </button>
+  </div>;
+}
+
+export function TabOverflowMenu({ tabs, anchor, choose, close, closeTab, blocked, t }: Props) {
   const menu = useRef<HTMLDivElement>(null);
   const selected = useRef(false);
   const [position, setPosition] = useState({ left: 0, top: 0 });
@@ -41,15 +58,9 @@ export function TabOverflowMenu({ tabs, anchor, choose, close, t }: Props) {
   }} onContextMenu={event => { event.preventDefault(); close(); }}>
     <div ref={menu} className="pf-tree-menu pf-tab-overflow-menu" role="menu" aria-label={t('隐藏的标签页')}
       style={position} onKeyDown={moveMenuFocus}>
-      {tabs.map(tab => <button key={tab.path} type="button" role="menuitem"
-        aria-label={tab.path.split(/[\\/]/).at(-1) ?? tab.path}
-        onClick={() => { selected.current = true; close(); choose(tab.path); }}>
-        <span className="pf-tab-overflow-label">
-          <span>{tab.path.split(/[\\/]/).at(-1) ?? tab.path}</span>
-          <small>{tab.path}</small>
-        </span>
-        {isDirty(tab) && <span className="pf-dirty-dot" aria-label={t('未保存')} />}
-      </button>)}
+      {tabs.map(tab => <OverflowItem key={tab.path} tab={tab} blocked={blocked} t={t}
+        choose={() => { selected.current = true; close(); choose(tab.path); }}
+        closeTab={() => { close(); closeTab(tab.path); }} />)}
     </div>
   </div>;
 }

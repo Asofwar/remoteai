@@ -23,7 +23,7 @@ export function RemoteFileEnvironment({ controller, ready, threadId, children }:
       remote: true,
       previews: { open: target => current().open(target), close: id => access?.close(id) ?? Promise.resolve() },
       resolveWebsite: url => current().resolveWebsite(url),
-      image: props => <ChatImage source={props.src} description={props.alt} />,
+      image: props => <ChatImage source={props.src} description={props.alt} compact={props.compact} />,
       actions: {
         applications: async () => { requireReady(); return controller.guiTools.files.applications(); },
         perform: async (target, action) => {

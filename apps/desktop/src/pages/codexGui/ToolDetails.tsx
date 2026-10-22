@@ -86,7 +86,7 @@ export function ToolDetails({ item, text }: { item: Item; text: string }) {
       {result.snippet && <p>{result.snippet}</p>}</div>)}
   </>;
   if (item.type === "imageView" || item.type === "imageGeneration") return <>
-    {item.type === "imageView" && <MessageImage src={generatedImageSource(item)} alt={guiText("查看的图片")} />}
+    {item.type === "imageView" && <MessageImage src={generatedImageSource(item)} alt={guiText("查看的图片")} compact />}
     {(item.path || item.savedPath) && <MessageLink href={item.path || item.savedPath}>
       {item.path || item.savedPath}</MessageLink>}
     {item.failure?.message && <p className={styles.failure}>{item.failure.message}</p>}

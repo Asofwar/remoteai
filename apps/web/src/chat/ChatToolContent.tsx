@@ -62,7 +62,8 @@ export function ChatToolContent({ item }: { item: Item }) {
       {state.message && <ChatMarkdown text={state.message} />}</div>)}
   </>;
   if (['imageView', 'imageGeneration'].includes(item.type)) return <>
-    <ChatImage source={generatedImageSource(item)} description={item.type === 'imageView' ? t("查看的图片") : t("生成的图片")} />
+    <ChatImage source={generatedImageSource(item)} compact={item.type === 'imageView'}
+      description={item.type === 'imageView' ? t("查看的图片") : t("生成的图片")} />
     <p className="chat-muted">{item.path || item.savedPath}</p>
     {item.failure?.message && <p className="chat-error">{item.failure.message}</p>}
     {item.revisedPrompt && <ChatMarkdown text={item.revisedPrompt} />}

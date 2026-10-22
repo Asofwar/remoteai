@@ -44,8 +44,16 @@
 .pf-file-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .pf-file-name strong, .pf-file-path { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .pf-file-path { padding: 0 8px; font-size: 11px; color: var(--pf-muted); }
-.pf-tabs { display: flex; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
-.pf-tab { display: flex; align-items: center; flex-shrink: 0; max-width: 240px;
+.pf-tabs-bar { display: flex; min-width: 0; position: relative; }
+.pf-tabs { display: flex; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none;
+  overscroll-behavior-x: contain; }
+.pf-tabs::-webkit-scrollbar { display: none; }
+.pf-tabs-bar[data-clipped-left=true] .pf-tabs {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 12px);
+  mask-image: linear-gradient(to right, transparent, #000 12px); }
+.pf-browser .pf-tabs-more { width: 32px; padding: 5px; border-radius: 0;
+  border-left: 1px solid var(--pf-border); }
+.pf-tab { display: flex; align-items: center; flex-shrink: 0; max-width: min(240px, 100%);
   border-bottom: 2px solid transparent; border-right: 1px solid var(--pf-border); }
 .pf-tab[data-active=true] { border-bottom-color: var(--pf-accent); background: var(--pf-hover); }
 .pf-tab [role=tab] { min-width: 0; flex-shrink: 1; }

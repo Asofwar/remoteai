@@ -13,3 +13,7 @@
 .pf-tab-menu { width: 300px; }
 .pf-tab-menu kbd { color: var(--pf-muted); font: inherit; white-space: nowrap; }
 .pf-tab-menu .pf-menu-icon-space { flex: 0 0 16px; }
+.pf-tab-overflow-menu { width: 300px; }
+.pf-tab-overflow-label { display: flex; flex-direction: column; min-width: 0; }
+.pf-tab-overflow-label small { color: var(--pf-muted); font-size: 11px; }
+.pf-tab-overflow-menu button > .pf-dirty-dot { flex: 0 0 7px; }

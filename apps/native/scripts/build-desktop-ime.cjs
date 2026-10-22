@@ -12,11 +12,11 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewp
   content="width=device-width,initial-scale=1,maximum-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none';
     script-src 'unsafe-inline'; style-src 'unsafe-inline'">
-  <style>*{box-sizing:border-box}html,body{margin:0;background:#111113;color:#eee;height:100%;overflow:hidden}
-  textarea{width:100%;height:100%;resize:none;border:0;padding:8px 12px;background:transparent;
-    color:#eee;font:16px system-ui;outline:none}textarea::placeholder{color:#999}
+  <style>*{box-sizing:border-box}html,body{margin:0;background:transparent;height:100%;overflow:hidden}
+  textarea{width:100%;height:100%;resize:none;border:0;padding:0;background:transparent;
+    color:transparent;caret-color:transparent;font:16px system-ui;outline:none}
   </style></head><body><textarea autofocus rows="1" maxlength="1000" autocapitalize="off" autocorrect="off"
-  spellcheck="false" aria-label="发送到电脑的文字" placeholder="输入文字，即时发送到电脑"></textarea><script>
+  spellcheck="false" aria-label="发送到电脑的文字"></textarea><script>
   const exports = {};
   ${script.replace(/<\/script/gi, '<\\/script')}
   exports.bindDesktopIme(document.querySelector('textarea'), function(input) {

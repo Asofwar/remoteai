@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { IceServer } from '../../../../shared/remote-chat/protocol';
-import type { DesktopDisplays, DesktopResolution, DesktopSettings, DesktopSignal, DesktopSignalReply }
+import type { DesktopDisplays, DesktopInputFocus, DesktopResolution, DesktopSettings, DesktopSignal, DesktopSignalReply }
   from '../../../../shared/remote-desktop/protocol';
 import { openDesktopCapture, type DesktopCaptureSettings } from './displays';
 import { desktopFailure } from '../../../../shared/remote-desktop/diagnostics';
@@ -88,6 +88,10 @@ export class NativeDesktopSession {
     });
   }
 
+  async inputFocus() {
+    if (!this.id || this.stopped || this.changingPrivacy) return null;
+    return invoke<DesktopInputFocus | null>('remote_desktop_input_focus', { id: this.id });
+  }
   async update(settings: DesktopSettings) {
     await invoke('remote_desktop_stream_update', { id: this.id, profile: profile(settings, this.displays) });
     this.settings = settings;

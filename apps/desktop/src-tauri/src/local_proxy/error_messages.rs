@@ -149,8 +149,7 @@ pub(super) fn gui(error: &str) -> String {
             None => message.to_string(),
         };
     }
-    // Only fixed, user-safe account messages may bypass the fallback. Internal errors can
-    // contain filesystem paths or credentials and belong in the sanitized diagnostics.
+    // Known failures get actionable copy; other failures retain their sanitized cause.
     match error {
         "请先选择 Codex GUI 账户。"
         | "暂时无法读取 Codex GUI 账户，请稍后重试。"
@@ -162,15 +161,26 @@ pub(super) fn gui(error: &str) -> String {
         _ => {
             return known::message(error)
                 .map(str::to_string)
-                .unwrap_or_else(|| {
-                    format!(
-                        "本地代理处理请求失败（错误编号 {}）。请导出诊断日志查看对应记录。",
-                        error_id(error)
-                    )
-                })
+                .unwrap_or_else(|| diagnostic_fallback(error))
         }
     }
     .to_string()
+}
+
+fn diagnostic_fallback(error: &str) -> String {
+    // Invalid typed envelopes are internal data, not human-readable failure messages.
+    let detail =
+        if error.starts_with("proxy_request_error:") || error.starts_with("proxy_catalog_error:") {
+            "错误信息格式无效，请重试。".to_string()
+        } else {
+            crate::error_logs::sanitize_diagnostic_message(error)
+        };
+    let detail = if detail.is_empty() {
+        "未收到具体错误信息。"
+    } else {
+        &detail
+    };
+    format!("请求失败：{detail}（错误编号 {}）", error_id(error))
 }
 
 /// Stable correlation with the detailed diagnostic entry without exposing its private contents.

@@ -89,8 +89,22 @@ try {
   await openCode();
   assert.ok((await find('文件内容', 'EditText')).text.includes('native_edit'), 'Saved content survives reopening');
   await screenshot('saved');
+  const editor = await find('文件内容', 'EditText');
+  const [left, top] = bounds(editor);
+  await adb('shell', 'input', 'swipe', String(left + 60), String(top + 24),
+    String(left + 60), String(top + 24), '900');
+  await find('引用到聊天');
+  // Some Android skins omit the system selection toolbar from UIAutomator; verify it in this screenshot.
+  await screenshot('selection-menu');
+  await tap('引用到聊天');
+  await find('打开文件浏览');
+  const quote = (await nodes()).find(node => node['resource-id'] === 'file-quote');
+  assert.ok(quote?.text.includes('C:/project/src/main.ts:'), 'Quote includes the full file path');
+  assert.match(quote.text, /main\.ts:\d+:\d+-\d+:\d+/, 'Quote includes start/end line and column');
+  assert.ok(quote.text.includes('```'), 'Quote includes the selected content');
+  await screenshot('quoted');
   await writeFile(path.join(output, 'result.json'), JSON.stringify({ passed: true, serial }, null, 2));
-  console.log('PASS: native file tree, fold, search, keyboard, save and unsaved-close guard');
+  console.log('PASS: native file tree, editing, saved drafts and long-press quote (system menu screenshot saved)');
 } catch (error) {
   await screenshot('failed');
   throw error;

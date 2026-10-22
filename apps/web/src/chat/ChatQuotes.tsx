@@ -6,7 +6,7 @@ import { appendQuote, clearSubmittedQuotes, quoteKey, type ChatQuote } from '../
 
 interface QuotesContext {
   quotes: ChatQuote[];
-  add: (quote: ChatQuote) => void;
+  add: (quote: ChatQuote) => boolean;
   remove: (quote: ChatQuote) => void;
   clear: (quotes: ChatQuote[]) => void;
 }
@@ -18,6 +18,8 @@ export function ChatQuotesProvider({ scope, children, sending, enabled }: {
 }) {
   useLanguage();
   const [quotes, setQuotes] = useState<ChatQuote[]>([]);
+  const current = useRef(quotes);
+  current.current = quotes;
   const previous = useRef(scope);
   useEffect(() => {
     if (previous.current === scope) return;
@@ -26,9 +28,11 @@ export function ChatQuotesProvider({ scope, children, sending, enabled }: {
     if (!creating) setQuotes([]);
   }, [scope, sending]);
   const add = (quote: ChatQuote) => {
-    const result = appendQuote(quotes, quote);
-    if (result.error) Toast.show({ content: t(result.error) });
-    else setQuotes(result.quotes);
+    const result = appendQuote(current.current, quote);
+    if (result.error) { Toast.show({ content: t(result.error) }); return false; }
+    current.current = result.quotes;
+    setQuotes(result.quotes);
+    return true;
   };
   return <Context.Provider value={enabled ? { quotes, add,
     remove: quote => setQuotes(current => current.filter(item => quoteKey(item) !== quoteKey(quote))),

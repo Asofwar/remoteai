@@ -39,6 +39,51 @@ test('commits Chinese once and forwards text, backspace and enter immediately', 
   await expect(field).toHaveValue('');
 });
 
+test('removes the mobile input row and scrolls vertically to the mouse row with two rows of context',
+  async ({ page }, info) => {
+    await page.setViewportSize({ width: 844, height: 390 });
+    await openDesktop(page);
+    await page.getByRole('button', { name: '收起键盘' }).click();
+    await page.getByRole('button', { name: '切换为触屏模式' }).click();
+    const original = (await page.locator('video').boundingBox())!;
+    await page.mouse.click(original.x + original.width * 0.8, original.y + original.height * 0.8);
+    await page.getByRole('button', { name: '键盘', exact: true }).click();
+    await page.setViewportSize({ width: 844, height: 220 });
+    const field = page.getByRole('textbox', { name: '发送到电脑的文字' });
+    await expect(field).toBeFocused();
+    await expect(field).toHaveCSS('opacity', '0');
+    await expect.poll(async () => {
+      const stage = (await page.locator('.rd-stage').boundingBox())!;
+      const cursor = (await page.locator('.rd-cursor').boundingBox())!;
+      return stage.y + stage.height - cursor.y;
+    }).toBeCloseTo(48, 0);
+    const video = (await page.locator('video').boundingBox())!;
+    expect(video.x).toBeCloseTo(original.x);
+    expect(video.width).toBeCloseTo(original.width);
+    expect(video.height).toBeCloseTo(original.height);
+    const dock = (await page.locator('.rd-keyboard').boundingBox())!;
+    const tabs = (await page.locator('.rd-input-tabs').boundingBox())!;
+    expect(dock.height).toBe(tabs.height);
+    await compose(field, '继续输入');
+    await expect.poll(() => page.evaluate(() => window.desktopTest.inputs.at(-1)))
+      .toEqual({ kind: 'text', text: '继续输入' });
+    await field.evaluate(element => element.blur());
+    await page.getByRole('tab', { name: '输入法', exact: true }).click();
+    await expect(field).toBeFocused();
+    await page.screenshot({ path: info.outputPath('mobile-input-row-context.png') });
+  });
+
+test('keeps the visible input field for a desktop with a hardware pointer', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop');
+  await page.goto('e2e/remote-desktop-harness.html');
+  await page.getByRole('button', { name: '打开工具' }).click();
+  await page.getByRole('button', { name: '远程桌面', exact: true }).click();
+  await page.getByRole('button', { name: '键盘', exact: true }).click();
+  const field = page.getByRole('textbox', { name: '发送到电脑的文字' });
+  await expect(field).toHaveCSS('opacity', '1');
+  expect((await field.boundingBox())!.height).toBe(38);
+});
+
 test('uses the same composition handling in the bundled native input document', async ({ page }) => {
   await page.goto('e2e/remote-desktop-harness.html');
   await page.evaluate(() => {

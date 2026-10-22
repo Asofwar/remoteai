@@ -4,6 +4,7 @@ import { test, expect } from '@playwright/test';
 import type { BrowserHostMessage } from '../../../shared/project-browser/nativeBridge';
 import type { DocumentsSnapshot } from '../../../shared/project-browser/documents';
 import type { ProjectFile } from '../../../shared/remote-chat/projectFiles';
+import type { FileSelection } from '../../../shared/project-browser/fileSelection';
 import { browserRequest, browserRoot, savedFiles } from './project-browser-fixture';
 import { longPress } from './project-browser-touch';
 const require = createRequire(import.meta.url);
@@ -30,6 +31,7 @@ test('bundled native editor: offline assets, mobile search/fold/save and close g
   let closed = false;
   let snapshot: DocumentsSnapshot | undefined;
   const references: ProjectFile[] = [];
+  const quotes: FileSelection[] = [];
   await page.exposeFunction('nativeBrowserRequest', async (raw: string) => {
     const message = JSON.parse(raw) as { type: string; snapshot?: DocumentsSnapshot };
     if (message.type === 'ready') {
@@ -39,7 +41,8 @@ test('bundled native editor: offline assets, mobile search/fold/save and close g
     } else if (message.type === 'closed') { closed = true; snapshot = message.snapshot; }
     else {
       const reply = await handleBrowserRequest(raw, { client, cwd: browserRoot, connected: true,
-        host: { copyPath: async () => {}, reference: async entry => { references.push(entry); } } });
+        host: { copyPath: async () => {}, reference: async entry => { references.push(entry); },
+          quoteSelection: async selection => { quotes.push(selection); } } });
       if (reply) await emit(reply);
     }
   });
@@ -118,5 +121,14 @@ test('bundled native editor: offline assets, mobile search/fold/save and close g
     { path: `${browserRoot}/notes.txt`, name: 'notes.txt', directory: false },
     { path: `${browserRoot}/src`, name: 'src', directory: true },
   ]);
+  closed = false;
+  const quoteEditor = page.getByRole('textbox', { name: '文件内容', exact: true }).first();
+  await quoteEditor.press('Control+a');
+  await longPress(page, quoteEditor.locator('.cm-line').first(), '文本操作');
+  await page.getByRole('menuitem', { name: '引用到聊天' }).click();
+  await expect.poll(() => closed).toBe(true);
+  expect(quotes).toEqual([{ path: `${browserRoot}/src/main.ts`, start: { line: 1, column: 1 },
+    end: { line: 1, column: 20 }, text: 'shared native draft' }]);
+  expect(snapshot?.tabs.find(tab => tab.path.endsWith('/main.ts'))?.text).toBe('shared native draft');
   expect(errors).toEqual([]);
 });

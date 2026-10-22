@@ -1,4 +1,7 @@
 {
+  "build": "编译msi和apk",
+  "buildSpaced": "编译 msi 和 apk",
+  "short": "修复好了",
   "reported": ".idea变化帮我加入忽略",
   "chinese": "把失败的测试修好，验证通过后帮我提交",
   "wrapped": "这是一条需要自动换行的中文消息，末尾的每一个字都应该完整显示，包括最后的忽略。",

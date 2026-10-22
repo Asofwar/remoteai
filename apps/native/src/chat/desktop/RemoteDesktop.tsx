@@ -17,6 +17,7 @@ import { useMousePanel } from '../../../../../shared/remote-desktop/useMousePane
 import { useMouseViewport } from '../../../../../shared/remote-desktop/useMouseViewport';
 import { useDesktopZoom } from '../../../../../shared/remote-desktop/useDesktopZoom';
 import { useInputViewport } from '../../../../../shared/remote-desktop/useInputViewport';
+import { useDesktopInputFocus } from '../../../../../shared/remote-desktop/useDesktopInputFocus';
 import { DisplaySettings } from './DisplaySettings';
 import { DesktopKeyboard } from './DesktopKeyboard';
 import { DesktopStats } from './DesktopStats';
@@ -52,8 +53,11 @@ export function RemoteDesktop({ client, active, close }: {
   const [size, setSize] = useState({ width: 400, height: 600 });
   const fitted = useInputViewport(desktopViewport(size, source), keyboard);
   const zoom = useDesktopZoom(fitted, active && !!session.stream);
+  const inputFocus = useDesktopInputFocus({ active: active && keyboard && !!session.stream,
+    read: session.inputFocus, displayId: session.settings?.displayId });
   const viewport = useMouseViewport(session.pointer, zoom.viewport,
-    panelVisible ? (panel.expanded ? MOUSE_PANEL_SIZE : MOUSE_ICON_SIZE) : undefined, zoom.modified);
+    panelVisible ? (panel.expanded ? MOUSE_PANEL_SIZE : MOUSE_ICON_SIZE) : undefined,
+    { manual: zoom.modified, inputOpen: keyboard, inputFocus });
   const trackpad = useTrackpad({ pointer: session.pointer, viewport, direct, panel, id: 'stage', zoom: zoom.gestures });
   const wheel = (delta: number, horizontal = false) => {
     session.pointer.synchronize(); session.input({ kind: 'wheel', delta, ...(horizontal ? { horizontal } : {}) });

@@ -73,6 +73,7 @@ export const ProjectBrowser = forwardRef<ProjectBrowserHandle, Props>(function P
       <section className="pf-file" aria-label={t('文件预览')}>
         {settingsOpen && <div className="pf-settings"><AutoSaveSettings preferences={preferences} t={t} /></div>}
         <ProjectEditorWorkspace narrow={split.narrow} options={{ store: file.store, cwd, connected, t, actions,
+          quoteSelection: actionsHost.quoteSelection,
           back: () => setShowFile(false), settings: () => setSettingsOpen(!settingsOpen), settingsOpen }} />
       </section>
     </div>

@@ -27,7 +27,8 @@
     .chat-approvals { max-height: 45vh; }
   }
   &[data-dream-skin='true'] .chat-message-footer { background: transparent; }
-  .chat-message-content { max-width: 900px; padding: 28px 32px; }
+  .chat-message-content, .chat-notice-content { max-width: 900px; padding-inline: 32px; }
+  .chat-message-content { padding-block: 28px; }
   .chat-markdown { font-size: var(--gui-font-size, 14px); line-height: 1.8;
     p { margin: 12px 0; }
     pre { background: transparent; padding: 16px; border-radius: 10px; }
@@ -83,7 +84,8 @@
 }
 @media (max-width: 1150px) {
   .gui-remote-workspace.chat-page {
-    .chat-message-content { padding: 20px; }
+    .chat-message-content, .chat-notice-content { padding-inline: 20px; }
+    .chat-message-content { padding-block: 20px; }
     .chat-composer-dock, .gui-remote-project { padding-inline: 16px; }
   }
 }
@@ -96,12 +98,13 @@
       .ant-btn { flex-shrink: 0; width: 26px; min-width: 26px; height: 26px; padding: 0; }
     }
     .chat-composer-dock, .gui-remote-project { padding-inline: 10px; }
-    .chat-message-content { padding-inline: 14px; }
+    .chat-message-content, .chat-notice-content { padding-inline: 14px; }
   }
 }
 @media (max-width: 860px) {
   .gui-remote-workspace.chat-page {
-    .chat-message-content { padding: 18px 14px; }
+    .chat-message-content, .chat-notice-content { padding-inline: 14px; }
+    .chat-message-content { padding-block: 18px; }
     .chat-composer-dock, .gui-remote-project { padding-inline: 10px; }
     .chat-composer-dock { padding-bottom: 10px; }
   }

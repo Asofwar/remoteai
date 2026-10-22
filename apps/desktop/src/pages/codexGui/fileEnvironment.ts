@@ -8,6 +8,6 @@ export interface FileEnvironment {
   actions: typeof fileApi;
   previews: typeof filePreviewApi;
   resolveWebsite: (url: string) => Promise<string>;
-  image: (props: { src?: string; alt?: string; title?: string }) => ReactNode;
+  image: (props: { src?: string; alt?: string; title?: string; compact?: boolean }) => ReactNode;
 }
 export const FileEnvironmentContext = createContext<FileEnvironment | null>(null);

@@ -21,6 +21,7 @@ test('shows every user message character inside its bubble at different widths',
   const widths = info.project.name === 'mobile' ? [390, 320] : [1280, 900];
   for (const width of widths) {
     await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(() => document.fonts.ready);
     for (const [id, text] of Object.entries(userMessages)) {
       const bubble = page.locator(`[data-message-id="${id}"] .chat-user-message`);
       await expect.poll(() => bubble.innerText()).toBe(text);
@@ -42,7 +43,27 @@ test('shows every user message character inside its bubble at different widths',
         return missing;
       });
       expect(clipped, `${id} at ${width}px`).toEqual([]);
+      if (['build', 'buildSpaced', 'short', 'reported'].includes(id)) {
+        const lines = await bubble.evaluate(node => {
+          const range = document.createRange();
+          range.selectNodeContents(node.querySelector('p')!);
+          return new Set([...range.getClientRects()].map(rect => Math.round(rect.top))).size;
+        });
+        expect(lines, `${id} stays on one line at ${width}px`).toBe(1);
+      }
     }
+    const sizes = await page.locator('[data-message-id="build"] .chat-user-message').evaluate(async node => {
+      const samples = new Set<string>();
+      const until = performance.now() + 1_200;
+      while (performance.now() < until) {
+        await new Promise(requestAnimationFrame);
+        const { x, y, width, height } = node.getBoundingClientRect();
+        const origin = node.closest('.chat-message-content')!.getBoundingClientRect();
+        samples.add(JSON.stringify([x - origin.x, y - origin.y, width, height]));
+      }
+      return samples.size;
+    });
+    expect(sizes, `Idle bubble remains stable at ${width}px`).toBe(1);
     expect(await page.locator('.chat-messages').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
     await screenshot(page, info, `user-text-${width}`);
   }

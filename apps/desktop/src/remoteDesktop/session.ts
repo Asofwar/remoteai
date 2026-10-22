@@ -241,6 +241,7 @@ export class DesktopHostSession {
     this.close();
   }
   get closed() { return this.stopped; }
+  inputFocus() { return this.capture.inputFocus(); }
   close() {
     if (this.stopped) return this.capture.close();
     this.stopped = true; clearTimeout(this.timer); clearTimeout(this.expires);

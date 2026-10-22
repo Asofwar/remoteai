@@ -24,8 +24,10 @@ export function RemoteGuiSidebar({ state, controller, actions, accountPicker, fo
   const { groups, toggle, toggleCollapse } = useThreadGroups(state);
   const threadActions = useThreadActions(state, controller);
   const pagination = useThreadScrollPagination({
-    enabled: state.ready && Boolean(state.cursor),
+    enabled: state.ready,
     loading: state.loading,
+    scope: JSON.stringify([state.archived, state.search, state.ready]),
+    cursor: state.cursor,
     loadMore: () => controller.list({ more: true }),
   });
   return <ResizableThreadSidebar className="gui-remote-sidebar" layoutSelector=".chat-diff-layout">

@@ -5,16 +5,6 @@ use std::{borrow::Cow, io::Cursor};
 const MAX_IMAGE_DIMENSION: u32 = 8192;
 const MAX_IMAGE_PIXELS: u64 = 16_777_216;
 
-pub(super) fn read(
-    session: &mut super::Session,
-    shortcut: Option<Shortcut>,
-) -> ClipboardResult<Content> {
-    if let Some(shortcut) = shortcut {
-        copy_selection(session, shortcut)?;
-    }
-    read_local()
-}
-
 pub(super) fn read_local() -> ClipboardResult<Content> {
     let mut clipboard = arboard::Clipboard::new().map_err(|_| ClipboardError::Access)?;
     if let Ok(paths) = clipboard.get().file_list() {
@@ -95,6 +85,7 @@ pub(super) fn write(
 pub(super) fn write_local(content: Content) -> ClipboardResult<()> {
     let mut clipboard = arboard::Clipboard::new().map_err(|_| ClipboardError::Access)?;
     match content {
+        Content::FileOffer { .. } => return Err(ClipboardError::Invalid),
         Content::Text { text } => {
             if text.len() > MAX_BYTES || text.contains('\0') {
                 return Err(ClipboardError::Size);

@@ -1,6 +1,6 @@
 import { guiText } from "../../i18n/guiText";
 import { backendText } from "../../../../../shared/i18n/backend/translateBackendMessage";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Spin } from "antd";
 import { ArrowDown, Terminal } from "lucide-react";
 import type { Conversation } from "./types";
@@ -19,6 +19,7 @@ import { ImageThreadContext } from "./useImageSource";
 import { FileThreadContext } from "./fileApi";
 import { MessageEditContext } from "./messageEditContext";
 import type { CapacityRetryControl } from "./CapacityErrorNotice";
+import { groupVisibleTurns } from "./messageErrorGroups";
 
 export function Messages({ value, selected, active = true, footer, pendingRequest, onQuote,
   onEdit, onDelete, editDisabled, editCwd, onFork, forkDisabled, retry, onCancelRetry }: {
@@ -32,6 +33,7 @@ export function Messages({ value, selected, active = true, footer, pendingReques
   const last = lastUserMessage(value);
   const { viewport, content, away, onScroll, jumpToLatest, pauseFollowing } = useFollowScroll(selected, active);
   const history = useMessageWindow({ turns: value?.turns, selected, active, viewport, pauseFollowing, away });
+  const entries = useMemo(() => groupVisibleTurns(history.entries), [history.entries]);
   const quote = useQuoteSelection({ root: content, selected, enabled: active && Boolean(onQuote) });
   const sending = pendingRequest && pendingRequest.threadId === selected && !value?.activeTurn;
   const processing = value?.processing;
@@ -63,8 +65,9 @@ export function Messages({ value, selected, active = true, footer, pendingReques
             {history.loading ? <span role="status"><Spin size="small" />{guiText("正在加载更早的消息…")}</span>
               : <button type="button" onClick={history.loadOlder}>{guiText("加载更早的消息")}</button>}
           </div>}
-          {history.entries.map(({ turn, items, followsInterruption }) => <TurnMessage
+          {entries.map(({ turn, items, followsInterruption, groups }) => <TurnMessage
             key={`${selected}:${turn.id}`} turn={turn} visibleItems={items}
+            messageGroups={groups}
             threadId={selected ?? undefined}
             retry={retry?.threadId === selected && retry.turnId === turn.id ? retry : undefined}
             onCancelRetry={onCancelRetry}

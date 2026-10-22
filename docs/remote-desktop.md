@@ -250,14 +250,28 @@ Horizontal scrolling requires an updated Windows host; older hosts retain vertic
 The desktop viewer uses the system clipboard for text, PNG images and files in both directions.
 Copy locally, then press Ctrl+V (or Shift+Insert) over the remote desktop to transfer and paste.
 Ctrl+C/Ctrl+X in the remote desktop copies the selection into the local system clipboard; files can then
-be pasted directly into Explorer without downloading or opening the Clipboard panel. File entries survive
-closing the viewer. Clipboard I/O runs on blocking workers, and gestures queue in order so an immediate
+be pasted directly into Explorer without downloading or opening the Clipboard panel. Clipboard I/O runs
+on blocking workers, and gestures queue in order so an immediate
 paste waits for an earlier copy to finish. Queued work is discarded when the viewer disconnects or closes.
 Remote-to-remote paste uses the host's original clipboard, including rich text, original file paths and cut/move
 metadata. This also works after local synchronization fails or when clipboard sharing is disabled. Native
 copy/cut and paste require control permission; sharing contents separately requires the corresponding clipboard
 and file permissions. Unsupported shared content (folders, large files or application-specific formats) remains
 available for native remote paste. Local clipboard access retries brief OS locks without repeating a remote cut.
+
+Updated Windows hosts negotiate `clipboardFiles`. Windows desktop viewers exchange file metadata on copy
+and publish OLE `FileGroupDescriptorW`/`FileContents` promises with `FD_PROGRESSUI`, `IStream` and
+`IDataObjectAsyncCapability`. Explorer requests bytes at paste time and displays its native copy progress
+and Cancel button in both directions. No file payload is downloaded just to populate the Windows clipboard.
+The OLE owner has a dedicated STA message pump; filesystem reads and network waits never run on the app UI
+thread. File requests use the active encrypted clipboard channel, including the WebView capture fallback.
+Keep the desktop session connected until pasting finishes; minimizing the viewer keeps file promises alive.
+Closing or expiring the session revokes the promises and pending reads. Source paths are never sent, every
+read is bounded and scoped to a copied-file handle, and file/direction permissions are checked on each request.
+Browser uploads to Windows use the same native destination copy operation. Browser downloads stay unchanged.
+macOS and older hosts retain the existing eager transfer and temporary-file clipboard. Apple's file-promise
+APIs document dragging-pasteboard integration, which does not establish equivalent Finder Cmd+V behavior:
+see [Apple's file-promise sample](https://developer.apple.com/documentation/appkit/supporting-drag-and-drop-through-file-promises).
 
 The viewer remembers the local content observed during copy/paste gestures. Unchanged local content is never
 uploaded over the remote original. A host OS revision detects context-menu copies without background polling;
@@ -275,13 +289,13 @@ download buttons. Folders must be zipped first. A copied image file can be sent 
 Clipboard access requires the browser's normal permissions; denied writes retain received content for a
 user-initiated retry. Content is transferred only after a paste/copy action, with no background clipboard polling.
 Copy and paste never open the panel automatically, including errors and file downloads. Successful transfers
-are silent; progress appears only after 800 ms. Failures use a compact notice with an explicit local-copy retry
+are silent; eager-transfer progress appears only after 800 ms. Failures use a compact notice with an explicit local-copy retry
 when needed, preserving keyboard focus. Single browser files download directly; multiple files offer a button
 to open the download list. The Clipboard toolbar button remains an optional, manually opened toolbox.
 
 Clipboard transfers use the authenticated desktop's ordered, encrypted control channel in acknowledged
 32 KiB chunks, capped at 64 MiB and 32 files. Native and WebView capture paths share the same clipboard
-service, session checks, validation and input ordering. Files use validated basenames inside a fresh
+service, session checks, validation and input ordering. Eager file transfers use validated basenames inside a fresh
 application-owned temporary directory; source paths never cross the connection. Temporary files remain
 available for pasting after disconnect and expire after 24 hours, cleaned on a subsequent file transfer.
 Both the viewer and host must be updated for automatic clipboard routing using the `clipboardNative` capability.

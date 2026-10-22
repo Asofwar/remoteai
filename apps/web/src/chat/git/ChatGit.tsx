@@ -18,7 +18,7 @@ import { ChatDetailsWorkspace } from '../ChatDetailsWorkspace';
 import { t } from '../../i18n';
 
 interface Props {
-  client: GitClient; cwd: string; connected: boolean; active: boolean; deviceName?: string; onClose: () => void;
+  client: GitClient; cwd: string; connected: boolean; active: boolean; onClose: () => void;
   desktopDiffs?: boolean;
 }
 
@@ -42,7 +42,6 @@ function GitContent(props: Props & { panel: RemoteGit; shared: boolean }) {
       <GitToolbar panel={panel} connected={props.connected} />
       {props.active && panel.fileAction && <GitFileActionDialog panel={panel} connected={props.connected} />}
       {props.active && panel.revisionAction && <GitRevisionDialog panel={panel} connected={props.connected} />}
-      <div className="git-project" title={panel.changes?.root ?? props.cwd}>{panel.changes?.root ?? props.cwd}</div>
       {!props.cwd && <p className="git-notice">{t('请先选择一个项目。')}</p>}
       {!props.connected && <p className="git-notice">{t('电脑连接后即可使用 Git。')}</p>}
       {panel.error && <p role="alert" className="git-error">{t(panel.error)}</p>}

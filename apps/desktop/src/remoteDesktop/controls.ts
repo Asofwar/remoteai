@@ -1,6 +1,7 @@
 import { object } from '../../../../shared/remote-chat/protocol';
 import type { DesktopCapture } from './capture';
 import type { ClipboardReply } from '../../../../shared/remote-desktop/clipboard';
+import type { FileReadEvent } from '../../../../shared/remote-desktop/fileClipboard';
 
 const MAX_INPUT_QUEUE = 64;
 
@@ -9,7 +10,7 @@ export class DesktopControls {
   private busy = false;
   private closed = false;
   constructor(private readonly capture: DesktopCapture, private readonly fail: () => void,
-    private readonly reply?: (message: ClipboardReply) => void) {}
+    private readonly reply?: (message: ClipboardReply | FileReadEvent) => void) {}
   receive(data: string) {
     if (this.closed) return;
     const input = object(JSON.parse(data) as unknown);
@@ -29,7 +30,7 @@ export class DesktopControls {
       while (!this.closed && this.queue.length) {
         const input = this.queue.shift() as { kind?: string };
         if (input.kind === 'clipboard') {
-          const reply = await this.capture.clipboard(input);
+          const reply = await this.capture.clipboard(input, event => { if (!this.closed) this.reply?.(event); });
           if (!this.closed) this.reply?.(reply);
         } else await this.capture.input(input);
       }

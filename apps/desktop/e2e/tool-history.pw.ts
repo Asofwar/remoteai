@@ -67,8 +67,12 @@ test("mouse scrolling reads a command's complete output without paging or losing
   await activity.locator(":scope > summary").click();
   const preview = activity.locator(":scope > summary > span");
   expect(await preview.evaluate((node) => getComputedStyle(node).animationName)).toContain("activeTextSweep");
-  const output = activity.getByRole("region", { name: "工具内容" }).nth(1);
-  await expect(output).toHaveText(commandOutput);
+  const output = activity.getByRole("region", { name: "工具内容" });
+  await expect(output).toHaveCount(1);
+  await expect(output.locator("pre code").last()).toHaveText(commandOutput);
+  const size = await output.evaluate(node => ({ height: node.getBoundingClientRect().height,
+    lineHeight: parseFloat(getComputedStyle(node).lineHeight) }));
+  expect(size.height).toBeCloseTo(15 * size.lineHeight + 24, 0);
   await expect(activity.getByRole("button", { name: "下一段", exact: true })).toHaveCount(0);
   await output.hover();
   await page.mouse.wheel(0, 100_000);
@@ -76,6 +80,6 @@ test("mouse scrolling reads a command's complete output without paging or losing
     .toBeLessThan(2);
   await page.mouse.wheel(0, -100_000);
   await expect.poll(() => output.evaluate((node) => node.scrollTop)).toBe(0);
-  expect(await output.textContent()).toBe(commandOutput);
+  expect(await output.locator("pre code").last().textContent()).toBe(commandOutput);
   await page.screenshot({ path: "../../.codex-tmp/command-output-scroll.png", animations: "disabled" });
 });

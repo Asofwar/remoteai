@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { X } from 'lucide-react';
 import type { DesktopInput, DesktopPlatform } from '../../../../../shared/remote-desktop/protocol';
 import { desktopShortcuts, desktopModifiers, INPUT_TABS, KEYBOARD_PAGES }
@@ -8,8 +8,9 @@ import { bindDesktopIme } from '../../../../../shared/remote-desktop/ime';
 import { t } from '../../i18n';
 import './keyboard.css';
 
-function DesktopIme({ input }: { input: (event: DesktopInput) => void }) {
-  const field = useRef<HTMLTextAreaElement>(null);
+function DesktopIme({ input, field }: {
+  input: (event: DesktopInput) => void; field: RefObject<HTMLTextAreaElement>;
+}) {
   const send = useRef(input); send.current = input;
   useEffect(() => {
     if (field.current) return bindDesktopIme(field.current, event => send.current(event));
@@ -19,20 +20,24 @@ function DesktopIme({ input }: { input: (event: DesktopInput) => void }) {
     aria-label={t('发送到电脑的文字')} placeholder={t('输入文字，即时发送到电脑')} />;
 }
 
-export function DesktopKeyboard({ input, close, supported, platform }: {
+export function DesktopKeyboard({ input, close, supported, platform, mobile = false }: {
   input: (event: DesktopInput) => void; close: () => void; supported: boolean;
-  platform?: DesktopPlatform;
+  platform?: DesktopPlatform; mobile?: boolean;
 }) {
   const keyboard = useSoftKeyboard(input);
-  return <section className="rd-keyboard" aria-label={t('远程输入')}>
+  const field = useRef<HTMLTextAreaElement>(null);
+  return <section className={`rd-keyboard${mobile ? ' rd-keyboard-mobile' : ''}`} aria-label={t('远程输入')}>
     <div className="rd-input-tabs">
       <div role="tablist" aria-label={t('输入方式')}>
         {INPUT_TABS.map(tab => <button key={tab.id} role="tab" aria-selected={keyboard.tab === tab.id}
-          onClick={() => keyboard.selectTab(tab.id)}>{t(tab.label)}</button>)}
+          onClick={() => {
+            keyboard.selectTab(tab.id);
+            if (tab.id === 'ime') field.current?.focus({ preventScroll: true });
+          }}>{t(tab.label)}</button>)}
       </div>
       <button className="rd-keyboard-close" aria-label={t('收起键盘')} onClick={close}><X size={23} /></button>
     </div>
-    {keyboard.tab === 'ime' ? <DesktopIme input={input} />
+    {keyboard.tab === 'ime' ? <DesktopIme input={input} field={field} />
       : <div className="rd-keyboard-content">
         {!supported && <p className="rd-keyboard-notice" role="status">
           {t('更新远程电脑上的应用后，即可使用这些按键。')}</p>}

@@ -40,7 +40,7 @@ function Harness() {
           <ProjectPicker value={project} projects={['/local/workspace']} disabled={false}
             onChange={setProject} onError={error => { throw error; }}
             actions={<GuiToolbox trigger="git" active={!device} connected git={localGit}
-              cwd={project} deviceName="本机" />}
+              cwd={project} />}
             hostPicker={<GuiHostPicker navigation={computers} active={!device} />} />
           <textarea aria-label="本机草稿" value={localDraft} onChange={event => setLocalDraft(event.target.value)} />
         </div>

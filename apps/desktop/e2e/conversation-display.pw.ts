@@ -131,13 +131,14 @@ test("process folds on completion, preserves inspected output, and displays the 
   await process.locator("summary").click();
   // Wait for the deferred command row instead of clicking the process heading a second time.
   await process.locator(`[data-message-id="${command.id}"] > details > summary`).click();
-  await expect(process.getByRole("region", { name: "工具内容" }).first()).toHaveText(command.command!);
-  await expect(process.getByRole("region", { name: "工具内容" }).last()).toHaveText("DISPLAY-FIRST");
+  const preview = process.getByRole("region", { name: "工具内容" });
+  await expect(preview.locator("pre code").first()).toHaveText(command.command!);
+  await expect(preview.locator("pre code").last()).toHaveText("DISPLAY-FIRST");
   await update(page, fixture([comment, command, answer], true));
   await page.getByLabel("消息", { exact: true }).fill("查看输出时继续输入");
   await update(page, fixture([comment, command, answer]));
   await expect(process).toHaveAttribute("open");
-  await expect(process.getByRole("region", { name: "工具内容" }).last()).toHaveText("DISPLAY-FIRST");
+  await expect(preview.locator("pre code").last()).toHaveText("DISPLAY-FIRST");
   await page.screenshot({ path: "../../.codex-tmp/chat-display-alignment/process-expanded.png",
     animations: "disabled" });
 });

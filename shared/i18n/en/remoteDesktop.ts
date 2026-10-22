@@ -108,6 +108,10 @@ export const remoteDesktopMessages: Record<string, string> = {
   '按住并拖动以滚动': 'Hold and drag to scroll', '十字滚动滑块': 'Scroll control',
   '更新远程电脑上的应用后，即可左右滚动。': 'Update the remote computer app to scroll horizontally.',
   '剪贴板': 'Clipboard', '远程桌面键盘输入': 'Remote desktop keyboard input',
+  '复制文件后，请保持连接直到粘贴完成。': 'After copying files, stay connected until pasting finishes.',
+  '文件信息无效，请重新复制。': 'Invalid file information. Please copy the files again.',
+  '文件传输失败，请重新复制。': 'File transfer failed. Please copy the files again.',
+  '桌面连接已结束，请重新连接后再复制文件。': 'The desktop connection has ended. Reconnect and copy the files again.',
   '请更新远程电脑上的应用，启用实体键盘和剪贴板。':
     'Update the app on the remote computer to enable physical keyboard and clipboard support.',
   '粘贴到远程': 'Paste to remote', '获取远程剪贴板': 'Get remote clipboard', '发送文件': 'Send files',

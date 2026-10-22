@@ -70,7 +70,7 @@ export const Composer = forwardRef<ComposerHandle, {
   const reading = draftReading || drop.reading || dictating;
   useComposerFileReferences({ scope: `${key}:${project}`,
     enabled: active && !disabled && !reading && !goalMode.enabled,
-    add: reference => addAttachments([reference]), focus: () => skillInput.current?.focus() });
+    add: reference => addAttachments([reference]), addQuote, focus: () => skillInput.current?.focus() });
   const hasDraft = Boolean(draft.text.trim() || draft.images.length
     || draft.attachments?.length || draft.quotes?.length);
   const suggestion = useNextPromptSuggestion(state, { active,
@@ -101,7 +101,7 @@ export const Composer = forwardRef<ComposerHandle, {
       projects={state.projects} hostPicker={hostPicker} running={running} active={active} dropState={drop}
       actions={<>
         {isDesktopApp && <GuiToolbox trigger="git" active={active} connected={!workspaceBusy}
-          cwd={project} deviceName={guiText("本机")} git={localGitClient} />}
+          cwd={project} git={localGitClient} />}
         <LocalProjectBrowser cwd={project} active={active} connected={!workspaceBusy && state.connection === 'ready'} />
       </>}
       disabled={running || state.sending || state.archived || workspaceBusy || reading} gitEnabled={!state.selected}

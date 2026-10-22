@@ -1642,6 +1642,7 @@ dependencies = [
  "webpki-roots 1.0.8",
  "webrtc",
  "windows 0.61.3",
+ "windows-core 0.61.2",
  "windows-service",
  "windows-sys 0.61.2",
  "winreg 0.55.0",

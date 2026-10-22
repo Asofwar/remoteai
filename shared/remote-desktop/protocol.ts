@@ -30,13 +30,17 @@ export interface DesktopDisplays {
 }
 export interface DesktopResolution { width: number; height: number }
 export interface DesktopCapabilities {
+  inputFocus?: boolean;
   displaySessions?: boolean;
   clipboardNative?: boolean;
+  clipboardFiles?: boolean;
   resolution?: boolean;
   privacyScreen?: boolean;
   platform?: DesktopPlatform;
   keyboard?: boolean; clipboard?: boolean; horizontalScroll?: boolean; control?: boolean;
 }
+/** Vertical bounds relative to the selected display; contains no text or application information. */
+export interface DesktopInputFocus { top: number; bottom: number; lineHeight?: number }
 export interface DesktopOffer extends DesktopDisplays {
   sdp: string; iceServers: IceServer[]; capabilities?: DesktopCapabilities; directUpgrade?: boolean;
   nativeMedia?: boolean; relayStandby?: boolean;
@@ -67,6 +71,7 @@ export type DesktopInput =
   | { kind: 'keyboard'; code: string; down: boolean }
   | { kind: 'key'; key: 'enter' | 'backspace' | 'escape' | 'tab' | 'desktop' | 'windows' };
 export interface DesktopClient {
+  inputFocus?(id: string): Promise<DesktopInputFocus | null>;
   permissionStatus?(): Promise<DesktopPermissionStatus>;
   nativeMedia?: import('./nativeMedia').NativeMediaFactory;
   diagnostic?: import('../remote-chat/diagnostics').ConnectionDiagnostic;
@@ -85,6 +90,7 @@ export function desktopClient(request: <T>(body: object) => Promise<T>,
   return {
     diagnostic,
     nativeMedia,
+    inputFocus: id => call('inputFocus', { id }),
     permissionStatus: () => call('permissions', {}),
     open: (id, settings) => call('open', { id, settings }),
     signal: (id, signal) => call('signal', { id, ...signal }),

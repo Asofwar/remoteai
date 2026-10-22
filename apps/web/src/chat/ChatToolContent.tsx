@@ -14,6 +14,8 @@ import { ChatDiff } from './ChatDiff';
 import { ChatToolResult } from './ChatToolResult';
 import { ChatImage } from './ChatImage';
 import { ChatFileLink } from './ChatFileLink';
+import { CommandOutput } from '../../../../shared/chat/CommandOutput';
+import { ChatCopyButton } from './ChatCopyButton';
 
 const FILE_CHANGE_STATUS: Record<string, string> = {
   declined: '未应用', failed: '修改失败', inProgress: '正在修改',
@@ -42,9 +44,10 @@ export function ChatToolContent({ item }: { item: Item }) {
   }
   if (item.type === 'commandExecution') return <>
     <p className="chat-muted">{item.cwd}{item.durationMs != null && ` · ${formatTurnDuration(item.durationMs)}`}</p>
-    <ChatCodeBlock text={item.command ?? ''} label={t("命令")} language="bash" copyLabel={t("复制命令")} />
-    <ChatCodeBlock text={item.aggregatedOutput || (item.status === 'inProgress' ? t("等待输出…") : t("没有文本输出"))}
-      label={t("输出")} copyLabel={t("复制输出")} />
+    <CommandOutput command={item.command ?? ''} label={t("工具内容")}
+      output={item.aggregatedOutput || (item.status === 'inProgress' ? t("等待输出…") : t("没有文本输出"))}
+      copyCommand={<ChatCopyButton text={item.command ?? ''} label={t("复制命令")} iconOnly />}
+      copyOutput={<ChatCopyButton text={item.aggregatedOutput ?? ''} label={t("复制输出")} iconOnly />} />
     {item.exitCode != null && <p className={item.exitCode ? 'chat-error' : 'chat-muted'}>{t("退出码：")}{item.exitCode}</p>}
   </>;
   if (item.type === 'fileChange') return <ChatDiff files={files}
@@ -59,7 +62,8 @@ export function ChatToolContent({ item }: { item: Item }) {
       {state.message && <ChatMarkdown text={state.message} />}</div>)}
   </>;
   if (['imageView', 'imageGeneration'].includes(item.type)) return <>
-    <ChatImage source={generatedImageSource(item)} description={item.type === 'imageView' ? t("查看的图片") : t("生成的图片")} />
+    <ChatImage source={generatedImageSource(item)} compact={item.type === 'imageView'}
+      description={item.type === 'imageView' ? t("查看的图片") : t("生成的图片")} />
     <p className="chat-muted">{item.path || item.savedPath}</p>
     {item.failure?.message && <p className="chat-error">{item.failure.message}</p>}
     {item.revisedPrompt && <ChatMarkdown text={item.revisedPrompt} />}

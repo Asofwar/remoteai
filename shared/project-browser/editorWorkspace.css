@@ -13,3 +13,9 @@
 .pf-tab-menu { width: 300px; }
 .pf-tab-menu kbd { color: var(--pf-muted); font: inherit; white-space: nowrap; }
 .pf-tab-menu .pf-menu-icon-space { flex: 0 0 16px; }
+.pf-tab-overflow-menu { width: 300px; }
+.pf-tab-overflow-item { display: flex; align-items: center; gap: 2px; }
+.pf-tab-overflow-menu .pf-tab-overflow-select { flex: 1; min-width: 0; width: auto; }
+.pf-tab-overflow-label { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.pf-tab-overflow-menu .pf-tab-overflow-close { width: 28px; padding: 5px; justify-content: center; }
+.pf-tab-overflow-menu button > .pf-dirty-dot { flex: 0 0 7px; }

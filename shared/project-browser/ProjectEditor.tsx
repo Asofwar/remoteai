@@ -8,10 +8,14 @@ import { ChevronsDownUp, ChevronsUpDown, Redo2, Search, Undo2, WrapText } from '
 import { editorHighlighting, editorLanguage, editorPhrases, editorTheme, textFolding } from './editorSetup';
 import { editorExtensions } from './editorExtensions';
 import type { BrowserTranslate } from './ProjectTree';
+import type { BrowserHost } from './entryActions';
+import { useEditorSelectionMenu } from './useEditorSelectionMenu';
+import { EditorSelectionMenu } from './EditorSelectionMenu';
 
 interface Props {
   text: string; path: string; readOnly: boolean; t: BrowserTranslate;
   onChange: (text: string) => void; save: () => void;
+  quoteSelection?: BrowserHost['quoteSelection'];
 }
 
 export function ProjectEditor(props: Props) {
@@ -23,6 +27,7 @@ export function ProjectEditor(props: Props) {
   latest.current = props;
   const [wrap, setWrap] = useState(false);
   const [languageError, setLanguageError] = useState(false);
+  const selectionMenu = useEditorSelectionMenu({ view, path: props.path, enabled: !!props.quoteSelection });
   useLayoutEffect(() => {
     if (!host.current) return;
     const { editable, wrapping, language } = settings.current;
@@ -37,6 +42,7 @@ export function ProjectEditor(props: Props) {
         editable.of(EditorState.readOnly.of(props.readOnly)), wrapping.of([]), language.of(syntax ? [] : textFolding),
         keymap.of([indentWithTab, { key: 'Mod-s', run: () => { latest.current.save(); return true; } }]),
         EditorView.updateListener.of(update => {
+          if (update.docChanged || update.selectionSet) selectionMenu.changed(update.docChanged);
           if (update.docChanged && !synchronizing.current) latest.current.onChange(update.state.sliceDoc());
         }),
       ] }),
@@ -93,5 +99,8 @@ export function ProjectEditor(props: Props) {
       {languageError && <span role="status">{props.t('语法高亮暂不可用')}</span>}
     </div>
     <div ref={host} className="pf-editor-host" />
+    {selectionMenu.menu && view.current && props.quoteSelection && <EditorSelectionMenu
+      menu={selectionMenu.menu} editor={view.current} quoteSelection={props.quoteSelection}
+      close={selectionMenu.close} t={props.t} />}
   </div>;
 }

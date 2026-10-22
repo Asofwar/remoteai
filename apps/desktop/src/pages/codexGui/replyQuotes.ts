@@ -1,4 +1,4 @@
-export interface ReplyQuote { messageId: string; text: string }
+export interface ReplyQuote { messageId: string; text: string; source?: 'file' }
 export const MAX_REPLY_QUOTES = 8;
 export const MAX_QUOTE_CHARACTERS = 16_000;
 
@@ -11,5 +11,7 @@ export function quotedReply(text: string, quotes: ReplyQuote[] = []): string {
   if (!quotes.length) return text;
   const references = quotes.map((quote) => quote.text.replace(/\r\n?/g, "\n")
     .split("\n").map((line) => `> ${line}`).join("\n")).join("\n\n");
-  return `引用 AI 回答：\n${references}${text.trim() ? `\n\n${text}` : ""}`;
+  const header = quotes.every(quote => quote.source === 'file') ? '引用文件内容：'
+    : quotes.some(quote => quote.source === 'file') ? '引用对话内容：' : '引用 AI 回答：';
+  return `${header}\n${references}${text.trim() ? `\n\n${text}` : ""}`;
 }

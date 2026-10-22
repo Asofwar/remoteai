@@ -82,7 +82,10 @@ test('white theme remains usable on narrow and tablet screens', async ({ page })
   await page.addInitScript((key) => localStorage.setItem(key, 'light'), storageKey);
   for (const width of [320, 768]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const path of ['', 'en/', 'features/', 'features/remote-workspace/', 'download/', 'guide/']) {
+    const paths = [
+      '', 'en/', 'features/', 'features/remote-workspace/', 'download/', 'guide/', 'resources/', 'en/resources/',
+    ];
+    for (const path of paths) {
       await page.goto(`${basePath}${path}`);
       await expect(page.locator('h1')).toBeVisible();
       await expect(page.locator('html')).toHaveCSS('background-color', white);

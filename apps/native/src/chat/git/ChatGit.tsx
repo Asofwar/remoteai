@@ -18,7 +18,7 @@ import { GitMenu, type GitMenuTarget } from './GitMenu';
 import { GitFileActionConfirmation, GitRevisionConfirmation } from './GitActionConfirmations';
 
 interface Props {
-  client: GitClient; cwd: string; active: boolean; connected: boolean; deviceName?: string; onClose: () => void;
+  client: GitClient; cwd: string; active: boolean; connected: boolean; onClose: () => void;
   downloads?: DownloadClient;
 }
 
@@ -39,11 +39,10 @@ export function ChatGit(props: Props) {
   const commitFiles = useGitCommitFiles(props.client, props.cwd, detail?.commit?.hash, props.active && props.connected);
   const diff = useGitDiff(props.client, props.cwd, panel.detail, props.active && props.connected);
   const { height } = useWindowDimensions();
-  return <BottomSheet visible={props.active} title="Git" subtitle={props.deviceName} onClose={close}
+  return <BottomSheet visible={props.active} title="Git" onClose={close}
     onBack={detail ? panel.backDetail : undefined} tall dragFromHeaderOnly fullWidthContent compactHeader>
     <View style={{ height: height * .80, flexShrink: 1 }}>
       <GitToolbar panel={panel} connected={props.connected} />
-      <Text numberOfLines={1} style={styles.project}>{panel.changes?.root ?? props.cwd}</Text>
       {!props.cwd && <Text style={styles.notice}>{t("请先选择一个项目。")}</Text>}
       {!props.connected && <Text style={styles.notice}>{t("电脑连接后即可使用 Git。")}</Text>}
       {!!panel.error && <Text accessibilityRole="alert" style={styles.error}>{panel.error}</Text>}

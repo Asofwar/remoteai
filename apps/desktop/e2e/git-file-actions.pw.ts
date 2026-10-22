@@ -7,7 +7,11 @@ for (const width of [390, 820]) {
     const rollback = page.getByRole('button', { name: '回退所选文件', exact: true });
     await expect(rollback).toBeDisabled();
     await expect(page.locator('.git-toolbar-actions button svg')).toHaveCount(6);
-    await expect(page.locator('.git-tracking-branches')).toHaveText('main → origin/main');
+    await expect(page.getByRole('button', { name: '拉取 Pull', exact: true })).toHaveText('1');
+    await expect(page.getByRole('button', { name: '推送 Push', exact: true })).toHaveText('2');
+    await page.getByRole('button', { name: '切换分支', exact: true }).click();
+    await expect(page.locator('.git-current-branch')).toHaveText('当前选择：main → origin/main');
+    await page.getByRole('button', { name: '关闭菜单', exact: true }).click();
     const selected = page.getByRole('checkbox', { name: '选择 src/app.ts', exact: true });
     await selected.check();
     const draft = page.getByRole('textbox', { name: '提交说明', exact: true });
@@ -53,7 +57,8 @@ for (const width of [390, 820]) {
   test(`Git shows the complete long branch at ${width}px`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/e2e/git-actions.html?longBranch');
-    const branch = page.locator('.git-tracking-branches');
+    await page.getByRole('button', { name: '切换分支', exact: true }).click();
+    const branch = page.locator('.git-current-branch');
     await expect(branch).toContainText(' → origin/feature/');
     expect(await branch.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

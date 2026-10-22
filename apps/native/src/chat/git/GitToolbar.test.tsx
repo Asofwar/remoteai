@@ -19,6 +19,7 @@ vi.mock('@expo/vector-icons', () => ({ Ionicons: 'Icon' }));
 
 interface NodeProps {
   children?: ReactNode; disabled?: boolean; onPress?: () => void; style?: { maxWidth?: number };
+  accessibilityLabel?: string;
 }
 function nodes(tree: ReactNode): ReactElement<NodeProps>[] {
   return Children.toArray(tree).flatMap(child => isValidElement<NodeProps>(child)
@@ -40,6 +41,9 @@ afterEach(() => vi.unstubAllGlobals());
 
 it('offers automatic merge for update and leaves strategy choices on pull', () => {
   const tree = GitToolbar({ panel, connected: true });
+  const buttons = nodes(tree).filter(node => node.props.onPress);
+  expect(text(buttons.find(node => node.props.accessibilityLabel === '拉取 Pull'))).toBe('2');
+  expect(text(buttons.find(node => node.props.accessibilityLabel === '推送 Push'))).toBe('1');
   expect(text(tree)).toContain('获取远程更新，无冲突时自动合并并提交。');
   expect(text(tree)).not.toContain('变基 Rebase');
   const submit = nodes(tree).find(node => node.props.onPress && text(node) === '执行 更新项目')!;
@@ -48,6 +52,8 @@ it('offers automatic merge for update and leaves strategy choices on pull', () =
   expect(action).toHaveBeenCalledExactlyOnceWith('update');
   state.menu = 'actions'; state.action = 'pull';
   expect(text(GitToolbar({ panel, connected: true }))).toContain('变基 Rebase');
+  state.menu = 'branches';
+  expect(text(GitToolbar({ panel, connected: true }))).toContain('当前选择：master → origin/master');
 });
 
 it('keeps the explanation compact and disables update for local edits', () => {

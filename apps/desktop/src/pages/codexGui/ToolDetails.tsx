@@ -11,6 +11,7 @@ import { DeferredDetails } from "./DeferredDetails";
 import { ToolText } from "./ToolText";
 import { CollaborationDetails } from "./CollaborationDetails";
 import { isCollaborationActivity } from "./collaborationActivity";
+import { CommandOutput } from "../../../../../shared/chat/CommandOutput";
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
@@ -67,14 +68,12 @@ export function ToolDetails({ item, text }: { item: Item; text: string }) {
   if (item.type === "contextCompaction") return <p>{guiText("较早的对话已整理为摘要，可以继续处理当前任务。")}</p>;
   if (item.type === "commandExecution") return <>
     <div className={styles.commandToolbar}><span>{item.cwd}</span>
-      {item.durationMs != null && <span>{formatTurnDuration(item.durationMs)}</span>}
-      <CopyButton text={item.command ?? ""} label={guiText("复制命令")} /></div>
-    <ToolText className={styles.commandCode} text={item.command ?? ""} />
-    <ToolText className={styles.output}
-      text={item.aggregatedOutput || (item.status === "inProgress" ? guiText("等待输出…") : guiText("没有文本输出"))} />
-    <div className={styles.commandToolbar}>
-      {item.exitCode != null && <span>{guiText("退出码：")}{item.exitCode}</span>}
-      <CopyButton text={item.aggregatedOutput ?? ""} label={guiText("复制输出")} /></div>
+      {item.durationMs != null && <span>{formatTurnDuration(item.durationMs)}</span>}</div>
+    <CommandOutput command={item.command ?? ""} label={guiText("工具内容")}
+      output={item.aggregatedOutput || (item.status === "inProgress" ? guiText("等待输出…") : guiText("没有文本输出"))}
+      copyCommand={<CopyButton text={item.command ?? ""} label={guiText("复制命令")} />}
+      copyOutput={<CopyButton text={item.aggregatedOutput ?? ""} label={guiText("复制输出")} />} />
+    {item.exitCode != null && <div className={styles.commandToolbar}>{guiText("退出码：")}{item.exitCode}</div>}
   </>;
   if (["mcpToolCall", "dynamicToolCall", "functionCallOutput"].includes(item.type)) return <ToolResult item={item} />;
   if (item.type === "webSearch") return <>

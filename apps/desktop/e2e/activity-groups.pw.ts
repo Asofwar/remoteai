@@ -32,7 +32,7 @@ test("consecutive operations show only the latest running row and reveal history
   await expect(completed.locator("span")).toHaveCSS("animation-name", "none");
   await expect(completed.locator("svg").last()).toHaveCSS("opacity", "0");
   await completed.click();
-  await expect(page.getByRole("region", { name: "工具内容" }).last()).toHaveText("result-0");
+  await expect(page.getByRole("region", { name: "工具内容" }).locator("pre code").last()).toHaveText("result-0");
   await page.getByLabel("消息", { exact: true }).fill("查看命令时继续输入");
   await expect(page.getByLabel("消息", { exact: true })).toHaveValue("查看命令时继续输入");
   await summary.focus();

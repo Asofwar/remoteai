@@ -2,17 +2,10 @@ import { guiText } from "../../i18n/guiText";
 import { CopyButton } from "./CopyButton";
 import { RichText } from "./RichText";
 import styles from "./ActivityRow.module.less";
+import { CompletePlainText } from "../../../../../shared/chat/CompletePlainText";
 
 const COPY_ACTION_THRESHOLD = 8_000;
 const MAX_FORMATTED_TOOL_CHARACTERS = 100_000;
-const TEXT_NODE_CHARACTERS = 10_000;
-
-function completePlainText(text: string) {
-  // Mount every span immediately; a single million-character text node can stall Chromium on expansion.
-  return Array.from({ length: Math.ceil(text.length / TEXT_NODE_CHARACTERS) }, (_, index) => (
-    <span key={index}>{text.slice(index * TEXT_NODE_CHARACTERS, (index + 1) * TEXT_NODE_CHARACTERS)}</span>
-  ));
-}
 
 /** The enclosing disclosure owns mounting; an open output always contains the complete text. */
 export function ToolText({ text, markdown = false, className }: {
@@ -23,7 +16,7 @@ export function ToolText({ text, markdown = false, className }: {
   return <>
     <div className={styles.textViewport}
       tabIndex={0} role="region" aria-label={guiText("工具内容")}>
-      {formatMarkdown ? <RichText text={text} /> : <pre className={className}>{completePlainText(text)}</pre>}
+      {formatMarkdown ? <RichText text={text} /> : <pre className={className}><CompletePlainText text={text} /></pre>}
     </div>
     {text.length > COPY_ACTION_THRESHOLD && <div className={styles.outputActions}>
       <CopyButton text={text} label={guiText("复制完整内容")} />

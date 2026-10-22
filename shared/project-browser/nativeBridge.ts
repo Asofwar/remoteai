@@ -1,6 +1,7 @@
 import { PROJECT_FILE_LIMIT, type ProjectBrowserClient } from './protocol';
 import type { DocumentsSnapshot } from './documents';
 import { withinPath, type BrowserHost, type EntryAction } from './entryActions';
+import { validFileSelection } from './fileSelection';
 
 function entryAction(target: Record<string, unknown>): EntryAction {
   if (target.action === 'delete') return { action: 'delete' };
@@ -52,9 +53,15 @@ export async function handleBrowserRequest(raw: string, options: {
     if (message.action === 'mutate') {
       return { type: 'reply', id, data: await options.client.mutate({ ...file, ...entryAction(target) }) };
     }
-    if (['copyPath', 'download', 'reference'].includes(String(message.action))) {
+    if (['copyPath', 'download', 'reference', 'quoteSelection'].includes(String(message.action))) {
       if (!options.host || !withinPath(file.path, options.cwd)
         || file.path.replace(/\\/g, '/').split('/').includes('..')) throw new Error('操作未完成，请重试。');
+      if (message.action === 'quoteSelection') {
+        if (!options.host.quoteSelection || !validFileSelection(target)) throw new Error('操作未完成，请重试。');
+        const { path, start, end, text } = target;
+        await options.host.quoteSelection({ path, start, end, text });
+        return { type: 'reply', id };
+      }
       if (message.action === 'reference') {
         await referenceEntry(target, file.path, options.host);
         return { type: 'reply', id };

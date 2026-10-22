@@ -1,5 +1,6 @@
 import type { ProjectFileTarget } from './protocol';
 import type { ProjectFile } from '../remote-chat/projectFiles';
+import type { FileSelection } from './fileSelection';
 
 export type EntryAction =
   | { action: 'createFile' | 'createFolder' | 'rename'; name: string }
@@ -11,6 +12,7 @@ export interface EntryChange { path: string; directory: boolean }
 export interface BrowserHost {
   copyPath: (path: string) => Promise<void>;
   reference?: (entry: ProjectFile) => Promise<void>;
+  quoteSelection?: (selection: FileSelection) => Promise<void>;
   open?: (entry: ProjectFile, application: 'explorer' | 'terminal') => Promise<void>;
   download?: (target: ProjectFileTarget) => Promise<string>;
 }

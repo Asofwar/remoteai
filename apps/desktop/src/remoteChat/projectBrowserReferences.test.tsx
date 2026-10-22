@@ -2,7 +2,7 @@
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ChatFileReferencesProvider, useChatFileReference,
+import { ChatFileReferencesProvider, useChatFileReference, useChatFileSelection,
   useComposerFileReferences } from '../../../../shared/chat/ChatFileReferences';
 import { useComposerAttachments } from '../../../web/src/chat/useComposerAttachments';
 
@@ -10,11 +10,13 @@ let root: Root;
 let reference: ReturnType<typeof useChatFileReference>;
 let attachments: ReturnType<typeof useComposerAttachments>;
 const focus = vi.fn();
+const addQuote = vi.fn(() => true);
+let quoteSelection: ReturnType<typeof useChatFileSelection>;
 const file = { path: 'D:/remote/文件 name.ts', name: '文件 name.ts', directory: false };
-function Browser() { reference = useChatFileReference(); return null; }
+function Browser() { reference = useChatFileReference(); quoteSelection = useChatFileSelection(); return null; }
 function Composer({ scope, enabled }: { scope: string; enabled: boolean }) {
   attachments = useComposerAttachments({ threadId: scope, sending: false });
-  useComposerFileReferences({ scope, enabled, add: attachments.add, focus });
+  useComposerFileReferences({ scope, enabled, add: attachments.add, addQuote, focus });
   return null;
 }
 async function render(scope = 'a', enabled = true, mounted = true) {
@@ -25,6 +27,7 @@ async function render(scope = 'a', enabled = true, mounted = true) {
 beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   focus.mockClear();
+  addQuote.mockReset().mockReturnValue(true);
   root = createRoot(document.createElement('div'));
   await render();
 });
@@ -42,6 +45,25 @@ it('adds file and folder references once and focuses only when the browser is cl
   ]);
   afterClose();
   expect(focus).toHaveBeenCalledOnce();
+});
+
+it('quotes the selected snapshot and focuses only its own conversation after closing the browser', async () => {
+  const selection = { path: file.path, start: { line: 2, column: 3 }, end: { line: 2, column: 8 }, text: 'draft' };
+  const afterClose = quoteSelection(selection);
+  expect(addQuote).toHaveBeenCalledWith({ messageId: `file:${file.path}:2:3-2:8`, source: 'file',
+    text: `${file.path}:2:3-2:8\n\`\`\`\ndraft\n\`\`\`` });
+  expect(focus).not.toHaveBeenCalled();
+  expect(attachments.items).toEqual([]);
+  await render('b');
+  afterClose();
+  expect(focus).not.toHaveBeenCalled();
+  quoteSelection(selection)();
+  expect(focus).toHaveBeenCalledOnce();
+  addQuote.mockReturnValue(false);
+  expect(() => quoteSelection(selection)).toThrow('引用数量');
+  expect(() => quoteSelection({ ...selection, text: 'x'.repeat(16_001) })).toThrow('缩小引用范围');
+  await render('b', false);
+  expect(() => quoteSelection(selection)).toThrow('聊天可用');
 });
 
 it('keeps rejected references out of the draft and permits duplicates at the limit', () => {

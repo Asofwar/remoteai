@@ -96,3 +96,24 @@ it('rejects invalid references and reports composer rejection without acknowledg
   await send({ path: '/project/a', name: 'a', directory: false });
   expect(reference).toHaveBeenCalledOnce();
 });
+
+it('quotes the selected draft with its exact range and rejects invalid or out-of-project selections', async () => {
+  const quoteSelection = vi.fn().mockResolvedValue(undefined);
+  const options = { ...fixture(), host: { copyPath: vi.fn(), quoteSelection } };
+  const body = { path: '/project/a.ts', start: { line: 2, column: 3 }, end: { line: 4, column: 5 },
+    text: 'unsaved\n  content' };
+  const send = (selection: object) => handleBrowserRequest(JSON.stringify({
+    type: 'request', id: 6, action: 'quoteSelection', body: selection,
+  }), options);
+  expect(await send(body)).toEqual({ type: 'reply', id: 6 });
+  expect(quoteSelection).toHaveBeenCalledWith(body);
+  expect(options.client.read).not.toHaveBeenCalled();
+  for (const invalid of [
+    { path: '/project/../secret' }, { path: '/other/a' }, { text: '' }, { text: 'x'.repeat(16_001) },
+    { start: { line: 0, column: 1 } }, { end: { line: 1, column: 1 } },
+    { end: { line: 2, column: 3 } }, { end: { line: 4, column: 1.2 } },
+  ]) expect(await send({ ...body, ...invalid })).toMatchObject({ error: expect.any(String) });
+  expect(quoteSelection).toHaveBeenCalledOnce();
+  quoteSelection.mockRejectedValueOnce(new Error('引用已满'));
+  expect(await send(body)).toEqual({ type: 'reply', id: 6, error: '引用已满' });
+});

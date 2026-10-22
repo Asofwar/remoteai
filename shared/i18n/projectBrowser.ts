@@ -1,4 +1,11 @@
 export const projectBrowserEnglish: Readonly<Record<string, string>> = {
+  '引用到聊天': 'Quote in chat',
+  '文本操作': 'Text actions',
+  '全选': 'Select all',
+  '暂时无法引用，请确认聊天可用且引用数量未达上限。':
+    'Unable to quote. Check that chat is available and the quote limit has not been reached.',
+  '这段内容太长，请缩小引用范围。': 'This selection is too long. Select a shorter passage.',
+  '无法读取剪贴板，请使用粘贴快捷键。': 'Unable to read the clipboard. Use the paste keyboard shortcut.',
   '文件操作': 'File actions',
   '项目文件夹操作': 'Project folder actions',
   '新建': 'New',
@@ -134,6 +141,13 @@ export const projectBrowserEnglish: Readonly<Record<string, string>> = {
 };
 
 export const projectBrowserRussian: Readonly<Record<string, string>> = {
+  '引用到聊天': 'Цитировать в чате',
+  '文本操作': 'Действия с текстом',
+  '全选': 'Выделить всё',
+  '暂时无法引用，请确认聊天可用且引用数量未达上限。':
+    'Не удалось добавить цитату. Проверьте доступность чата и лимит цитат.',
+  '这段内容太长，请缩小引用范围。': 'Выделенный текст слишком длинный. Выберите более короткий фрагмент.',
+  '无法读取剪贴板，请使用粘贴快捷键。': 'Не удалось прочитать буфер обмена. Используйте сочетание клавиш для вставки.',
   '文件操作': 'Действия с файлом',
   '项目文件夹操作': 'Действия с папкой проекта',
   '新建': 'Создать',

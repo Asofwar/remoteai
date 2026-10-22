@@ -143,6 +143,7 @@ export function ChatComposer({ projectPicker, suggestions, models, selection, se
   const attachmentBusy = sending || photos.busy || attachments.busy || queueEditor.loading;
   useComposerFileReferences({ scope: `${threadId ?? ''}:${cwd}`,
     enabled: active && !disabled && !attachmentBusy && !goalMode.enabled, add: attachments.add,
+    addQuote: quote => quoteDraft?.add({ ...quote, role: 'tool' }) ?? false,
     focus: () => menu.input.current?.focus() });
   const cannotSend = disabled || attachmentBusy || goalBusy || (goalMode.enabled && running)
     || (action === 'send' && !hasDraft);

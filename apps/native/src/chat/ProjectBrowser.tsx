@@ -15,7 +15,7 @@ import { useFilePreferences, setFileAutoSave } from '../settings/filePreferences
 import { readBrowserSession, saveBrowserSession } from './projectBrowserSessions';
 import type { DocumentsSnapshot } from '../../../../shared/project-browser/documents';
 import { projectBrowserHost } from './projectBrowserHost';
-import { useChatFileReference } from '../../../../shared/chat/ChatFileReferences';
+import { useChatFileReference, useChatFileSelection } from '../../../../shared/chat/ChatFileReferences';
 
 export function ProjectBrowser({ client, cwd, connected, active, onClose }: {
   client: ProjectBrowserClient; cwd: string; connected: boolean; active: boolean; onClose: () => void;
@@ -26,11 +26,15 @@ export function ProjectBrowser({ client, cwd, connected, active, onClose }: {
   const preferences = useFilePreferences();
   const webview = useRef<WebView>(null);
   const reference = useChatFileReference();
+  const quoteSelection = useChatFileSelection();
   const focusAfterClose = useRef<(() => void) | null>(null);
   const transfer = useMemo(() => new AbortController(), [client, cwd]);
   const host = useMemo(() => ({ ...projectBrowserHost(client, transfer.signal),
     reference: async (entry: Parameters<typeof reference>[0]) => { focusAfterClose.current = reference(entry); },
-  }), [client, transfer, reference]);
+    quoteSelection: async (selection: Parameters<typeof quoteSelection>[0]) => {
+      focusAfterClose.current = quoteSelection(selection);
+    },
+  }), [client, transfer, reference, quoteSelection]);
   useEffect(() => () => transfer.abort(), [transfer]);
   const [html, setHtml] = useState('');
   const [error, setError] = useState('');

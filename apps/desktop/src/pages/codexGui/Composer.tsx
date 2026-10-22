@@ -70,7 +70,7 @@ export const Composer = forwardRef<ComposerHandle, {
   const reading = draftReading || drop.reading || dictating;
   useComposerFileReferences({ scope: `${key}:${project}`,
     enabled: active && !disabled && !reading && !goalMode.enabled,
-    add: reference => addAttachments([reference]), focus: () => skillInput.current?.focus() });
+    add: reference => addAttachments([reference]), addQuote, focus: () => skillInput.current?.focus() });
   const hasDraft = Boolean(draft.text.trim() || draft.images.length
     || draft.attachments?.length || draft.quotes?.length);
   const suggestion = useNextPromptSuggestion(state, { active,

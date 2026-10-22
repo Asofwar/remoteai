@@ -63,10 +63,9 @@ test('maps hover, left/right/middle clicks, dragging and wheel to the actual vid
   expect(await page.evaluate(() => window.desktopTest.inputs.length)).toBe(count);
 });
 
-test('forwards physical keys, editing shortcuts and IME text, releasing modifiers on blur', async ({ page }) => {
+test('forwards physical keys and editing shortcuts, releasing modifiers on blur', async ({ page }) => {
   await focusDesktop(page);
   await page.keyboard.press('Control+a'); await page.keyboard.press('ArrowLeft'); await page.keyboard.press('F2');
-  await page.keyboard.insertText('中文输入');
   await page.keyboard.down('Shift');
   await page.evaluate(() => window.dispatchEvent(new Event('blur')));
   await expect.poll(() => page.evaluate(() => window.desktopTest.inputs.at(-1)))
@@ -77,7 +76,6 @@ test('forwards physical keys, editing shortcuts and IME text, releasing modifier
   expect(inputs).toContainEqual({ kind: 'keyboard', code: 'ControlLeft', down: false });
   expect(inputs).toContainEqual({ kind: 'keyboard', code: 'ArrowLeft', down: true });
   expect(inputs).toContainEqual({ kind: 'keyboard', code: 'F2', down: true });
-  expect(inputs).toContainEqual({ kind: 'text', text: '中文输入' });
   await page.keyboard.up('Shift');
   await page.getByRole('button', { name: '键盘', exact: true }).click();
   const count = inputs.length;

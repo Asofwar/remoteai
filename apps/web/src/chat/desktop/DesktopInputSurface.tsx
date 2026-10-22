@@ -30,7 +30,8 @@ export function DesktopInputSurface({ pointer, viewport, input, trackpad, hardwa
       onWheel={event => { if (!active) return;
         if (hardware) mouse.onWheel(event); else wheel(event.deltaY > 0 ? -120 : 120); }}
       aria-label={t('远程桌面触控区域')} />
-    <textarea ref={capture} className="rd-key-capture" tabIndex={-1} inputMode="none" spellCheck={false}
+    {/* A read-only PC target disables local IME while retaining physical keys and trusted paste events. */}
+    <textarea ref={capture} className="rd-key-capture" tabIndex={-1} inputMode="none" readOnly={hardware} spellCheck={false}
       autoCapitalize="off" autoComplete="off" aria-label={t('远程桌面键盘输入')} {...keyboard.handlers} />
   </>;
 }

@@ -4,7 +4,7 @@ import type { NativeMediaFactory, NativeMediaSession } from '../../../../shared/
 import { closeNativeMedia, openNativeMedia, nativeMediaIceServers }
   from '../../../../shared/remote-desktop/nativeMedia';
 import type { ConnectionDiagnostic } from '../../../../shared/remote-chat/diagnostics';
-import type { DesktopHostSession } from './host';
+import type { DesktopHostSession } from './hostRegistry';
 
 interface Options {
   id: string;

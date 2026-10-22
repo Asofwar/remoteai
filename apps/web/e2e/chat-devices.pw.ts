@@ -53,6 +53,46 @@ test.beforeEach(async ({ request }) => {
   await request.post(`${fixtureUrl}/test/reset`);
 });
 
+test('desktop computer search keeps its query while refreshing and recovers after a failed refresh',
+  async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'The search bar belongs to the desktop picker.');
+    await provideComputers(page, computers);
+    await login(page);
+    await connect(page);
+    await connectedTo(page, '我的工作电脑');
+    await page.getByRole('button', { name: '选择电脑', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: '选择电脑', exact: true });
+    const search = dialog.getByRole('textbox', { name: '搜索主机', exact: true });
+    const refresh = dialog.getByRole('button', { name: '刷新主机列表', exact: true });
+    await search.fill('另一台');
+    await expect(dialog.getByRole('button', { name: '我的工作电脑 在线', exact: true })).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: '另一台电脑 在线', exact: true })).toBeVisible();
+    let release = () => {};
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    await page.route('**/devices', async route => {
+      await pending;
+      await route.fulfill({ status: 503, json: { message: 'Fixture refresh unavailable' } });
+    });
+    await refresh.click();
+    await expect(refresh).toBeDisabled();
+    await search.fill('工作');
+    await expect(dialog.getByRole('button', { name: '我的工作电脑 在线', exact: true })).toBeVisible();
+    release();
+    await expect(dialog.getByRole('alert')).toHaveText('暂时无法读取电脑列表，请重试。');
+    await expect(refresh).toBeEnabled();
+    const devices = computers().map(device => device.deviceId === COMPUTER
+      ? { ...device, name: '工作电脑已更新' } : device);
+    await page.route('**/devices', route => route.fulfill({ json: { devices } }));
+    await refresh.click();
+    await expect(dialog.getByRole('button', { name: '工作电脑已更新 在线', exact: true })).toBeVisible();
+    await expect(dialog.getByRole('alert')).toHaveCount(0);
+    await expect(search).toHaveValue('工作');
+    await expect(refresh).toBeEnabled();
+    await expect(refresh).toHaveText('');
+    await search.fill('');
+    await screenshot(page, info, 'computer-search-footer');
+  });
+
 for (const transport of ['P2P', 'Relay']) {
   test(`retains both device sessions, conversation and drafts over ${transport}`, async ({ page, request }, info) => {
     if (transport === 'Relay') await page.addInitScript(() => {

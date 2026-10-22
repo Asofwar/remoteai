@@ -10,12 +10,15 @@ import { useChatViewport } from './useChatViewport';
 import { loadLastConnectedDevice, saveLastConnectedDevice } from './lastConnectedDevice';
 import { useDownloadConnection } from '../downloads/useDownloadConnection';
 import { useRetainedChatDevices } from '../../../../shared/remote-chat/useRetainedChatDevices';
+import type { ComputerListRefresh } from '../../../../shared/remote-chat/ComputerSearchBar';
+import { useComputerListRefresh } from './useComputerListRefresh';
 
 interface Props { session: AuthSession; devices: RemoteDevice[]; active: boolean }
 
 export function ChatPage({ session, devices, active }: Props) {
   useLanguage();
   const dispatch = useAppDispatch();
+  const deviceRefresh = useComputerListRefresh();
   const [lastConnectedDeviceId] = useState(() => loadLastConnectedDevice(session));
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const device = devices.find((entry) => entry.deviceId === deviceId)
@@ -37,7 +40,7 @@ export function ChatPage({ session, devices, active }: Props) {
       return <div className="chat-device-session" hidden={!selected}
         key={JSON.stringify([scope, chatDevice?.deviceId])}>
         <WebChat session={session} device={chatDevice} devices={devices} selected={selected}
-          active={active && selected} chooseDevice={setDeviceId} />
+          active={active && selected} chooseDevice={setDeviceId} deviceRefresh={deviceRefresh} />
       </div>;
     })}
   </section>;
@@ -45,6 +48,7 @@ export function ChatPage({ session, devices, active }: Props) {
 
 function WebChat({ session, device, selected, ...props }: Props & {
   device?: RemoteDevice; selected: boolean; chooseDevice: (id: string) => void;
+  deviceRefresh: ComputerListRefresh;
 }) {
   const chat = useChat(session, device?.deviceId ?? '', props.active && Boolean(device));
   useEffect(() => {

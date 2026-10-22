@@ -1,7 +1,8 @@
 import { guiText } from "../../i18n/guiText";
 import { useEffect, useRef, useState } from 'react';
-import { Input, Popover, Spin, type InputRef } from 'antd';
-import { Check, ChevronDown, Laptop, Monitor, RefreshCw, Search } from 'lucide-react';
+import { Popover, type InputRef } from 'antd';
+import { Check, ChevronDown, Laptop, Monitor } from 'lucide-react';
+import { ComputerSearchBar } from '../../../../../shared/remote-chat/ComputerSearchBar';
 import type { GuiComputerNavigation } from './remote/types';
 import projectStyles from './ProjectPicker.module.less';
 import styles from './GuiHostPicker.module.less';
@@ -28,13 +29,12 @@ export function GuiHostPicker({ navigation, active }: { navigation: GuiComputerN
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
     const options = Array.from(list.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []);
     const current = options.indexOf(document.activeElement as HTMLButtonElement);
-    const next = current + (event.key === 'ArrowDown' ? 1 : -1);
+    const next = current < 0 && event.key === 'ArrowUp' ? options.length - 1
+      : current + (event.key === 'ArrowDown' ? 1 : -1);
     event.preventDefault();
     if (next < 0 || next >= options.length) search.current?.focus();
     else options[next]?.focus();
   }}>
-    <Input ref={search} variant="borderless" className={projectStyles.search} prefix={<Search size={16} />}
-      aria-label={guiText("搜索主机")} placeholder={guiText("搜索主机")} value={query} onChange={event => setQuery(event.target.value)} />
     <div ref={list} className={`${projectStyles.list} ${styles.list}`} role="menu"
       aria-label={guiText("主机列表")} aria-busy={navigation.loading}>
       {showLocal && <button type="button" role="menuitemradio" aria-checked={!currentId}
@@ -50,18 +50,15 @@ export function GuiHostPicker({ navigation, active }: { navigation: GuiComputerN
       </button>)}
       {!showLocal && !devices.length && <p className={projectStyles.empty}>{guiText("没有找到匹配的主机")}</p>}
     </div>
-    <div className={projectStyles.divider} />
     {!navigation.authenticated ? <button type="button" className={projectStyles.option}
       onClick={() => { close(); navigation.login(); }}>{guiText("登录后选择其他主机")}</button> : <>
       {!navigation.devices.length && !navigation.loading && !navigation.error
         && <p className={projectStyles.empty}>{guiText("在其他主机上打开 Remote AI，登录同一账户即可连接。")}</p>}
-      <button type="button" className={projectStyles.option} disabled={navigation.loading}
-        aria-label={guiText("刷新主机列表")} onClick={navigation.refresh}>
-        {navigation.loading ? <Spin size="small" /> : <RefreshCw size={16} />}
-        <span>{navigation.loading ? guiText("正在查找主机…") : guiText("刷新主机列表")}</span>
-      </button>
     </>}
     {navigation.error && <p className={`${projectStyles.empty} ${styles.error}`} role="alert">{navigation.error}</p>}
+    <ComputerSearchBar inputRef={search} query={query} onQueryChange={setQuery}
+      searchLabel={guiText("搜索主机")} refreshLabel={guiText("刷新主机列表")}
+      refresh={navigation.authenticated ? navigation : undefined} />
   </div>;
   return <Popover trigger="click" placement="topRight" arrow={false} open={open && active} content={panel}
     onOpenChange={next => { setOpen(next); if (next) { setQuery(''); navigation.refresh(); } }}

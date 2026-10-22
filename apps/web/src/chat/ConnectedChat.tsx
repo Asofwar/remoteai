@@ -6,6 +6,7 @@ import { t, useLanguage } from '../i18n';
 import { useEffect, useState, type ReactNode } from 'react';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import type { ChatComputer } from '../../../../shared/remote-chat/devices';
+import type { ComputerListRefresh } from '../../../../shared/remote-chat/ComputerSearchBar';
 import { ChatApproval } from './ChatApproval';
 import { ChatComposer } from './ChatComposer';
 import { ChatProjectSwitch } from './ChatProjectSwitch';
@@ -46,6 +47,7 @@ export interface ConnectedChatProps {
   device?: ChatComputer; devices: ChatComputer[]; active: boolean;
   scope: string; email: string; chooseDevice: (id: string) => void;
   chooseLocal?: () => void; accountPicker?: ReactNode; headerActions?: ReactNode;
+  deviceRefresh?: ComputerListRefresh;
   headerConnectionActions?: ReactNode; headerEnd?: ReactNode;
   draggableHeader?: boolean;
   scrollableComposer?: boolean;
@@ -68,7 +70,7 @@ export interface ChatSidebarActions {
 export function ConnectedChat({ chat, device, devices, active, scope, email, chooseDevice,
   chooseLocal, accountPicker, headerActions, headerConnectionActions, headerEnd, renderSidebar, composerHeader,
   conversationFooter, renderUserMessage, draggableHeader, scrollableComposer,
-  readClipboardImages, nativeFileDrop, desktopDiffs }: ConnectedChatProps) {
+  readClipboardImages, nativeFileDrop, desktopDiffs, deviceRefresh }: ConnectedChatProps) {
   useLanguage();
   const { state, controller, foreground } = chat;
   const [drawer, setDrawer] = useState(false);
@@ -201,7 +203,7 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
     {tokenSummary && <ChatTokenSummary read={controller.readTokenSummary} ready={ready}
       deviceName={device?.name} onClose={() => setTokenSummary(false)} />}
     {pickingDevice && <ChatDevices chooseLocal={chooseLocal} devices={devices} onClose={() => setPickingDevice(false)}
-      choose={(id) => { chooseDevice(id); setPickingDevice(false); }} />}
+      refresh={deviceRefresh} choose={(id) => { chooseDevice(id); setPickingDevice(false); }} />}
   </ChatQuotesProvider></ChatFileReferencesProvider></ChatDetailsWorkspace>
   </ChatFileContext.Provider></ChatImageContext.Provider></ImageAiContext.Provider>;
 }

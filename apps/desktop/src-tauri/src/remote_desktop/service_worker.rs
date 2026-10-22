@@ -111,6 +111,10 @@ async fn execute(call: Call, root: PathBuf) -> Result<Value, String> {
             let args: Id = decode(call.args)?;
             encode(super::stream::remote_desktop_stream_status(args.id).await?)
         }
+        "remote_desktop_input_focus" => {
+            let args: Id = decode(call.args)?;
+            encode(super::input_focus::remote_desktop_input_focus(args.id).await?)
+        }
         "remote_desktop_privacy" => {
             let args: Privacy = decode(call.args)?;
             encode(

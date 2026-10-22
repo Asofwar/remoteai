@@ -14,7 +14,7 @@
 
 .tabs > .header {
   display: grid;
-  grid-template-columns: max-content minmax(0, max-content);
+  grid-template-columns: max-content minmax(0, max-content) 1fr;
   flex-shrink: 0;
   align-items: center;
   justify-content: flex-start;
@@ -29,6 +29,12 @@
 .tabs .tabBar { min-width: 0; margin: 0; }
 .tabs .tabBar::before { border-bottom: 0; }
 .tabs .tabBar :global(.ant-tabs-tab) { padding: 8px 0; }
+.exportButton { grid-column: 3; grid-row: 2; justify-self: end; }
+
+@media (max-width: 600px) {
+  .tabs > .header { gap: 8px 14px; }
+  .exportButton { grid-column: 1 / -1; grid-row: 3; }
+}
 
 .tabs > :global(.ant-tabs-content-holder),
 .tabs :global(.ant-tabs-content),

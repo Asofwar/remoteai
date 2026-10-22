@@ -1,4 +1,9 @@
-import type { GitAction } from './gitTypes';
+import type { GitAction, GitRepository } from './gitTypes';
+
+export function gitSyncCounts(repository: GitRepository | null): Partial<Record<GitAction, number>> {
+  if (!repository?.upstream) return {};
+  return { pull: repository.behind, push: repository.ahead };
+}
 
 export const GIT_ACTIONS: { action: Exclude<GitAction, 'switch'>; label: string; hint: string }[] = [
   { action: 'fetch', label: '获取 Fetch', hint: '获取所有远程分支的最新记录，不修改本地文件。' },

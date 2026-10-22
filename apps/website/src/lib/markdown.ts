@@ -2,6 +2,7 @@ import type { Route } from '../App';
 import { copy, homeFaqs } from '../content/copy';
 import { featureContent, features, findFeature } from '../content/features';
 import { pageMetadata } from './metadata';
+import { resourceMarkdown } from './resource-content';
 import { pagePath, SITE_URL, sourceUrl, LINKS } from './site';
 
 function faqText(items: { question: string; answer: string }[]) {
@@ -33,6 +34,7 @@ export function renderMarkdown(route: Route) {
   const url = new URL(pagePath(language, path), SITE_URL).href;
   const sections = [`# ${meta.title}`, `> ${meta.description}`, `Source: ${url}`];
   if (path.startsWith('features/') && path !== 'features/') sections.push(featureText(route));
+  else if (path === 'resources/') sections.push(resourceMarkdown(language));
   else if (path === 'download/')
     sections.push(
       ...t.download.cards.map(

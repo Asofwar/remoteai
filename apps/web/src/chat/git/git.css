@@ -12,8 +12,6 @@
   --green-soft: var(--git-accent-bg); --green-dark: var(--git-accent);
   --gui-border: var(--git-border); --gui-muted: var(--git-muted);
 }
-.chat-git-drawer .chat-terminal-device { color: var(--git-muted); }
-.git-workspace-device { margin: 8px 16px 0; flex-shrink: 0; }
 .git-menu input::placeholder, .git-commit-form textarea::placeholder { color: var(--git-muted); opacity: 1; }
 .chat-git { position: relative; display: flex; flex-direction: column; min-height: 0;
   width: 100%; color: var(--git-ink, #17211b); background: var(--git-surface, #fff); }
@@ -25,6 +23,10 @@
 .git-toolbar-actions { display: flex; align-items: center; margin-left: auto; gap: 2px; }
 .git-toolbar-actions button { display: flex; align-items: center; justify-content: center;
   width: 36px; border-radius: 6px; }
+.git-toolbar-actions .git-counted-action { width: auto; min-width: 36px; padding-inline: 8px; gap: 2px; }
+.git-toolbar-actions svg { flex-shrink: 0; }
+.git-action-count { align-self: flex-start; font-size: 10px; line-height: 12px;
+  font-variant-numeric: tabular-nums; transform: translateY(-3px); }
 .git-toolbar-actions button:hover:not(:disabled), .git-toolbar-actions button[aria-expanded="true"] {
   background: var(--git-accent-bg, #e5f2eb); color: var(--git-accent, #25836c); }
 .git-branch { font-weight: 600; overflow-wrap: anywhere; }
@@ -34,10 +36,6 @@
   max-width: 100%; flex: 1 1 100px; padding-left: 0; color: var(--git-ink, #17211b); }
 .git-branch span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .git-branch svg, .git-file svg { flex-shrink: 0; }
-.git-tracking { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px;
-  padding: 0 16px 6px; color: var(--git-muted, #718078); font-size: 11px; }
-.git-tracking-branches { min-width: 0; overflow-wrap: anywhere; }
-.git-tracking-counts { flex-shrink: 0; white-space: nowrap; }
 .git-menu { position: absolute; top: 100%; left: 0; z-index: 20;
   box-sizing: border-box; width: calc(100% - 32px); max-width: 400px;
   max-height: min(440px, 60vh); overflow: auto; margin: 0 16px 8px; padding: 12px;
@@ -67,9 +65,6 @@
   min-height: 30px; font-size: 11px; color: var(--git-muted, #718078); }
 .git-view-toggle button[aria-pressed="true"] { background: var(--git-surface, white); color: var(--git-accent, #14785b);
   font-weight: 600; }
-.git-project { padding: 0 16px 10px; font-size: 11px; color: var(--git-muted, #718078);
-  white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; }
 .git-tabs { display: flex; flex-shrink: 0; margin: 0 16px; padding: 3px; gap: 4px;
   background: var(--git-subtle, #f2f5f3); border-radius: 10px; }
 .git-tabs button { flex: 1; border: 0; padding: 8px; min-height: 38px;

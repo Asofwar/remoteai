@@ -13,12 +13,17 @@ const filename = `node-${version}-win-x64.zip`;
 const url = `https://nodejs.org/dist/${version}/${filename}`;
 const output = resolve(root, 'apps/desktop/src-tauri/resources/desktop-service');
 
+export function bundleDesktopService({ write = true, metafile = false } = {}) {
+  return build({ entryPoints: [resolve(root, 'apps/desktop/service/host.ts')],
+    outfile: resolve(output, 'host.mjs'), bundle: true, platform: 'node', target: 'node24', format: 'esm',
+    legalComments: 'linked', alias: { '@tauri-apps/api/core': resolve(root, 'apps/desktop/service/rpc.ts') },
+    write, metafile });
+}
+
 export async function prepareDesktopService() {
   if (process.platform !== 'win32' || process.arch !== 'x64') return;
   await mkdir(output, { recursive: true });
-  await build({ entryPoints: [resolve(root, 'apps/desktop/service/host.ts')],
-    outfile: resolve(output, 'host.mjs'), bundle: true, platform: 'node', target: 'node24', format: 'esm',
-    legalComments: 'linked', alias: { '@tauri-apps/api/core': resolve(root, 'apps/desktop/service/rpc.ts') } });
+  await bundleDesktopService();
   const archive = resolve(root, '.codex-tmp/desktop-service-runtime', filename);
   const extracted = resolve(root, '.codex-tmp/desktop-service-runtime/extracted');
   await mkdir(resolve(archive, '..'), { recursive: true });

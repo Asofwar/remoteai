@@ -182,6 +182,7 @@ function scrollList() {
   const list = container.querySelector<HTMLDivElement>(`.${styles.threadList}`)!;
   Object.defineProperties(list, { clientHeight: { configurable: true, value: 400 },
     scrollHeight: { configurable: true, value: 1000 } });
+  list.dispatchEvent(new Event("scroll"));
   const scroll = (top: number) => act(async () => {
     list.scrollTop = top;
     list.dispatchEvent(new Event("scroll", { bubbles: true }));
@@ -192,7 +193,7 @@ function scrollList() {
   return { list, scroll, wheel };
 }
 
-it("loads near the bottom without a button and keeps rapid scrolling single-flight", async () => {
+it("refills at 70% of the buffered screen without a hint or overlapping requests", async () => {
   let finish!: () => void;
   const refresh = vi.spyOn(controller, "refresh").mockImplementation(() => new Promise<void>((resolve) => {
     finish = resolve;
@@ -200,11 +201,12 @@ it("loads near the bottom without a button and keeps rapid scrolling single-flig
   state = { ...state, cursor: "next" };
   await render();
   expect(button("加载更多")).toBeUndefined();
-  expect(container.textContent).toContain("向下滚动，查看更多");
+  expect(container.textContent).not.toContain("向下滚动，查看更多");
+  expect(container.querySelector('[role="status"]')).toBeNull();
   const { scroll, wheel } = scrollList();
-  await scroll(200);
+  await scroll(479);
   expect(refresh).not.toHaveBeenCalled();
-  await scroll(490);
+  await scroll(480);
   await scroll(510);
   await wheel(50);
   expect(refresh).toHaveBeenCalledExactlyOnceWith(true);
@@ -219,17 +221,15 @@ it("loads near the bottom without a button and keeps rapid scrolling single-flig
   await act(async () => finish());
 });
 
-it("ignores upward scrolling and pauses pagination while loading, disconnected, or exhausted", async () => {
+it("pauses pagination while loading, disconnected, or exhausted", async () => {
   const refresh = vi.spyOn(controller, "refresh").mockResolvedValue();
   state = { ...state, cursor: "next", loading: true };
   await render();
   const { scroll, wheel } = scrollList();
   await scroll(500);
-  state = { ...state, loading: false };
-  await render();
   await scroll(490);
   await wheel(-50);
-  state = { ...state, connection: "offline" };
+  state = { ...state, loading: false, connection: "offline" };
   await render();
   await wheel(50);
   state = { ...state, connection: "ready", cursor: null };

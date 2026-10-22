@@ -27,48 +27,76 @@ async function scrollDown(page: Page, touch: boolean) {
   } finally { await session.detach(); }
 }
 
-async function stopTouchMomentum(page: Page) {
-  const box = (await page.locator('.chat-thread-list').boundingBox())!;
-  const session = await page.context().newCDPSession(page);
-  try {
-    // Stop the previous fling before measuring the position a newly appended page must preserve.
-    await session.send('Input.dispatchTouchEvent', { type: 'touchStart',
-      touchPoints: [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }] });
-    await session.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
-  } finally { await session.detach(); }
-}
-
-test('loads once near the bottom using a mouse wheel or phone touch and preserves the reading position',
+test('refills at 70% of the buffered screen and preserves the idle reading position',
   async ({ page, isMobile }) => {
     let requests = 0;
     let finish = () => {};
     const pending = new Promise<void>(resolve => { finish = resolve; });
     await page.route('**/thread-page?*', async route => {
       const cursor = new URL(route.request().url()).searchParams.get('cursor');
-      if (!cursor) return route.fulfill({ json: { data: threads(0, 12), nextCursor: 'next' } });
+      if (!cursor) return route.fulfill({ json: { data: threads(0, 24), nextCursor: 'next' } });
       requests++;
       await pending;
-      await route.fulfill({ json: { data: threads(12, 12), nextCursor: null } });
+      await route.fulfill({ json: { data: threads(24, 24), nextCursor: null } });
     });
     await page.goto('./e2e/thread-pagination-harness.html');
-    await expect(page.locator('.chat-thread')).toHaveCount(12);
+    await expect(page.locator('.chat-thread')).toHaveCount(24);
     await expect(page.getByRole('button', { name: '加载更多', exact: true })).toHaveCount(0);
+    await expect(page.getByText('向下滚动，查看更多')).toHaveCount(0);
     expect(requests).toBe(0);
-    for (let step = 0; step < 6 && requests === 0; step++) await scrollDown(page, isMobile);
-    await expect(page.getByRole('status')).toHaveText('正在加载…');
-    for (let step = 0; step < 3; step++) await scrollDown(page, isMobile);
-    expect(requests).toBe(1);
     const list = page.locator('.chat-thread-list');
-    await expect.poll(() => list.evaluate(node => node.scrollHeight - node.clientHeight - node.scrollTop)).toBeLessThan(2);
-    if (isMobile) await stopTouchMomentum(page);
+    await list.evaluate(async node => {
+      node.scrollTop = Math.ceil(node.scrollHeight - node.clientHeight * 1.3) - 1;
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    });
+    expect(requests).toBe(0);
+    await list.evaluate(node => { node.scrollTop = Math.ceil(node.scrollHeight - node.clientHeight * 1.3); });
+    await expect(page.getByRole('status')).toHaveText('正在加载…');
+    expect(requests).toBe(1);
+    const remaining = await list.evaluate(node => (node.scrollHeight - node.clientHeight - node.scrollTop)
+      / node.clientHeight);
+    expect(remaining).toBeGreaterThan(0.29);
+    expect(remaining).toBeLessThanOrEqual(0.3);
+    await list.evaluate(async node => {
+      node.scrollTop = node.scrollHeight;
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    });
+    expect(requests).toBe(1);
+    await expect.poll(() => list.evaluate(node => node.scrollHeight - node.clientHeight - node.scrollTop))
+      .toBeLessThan(2);
     const position = await list.evaluate(node => node.scrollTop);
     finish();
-    await expect(page.locator('.chat-thread')).toHaveCount(24);
+    await expect(page.locator('.chat-thread')).toHaveCount(48);
     await expect(page.getByRole('status')).toHaveCount(0);
     expect(await list.evaluate(node => node.scrollTop)).toBe(position);
     await scrollDown(page, isMobile);
     expect(requests).toBe(1);
+    await page.screenshot({ path: `../../.codex-tmp/thread-prefetch-${isMobile ? 'mobile' : 'desktop'}.png` });
   });
+
+test('coalesces real mouse or touch scrolling while the next page is pending', async ({ page, isMobile }) => {
+  let requests = 0;
+  let finish = () => {};
+  const pending = new Promise<void>(resolve => { finish = resolve; });
+  await page.route('**/thread-page?*', async route => {
+    const cursor = new URL(route.request().url()).searchParams.get('cursor');
+    if (!cursor) return route.fulfill({ json: { data: threads(0, 24), nextCursor: 'next' } });
+    requests++;
+    await pending;
+    await route.fulfill({ json: { data: threads(24, 24), nextCursor: null } });
+  });
+  await page.goto('./e2e/thread-pagination-harness.html');
+  await expect(page.locator('.chat-thread')).toHaveCount(24);
+  for (let step = 0; step < 6 && requests === 0; step++) await scrollDown(page, isMobile);
+  await expect(page.getByRole('status')).toHaveText('正在加载…');
+  for (let step = 0; step < 3; step++) await scrollDown(page, isMobile);
+  expect(requests).toBe(1);
+  finish();
+  await expect(page.locator('.chat-thread')).toHaveCount(48);
+  await expect(page.getByRole('status')).toHaveCount(0);
+  await scrollDown(page, isMobile);
+  expect(requests).toBe(1);
+});
 
 test('fills a short collapsed list across pages and stops when there are no more chats', async ({ page }) => {
   const cursors: string[] = [];

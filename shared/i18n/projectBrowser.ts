@@ -1,4 +1,11 @@
 export const projectBrowserEnglish: Readonly<Record<string, string>> = {
+  '引用到聊天': 'Quote in chat',
+  '文本操作': 'Text actions',
+  '全选': 'Select all',
+  '暂时无法引用，请确认聊天可用且引用数量未达上限。':
+    'Unable to quote. Check that chat is available and the quote limit has not been reached.',
+  '这段内容太长，请缩小引用范围。': 'This selection is too long. Select a shorter passage.',
+  '无法读取剪贴板，请使用粘贴快捷键。': 'Unable to read the clipboard. Use the paste keyboard shortcut.',
   '文件操作': 'File actions',
   '项目文件夹操作': 'Project folder actions',
   '新建': 'New',
@@ -48,6 +55,8 @@ export const projectBrowserEnglish: Readonly<Record<string, string>> = {
   '操作未完成，请确认文件仍存在且有访问权限。':
     'Unable to complete the action. Check that the file exists and you have permission to access it.',
   '打开的文件': 'Open files',
+  '更多标签页': 'More tabs',
+  '隐藏的标签页': 'Hidden tabs',
   '标签页操作': 'Tab actions',
   '关闭其他标签页': 'Close other tabs',
   '关闭所有标签页': 'Close all tabs',
@@ -134,6 +143,13 @@ export const projectBrowserEnglish: Readonly<Record<string, string>> = {
 };
 
 export const projectBrowserRussian: Readonly<Record<string, string>> = {
+  '引用到聊天': 'Цитировать в чате',
+  '文本操作': 'Действия с текстом',
+  '全选': 'Выделить всё',
+  '暂时无法引用，请确认聊天可用且引用数量未达上限。':
+    'Не удалось добавить цитату. Проверьте доступность чата и лимит цитат.',
+  '这段内容太长，请缩小引用范围。': 'Выделенный текст слишком длинный. Выберите более короткий фрагмент.',
+  '无法读取剪贴板，请使用粘贴快捷键。': 'Не удалось прочитать буфер обмена. Используйте сочетание клавиш для вставки.',
   '文件操作': 'Действия с файлом',
   '项目文件夹操作': 'Действия с папкой проекта',
   '新建': 'Создать',
@@ -180,6 +196,8 @@ export const projectBrowserRussian: Readonly<Record<string, string>> = {
   '操作未完成，请确认文件仍存在且有访问权限。':
     'Не удалось выполнить действие. Убедитесь, что файл существует и у вас есть права доступа.',
   '打开的文件': 'Открытые файлы',
+  '更多标签页': 'Другие вкладки',
+  '隐藏的标签页': 'Скрытые вкладки',
   '标签页操作': 'Действия с вкладкой',
   '关闭其他标签页': 'Закрыть другие вкладки',
   '关闭所有标签页': 'Закрыть все вкладки',

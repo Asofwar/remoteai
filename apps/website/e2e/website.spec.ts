@@ -69,9 +69,12 @@ test('narrow screens keep navigation and long feature pages usable', async ({ pa
     'features/computer-use/',
     'download/',
     'guide/',
+    'resources/',
     'en/',
+    'en/resources/',
     'en/features/computer-use/',
     'ru/',
+    'ru/resources/',
     'ru/features/computer-use/',
   ]) {
     await page.goto(`${basePath}${path}`);
@@ -95,6 +98,22 @@ test('core content, FAQ and mobile navigation remain usable without JavaScript',
   await page.getByLabel('打开导航', { exact: true }).click();
   await page.getByRole('navigation', { name: '移动导航' }).getByText('下载', { exact: true }).click();
   await expect(page.locator('h1')).toContainText('你的下一段工作');
+  await page.locator('.site-footer').getByRole('link', { name: 'AI 资源', exact: true }).click();
+  await expect(page.locator('.resource-card')).toHaveCount(26);
+  await page.getByRole('navigation', { name: '按需探索' }).getByRole('link', { name: /评测与学习/ }).click();
+  await expect(page).toHaveURL(/\/resources\/#learn$/);
+  await expect(page.getByRole('heading', { name: '评测与学习 4', exact: true })).toBeInViewport();
+  await page.goto(`http://127.0.0.1:4175${basePath}ru/`);
+  await page.locator('.site-footer').getByRole('link', { name: 'ИИ-ресурсы', exact: true }).click();
+  await expect(page).toHaveURL(/\/ru\/resources\/$/);
+  await expect(page.locator('.resource-card')).toHaveCount(26);
+  await expect(page.locator('.resource-stats')).toContainText('Разделов: 5');
+  await page
+    .getByRole('navigation', { name: 'Обзор по разделам' })
+    .getByRole('link', { name: /Оценка моделей/ })
+    .click();
+  await expect(page).toHaveURL(/\/ru\/resources\/#learn$/);
+  await expect(page.getByRole('heading', { name: 'Оценка моделей и обучение 4', exact: true })).toBeInViewport();
   await context.close();
 });
 

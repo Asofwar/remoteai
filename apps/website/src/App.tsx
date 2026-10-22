@@ -7,6 +7,7 @@ import { Features } from './pages/Features';
 import { FeatureDetail } from './pages/FeatureDetail';
 import { Download } from './pages/Download';
 import { Guide } from './pages/Guide';
+import { Resources } from './pages/Resources';
 import { href } from './lib/site';
 import { ui } from './lib/ui-text';
 
@@ -20,6 +21,7 @@ function Page({ language, path }: Route) {
   if (path === 'features/') return <Features language={language} />;
   if (path === 'download/') return <Download language={language} />;
   if (path === 'guide/') return <Guide language={language} />;
+  if (path === 'resources/') return <Resources language={language} />;
   const feature = findFeature(path.replace(/^features\//, '').replace(/\/$/, ''));
   if (path.startsWith('features/') && feature) return <FeatureDetail feature={feature} language={language} />;
   return (

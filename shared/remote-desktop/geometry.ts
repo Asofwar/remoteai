@@ -1,3 +1,5 @@
+import type { DesktopInputFocus } from './protocol';
+
 export interface Point { x: number; y: number }
 export interface Size { width: number; height: number }
 export interface DesktopViewport { stage: Size; content: Size & Point; edgePan?: Point & { offset: Point } }
@@ -10,6 +12,9 @@ const PANEL_GAP = CURSOR_SIZE.width + 6;
 const EDGE_GAP = 8;
 const EDGE_PAN_GAIN = { x: 1, y: 2 };
 const RETURN_POINTER_GAIN = 2;
+const INPUT_CONTEXT_LINES = 2;
+// Older hosts and inaccessible controls fall back to two typical rendered text rows.
+const INPUT_LINE_HEIGHT = 24;
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 /** Fit the complete desktop inside the available stage, preserving its aspect ratio. */
@@ -22,6 +27,18 @@ export function desktopViewport(stage: Size, source: Size): DesktopViewport {
 export function cursorPosition(point: Point, { content }: DesktopViewport): Point {
   return { x: content.x + point.x * Math.max(0, content.width - 1),
     y: content.y + point.y * Math.max(0, content.height - 1) };
+}
+
+/** Reveal the input row with context below it, without moving horizontally or changing scale. */
+export function revealDesktopInputRow(viewport: DesktopViewport, point: Point,
+  focus?: DesktopInputFocus | null): DesktopViewport {
+  const { stage, content } = viewport;
+  const lineHeight = focus?.lineHeight ? focus.lineHeight * content.height : INPUT_LINE_HEIGHT;
+  const targetHeight = focus ? (focus.bottom - focus.top) * content.height : 0;
+  const context = Math.min(INPUT_CONTEXT_LINES * lineHeight, Math.max(0, (stage.height - targetHeight) / 2));
+  const row = focus ? focus.bottom * content.height : point.y * Math.max(0, content.height - 1);
+  const y = Math.min(content.y, stage.height - row - context);
+  return { stage, content: { ...content, y } };
 }
 export function desktopPoint(point: Point, { content }: DesktopViewport, clampOutside = false): Point | undefined {
   const x = point.x - content.x; const y = point.y - content.y;

@@ -38,9 +38,13 @@ pub(crate) struct ClipboardMessage {
 enum Request {
     Read {
         shortcut: Option<Shortcut>,
+        #[serde(default, rename = "fileStreaming")]
+        file_streaming: bool,
     },
     Copy {
         shortcut: Shortcut,
+        #[serde(default, rename = "fileStreaming")]
+        file_streaming: bool,
     },
     Paste {
         #[serde(rename = "preferLocal")]
@@ -62,6 +66,10 @@ enum Request {
         offset: usize,
     },
     Clear,
+    #[cfg(windows)]
+    Files {
+        request: super::clipboard_stream::host::Request,
+    },
 }
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -75,7 +83,7 @@ pub(crate) struct ReplyData {
     #[serde(skip_serializing_if = "Option::is_none")]
     length: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<String>,
+    pub(super) data: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pasted: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -95,9 +103,18 @@ pub(crate) struct ClipboardReply {
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "format", rename_all = "camelCase")]
 pub(crate) enum Content {
-    Text { text: String },
-    Image { data: String },
-    Files { files: Vec<ClipboardFile> },
+    Text {
+        text: String,
+    },
+    Image {
+        data: String,
+    },
+    Files {
+        files: Vec<ClipboardFile>,
+    },
+    FileOffer {
+        offer: super::clipboard_stream::Offer,
+    },
 }
 #[derive(Deserialize, Serialize)]
 pub(crate) struct ClipboardFile {
@@ -141,8 +158,16 @@ impl Transfer {
 }
 
 pub(super) fn handle(id: &str, message: ClipboardMessage) -> ClipboardReply {
+    handle_with_sender(id, message, None)
+}
+
+fn handle_with_sender(
+    id: &str,
+    message: ClipboardMessage,
+    sender: Option<super::clipboard_stream::Sender>,
+) -> ClipboardReply {
     let request_id = message.request_id;
-    let result = super::with_session(id, |session| Ok(apply(session, message)))
+    let result = super::with_session(id, |session| Ok(apply(session, message, sender)))
         .map_err(super::safe_error)
         .and_then(|result| result.map_err(|error| error.to_string()));
     let (result, error) = match result {
@@ -157,24 +182,44 @@ pub(super) fn handle(id: &str, message: ClipboardMessage) -> ClipboardReply {
     }
 }
 
-fn apply(session: &mut super::Session, message: ClipboardMessage) -> ClipboardResult<ReplyData> {
+fn apply(
+    session: &mut super::Session,
+    message: ClipboardMessage,
+    _sender: Option<super::clipboard_stream::Sender>,
+) -> ClipboardResult<ReplyData> {
     authorize(&session.permissions, &message.request)?;
     if message.transfer_id.is_empty() || message.transfer_id.len() > 100 {
         return Err(ClipboardError::Invalid);
     }
     let id = message.transfer_id;
     match message.request {
-        Request::Copy { shortcut } => {
+        Request::Copy {
+            shortcut,
+            file_streaming,
+        } => {
             super::clipboard_platform::copy_selection(session, shortcut)?;
             session.clipboard_revision = super::clipboard_revision::current().ok();
             // Sharing is optional: folders, large files and private formats still copy natively.
             if !session.permissions.clipboard_read {
                 return Ok(ReplyData::default());
             }
-            Ok(read_content(session, id, None).unwrap_or_default())
+            Ok(read_content(session, id, None, file_streaming).unwrap_or_default())
         }
         Request::Paste { prefer_local } => prepare_paste(session, prefer_local),
-        Request::Read { shortcut } => read_content(session, id, shortcut),
+        Request::Read {
+            shortcut,
+            file_streaming,
+        } => read_content(session, id, shortcut, file_streaming),
+        #[cfg(windows)]
+        Request::Files { request } => {
+            let host = session.id.clone();
+            let sender = _sender.unwrap_or_else(|| {
+                std::sync::Arc::new(move |event| {
+                    tauri::async_runtime::block_on(super::stream::send_clipboard_file(&host, event))
+                })
+            });
+            super::clipboard_stream::host::apply(session, request, sender)
+        }
         Request::Begin { length } => {
             if length == 0 {
                 return Err(ClipboardError::Invalid);
@@ -200,8 +245,23 @@ fn read_content(
     session: &mut super::Session,
     id: String,
     shortcut: Option<Shortcut>,
+    _file_streaming: bool,
 ) -> ClipboardResult<ReplyData> {
-    let content = super::clipboard_platform::read(session, shortcut)?;
+    if let Some(shortcut) = shortcut {
+        super::clipboard_platform::copy_selection(session, shortcut)?;
+    }
+    #[cfg(windows)]
+    let offer = if _file_streaming && session.permissions.files {
+        super::clipboard_stream::capture(&format!("host:{}", session.id))?
+    } else {
+        None
+    };
+    #[cfg(not(windows))]
+    let offer: Option<super::clipboard_stream::Offer> = None;
+    let content = match offer {
+        Some(offer) => Content::FileOffer { offer },
+        None => super::clipboard_platform::read_local()?,
+    };
     allow_content(&session.permissions, &content)?;
     let bytes = serde_json::to_vec(&content).map_err(|_| ClipboardError::Invalid)?;
     let length = bytes.len();
@@ -221,7 +281,7 @@ fn can_import(
     prefer_local && allowed && current.is_some() && previous == current
 }
 
-fn paste_original(session: &mut super::Session) -> ClipboardResult<ReplyData> {
+pub(super) fn paste_original(session: &mut super::Session) -> ClipboardResult<ReplyData> {
     super::clipboard_platform::paste_selection(session)?;
     session.clipboard_revision = super::clipboard_revision::current().ok();
     Ok(ReplyData {
@@ -251,7 +311,7 @@ fn allow_content(
     permissions: &super::permissions::Permissions,
     content: &Content,
 ) -> ClipboardResult<()> {
-    if matches!(content, Content::Files { .. }) && !permissions.files {
+    if matches!(content, Content::Files { .. } | Content::FileOffer { .. }) && !permissions.files {
         return Err(ClipboardError::Denied);
     }
     Ok(())
@@ -263,7 +323,7 @@ fn authorize(
 ) -> ClipboardResult<()> {
     let allowed = match request {
         Request::Copy { .. } | Request::Paste { .. } => permissions.control,
-        Request::Read { shortcut } => {
+        Request::Read { shortcut, .. } => {
             permissions.clipboard_read && (shortcut.is_none() || permissions.control)
         }
         Request::Chunk { .. } => permissions.clipboard_read,
@@ -272,6 +332,8 @@ fn authorize(
             permissions.clipboard_write && (!paste || permissions.control)
         }
         Request::Clear => true,
+        #[cfg(windows)]
+        Request::Files { .. } => true, // The streaming handler checks each direction and file permission.
     };
     if allowed {
         Ok(())
@@ -347,9 +409,13 @@ fn commit_content(
 pub(crate) async fn remote_desktop_clipboard(
     id: String,
     message: ClipboardMessage,
+    on_file_read: tauri::ipc::Channel<super::clipboard_stream::ReadEvent>,
 ) -> ClipboardReply {
     let request_id = message.request_id;
-    tauri::async_runtime::spawn_blocking(move || handle(&id, message))
+    let sender: super::clipboard_stream::Sender = std::sync::Arc::new(move |event| {
+        on_file_read.send(event).map_err(|_| ClipboardError::Access)
+    });
+    tauri::async_runtime::spawn_blocking(move || handle_with_sender(&id, message, Some(sender)))
         .await
         .unwrap_or_else(|_| ClipboardReply {
             kind: "clipboard",
@@ -360,114 +426,5 @@ pub(crate) async fn remote_desktop_clipboard(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn enforces_direction_control_and_file_permissions() {
-        let policy = super::super::permissions::Permissions {
-            control: false,
-            clipboard_write: false,
-            files: false,
-            ..Default::default()
-        };
-        assert!(authorize(&policy, &Request::Read { shortcut: None }).is_ok());
-        assert!(authorize(
-            &policy,
-            &Request::Read {
-                shortcut: Some(Shortcut::Copy)
-            }
-        )
-        .is_err());
-        assert!(authorize(&policy, &Request::Begin { length: 5 }).is_err());
-        assert!(authorize(
-            &policy,
-            &Request::Commit {
-                paste: true,
-                expected_revision: None
-            }
-        )
-        .is_err());
-        assert!(allow_content(&policy, &Content::Files { files: Vec::new() }).is_err());
-        assert!(allow_content(
-            &policy,
-            &Content::Text {
-                text: "test".into()
-            }
-        )
-        .is_ok());
-    }
-    #[test]
-    fn native_gestures_need_control_but_not_clipboard_sharing() {
-        let policy = super::super::permissions::Permissions {
-            clipboard_read: false,
-            clipboard_write: false,
-            files: false,
-            ..Default::default()
-        };
-        assert!(authorize(
-            &policy,
-            &Request::Copy {
-                shortcut: Shortcut::Cut
-            }
-        )
-        .is_ok());
-        assert!(authorize(
-            &policy,
-            &Request::Paste {
-                prefer_local: false
-            }
-        )
-        .is_ok());
-        assert!(authorize(&policy, &Request::Read { shortcut: None }).is_err());
-        assert!(authorize(&policy, &Request::Begin { length: 5 }).is_err());
-        let view_only = super::super::permissions::Permissions {
-            control: false,
-            ..policy
-        };
-        assert!(authorize(
-            &view_only,
-            &Request::Copy {
-                shortcut: Shortcut::Copy
-            }
-        )
-        .is_err());
-        assert!(authorize(
-            &view_only,
-            &Request::Paste {
-                prefer_local: false
-            }
-        )
-        .is_err());
-    }
-    #[test]
-    fn remote_changes_and_unreadable_revisions_always_preserve_the_original() {
-        assert!(can_import(true, true, Some("1"), Some("1")));
-        assert!(!can_import(false, true, Some("1"), Some("1")));
-        assert!(!can_import(true, false, Some("1"), Some("1")));
-        assert!(!can_import(true, true, Some("1"), Some("2")));
-        assert!(!can_import(true, true, None, None));
-    }
-    #[test]
-    fn native_gesture_wire_fields_preserve_revision_guards() {
-        let paste: Request =
-            serde_json::from_str(r#"{"action":"paste","preferLocal":true}"#).unwrap();
-        assert!(matches!(paste, Request::Paste { prefer_local: true }));
-        let commit: Request =
-            serde_json::from_str(r#"{"action":"commit","paste":true,"expectedRevision":"42"}"#)
-                .unwrap();
-        assert!(
-            matches!(commit, Request::Commit { expected_revision: Some(value), .. } if value == "42")
-        );
-    }
-    #[test]
-    fn rejects_oversize_reordered_and_excess_chunks() {
-        assert!(Transfer::new("test".into(), vec![], Some(MAX_WIRE_BYTES + 1)).is_err());
-        let mut transfer = Transfer::new("test".into(), vec![], Some(3)).unwrap();
-        assert!(transfer.append(1, "YQ==").is_err());
-        assert!(transfer.append(0, "YWJjZA==").is_err());
-        transfer.append(0, "YWJj").unwrap();
-        assert_eq!(transfer.bytes, b"abc");
-        assert!(transfer.append(3, "YQ==").is_err());
-        assert!(transfer.append(3, "!!!").is_err());
-    }
-}
+#[path = "clipboard_tests.rs"]
+mod tests;

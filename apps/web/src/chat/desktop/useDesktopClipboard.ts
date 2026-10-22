@@ -7,13 +7,15 @@ import { MISSING_CLIPBOARD_IMAGES, readPastedContent } from '../../../../../shar
 import { browserDesktopClipboard, downloadClipboardFile, filesContent, readBrowserClipboardBaseline }
   from './clipboardContent';
 import { useClipboardQueue } from './useClipboardQueue';
+import { useNativeFileClipboard, type FileClipboardSession } from './useNativeFileClipboard';
 
 interface Options {
-  active: boolean; clipboard: Pick<DesktopClipboard, 'read' | 'write' | 'copy' | 'paste'>;
+  active: boolean; connected?: boolean;
+  clipboard: Pick<DesktopClipboard, 'read' | 'write' | 'copy' | 'paste'> & FileClipboardSession;
   localClipboard?: LocalDesktopClipboard;
 }
-export function useDesktopClipboard({ active, clipboard, localClipboard }: Options) {
-  const local = localClipboard ?? browserDesktopClipboard;
+export function useDesktopClipboard({ active, connected = active, clipboard, localClipboard }: Options) {
+  const { local, streaming } = useNativeFileClipboard(localClipboard ?? browserDesktopClipboard, clipboard, connected);
   const [open, setOpen] = useState(false);
   const [received, setReceived] = useState<ClipboardContent>();
   const [needsSave, setNeedsSave] = useState(false);
@@ -30,6 +32,10 @@ export function useDesktopClipboard({ active, clipboard, localClipboard }: Optio
     throw error;
   });
   const readBaseline = () => localClipboard ? local.read().catch(() => undefined) : readBrowserClipboardBaseline();
+  const readRemote = (shortcut: 'copy' | 'cut' | undefined, progress: ReturnType<typeof report>) => {
+    const options: [boolean?] = streaming ? [true] : [];
+    return shortcut ? clipboard.copy(shortcut, progress, ...options) : clipboard.read(undefined, progress, ...options);
+  };
   const send = (content: () => Promise<ClipboardContent>, fromFiles = false) => {
     void run(async current => {
       const value = await content();
@@ -48,8 +54,7 @@ export function useDesktopClipboard({ active, clipboard, localClipboard }: Optio
       // Read the local baseline alongside the remote gesture; local access cannot block native copy/cut.
       const baseline = readBaseline();
       try {
-        const content = await (shortcut ? clipboard.copy(shortcut, report(current))
-          : clipboard.read(undefined, report(current)));
+        const content = await readRemote(shortcut, report(current));
         const before = await baseline;
         if (!current()) return;
         origin.current.remember(before);
@@ -105,6 +110,7 @@ export function useDesktopClipboard({ active, clipboard, localClipboard }: Optio
     });
   };
   return { open, setOpen, busy, status, progress, received, copy, paste, save, needsSave, nativeFiles: local.files,
+    nativeFileProgress: clipboard.fileStreaming === true,
     pasteShortcut: localClipboard ? () => pasteAutomatic(readLocalForPaste) : undefined,
     pasteLocal: () => send(local.read), sendFiles: (files: File[]) => send(() => filesContent(files), true) };
 }

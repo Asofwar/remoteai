@@ -1403,7 +1403,8 @@ export function DashboardApp() {
           {page === "totp" && <TotpPage accounts={manager.accounts} manager={totpManager} t={t} />}
           {page === "downloads" && <DownloadsPage auth={cloud.state} />}
           {page === "logDiagnostics" && <LogDiagnosticsPage activeTab={diagnosticsTab}
-            onTabChange={setDiagnosticsTab} language={language} t={t} />}
+            onTabChange={setDiagnosticsTab} language={language} t={t}
+            onExportLogs={() => void exportLogs()} exportingLogs={exportingLogs} />}
           <section className="page-panel" hidden={page !== "dreamSkin"}>
             {page === "dreamSkin" && <MemoDreamSkinPage t={t} notify={notify} />}
           </section>

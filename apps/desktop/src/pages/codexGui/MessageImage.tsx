@@ -3,20 +3,21 @@ import { useContext, useState } from "react";
 import { FileEnvironmentContext } from './fileEnvironment';
 import { ImagePreview } from "./ImagePreview";
 import styles from "./MessageImage.module.less";
+import thumbnailStyles from "../../../../../shared/chat/toolImageThumbnail.module.css";
 import { useImageSource } from "./useImageSource";
 import { isTauri } from "@tauri-apps/api/core";
 import { isHostedWebApp } from "../../api/backend";
 import { FileMenu } from "./FileMenu";
 import { parseFileReference } from "./fileReference";
 
-interface MessageImageProps { src?: string; alt?: string; title?: string }
+interface MessageImageProps { src?: string; alt?: string; title?: string; compact?: boolean }
 
 export function MessageImage(props: MessageImageProps) {
   const environment = useContext(FileEnvironmentContext);
   return environment ? environment.image(props) : <LocalMessageImage {...props} />;
 }
 
-function LocalMessageImage({ src, alt, title }: MessageImageProps) {
+function LocalMessageImage({ src, alt, title, compact }: MessageImageProps) {
   const [failedSource, setFailedSource] = useState<string>();
   const [preview, setPreview] = useState(false);
   const image = useImageSource(src);
@@ -33,7 +34,8 @@ function LocalMessageImage({ src, alt, title }: MessageImageProps) {
   if (!image.url) return <span className={styles.unavailable}>{description}{guiText("（暂不支持预览）")}</span>;
 
   return <>
-    <button type="button" className={styles.thumbnail} aria-label={guiText("放大查看：{value1}", { value1: description })}
+    <button type="button" className={`${styles.thumbnail}${compact ? ` ${thumbnailStyles.thumbnail}` : ""}`}
+      aria-label={guiText("放大查看：{value1}", { value1: description })}
       title={title} onClick={() => setPreview(true)}>
       <img src={image.url} alt={description} loading="lazy" decoding="async" referrerPolicy="no-referrer"
         onError={() => setFailedSource(image.url)} />

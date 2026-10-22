@@ -5,8 +5,12 @@ import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { RemoteGit } from '../../../../../shared/remote-chat/useRemoteGit';
 import type { GitAction } from '../../../../../shared/remote-chat/gitTypes';
-import { GIT_ACTIONS } from '../../../../../shared/remote-chat/gitActions';
+import { GIT_ACTIONS, gitSyncCounts } from '../../../../../shared/remote-chat/gitActions';
 import { useGitStyles as useStyles } from './styles';
+
+const ACTION_ICONS = {
+  fetch: 'download-outline', pull: 'arrow-down', update: 'swap-vertical-outline', push: 'arrow-up',
+} as const;
 
 export function GitToolbar({ panel, connected }: { panel: RemoteGit; connected: boolean }) {
   const styles = useStyles();
@@ -17,6 +21,9 @@ export function GitToolbar({ panel, connected }: { panel: RemoteGit; connected: 
   const [action, setAction] = useState<Exclude<GitAction, 'switch'>>('update');
   const disabled = panel.busy || !connected || !panel.changes;
   const repository = panel.repository;
+  const counts = gitSyncCounts(repository);
+  const branch = panel.changes?.branch ?? t('分离的 HEAD');
+  const selection = repository?.upstream ? `${branch} → ${repository.upstream}` : branch;
   const actionDisabled = disabled || !repository?.remotes.length || (action !== 'fetch' && !repository.upstream)
     || ((action === 'pull' || action === 'update') && !!panel.changes?.files.length);
   return <>
@@ -25,19 +32,27 @@ export function GitToolbar({ panel, connected }: { panel: RemoteGit; connected: 
         style={[styles.branchButton, disabled && styles.disabled]}
         onPress={() => setMenu(menu === 'branches' ? null : 'branches')}>
         <Ionicons name="git-branch-outline" size={16} color={color("#587267", 'muted')} />
-        <Text numberOfLines={1} style={styles.branch}>{panel.changes?.branch ?? t("分离的 HEAD")}</Text>
+        <Text numberOfLines={1} style={styles.branch}>{branch}</Text>
         <Ionicons name="chevron-down" size={12} color={color("#718078", 'muted')} /></Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel={t("同步")} disabled={disabled} style={styles.syncButton}
-        onPress={() => setMenu(menu === 'actions' ? null : 'actions')}>
-        <Ionicons name="swap-vertical-outline" size={16} color={color("#587267", 'muted')} /><Text style={styles.buttonText}>{t("同步")}</Text>
-      </Pressable>
+      <View style={styles.toolbarActions}>{GIT_ACTIONS.map(item => {
+        const count = counts[item.action];
+        return <Pressable key={item.action} accessibilityRole="button" accessibilityLabel={t(item.label)}
+          accessibilityHint={count !== undefined ? t('待同步 {count} 个提交', { count }) : undefined}
+          accessibilityState={{ expanded: menu === 'actions' && action === item.action, disabled }}
+          disabled={disabled} style={[styles.toolbarAction, disabled && styles.disabled]}
+          onPress={() => {
+            setAction(item.action); setMenu(menu === 'actions' && action === item.action ? null : 'actions');
+          }}>
+          <Ionicons name={ACTION_ICONS[item.action]} size={18} color={color("#587267", 'muted')} />
+          {count !== undefined && <Text style={styles.actionCount}>{count}</Text>}
+        </Pressable>;
+      })}
       <Pressable accessibilityRole="button" accessibilityLabel={t("刷新 Git")} disabled={disabled} style={styles.button}
         onPress={() => { panel.setDetail(null); void panel.refresh(); }}>
         <Ionicons name="refresh-outline" size={18} color={color("#587267", 'muted')} />
       </Pressable>
+      </View>
     </View>
-    {!!repository?.upstream && <Text style={styles.tracking}>
-      {repository.upstream}   ↑ {repository.ahead} · ↓ {repository.behind}</Text>}
     {menu && <View style={styles.menu}>
       <View style={styles.menuHeading}><Text style={styles.areaTitle}>{menu === 'branches' ? t("切换分支") : t("同步项目")}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel={t("关闭菜单")} style={styles.button}
@@ -55,13 +70,9 @@ export function GitToolbar({ panel, connected }: { panel: RemoteGit; connected: 
               <Text style={styles.meta}>{branch.occupied ? t("其他工作树使用中") : branch.remote ? t("远程") : t("本地")}
                 {current ? ' ✓' : ''}</Text></Pressable>;
           })}
-          <Text style={styles.menuHint}>{t("选择远程分支会创建同名本地分支。")}</Text>
+          <Text style={styles.menuHint}>{t('当前选择：{branch}', { branch: selection })}</Text>
         </> : <>
-          <View style={styles.actionOptions}>{GIT_ACTIONS.map(item => <Pressable key={item.action}
-            accessibilityRole="button" accessibilityState={{ selected: action === item.action }}
-            style={[styles.actionButton, action === item.action && styles.activeMode]}
-            onPress={() => setAction(item.action)}>
-            <Text style={styles.buttonText}>{t(item.label)}</Text></Pressable>)}</View>
+          <Text style={styles.areaTitle}>{t(GIT_ACTIONS.find(item => item.action === action)!.label)}</Text>
           <Text style={styles.menuHint}>{t(GIT_ACTIONS.find(item => item.action === action)!.hint)}</Text>
           <Text style={styles.menuHint}>{t("当前分支：")}{panel.changes?.branch ?? 'HEAD'}{'\n'}
             {t("跟踪分支：")}{repository?.upstream ?? t("未设置")}</Text>

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { GuiController } from "./controller";
 import { MAX_IMAGE_BYTES, useComposerDraft } from "./useComposerDraft";
 import { MAX_REPLY_QUOTES, MAX_QUOTE_CHARACTERS, quoteKey } from "./replyQuotes";
+import { fileSelectionQuote } from '../../../../../shared/project-browser/fileSelection';
 
 let root: Root;
 let container: HTMLDivElement;
@@ -13,6 +14,15 @@ let editor: ReturnType<typeof useComposerDraft>;
 let readers: FileReader[];
 const imageUrl = "data:image/png;base64,iVBORw0KGgo=";
 const file = () => new File(["image"], "截图.png", { type: "image/png" });
+
+it('sends file selections with their path, range and original content alongside the existing draft', async () => {
+  const quote = fileSelectionQuote({ path: 'F:/project/a.ts', start: { line: 2, column: 3 },
+    end: { line: 3, column: 1 }, text: '  source\n' });
+  act(() => { editor.editText('请修改'); editor.addQuote(quote); });
+  await act(async () => editor.send());
+  expect(controller.send).toHaveBeenCalledWith(
+    '引用文件内容：\n> F:/project/a.ts:2:3-3:1\n> ```\n>   source\n> \n> ```\n\n请修改', [], []);
+});
 
 it("appends dictation to the latest text while retaining references and mentions", () => {
   const attachment = { kind: "file" as const, name: "notes", path: "C:/notes.txt" };

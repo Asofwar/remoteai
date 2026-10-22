@@ -16,6 +16,7 @@ import { useMouseViewport } from '../../../../../shared/remote-desktop/useMouseV
 import { useDesktopZoom } from '../../../../../shared/remote-desktop/useDesktopZoom';
 import { desktopStatusAction } from '../../../../../shared/remote-desktop/statusAction';
 import { useInputViewport } from '../../../../../shared/remote-desktop/useInputViewport';
+import { useDesktopInputFocus } from '../../../../../shared/remote-desktop/useDesktopInputFocus';
 import { MOUSE_PANEL_SIZE, MOUSE_ICON_SIZE } from '../../../../../shared/remote-desktop/geometry';
 import { t } from '../../i18n';
 import { usePageVisibility } from './usePageVisibility';
@@ -63,6 +64,7 @@ function DesktopViewer({ client, active, connected = true, close, localClipboard
   const hardware = useHardwarePointer();
   const desktopWindow = nativeWindow || hardware;
   const clipboard = useDesktopClipboard({ active: shown && !!session.stream,
+    connected: active && !!session.stream,
     clipboard: session.clipboard, localClipboard });
   const panelVisible = !viewOnly && !hardware && !direct && !display && !keyboard && !clipboard.open;
   const panel = useMousePanel(shown && panelVisible && !!session.stream);
@@ -78,8 +80,11 @@ function DesktopViewer({ client, active, connected = true, close, localClipboard
   const measured = useVideoViewport(stage, video, shown);
   const fitted = useInputViewport(measured, keyboard);
   const zoom = useDesktopZoom(fitted, shown && !!session.stream);
+  const inputFocus = useDesktopInputFocus({ active: shown && keyboard && !hardware && !!session.stream,
+    read: session.inputFocus, displayId: session.settings.displayId });
   const viewport = useMouseViewport(session.pointer, zoom.viewport,
-    panelVisible ? (panel.expanded ? MOUSE_PANEL_SIZE : MOUSE_ICON_SIZE) : undefined, zoom.modified);
+    panelVisible ? (panel.expanded ? MOUSE_PANEL_SIZE : MOUSE_ICON_SIZE) : undefined,
+    { manual: zoom.modified, inputOpen: keyboard && !hardware, inputFocus });
   const trackpad = useTrackpad({ pointer: session.pointer, viewport, direct, panel, id: 'stage', zoom: zoom.gestures });
   const wheel = (delta: number, horizontal = false) => {
     session.pointer.synchronize(); session.input({ kind: 'wheel', delta, ...(horizontal ? { horizontal } : {}) });
@@ -170,7 +175,7 @@ function DesktopViewer({ client, active, connected = true, close, localClipboard
     </nav>
     </div>
     {keyboard && <DesktopKeyboard input={session.input} close={() => setKeyboard(false)}
-      platform={session.capabilities.platform}
+      platform={session.capabilities.platform} mobile={!hardware}
       supported={!!session.capabilities.keyboard} />}
   </div>
     {windowControls.minimized && !windowState && <button type="button" className="rd-restore"

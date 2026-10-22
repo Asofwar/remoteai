@@ -27,22 +27,35 @@
 .pf-tree { width: var(--pf-tree-width); min-width: 0; display: flex; flex-direction: column; flex-shrink: 0; }
 .pf-tree-heading, .pf-file-heading { display: flex; align-items: center; gap: 6px; padding: 8px;
   min-height: 54px; border-bottom: 1px solid var(--pf-border); flex-shrink: 0; }
+.pf-file-heading { display: block; }
+.pf-file-toolbar { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .pf-tree-heading > span { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; }
 .pf-tree-list { padding: 6px 0 20px; overflow: auto; flex: 1; min-height: 0; overscroll-behavior: contain; }
-.pf-browser .pf-tree-row { width: 100%; justify-content: flex-start; border-radius: 0; text-align: left; gap: 6px; }
+.pf-browser .pf-tree-row { width: 100%; justify-content: flex-start; border-radius: 0; text-align: left; gap: 6px;
+  padding-left: var(--pf-tree-row-indent); }
 .pf-tree-row span:last-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .pf-tree-row[aria-selected=true] { background: var(--pf-selection); color: var(--pf-accent); }
 .pf-tree-spacer { width: 13px; flex-shrink: 0; }
 .pf-notice { margin: 8px 12px; color: var(--pf-muted); font-size: 12px; overflow-wrap: anywhere; }
+/* Align directory feedback with its folder label, after the chevron, icon and two gaps. */
+.pf-tree-row + .pf-notice { margin-left: calc(var(--pf-tree-row-indent) + 13px + 16px + 2 * 6px); }
 .pf-splitter { width: 5px; flex-shrink: 0; cursor: col-resize; touch-action: none;
   border-left: 1px solid var(--pf-border); position: relative; }
 .pf-splitter:hover, .pf-splitter:focus-visible { background: var(--pf-selection); }
 .pf-file { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .pf-file-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .pf-file-name strong, .pf-file-path { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.pf-file-path { padding: 0 8px; font-size: 11px; color: var(--pf-muted); }
-.pf-tabs { display: flex; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
-.pf-tab { display: flex; align-items: center; flex-shrink: 0; max-width: 240px;
+.pf-file-path { display: block; padding: 0 8px; font-size: 11px; color: var(--pf-muted); }
+.pf-tabs-bar { display: flex; min-width: 0; position: relative; }
+.pf-tabs { display: flex; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none;
+  overscroll-behavior-x: contain; }
+.pf-tabs::-webkit-scrollbar { display: none; }
+.pf-tabs-bar[data-clipped-left=true] .pf-tabs {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 12px);
+  mask-image: linear-gradient(to right, transparent, #000 12px); }
+.pf-browser .pf-tabs-more { width: 32px; padding: 5px; border-radius: 0;
+  border-left: 1px solid var(--pf-border); }
+.pf-tab { display: flex; align-items: center; flex-shrink: 0; max-width: min(240px, 100%);
   border-bottom: 2px solid transparent; border-right: 1px solid var(--pf-border); }
 .pf-tab[data-active=true] { border-bottom-color: var(--pf-accent); background: var(--pf-hover); }
 .pf-tab [role=tab] { min-width: 0; flex-shrink: 1; }

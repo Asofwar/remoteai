@@ -17,7 +17,7 @@ function nativePaste(): NonNullable<ClipboardReply['result']> {
 }
 
 /** Substitute OS clipboard access only; production control queues and WebRTC carry every request and reply. */
-export function desktopClipboard(message: ClipboardMessage): ClipboardReply {
+export function desktopClipboard(message: ClipboardMessage, content = clipboardFixture.content): ClipboardReply {
   clipboardFixture.requests.push(message);
   const reply: ClipboardReply = { kind: 'clipboard', requestId: message.requestId, result: {} };
   if (clipboardFixture.error) return { ...reply, error: clipboardFixture.error };
@@ -26,14 +26,14 @@ export function desktopClipboard(message: ClipboardMessage): ClipboardReply {
     case 'copy':
       clipboardFixture.copies += 1; observedRevision = clipboardFixture.revision;
       if (!clipboardFixture.readAllowed || !clipboardFixture.shareable) return reply;
-      transfer = new TextEncoder().encode(JSON.stringify(clipboardFixture.content));
+      transfer = new TextEncoder().encode(JSON.stringify(content));
       return { ...reply, result: { length: transfer.length } };
     case 'paste':
       return { ...reply, result: request.preferLocal && clipboardFixture.writeAllowed
         && observedRevision === clipboardFixture.revision
         ? { pasted: false, revision: String(clipboardFixture.revision) } : nativePaste() };
     case 'read':
-      transfer = new TextEncoder().encode(JSON.stringify(clipboardFixture.content));
+      transfer = new TextEncoder().encode(JSON.stringify(content));
       return { ...reply, result: { length: transfer.length } };
     case 'begin': transfer = new Uint8Array(request.length); return reply;
     case 'append':
@@ -55,5 +55,6 @@ export function desktopClipboard(message: ClipboardMessage): ClipboardReply {
       if (request.paste) clipboardFixture.pastes += 1;
       return reply;
     case 'clear': transfer = new Uint8Array(); return reply;
+    case 'files': throw new Error('File streaming fixture is not enabled');
   }
 }

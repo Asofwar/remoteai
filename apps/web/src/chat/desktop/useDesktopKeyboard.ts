@@ -21,14 +21,16 @@ export function useDesktopKeyboard(options: Options) {
   }, [keyboard]);
   useEffect(() => { if (!options.active) keyboard.release(); }, [keyboard, options.active]);
   const commit = (element: HTMLTextAreaElement, text: string) => {
-    if (options.active && text) options.input({ kind: 'text', text });
+    if (options.active && !element.readOnly && text) options.input({ kind: 'text', text });
     element.value = '';
   };
   return {
     release: () => keyboard.release(),
     handlers: {
       onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => {
-        if (!options.active || event.nativeEvent.isComposing || composing.current || event.key === 'Process') return;
+        if (!options.active) return;
+        if (!event.currentTarget.readOnly
+          && (event.nativeEvent.isComposing || composing.current || event.key === 'Process')) return;
         const command = event.ctrlKey || event.metaKey;
         const paste = command && !event.shiftKey && !event.altKey && event.code === 'KeyV';
         const insert = event.shiftKey && !command && !event.altKey && event.code === 'Insert';
@@ -51,7 +53,10 @@ export function useDesktopKeyboard(options: Options) {
         if (keyboard.releaseKey(event.code)) event.preventDefault();
       },
       onBlur: () => keyboard.release(),
-      onCompositionStart: () => { composing.current = true; keyboard.release(); },
+      onCompositionStart: (event: CompositionEvent<HTMLTextAreaElement>) => {
+        if (event.currentTarget.readOnly) return;
+        composing.current = true; keyboard.release();
+      },
       onCompositionEnd: (event: CompositionEvent<HTMLTextAreaElement>) => {
         composing.current = false; commit(event.currentTarget, event.data);
       },

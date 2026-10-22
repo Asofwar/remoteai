@@ -4,6 +4,7 @@ import { prepareImageEdit } from './prepareImageEdit';
 import { remotePromptSuggestion } from '../../../../shared/remote-chat/client/promptSuggestion';
 import { t, useLanguage } from '../i18n';
 import { useEffect, useState, type ReactNode } from 'react';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import type { ChatComputer } from '../../../../shared/remote-chat/devices';
 import { ChatApproval } from './ChatApproval';
 import { ChatComposer } from './ChatComposer';
@@ -74,6 +75,7 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
   const desktop = useDesktopLayout();
   const [sidebar, setSidebar] = usePanelVisibility('chat-list');
   const listOpen = desktop ? sidebar : drawer;
+  const ListToggleIcon = listOpen ? PanelLeftClose : PanelLeftOpen;
   const closeList = () => { if (desktop) setSidebar(false); else setDrawer(false); };
   const selectedFromList = () => { if (!desktop) setDrawer(false); };
   const [pickingDevice, setPickingDevice] = useState(false);
@@ -146,8 +148,12 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
     enabled={active && !state.selectedArchived}>
     <div className="chat-conversation">
     <header className="chat-header" data-tauri-drag-region={draggableHeader || undefined}>
-      <ChatListButton client={controller.guiAccounts} active={active && foreground} ready={ready}
-        expanded={listOpen} onClick={() => { if (desktop) setSidebar(!sidebar); else setDrawer(!drawer); }} />
+      {desktop ? <button type="button" className="chat-back"
+        aria-label={listOpen ? t('收起聊天列表') : t('打开聊天列表')}
+        aria-expanded={listOpen} onClick={() => setSidebar(!sidebar)}>
+        <ListToggleIcon size={21} />
+      </button> : <ChatListButton client={controller.guiAccounts} active={active && foreground} ready={ready}
+        expanded={listOpen} onClick={() => setDrawer(!drawer)} />}
       <div className="chat-grow" data-tauri-drag-region={draggableHeader || undefined}>
         <h2 data-tauri-drag-region={draggableHeader || undefined}>
           {state.selected ? threadPresentation(state.selected, state.sidebar, t).title : t("新聊天")}</h2>
@@ -161,10 +167,12 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
         value={state.selected?.turns ? { turns: state.selected.turns } : undefined} />}
       {headerEnd}
     </header>
-    <ChatTaskStatus state={state} />
-    {!!error && <p role="alert" className="chat-error">{t(error)}</p>}
-    {state.desktopOnly && <p className="chat-muted" style={{ maxWidth: 400 }}>
-      {t('桌面已就绪。打开远程桌面，登录电脑后即可继续聊天。')}</p>}
+    <div className="chat-scroll chat-notices"><div className="chat-notice-content">
+      <ChatTaskStatus state={state} />
+      {!!error && <p role="alert" className="chat-error">{t(error)}</p>}
+      {state.desktopOnly && <p className="chat-muted">
+        {t('桌面已就绪。打开远程桌面，登录电脑后即可继续聊天。')}</p>}
+    </div></div>
       <TaskReviewProvider controller={controller} state={state} active={active && foreground}>
       <ChatRetryProvider controller={controller} state={state}>
       <ChatMessages thread={state.selected} offline={!ready}

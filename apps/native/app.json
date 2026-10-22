@@ -2,7 +2,7 @@
   "expo": {
     "name": "Remote AI",
     "slug": "codex-switch",
-    "version": "2.0.15",
+    "version": "2.0.17",
     "icon": "./assets/icon.png",
     "orientation": "default",
     "userInterfaceStyle": "automatic",
@@ -28,7 +28,7 @@
     "android": {
       "icon": "./assets/icon.png",
       "package": "com.codexswitch.mobile",
-      "versionCode": 20001599,
+      "versionCode": 20001799,
       "usesCleartextTraffic": true,
       "permissions": [
         "android.permission.REQUEST_INSTALL_PACKAGES"

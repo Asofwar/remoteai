@@ -66,6 +66,30 @@ async fn current(id: &str) -> super::Result<std::sync::Arc<native::Stream>> {
         .ok_or(DesktopError::Expired)
 }
 
+#[cfg(windows)]
+pub(super) async fn send_clipboard_file(
+    id: &str,
+    event: super::clipboard_stream::ReadEvent,
+) -> super::clipboard::ClipboardResult<()> {
+    use super::clipboard::ClipboardError;
+    let stream = current(id).await.map_err(|_| ClipboardError::Access)?;
+    if *stream.cancel.borrow() {
+        return Err(ClipboardError::Access);
+    }
+    let peer = std::sync::Arc::clone(&stream.peer.borrow());
+    let channel = if stream.separate_clipboard {
+        &peer.clipboard
+    } else {
+        &peer.controls
+    };
+    let message = serde_json::to_string(&event).map_err(|_| ClipboardError::Invalid)?;
+    channel
+        .send_text(message)
+        .await
+        .map_err(|_| ClipboardError::Access)?;
+    Ok(())
+}
+
 #[tauri::command]
 pub(crate) async fn remote_desktop_stream_available(app: tauri::AppHandle) -> bool {
     #[cfg(any(windows, target_os = "macos"))]

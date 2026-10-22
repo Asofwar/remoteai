@@ -1,6 +1,8 @@
 import type { Route } from '../App';
 import { copy, homeFaqs } from '../content/copy';
 import { featureContent, findFeature } from '../content/features';
+import { resourcesCopy } from '../content/resources-copy';
+import { resourceListSchema } from './resource-content';
 import { languages, languageTags, pagePath, SITE_URL, LINKS } from './site';
 import { ui } from './ui-text';
 
@@ -32,6 +34,9 @@ export function pageMetadata({ language, path }: Route) {
       description: t.download.description,
     },
     'guide/': { title: `${t.nav.guide} — Remote AI`, description: t.guide.description },
+    'resources/': {
+      title: `${resourcesCopy(language).title} — Remote AI`, description: resourcesCopy(language).metadata,
+    },
     '404/': { title: '404 — Remote AI', description: ui(language, 'notFoundDescription') },
   };
   return pages[path as keyof typeof pages] ?? pages['404/'];
@@ -79,6 +84,7 @@ function structuredData(route: Route) {
     },
   ];
   if (!path) nodes.push(applicationSchema(language));
+  if (path === 'resources/') nodes.push(resourceListSchema(language));
   if (path) nodes.push(breadcrumbSchema(route));
   const faq = feature
     ? featureContent(feature, language).faqs

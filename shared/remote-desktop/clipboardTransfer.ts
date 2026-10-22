@@ -2,6 +2,8 @@ import { CLIPBOARD_CHUNK_BYTES, MAX_CLIPBOARD_WIRE_BYTES, decodeClipboardBytes, 
   validateClipboardContent, type ClipboardContent, type ClipboardMessage, type ClipboardProgress,
   type ClipboardReply, type ClipboardRequest } from './clipboard';
 
+import { DesktopFileClipboard, type FileReadEvent } from './fileClipboard';
+
 const REQUEST_TIMEOUT = 15_000;
 const TRANSFER_WINDOW = 4;
 type Result = NonNullable<ClipboardReply['result']>;
@@ -14,8 +16,10 @@ export class DesktopClipboard {
   private pending = new Map<number, { resolve: (value: Result) => void; reject: (error: Error) => void;
     timer: ReturnType<typeof setTimeout> }>();
   constructor(private readonly send: (message: ClipboardMessage) => boolean) {}
+  readonly files = new DesktopFileClipboard((id, request) => this.request(id, request));
 
-  receive(message: ClipboardReply) {
+  receive(message: ClipboardReply | FileReadEvent) {
+    if (message.kind === 'clipboardFileRead') { void this.files.receive(message); return; }
     const pending = this.pending.get(message.requestId);
     if (!pending) return;
     clearTimeout(pending.timer); this.pending.delete(message.requestId);
@@ -70,15 +74,15 @@ export class DesktopClipboard {
       await Promise.all(pending.map(item => item.result));
     }
   }
-  read(shortcut?: 'copy' | 'cut', progress?: ClipboardProgress) {
+  read(shortcut?: 'copy' | 'cut', progress?: ClipboardProgress, fileStreaming = false) {
     return this.transfer(async id => {
-      const { length } = await this.request(id, { action: 'read', shortcut });
+      const { length } = await this.request(id, { action: 'read', shortcut, ...(fileStreaming ? { fileStreaming } : {}) });
       return this.download(id, length, progress);
     });
   }
-  copy(shortcut: 'copy' | 'cut', progress?: ClipboardProgress) {
+  copy(shortcut: 'copy' | 'cut', progress?: ClipboardProgress, fileStreaming = false) {
     return this.transfer(async id => {
-      const { length } = await this.request(id, { action: 'copy', shortcut });
+      const { length } = await this.request(id, { action: 'copy', shortcut, ...(fileStreaming ? { fileStreaming } : {}) });
       // Native copy succeeds even when sharing its contents is disabled or unsupported.
       return length === undefined ? undefined : this.download(id, length, progress);
     });
@@ -119,6 +123,7 @@ export class DesktopClipboard {
     });
   }
   stop() {
+    this.files.close();
     this.stopped = true;
     this.cancel();
   }

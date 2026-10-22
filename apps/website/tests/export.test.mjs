@@ -22,9 +22,9 @@ function pageLanguage(url) {
 }
 
 test('exports every language, every feature, and crawlable content without JavaScript', () => {
-  assert.equal(urls.length, 45);
+  assert.equal(urls.length, 48);
   for (const language of Object.keys(languageTags)) {
-    assert.equal(urls.filter((url) => pageLanguage(url).language === language).length, 15, language);
+    assert.equal(urls.filter((url) => pageLanguage(url).language === language).length, 16, language);
   }
   const titles = new Set();
   for (const { url, html } of htmlFiles) {
@@ -112,6 +112,37 @@ test('feature exports contain detailed explanations, steps, images and matching 
     const markdown = readFileSync(resolve(dist, new URL(url).pathname.slice(basePath.length), 'index.md'), 'utf8');
     assert.ok(markdown.length > 900, url);
     assert.ok(markdown.includes('https://github.com/piperhex/remoteai/blob/master/'), url);
+  }
+});
+
+test('the AI resources page lists every resource with a description in every language', () => {
+  const groups = ['models', 'docs', 'open-tools', 'agents', 'learn'];
+  for (const [language, prefix] of Object.entries(prefixes)) {
+    const url = new URL(`${prefix}resources/`, siteUrl).href;
+    assert.ok(urls.includes(url), url);
+    const folder = resolve(dist, `${prefix}resources`);
+    const html = readFileSync(resolve(folder, 'index.html'), 'utf8');
+    const cards = [...html.matchAll(/<a class="resource-card"[^>]*>/g)].map((match) => match[0]);
+    assert.equal(cards.length, 26, url);
+    for (const card of cards) {
+      assert.match(card, /href="https:\/\/[^"]+"/, url);
+      assert.ok(card.includes('target="_blank"') && card.includes('rel="noopener noreferrer"'), card);
+    }
+    for (const group of groups) {
+      assert.ok(html.includes(`id="${group}"`), `${url} #${group}`);
+      assert.ok(html.includes(`href="#${group}"`), `${url} navigation to #${group}`);
+    }
+    const graph = JSON.parse(html.match(/<script type="application\/ld\+json">(.*?)<\/script>/)[1])['@graph'];
+    const list = graph.find((node) => node['@type'] === 'ItemList');
+    assert.equal(list?.numberOfItems, 26, url);
+    assert.equal(list.itemListElement.length, 26, url);
+    for (const { item } of list.itemListElement) {
+      assert.ok(item.name && item.url.startsWith('https://') && item.description, `${url} ${item.name}`);
+      // Russian descriptions come from resources-ru.ts; an English fallback here means a missing translation.
+      if (language === 'ru') assert.match(item.description, /\p{Script=Cyrillic}/u, `${url} ${item.name}`);
+    }
+    const markdown = readFileSync(resolve(folder, 'index.md'), 'utf8');
+    assert.equal((markdown.match(/^- \[[^\]]+\]\(https:\/\/[^)]+\): \S/gm) ?? []).length, 26, `${url}index.md`);
   }
 });
 

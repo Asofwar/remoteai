@@ -27,6 +27,13 @@
 - Whenever a user request involves writing prompts or copy, proactively refine and improve the wording so it is concise, friendly, and accurate instead of simply repeating the user's original wording.
 - Keep temporary messages, including hover tooltips, popovers, and confirmation prompts shown after a click, visually compact. Limit the text area to a maximum width of `400px`, which is roughly one line of 25 full-width Chinese characters at the standard body-text size. Wrap longer copy onto additional lines instead of widening the message.
 
+## Desktop Local, Remote, and Web Parity
+
+- 后续涉及 PC 端的改动，默认在同一任务中同步修改 `apps/desktop` 的本地模式、远程模式和 `apps/web` 的 PC 页面，确保对应功能、界面效果、交互及文案一致，无需用户另行提醒；用户明确限定范围时，以用户要求为准。
+- 从任一入口修改功能或修复问题时，都要检查另外两个入口的对应实现；能复用的业务逻辑、组件和样式优先放在共享模块，避免各端后续遗漏同步。
+- 三个入口应保持一致的布局、视觉样式、操作反馈和状态展示，并适配各自窗口与桌面浏览器宽度；受平台能力限制无法完全一致时，应提供对应适配，并在交付时说明差异及原因。
+- 完成前分别验证 PC 本地、PC 远程和 Web PC 的受影响功能与展示效果，并在交付时说明同步结果，不得只修改或验证其中一个入口就视为完成。
+
 ## Mobile and Web Parity
 
 - 用户提出移动端或手机端改动时，默认在同一任务中同步修改 `apps/native` 和 `apps/web` 的对应功能、界面效果、交互及文案，无需用户另行提醒；用户明确限定范围时，以用户要求为准。

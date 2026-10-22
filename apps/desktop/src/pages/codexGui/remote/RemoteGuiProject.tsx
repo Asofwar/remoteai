@@ -24,7 +24,7 @@ export function RemoteGuiProject({ state, controller, computers, active }: {
         request={controller.guiTools.workspace} onBusyChange={controller.setWorkspaceBusy}
         onChange={path => controller.chooseDraftProject(directoryProject(path))} />}
       <GuiToolbox trigger="git" active={active} connected={state.ready && !state.workspaceBusy} cwd={cwd}
-        deviceName={computers.current?.name ?? guiText("远程电脑")} git={controller.guiTools.git} />
+        git={controller.guiTools.git} />
       <ProjectBrowserButton client={controller.guiTools.projectBrowser} cwd={cwd}
         active={active} connected={state.ready && !state.workspaceBusy}
         className={workspaceStyles.trigger} desktopStyle />

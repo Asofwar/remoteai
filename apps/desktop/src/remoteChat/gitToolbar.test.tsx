@@ -62,7 +62,10 @@ it('exposes sync actions as labeled icons and disables rollback without a select
   expect(actions.map(button => button.getAttribute('aria-label'))).toEqual([
     '获取 Fetch', '拉取 Pull', '更新项目', '推送 Push', '回退所选文件', '刷新 Git',
   ]);
-  expect(actions.every(button => button.querySelector('svg') && !button.textContent)).toBe(true);
+  expect(actions.every(button => button.querySelector('svg'))).toBe(true);
+  expect(actions.map(button => button.textContent)).toEqual(['', '1', '', '2', '', '']);
   expect((actions[4] as HTMLButtonElement).disabled).toBe(true);
-  expect(host.querySelector('.git-tracking-branches')?.textContent).toBe('main → origin/main');
+  expect(host.textContent).not.toContain('main → origin/main');
+  await click('切换分支');
+  expect(host.querySelector('.git-current-branch')?.textContent).toBe('当前选择：main → origin/main');
 });

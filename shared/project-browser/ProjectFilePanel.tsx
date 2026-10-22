@@ -2,10 +2,12 @@ import { FileSearch } from 'lucide-react';
 import { ProjectEditor } from './ProjectEditor';
 import { isDirty, type DocumentTab } from './documents';
 import type { BrowserTranslate } from './ProjectTree';
+import type { BrowserHost } from './entryActions';
 
-export function ProjectFilePanel({ tab, active, connected, edit, save, t }: {
+export function ProjectFilePanel({ tab, active, connected, edit, save, t, quoteSelection }: {
   tab: DocumentTab; active: boolean; connected: boolean; edit: (text: string) => void;
   save: () => void; t: BrowserTranslate;
+  quoteSelection?: BrowserHost['quoteSelection'];
 }) {
   const document = tab.document;
   const filename = tab.path.split(/[\\/]/).at(-1);
@@ -14,7 +16,7 @@ export function ProjectFilePanel({ tab, active, connected, edit, save, t }: {
     {tab.loading && <p className="pf-feedback" role="status">{t('正在加载…')}</p>}
     {document?.kind === 'text' && <ProjectEditor key={tab.editorVersion} path={document.path}
       text={tab.text} readOnly={document.readOnly || !connected || tab.loading}
-      onChange={edit} save={save} t={t} />}
+      onChange={edit} save={save} t={t} quoteSelection={active ? quoteSelection : undefined} />}
     {document?.kind === 'image' && <div className="pf-image"><img src={document.image} alt={filename} /></div>}
     {document && ['binary', 'large'].includes(document.kind) && <div className="pf-empty">
       <FileSearch size={36} /><p>{t(document.kind === 'large'

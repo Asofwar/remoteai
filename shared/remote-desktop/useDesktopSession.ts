@@ -105,6 +105,7 @@ export function useDesktopSession({ client, active, connected = true, createPeer
     privacyScreen, togglePrivacy, resolution, frameRendered: () => receiver.current?.frameRendered(stream),
     waitingForPermission: waitingForDesktopPermission(status),
     input: (input: Parameters<DesktopDisplaySession['input']>[0]) => receiver.current?.input(input),
+    inputFocus: async () => await receiver.current?.inputFocus() ?? null,
     retry: () => {
       if (!active || !available.current) return;
       recovery.current?.stop();

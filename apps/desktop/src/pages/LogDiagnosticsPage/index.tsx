@@ -1,4 +1,5 @@
-import { Tabs } from "antd";
+import { Button, Tabs } from "antd";
+import { FileDown } from "lucide-react";
 import { ProxySessionManager } from "../../components/ProxySessionManager";
 import type { Language, Translate } from "../../i18n";
 import { ErrorLogsPage } from "../ErrorLogsPage";
@@ -11,9 +12,12 @@ interface LogDiagnosticsPageProps {
   language: Language;
   onTabChange: (tab: LogDiagnosticsTab) => void;
   t: Translate;
+  onExportLogs: () => void;
+  exportingLogs: boolean;
 }
 
-export function LogDiagnosticsPage({ activeTab, language, onTabChange, t }: LogDiagnosticsPageProps) {
+export function LogDiagnosticsPage({ activeTab, language, onTabChange, t,
+  onExportLogs, exportingLogs }: LogDiagnosticsPageProps) {
   return (
     <Tabs className={styles.tabs} activeKey={activeTab} destroyOnHidden animated={false}
       renderTabBar={(props, TabBar) => (
@@ -23,6 +27,8 @@ export function LogDiagnosticsPage({ activeTab, language, onTabChange, t }: LogD
             <h1>{t("logDiagnostics.title")}</h1>
           </div>
           <TabBar {...props} className={styles.tabBar} />
+          {activeTab === "errorLogs" && <Button className={styles.exportButton} icon={<FileDown size={16} />}
+            loading={exportingLogs} onClick={onExportLogs}>{t("settings.logs.export")}</Button>}
         </div>
       )}
       onChange={(key) => onTabChange(key as LogDiagnosticsTab)} items={[

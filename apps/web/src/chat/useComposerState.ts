@@ -66,6 +66,7 @@ export function useComposerState(props: ComposerProps) {
   const busy = sending || draft.picking || attachments.busy || queueEditor.loading || paste.reading || drop.reading;
   useComposerFileReferences({ scope: `${threadId ?? ''}:${props.cwd}`,
     enabled: active && !disabled && !busy && !goalMode.enabled, add: attachments.add,
+    addQuote: quote => quotes?.add({ ...quote, role: 'tool' }) ?? false,
     focus: () => menu.input.current?.focus() });
   const compact = !goalMode.enabled && !props.goal && !draft.text.length && !hasContent && !busy;
   const action = composerAction({ running: running && !hasContent,

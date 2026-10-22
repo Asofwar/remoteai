@@ -49,6 +49,7 @@ export const gitMessages: Record<string, string> = {
   '展开或收起 {path}': 'Expand or collapse {path}', '切换分支': 'Switch branch', '分离的 HEAD': 'Detached HEAD',
   '同步': 'Sync', '同步项目': 'Sync project', '关闭菜单': 'Close menu', '搜索分支': 'Search branches',
   '其他工作树使用中': 'Used by another worktree', '远程': 'Remote', '本地': 'Local',
+  '当前选择：{branch}': 'Current selection: {branch}', '待同步 {count} 个提交': '{count} commits to sync',
   '选择远程分支会创建同名本地分支。': 'Selecting a remote branch creates a local branch with the same name.',
   '获取 Fetch': 'Fetch', '拉取 Pull': 'Pull', '更新项目': 'Update project', '推送 Push': 'Push',
   '获取所有远程分支的最新记录，不修改本地文件。': 'Fetch all remotes without changing local files.',

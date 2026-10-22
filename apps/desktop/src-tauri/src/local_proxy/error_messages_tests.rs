@@ -89,3 +89,16 @@ fn account_errors_remain_actionable_without_guessing_the_cause() {
     assert!(gui("unexpected internal failure").contains("错误编号"));
     assert!(transport("Official Codex proxy request returned HTTP 401").is_none());
 }
+
+#[test]
+fn unknown_failures_show_the_sanitized_cause_without_requiring_an_export() {
+    let error = "Unexpected upstream failure: response body ended before JSON was complete; \
+        token=private-value; path=\"C:\\Users\\private\\auth.json\"; \
+        url=https://private.test/responses";
+    let message = gui(error);
+    assert!(message.contains("response body ended before JSON was complete"));
+    assert!(message.contains(&error_id(error)));
+    assert!(!message.contains("private"));
+    assert!(!message.contains("导出"));
+    assert!(!gui("").is_empty());
+}

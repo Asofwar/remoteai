@@ -5,7 +5,9 @@ import { requestErrorPosition, turnRequestErrors, type TurnRequestError } from "
 import type { Item, Turn } from "./types";
 
 type MessageGroup = { type: "work" | "message"; key: string; items: Item[] };
-export type TurnMessageGroup = MessageGroup | { type: "error"; key: string; error: TurnRequestError };
+export type TurnMessageGroup = MessageGroup | {
+  type: "error"; key: string; error: TurnRequestError; count?: number;
+};
 interface GroupOptions {
   visible: Set<string>;
   continuation: Set<string>;

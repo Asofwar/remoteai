@@ -15,7 +15,8 @@ for (const remote of [false, true]) {
       await expect(retry).toBeDisabled();
       await page.getByLabel('暂不可用').uncheck();
       await expect(retry).toBeEnabled();
-      const details = page.getByText('查看报错详情', { exact: true });
+      const details = remote ? page.getByText('查看报错详情', { exact: true })
+        : page.locator('summary[aria-label="查看报错详情"]');
       const linkBounds = (await details.boundingBox())!;
       const retryBounds = (await retry.boundingBox())!;
       expect(retryBounds.x - linkBounds.x - linkBounds.width).toBeGreaterThanOrEqual(0);
@@ -28,7 +29,7 @@ for (const remote of [false, true]) {
       await retry.click();
       const pending = page.getByRole('button', { name: '正在重试…', exact: true });
       await expect(pending).toBeDisabled();
-      if (!remote) await expect(page.locator('details').filter({ has: pending })).not.toHaveAttribute('open');
+      if (!remote) await expect(page.locator('[data-request-error] > details')).not.toHaveAttribute('open');
       await expect(page.getByLabel('发送次数')).toHaveText('1');
       await expect(retry).toBeEnabled();
       await retry.click();

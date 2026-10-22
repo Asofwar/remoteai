@@ -25,8 +25,8 @@
 .reasoningBody { font-size: calc(var(--gui-font-size, 14px) - 1px); }
 .commandToolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; color: var(--gui-muted);
   > span:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; } }
-.commandCode { padding: 8px 10px; background: var(--bg); border-radius: 5px; }
-.output { padding: 8px 0; }
+.commandBody :global(.cs-command-output) { margin: 8px 0; }
+.commandBody :global(.cs-command-output) pre { margin: 0; white-space: pre; overflow-wrap: normal; }
 .textViewport { max-height: 340px; overflow: auto; min-width: 0; }
 .textViewport:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .payload { padding: 8px 0; summary { cursor: pointer; color: var(--gui-muted); } }

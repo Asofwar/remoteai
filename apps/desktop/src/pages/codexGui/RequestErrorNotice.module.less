@@ -1,8 +1,10 @@
 .notice {
-  max-width: 400px;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
   min-width: 0;
   margin: 12px 0;
-  color: #c96c3d;
+  color: #c18b25;
   font-size: calc(var(--gui-font-size, 14px) - 2px);
   line-height: 20px;
   overflow-wrap: anywhere;
@@ -11,8 +13,20 @@
   summary:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
 }
 
-.actions { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; white-space: nowrap; }
-.hint { text-decoration: underline; }
+.errorRow { flex: 1; min-width: 0; }
+.summary {
+  display: flex; align-items: center; gap: 9px; min-width: 0; min-height: 28px;
+  padding: 3px 0; list-style: none;
+  &::-webkit-details-marker { display: none; }
+  > svg { flex-shrink: 0; }
+}
+.preview { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.count { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.toggle { opacity: 0; transition: transform .12s ease; }
+.errorRow:hover .toggle, .errorRow:focus-within .toggle, .errorRow[open] .toggle { opacity: 1; }
+.errorRow[open] .toggle { transform: rotate(180deg); }
+.notice > .retryButton { flex-shrink: 0; margin-top: 5px; }
+@media (hover: none) { .toggle { opacity: 1; } }
 
 .notice .retryButton, .capacityNotice .retryButton {
   display: inline-flex;
@@ -95,6 +109,8 @@
 }
 
 .details {
+  box-sizing: border-box;
+  max-width: 400px;
   margin: 8px 0 0;
   padding: 10px 12px;
   max-height: 240px;
@@ -106,4 +122,5 @@
   font: inherit;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  pre { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 }

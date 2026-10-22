@@ -64,6 +64,7 @@ function DesktopViewer({ client, active, connected = true, close, localClipboard
   const hardware = useHardwarePointer();
   const desktopWindow = nativeWindow || hardware;
   const clipboard = useDesktopClipboard({ active: shown && !!session.stream,
+    connected: active && !!session.stream,
     clipboard: session.clipboard, localClipboard });
   const panelVisible = !viewOnly && !hardware && !direct && !display && !keyboard && !clipboard.open;
   const panel = useMousePanel(shown && panelVisible && !!session.stream);

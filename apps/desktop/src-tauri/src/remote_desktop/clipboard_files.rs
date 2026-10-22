@@ -7,7 +7,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-const MAX_FILES: usize = 32;
+pub(super) const MAX_FILES: usize = 32;
 const FILE_RETENTION: Duration = Duration::from_secs(24 * 60 * 60);
 
 pub(super) fn read(paths: Vec<PathBuf>) -> ClipboardResult<Vec<ClipboardFile>> {

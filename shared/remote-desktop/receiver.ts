@@ -258,7 +258,9 @@ export class DesktopReceiver {
       if (data === '{"kind":"pong"}') { this.lastActivePong = Date.now(); return; }
       try {
         const message = JSON.parse(data) as DesktopStats & { kind?: string; message?: string };
-        if (message.kind === 'clipboard') { this.clipboard.receive(message as unknown as ClipboardReply); return; }
+        if (message.kind === 'clipboard' || message.kind === 'clipboardFileRead') {
+          this.clipboard.receive(message as unknown as ClipboardReply); return;
+        }
         if (message.kind === 'stats') {
           this.hostStats = message; this.options.stats({ ...message, ...this.measured });
         }

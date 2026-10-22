@@ -19,6 +19,7 @@ export function DesktopClipboardPanel({ clipboard }: { clipboard: ReturnType<typ
     </div>
     <small>{t(clipboard.nativeFiles ? '每次最多 64 MB、32 个文件，文件夹请先压缩。'
       : '每次最多 64 MB、32 个文件。远程文件会下载到本机；文件夹请先压缩。')}</small>
+    {clipboard.nativeFileProgress && <small>{t('复制文件后，请保持连接直到粘贴完成。')}</small>}
     {clipboard.status && <p role="status">{t(clipboard.status)}
       {clipboard.progress !== undefined && ` ${clipboard.progress}%`}</p>}
     {received?.format === 'text' && <textarea readOnly value={received.text} aria-label={t('远程剪贴板文本')} />}

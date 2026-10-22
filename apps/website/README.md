@@ -103,7 +103,12 @@ Remove-Item Env:WEBSITE_URL
 默认项目站点的 `/remoteai/robots.txt` 不具有站点级控制效力；应在对应用户站点
 根目录维护规则，或在绑定独立域名后使用本项目生成的根目录文件。
 无根目录限制时，页面可正常抓取。可在 Search Console 提交
-`https://piperhex.github.io/remoteai/sitemap.xml`。
+`https://remoteai.piperhex.com/sitemap.xml`。
+
+Google Search Console 的网址前缀资源为 `https://remoteai.piperhex.com/`，使用 HTML 文件验证。
+验证文件保存在 `public/googleffa1f2d3c6214248.html`，构建时原样复制到 `dist/` 根目录，
+发布后可通过 `https://remoteai.piperhex.com/googleffa1f2d3c6214248.html` 访问。
+请保留文件名和内容，通过验证后也不要删除，以便 Google 后续重新检查所有权。
 
 `llms.txt` 和 Markdown 只是便于读取的补充资料，不代表搜索平台会使用它们。
 GEO 的主要工作是提供可抓取的完整内容、清晰的产品实体、具体功能说明、

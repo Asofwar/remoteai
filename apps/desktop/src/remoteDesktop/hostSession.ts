@@ -44,6 +44,7 @@ export class HostSession {
       keyboard: policy?.control ?? true, control: policy?.control ?? true,
       inputFocus: policy?.control ?? true,
       clipboardNative: true,
+      clipboardFiles: offer.platform === 'windows',
       clipboard: !policy || policy.clipboardRead || policy.clipboardWrite, horizontalScroll: policy?.control ?? true } };
   }
   signal(signal: DesktopSignal) { return this.session.signal(signal); }

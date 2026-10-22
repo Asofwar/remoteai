@@ -111,6 +111,8 @@ fn release(_session: Option<Session>) -> Result<()> {
     #[cfg(any(windows, target_os = "macos"))]
     if let Some(mut session) = _session {
         #[cfg(windows)]
+        super::clipboard_stream::release(&format!("host:{}", session.id));
+        #[cfg(windows)]
         let _desktop = super::input_desktop::InputDesktop::enter()?;
         session.input.release()?;
     }

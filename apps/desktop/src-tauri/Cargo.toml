@@ -115,6 +115,7 @@ easytier-core = { path = "../../../crates/chat-connectivity/vendor/easytier-core
 core-foundation = "0.10"
 
 [target.'cfg(windows)'.dependencies]
+windows-core = "0.61"
 windows-service = "0.8"
 windows-sys = { version = "0.61", features = [
   "Win32_Foundation",
@@ -142,6 +143,11 @@ windows-sys = { version = "0.61", features = [
 ] }
 winreg = "0.55"
 windows = { version = "0.61", features = [
+  "Win32_Graphics_Gdi",
+  "Win32_System_Com_StructuredStorage",
+  "Win32_System_DataExchange",
+  "Win32_System_Memory",
+  "Win32_UI_WindowsAndMessaging",
   "Data_Xml_Dom",
   "UI_Notifications",
   "ApplicationModel",

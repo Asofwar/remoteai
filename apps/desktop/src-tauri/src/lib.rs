@@ -334,6 +334,7 @@ pub fn run() {
             remote_desktop::clipboard::remote_desktop_clipboard,
             remote_desktop::local_clipboard::remote_desktop_read_local_clipboard,
             remote_desktop::local_clipboard::remote_desktop_write_local_clipboard,
+            remote_desktop::clipboard_stream::local::remote_desktop_local_file_clipboard,
             remote_desktop::remote_desktop_close,
             remote_desktop::stream::remote_desktop_stream_open,
             remote_desktop::stream::remote_desktop_stream_available,

@@ -1,6 +1,7 @@
 import type { ClipboardContent } from './clipboard';
 
 function sameContent(left: ClipboardContent, right: ClipboardContent) {
+  if (left.format === 'fileOffer' && right.format === 'fileOffer') return left.offer.id === right.offer.id;
   if (left.format === 'text' && right.format === 'text') return left.text === right.text;
   if (left.format === 'image' && right.format === 'image') return left.data === right.data;
   if (left.format !== 'files' || right.format !== 'files' || left.files.length !== right.files.length) return false;

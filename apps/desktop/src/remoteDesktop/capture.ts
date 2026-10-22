@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { Channel, invoke } from '@tauri-apps/api/core';
 import type { DesktopDisplays, DesktopInputFocus } from '../../../../shared/remote-desktop/protocol';
 import type { ClipboardReply } from '../../../../shared/remote-desktop/clipboard';
 import { openDesktopCapture } from './displays';
@@ -51,9 +51,10 @@ export class DesktopCapture {
   async renew(expiresAt: number) {
     if (this.id && !this.stopped) await invoke('remote_desktop_renew', { id: this.id, expiresAt });
   }
-  async clipboard(message: object) {
+  async clipboard(message: object, onRead?: (event: import('../../../../shared/remote-desktop/fileClipboard').FileReadEvent) => void) {
     if (this.stopped || !this.id) throw new Error('桌面连接已结束。');
-    return invoke<ClipboardReply>('remote_desktop_clipboard', { id: this.id, message });
+    const onFileRead = new Channel(onRead);
+    return invoke<ClipboardReply>('remote_desktop_clipboard', { id: this.id, message, onFileRead });
   }
   private async release() {
     if (!this.id) return this.closing;

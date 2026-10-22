@@ -31,6 +31,7 @@ export interface DesktopCapabilities {
   inputFocus?: boolean;
   displaySessions?: boolean;
   clipboardNative?: boolean;
+  clipboardFiles?: boolean;
   resolution?: boolean;
   privacyScreen?: boolean;
   platform?: DesktopPlatform;

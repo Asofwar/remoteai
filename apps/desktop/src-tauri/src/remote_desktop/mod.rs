@@ -9,6 +9,7 @@ pub(crate) mod clipboard;
 mod clipboard_files;
 mod clipboard_platform;
 mod clipboard_revision;
+pub(crate) mod clipboard_stream;
 pub(crate) mod displays;
 #[cfg(windows)]
 pub(crate) mod input_desktop;

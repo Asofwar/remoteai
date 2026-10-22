@@ -7,6 +7,9 @@ import type { IceServer } from '../../../shared/remote-chat/protocol';
 import { clipboardFixture, desktopClipboard } from './remote-desktop-clipboard-fixture';
 import type { ClipboardContent, ClipboardMessage } from '../../../shared/remote-desktop/clipboard';
 import { STANDBY_PONG } from '../../../shared/remote-desktop/standbyProtocol';
+import { fileStreamFixture, hostFileRequest, localFileRequest, promised } from './remote-desktop-file-stream-fixture';
+import type { Channel } from '@tauri-apps/api/core';
+import type { FileReadEvent } from '../../../shared/remote-desktop/fileClipboard';
 
 declare global { interface Window { desktopRelayFixture?: {
   iceServers: IceServer[]; upgrade?: boolean; failDirectAttempts?: number; loseCommitReply?: boolean; directFirst?: boolean;
@@ -52,6 +55,7 @@ export const desktopTest = { inputs: [] as DesktopInput[], settings: [] as Deskt
   disconnect: () => host.release('fixture'),
   reconnect: () => host.register('fixture', window.desktopRelayFixture?.iceServers ?? []),
   clipboard: clipboardFixture,
+  fileStreams: fileStreamFixture,
   localClipboard: { content: { format: 'text', text: 'Local clipboard' } as ClipboardContent,
     calls: [] as string[], delay: 0, writeFailures: 0 },
   selectedDisplays: [] as string[], inputDisplays: [] as string[],
@@ -93,11 +97,15 @@ async function frame(id: string, width: number) {
 }
 
 // Only native IPC is substituted. Host capture pacing, WebRTC/SRTP, receiver and controls are production code.
+let callbackId = 0;
 if (new URLSearchParams(location.search).has('native-clipboard')) {
   Object.defineProperty(window, 'isTauri', { value: true, configurable: true });
 }
 Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {
+  transformCallback: () => ++callbackId,
+  unregisterCallback: () => undefined,
   invoke: async (command: string, args: {
+    request?: Parameters<typeof localFileRequest>[0]; onRead?: Channel<FileReadEvent>; onFileRead?: Channel<FileReadEvent>;
     id?: string;
     width?: number; input?: DesktopInput; displayId?: string; message?: ClipboardMessage; content?: ClipboardContent;
   } = {}) => {
@@ -114,7 +122,16 @@ Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {
       }
       desktopTest.localClipboard.content = structuredClone(args.content!); return;
     }
-    if (command === 'remote_desktop_clipboard') return desktopClipboard(args.message!);
+    if (command === 'remote_desktop_local_file_clipboard') {
+      return localFileRequest(args.request!, args.onRead!, desktopTest.localClipboard);
+    }
+    if (command === 'remote_desktop_clipboard') {
+      if (args.message?.request.action === 'files') return hostFileRequest(args.message, args.onFileRead!);
+      const streaming = args.message?.request.action === 'copy' || args.message?.request.action === 'read';
+      const content = streaming && args.message?.request.fileStreaming
+        ? promised(clipboardFixture.content) : clipboardFixture.content;
+      return desktopClipboard(args.message!, content);
+    }
     if (command === 'remote_desktop_input_focus') {
       desktopTest.inputFocusReads += 1;
       return structuredClone(desktopTest.inputFocus);
@@ -137,6 +154,7 @@ Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {
       const id = `capture-${++opened}`;
       captures.set(id, { display: selected, canvas: document.createElement('canvas') });
       const macos = new URLSearchParams(location.search).has('macos');
+      if (new URLSearchParams(location.search).has('file-streaming')) return { id, platform: 'windows' };
       return multiDisplay || macos ? { id, displays: desktopTest.displays, displayId: selected.id, displaySessions: true,
         ...(macos ? { platform: 'macos' } : {}) } : id;
     }

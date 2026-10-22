@@ -1,5 +1,5 @@
 import { MoreHorizontal, RefreshCw } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, type CSSProperties } from 'react';
 import type { ProjectBrowserClient } from './protocol';
 import { useProjectTree, type DirectoryState } from './useProjectTree';
 import { parentPath, type BrowserHost } from './entryActions';
@@ -47,7 +47,8 @@ export function ProjectTree({ client, cwd, connected, selected, choose, t, host,
     <div role="tree" aria-label={t('项目文件')} className="pf-tree-list">
       {tree.rows.map(({ entry, depth }) => {
         const expanded = tree.expanded.has(entry.path);
-        return <div key={entry.path} role="none">
+        return <div key={entry.path} role="none"
+          style={{ '--pf-tree-row-indent': `${10 + depth * 16}px` } as CSSProperties}>
           <ProjectTreeRow entry={entry} depth={depth} expanded={expanded} selected={selected === entry.path}
             disabled={!connected || actions.busy} cut={!!actions.clipboard?.cut
               && actions.clipboard.entry.path === entry.path}

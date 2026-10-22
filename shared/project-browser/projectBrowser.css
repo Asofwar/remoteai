@@ -27,6 +27,8 @@
 .pf-tree { width: var(--pf-tree-width); min-width: 0; display: flex; flex-direction: column; flex-shrink: 0; }
 .pf-tree-heading, .pf-file-heading { display: flex; align-items: center; gap: 6px; padding: 8px;
   min-height: 54px; border-bottom: 1px solid var(--pf-border); flex-shrink: 0; }
+.pf-file-heading { display: block; }
+.pf-file-toolbar { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .pf-tree-heading > span { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; }
 .pf-tree-list { padding: 6px 0 20px; overflow: auto; flex: 1; min-height: 0; overscroll-behavior: contain; }
 .pf-browser .pf-tree-row { width: 100%; justify-content: flex-start; border-radius: 0; text-align: left; gap: 6px;
@@ -43,7 +45,7 @@
 .pf-file { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .pf-file-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .pf-file-name strong, .pf-file-path { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.pf-file-path { padding: 0 8px; font-size: 11px; color: var(--pf-muted); }
+.pf-file-path { display: block; padding: 0 8px; font-size: 11px; color: var(--pf-muted); }
 .pf-tabs-bar { display: flex; min-width: 0; position: relative; }
 .pf-tabs { display: flex; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none;
   overscroll-behavior-x: contain; }

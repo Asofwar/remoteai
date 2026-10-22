@@ -16,6 +16,7 @@ function MessageTextFixture() {
     </Pressable>
     <Pressable onPress={() => setSweep(value => !value)} style={{ padding: 16 }}><Text>Font sweep</Text></Pressable>
     <ScrollView contentContainerStyle={{ padding: 16, gap: 20 }}>
+      <Text testID="single-line-reference" style={{ fontSize: 14, lineHeight: 25 }}>一行文字</Text>
       <View testID="overflow-bubble" style={{ backgroundColor: '#e7f5f4', padding: 19 }}>
         <Text>Layout recovery</Text>
         <Text testID="overflow-reference" style={{ fontSize: 14, lineHeight: 25 }}>
@@ -28,13 +29,14 @@ function MessageTextFixture() {
       </View>
       {sweep ? Array.from({ length: 49 }, (_, index) => <View key={index} style={{ alignItems: 'flex-end' }}>
         <View style={{ padding: 19, maxWidth: '90%', backgroundColor: '#e7f5f4' }}>
-          <SelectableChatText style={{ fontSize: 12 + index / 8, lineHeight: 25 }}>
-            {samples.reported}
+          <SelectableChatText testID={`sweep-${index}`}
+            style={{ fontSize: 12 + index / 8, lineHeight: 25, fontStyle: 'italic' }}>
+            编译off
           </SelectableChatText>
         </View>
       </View>) :
       <View style={{ width: narrow ? 280 : '100%', alignSelf: 'flex-end', gap: 20 }}>
-        {Object.entries(samples).map(([id, text]) => <View key={id}>
+        {Object.entries(samples).map(([id, text]) => <View key={id} testID={`sample-${id}`}>
           <Text>{id}</Text>
           <ChatMessage item={{ id, type: 'userMessage', text }} onOpen={() => {}} />
         </View>)}

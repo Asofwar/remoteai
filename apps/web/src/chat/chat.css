@@ -198,6 +198,15 @@ html:has(.app-shell.chat-active), body:has(.app-shell.chat-active) { overscroll-
 .chat-markdown th, .chat-markdown td { padding: 10px 12px; border: 1px solid var(--chat-border); }
 .chat-markdown blockquote { margin-left: 0; padding-left: 14px; border-left: 3px solid var(--app-border, #b7cbc0); }
 .chat-error { max-width: 400px; padding: 12px; color: var(--app-danger, #c74e47); font-size: 12px; overflow-wrap: anywhere; }
+/* Reserve the same scrollbar space so notices and replies keep the same left edge. */
+.chat-notices, .chat-messages { scrollbar-gutter: stable; }
+.chat-notices { flex-shrink: 0; }
+.chat-notice-content {
+  box-sizing: border-box; display: flex; flex-direction: column; gap: 12px;
+  width: 100%; max-width: 900px; margin-inline: auto; padding: 6px 16px;
+}
+.chat-notice-content:empty { display: none; }
+.chat-notice-content > * { max-width: 400px; margin: 0; padding: 0; overflow-wrap: anywhere; }
 
 .chat-attachment-previews { display: flex; gap: 12px; overflow-x: auto; padding: 6px 6px 12px 0; }
 .chat-attachment-preview { position: relative; width: 64px; height: 64px; flex-shrink: 0; }

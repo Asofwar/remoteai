@@ -167,10 +167,12 @@ export function ConnectedChat({ chat, device, devices, active, scope, email, cho
         value={state.selected?.turns ? { turns: state.selected.turns } : undefined} />}
       {headerEnd}
     </header>
-    <ChatTaskStatus state={state} />
-    {!!error && <p role="alert" className="chat-error">{t(error)}</p>}
-    {state.desktopOnly && <p className="chat-muted" style={{ maxWidth: 400 }}>
-      {t('桌面已就绪。打开远程桌面，登录电脑后即可继续聊天。')}</p>}
+    <div className="chat-scroll chat-notices"><div className="chat-notice-content">
+      <ChatTaskStatus state={state} />
+      {!!error && <p role="alert" className="chat-error">{t(error)}</p>}
+      {state.desktopOnly && <p className="chat-muted">
+        {t('桌面已就绪。打开远程桌面，登录电脑后即可继续聊天。')}</p>}
+    </div></div>
       <TaskReviewProvider controller={controller} state={state} active={active && foreground}>
       <ChatRetryProvider controller={controller} state={state}>
       <ChatMessages thread={state.selected} offline={!ready}

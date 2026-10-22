@@ -64,7 +64,7 @@ function Tools() {
     }); }}>打开预览</button>
     <ProjectBrowserButton client={client.projectBrowser} cwd={browserRoot} connected active desktopStyle />
     {mode === 'web' ? <ChatTools client={client} cwd={browserRoot} connected active />
-      : <GuiToolbox git={client.git} cwd={browserRoot} deviceName="测试电脑" connected active trigger="git" />}
+      : <GuiToolbox git={client.git} cwd={browserRoot} connected active trigger="git" />}
     <ChatTerminal client={client.terminal} cwd={browserRoot} active connected />
     <button onClick={() => { setReview(true); workspace.tabs.open('review'); }}>打开任务验收</button>
     {review && <AdaptiveSheet open title="任务验收" tabId="review" presentation="drawer" onClose={() => setReview(false)}>

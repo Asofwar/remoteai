@@ -32,7 +32,7 @@ function Harness() {
             <div className="chat-connection-info">Windows · Relay</div>
           </div>
           <GuiToolbox git={client.git} cwd="C:/workspace" active
-            connected={connected} deviceName="Windows 测试电脑" />
+            connected={connected} />
         </header>
       </section>
       : <ChatTools client={client} cwd="C:/workspace" active connected={connected} deviceName="Windows 测试电脑" />}

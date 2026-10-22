@@ -14,7 +14,7 @@ const ChatGit = lazy(() => import('../../../../web/src/chat/git/ChatGit')
   .then(module => ({ default: module.ChatGit })));
 
 interface Props {
-  active: boolean; connected: boolean; cwd: string; deviceName: string;
+  active: boolean; connected: boolean; cwd: string;
   git: GitClient;
   trigger?: 'toolbox' | 'git';
 }
@@ -42,7 +42,7 @@ export function GuiToolbox(props: Props) {
     </Popover>}
     <Suspense fallback={null}>
       {panel === 'git' && <ChatGit key={props.cwd} client={props.git} cwd={props.cwd}
-        connected={props.connected} active={props.active} deviceName={props.deviceName} desktopDiffs
+        connected={props.connected} active={props.active} desktopDiffs
         onClose={() => setPanel(null)} />}
     </Suspense>
   </>;

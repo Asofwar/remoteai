@@ -101,7 +101,7 @@ export const Composer = forwardRef<ComposerHandle, {
       projects={state.projects} hostPicker={hostPicker} running={running} active={active} dropState={drop}
       actions={<>
         {isDesktopApp && <GuiToolbox trigger="git" active={active} connected={!workspaceBusy}
-          cwd={project} deviceName={guiText("本机")} git={localGitClient} />}
+          cwd={project} git={localGitClient} />}
         <LocalProjectBrowser cwd={project} active={active} connected={!workspaceBusy && state.connection === 'ready'} />
       </>}
       disabled={running || state.sending || state.archived || workspaceBusy || reading} gitEnabled={!state.selected}

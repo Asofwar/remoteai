@@ -53,6 +53,7 @@ export default function RemoteGuiWorkspace(props: {
         controller={chat.controller} active={active} />}
       scope={scope} draggableHeader={isDesktopApp} scrollableComposer
       chooseLocal={() => computers.choose(null)}
+      deviceRefresh={computers}
       chooseDevice={(id) => { const device = computers.devices.find((entry) => entry.deviceId === id);
         if (device) computers.choose(device); }}
       headerConnectionActions={<>

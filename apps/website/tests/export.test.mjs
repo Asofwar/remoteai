@@ -13,7 +13,7 @@ const htmlFiles = urls.map((url) => ({
 }));
 
 test('exports both languages, every feature, and crawlable content without JavaScript', () => {
-  assert.equal(urls.length, 30);
+  assert.equal(urls.length, 32);
   const titles = new Set();
   for (const { url, html } of htmlFiles) {
     assert.equal((html.match(/<h1\b/g) ?? []).length, 1, url);

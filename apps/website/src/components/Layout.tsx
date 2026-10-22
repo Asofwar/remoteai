@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Button } from 'antd';
 import { ArrowUpRight, Github, Languages, Menu } from 'lucide-react';
 import { copy } from '../content/copy';
+import { resourcesCopy } from '../content/resources-copy';
 import type { Language } from '../content/types';
 import { asset, href, LINKS } from '../lib/site';
 import { ThemeToggle } from './ThemeToggle';
@@ -99,6 +100,7 @@ function Footer({ language }: { language: Language }) {
           <div className="footer-column">
             <h2>{t.footer.resources}</h2>
             <a href={href(language, 'guide/')}>{t.nav.guide}</a>
+            <a href={href(language, 'resources/')}>{resourcesCopy(language).title}</a>
             <a href={LINKS.releases}>{t.footer.releases}</a>
             <a href={href(language, 'index.md')}>{t.footer.text}</a>
           </div>

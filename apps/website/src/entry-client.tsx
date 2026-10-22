@@ -10,6 +10,7 @@ import './styles/pages-responsive.css';
 import './styles/illustrations.css';
 import './styles/showcase.css';
 import './styles/stories.css';
+import './styles/resources.css';
 
 const container = document.getElementById('root');
 if (!container) throw new Error('Website root is missing.');

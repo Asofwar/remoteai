@@ -5,8 +5,8 @@ React 18 + Ant Design 5 + Vite 的静态多页官网。源码位于 `apps/websit
 
 ## 页面与内容
 
-- 中文和英文各 15 页，共 30 个可直接访问的页面。
-- 首页、功能总览、下载页、快速上手指南。
+- 中文和英文各 16 页，共 32 个可直接访问的页面。
+- 首页、功能总览、下载页、快速上手指南、AI 资源页。
 - 11 个独立功能页：Codex GUI、跨设备工作区、会话管理、多账号管理、
   Provider 与本地代理、Token 分析、Skills 与插件、电脑助手、
   Dream Skin、2FA、悬浮用量球。
@@ -89,6 +89,21 @@ Remove-Item Env:WEBSITE_URL
 分享图片和 sitemap，不能只修改 HTML 中的域名。它是公开地址，不是密钥。
 
 ## SEO 与生成式搜索
+
+### AI 资源页
+
+`/resources/` 和 `/en/resources/` 收录模型官网、API 文档、本地与开源工具、
+Agent 与扩展、评测与学习资料。入口位于页脚的“资源 → AI 资源”，不增加主导航项目。
+分类使用原生锚点，外链在新标签页打开；禁用 JavaScript 时仍可完整浏览。
+页面继承纯白 / 深色主题，并生成 canonical、语言链接、ItemList 结构化数据和 Markdown 文本版，
+自动加入 sitemap 与 llms.txt。
+
+链接和双语用途说明统一维护在 `src/content/resources.ts`，页面文案位于
+`src/content/resources-copy.ts`。本次链接核对日期：2026-10-22。
+新增或更新资源时检查官网归属、链接目标和用途描述；保留官方入口，避免中转站与推广链接。
+模型版本、价格和榜单会变化，不在此复制这些数值；目录收录也不代表 Remote AI 的兼容性承诺。
+
+### 页面与索引
 
 - 每个地址都有完整静态 HTML，正文、步骤、FAQ 和导航不依赖客户端执行。
 - 服务端提取 Ant Design 样式，避免页面等待 JavaScript 才获得基本外观。

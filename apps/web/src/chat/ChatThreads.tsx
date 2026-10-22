@@ -54,7 +54,7 @@ export function ChatThreads({ state, controller, newChat, onClose, openSearch, p
         </section>)}
       {!state.threads.length && <p className="chat-empty chat-muted">
         {ready ? t("暂时没有聊天") : t("连接电脑后查看聊天")}</p>}
-      <div ref={pagination.end} className="chat-thread-pagination">
+      <div className="chat-thread-pagination">
         {pagination.loadingMore && <span role="status" className="chat-muted chat-row">
           <LoaderCircle size={16} className="chat-spinner" aria-hidden="true" />{t("正在加载…")}</span>}
         {state.cursor && pagination.failed && <button type="button" className="chat-button"

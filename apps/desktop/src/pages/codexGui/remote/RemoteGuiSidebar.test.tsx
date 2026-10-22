@@ -90,20 +90,22 @@ it('keeps remote chats usable during background sync and queues a fresh manual r
   expect(list().textContent).toContain('最新对话');
 });
 
-it('retries the failed remote page on downward scrolling with the local hint and no overlapping requests', async () => {
+it('refills at 70% of the buffered screen and retries without a hint or overlapping requests', async () => {
   request.mockRejectedValueOnce(new Error('连接暂时中断'));
   await render(); dimensions();
   expect(request).not.toHaveBeenCalled();
-  await scroll(200);
+  expect(footer()).toBeNull();
+  await scroll(0);
+  await scroll(479);
   expect(request).not.toHaveBeenCalled();
-  await scroll(490);
+  await scroll(480);
   expect(request).toHaveBeenCalledExactlyOnceWith('request', {
     operation: 'list', search: '', archived: false, cursor: 'next',
   });
   expect(container.textContent).toContain('已有对话');
   expect(container.textContent).not.toContain('加载失败，点击重试');
-  expect(footer()?.textContent).toBe('向下滚动，查看更多');
-  expect(footer()?.querySelector('button')).toBeNull();
+  expect(footer()).toBeNull();
+  expect(container.textContent).not.toContain('向下滚动，查看更多');
   let finish!: (value: unknown) => void;
   request.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
   await wheel();
@@ -119,14 +121,12 @@ it('retries the failed remote page on downward scrolling with the local hint and
   expect(request).toHaveBeenCalledTimes(2);
 });
 
-it('loads archived conversations with the wheel when collapsed groups leave no scrollable overflow', async () => {
+it('automatically preloads archived conversations when collapsed groups leave no scrollable overflow', async () => {
   Object.assign(controller.snapshot(), { archived: true });
   await render(); dimensions(400);
   const group = container.querySelector<HTMLButtonElement>('button[aria-expanded]')!;
   await act(async () => group.click());
   expect(group.getAttribute('aria-expanded')).toBe('false');
-  expect(request).not.toHaveBeenCalled();
-  await wheel();
   expect(request).toHaveBeenCalledExactlyOnceWith('request', {
     operation: 'list', search: '', archived: true, cursor: 'next',
   });
@@ -141,7 +141,7 @@ it.each<Partial<ChatState>>([{ ready: false }, { loading: true }, { cursor: null
   },
 );
 
-it('ignores upward gestures and downward gestures away from the bottom', async () => {
+it('ignores upward gestures and downward gestures before the prefetch threshold', async () => {
   await render(); dimensions();
   await wheel();
   list().scrollTop = 600;
